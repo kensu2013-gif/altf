@@ -226,17 +226,29 @@ export default function QuotationEditor() {
         if (!user) return;
 
         try {
-            await fetch('/api/my/quotations', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: user.id,
-                    items: items,
-                    totalAmount: totalAmount,
-                    customerName: user.companyName || 'Guest',
-                    memo: quotationMemo // Save Inquiry Memo
-                })
-            });
+            // Send to Make.com Webhook for Quotation Automation
+            const WEBHOOK_URL = 'https://hook.us2.make.com/YOUR_QUOTE_WEBHOOK_URL_HERE';
+
+            try {
+                const webhookResponse = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: user.id,
+                        customerName: user.companyName || 'Guest',
+                        items: items,
+                        totalAmount: totalAmount,
+                        memo: quotationMemo,
+                        status: 'DRAFT',
+                        createdAt: new Date().toISOString()
+                    })
+                });
+                if (!webhookResponse.ok) {
+                    console.error('Quote Webhook returned an error status.');
+                }
+            } catch (err) {
+                console.error('Quote Webhook error:', err);
+            }
 
             // Persist to Local Store for Admin Visibility
             useStore.getState().addQuotation({
@@ -247,7 +259,6 @@ export default function QuotationEditor() {
                 totalAmount: totalAmount,
                 memo: quotationMemo
             });
-
 
             setSuccessConfig({
                 isOpen: true,

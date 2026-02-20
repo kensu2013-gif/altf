@@ -313,8 +313,8 @@ export const useStore = create<AppState>()(
                 const { auth } = get();
 
 
-                // Demo Code: 123456
-                if (auth.pendingAdminUser && code === '123456') {
+                // Demo Code: 123456 or user requested code
+                if (auth.pendingAdminUser && (code === '******' || code === '120528')) {
                     set({
                         auth: { user: auth.pendingAdminUser, isAuthenticated: true, pendingAdminUser: null },
                         quotation: { ...get().quotation, customerNumber: auth.pendingAdminUser.companyName }
