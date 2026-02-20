@@ -35,7 +35,7 @@ export default defineConfig({
       },
       */
       '/api/quote': {
-        target: 'http://localhost:3001',
+        target: 'https://altf-api.onrender.com',
         changeOrigin: true,
       },
       '/api/geo': {
@@ -47,15 +47,15 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/api/my': {
-        target: 'http://localhost:3001',
+        target: 'https://altf-api.onrender.com',
         changeOrigin: true,
       },
       '/api/auth': {
-        target: 'http://localhost:3001',
+        target: 'https://altf-api.onrender.com',
         changeOrigin: true,
       },
       '/api/users': {
-        target: 'http://localhost:3001',
+        target: 'https://altf-api.onrender.com',
         changeOrigin: true,
       },
     },
