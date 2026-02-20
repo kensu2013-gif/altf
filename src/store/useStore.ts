@@ -75,7 +75,7 @@ interface AppState {
     resetNewOrderCount: () => void;
 
     // Admin Order Actions
-    submitOrder: (order: Partial<Order> & Omit<Order, 'id' | 'createdAt'> | any) => string;
+    submitOrder: (order: Partial<Order> & Omit<Order, 'id' | 'createdAt'>) => string;
     updateOrder: (orderId: string, updates: Partial<Order>) => void;
     trashOrder: (orderId: string) => Promise<void>;
     restoreOrder: (orderId: string) => Promise<void>;
@@ -343,11 +343,11 @@ export const useStore = create<AppState>()(
             },
 
             submitOrder: (orderData) => {
-                const newId = (orderData as any).id || `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 1000)}`;
+                const newId = (orderData as Partial<Order>).id || `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 1000)}`;
                 const newOrder: Order = {
                     ...orderData,
                     id: newId,
-                    createdAt: (orderData as any).createdAt || new Date().toISOString()
+                    createdAt: (orderData as Partial<Order>).createdAt || new Date().toISOString()
                 } as Order;
 
                 set((state) => ({

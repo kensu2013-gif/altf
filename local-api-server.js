@@ -5,19 +5,7 @@ import crypto from 'crypto';
 const PORT = process.env.PORT || 3001;
 
 // --- Persistence Setup ---
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DATA_DIR = path.join(__dirname, 'data');
-const DATA_FILE = path.join(DATA_DIR, 'db.json');
-
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-}
+import { loadDbFromS3, saveDbToS3 } from './s3-db.js';
 
 // Initial Data Structure
 let db = {
@@ -27,22 +15,21 @@ let db = {
 };
 
 // Load Data
-function loadData() {
+async function loadData() {
     try {
-        if (fs.existsSync(DATA_FILE)) {
-            const fileData = fs.readFileSync(DATA_FILE, 'utf8');
-            const json = JSON.parse(fileData);
+        const json = await loadDbFromS3();
+        if (json) {
             db.users = json.users || [];
             db.quotations = json.quotations || [];
             db.orders = json.orders || [];
-            console.log(`[API] Loaded data: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders`);
+            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders`);
         } else {
             // Seed Initial Admin if file doesn't exist
             db.users = [
                 {
                     id: 'admin-user-id',
                     email: 'admin@altf.kr',
-                    password: 'admin1234!',
+                    password: '1127foa12^^',
                     companyName: 'AltF Admin',
                     bizNo: '000-00-00000',
                     contactName: 'Admin',
@@ -57,25 +44,25 @@ function loadData() {
                     status: 'APPROVED'
                 }
             ];
-            saveData();
+            await saveData();
         }
     } catch (e) {
-        console.error('[API] Failed to load data:', e);
+        console.error('[API] Failed to load data from S3:', e);
     }
 }
 
 // Save Data
-function saveData() {
+async function saveData() {
     try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2), 'utf8');
-        // console.log('[API] Data saved');
+        await saveDbToS3(db);
+        // console.log('[API] Data saved to S3');
     } catch (e) {
-        console.error('[API] Failed to save data:', e);
+        console.error('[API] Failed to save data to S3:', e);
     }
 }
 
 // Initialize
-loadData();
+await loadData();
 
 // References for easier access (optional since we operate on db object directly now)
 // We will use db.users, db.quotations, db.orders directly in code.
@@ -83,7 +70,7 @@ loadData();
 const sessionStore = new Map(); // session_id -> items[]
 
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
@@ -101,7 +88,7 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/quote/import') {
         let body = '';
         req.on('data', chunk => body += chunk.toString());
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const data = JSON.parse(body);
                 const { session_id, items, status } = data; // Added 'status'
@@ -222,7 +209,7 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/auth/login') {
         let body = '';
         req.on('data', chunk => body += chunk.toString());
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const { email, password } = JSON.parse(body);
                 console.log(`[API] Login attempt: Email=${email}, Password=${password}`); // DEBUG LOG
@@ -268,7 +255,7 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/users') {
         let body = '';
         req.on('data', chunk => body += chunk.toString());
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const data = JSON.parse(body);
                 if (db.users.some(u => u.email === data.email)) {
@@ -286,7 +273,7 @@ const server = http.createServer((req, res) => {
                 };
 
                 db.users.push(newUser);
-                saveData(); // <--- SAVE
+                await saveData(); // <--- SAVE
                 console.log(`[API] Created user: ${newUser.email} (${newUser.role})`);
 
                 res.writeHead(201, { 'Content-Type': 'application/json' });
@@ -305,7 +292,7 @@ const server = http.createServer((req, res) => {
         const id = url.pathname.split('/').pop();
         let body = '';
         req.on('data', chunk => body += chunk.toString());
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const updates = JSON.parse(body);
                 const index = db.users.findIndex(u => u.id === id);
@@ -318,7 +305,7 @@ const server = http.createServer((req, res) => {
                     }
 
                     db.users[index] = { ...db.users[index], ...updates };
-                    saveData(); // <--- SAVE
+                    await saveData(); // <--- SAVE
                     console.log(`[API] Updated user ${id}`);
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(db.users[index]));
@@ -341,7 +328,7 @@ const server = http.createServer((req, res) => {
         const index = db.users.findIndex(u => u.id === id);
         if (index !== -1) {
             db.users.splice(index, 1);
-            saveData(); // <--- SAVE
+            await saveData(); // <--- SAVE
             console.log(`[API] Deleted user ${id}`);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true }));
@@ -359,7 +346,7 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/my/quotations') {
         let body = '';
         req.on('data', chunk => body += chunk.toString());
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const data = JSON.parse(body);
                 // Simple validation
@@ -383,7 +370,7 @@ const server = http.createServer((req, res) => {
                 };
 
                 db.quotations.unshift(newQuote); // Add to beginning
-                saveData(); // <--- SAVE
+                await saveData(); // <--- SAVE
                 console.log(`[API] Saved quotation ${newId} for user ${data.userId}`);
 
                 res.writeHead(201, { 'Content-Type': 'application/json' });
@@ -435,7 +422,7 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/my/orders') {
         let body = '';
         req.on('data', chunk => body += chunk.toString());
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const data = JSON.parse(body);
 
@@ -452,7 +439,7 @@ const server = http.createServer((req, res) => {
                 };
 
                 db.orders.unshift(newOrder);
-                saveData(); // <--- SAVE
+                await saveData(); // <--- SAVE
                 console.log(`[API] Created order ${newId}`);
 
                 res.writeHead(201, { 'Content-Type': 'application/json' });
@@ -502,7 +489,7 @@ const server = http.createServer((req, res) => {
         const id = url.pathname.split('/').pop();
         let body = '';
         req.on('data', chunk => body += chunk.toString());
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const updates = JSON.parse(body);
                 const index = db.orders.findIndex(o => o.id === id);
@@ -510,7 +497,7 @@ const server = http.createServer((req, res) => {
                 if (index !== -1) {
                     // Update the order in memory
                     db.orders[index] = { ...db.orders[index], ...updates };
-                    saveData(); // <--- SAVE
+                    await saveData(); // <--- SAVE
                     console.log(`[API] Updated order ${id}`);
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(db.orders[index]));
@@ -533,7 +520,7 @@ const server = http.createServer((req, res) => {
         const id = url.pathname.split('/').pop();
         let body = '';
         req.on('data', chunk => body += chunk.toString());
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const updates = JSON.parse(body);
                 const index = db.quotations.findIndex(q => q.id === id);
@@ -541,7 +528,7 @@ const server = http.createServer((req, res) => {
                 if (index !== -1) {
                     // Update the quotation in memory
                     db.quotations[index] = { ...db.quotations[index], ...updates };
-                    saveData(); // <--- SAVE
+                    await saveData(); // <--- SAVE
                     console.log(`[API] Updated quotation ${id}`);
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(db.quotations[index]));
@@ -566,7 +553,7 @@ const server = http.createServer((req, res) => {
 
         if (index !== -1) {
             db.quotations.splice(index, 1);
-            saveData(); // <--- SAVE
+            await saveData(); // <--- SAVE
             console.log(`[API] Deleted quotation ${id}`);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true }));
@@ -585,7 +572,7 @@ const server = http.createServer((req, res) => {
 
         if (index !== -1) {
             db.orders.splice(index, 1);
-            saveData(); // <--- SAVE
+            await saveData(); // <--- SAVE
             console.log(`[API] Deleted order ${id}`);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true }));
