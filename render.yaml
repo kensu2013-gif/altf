@@ -1,7 +1,7 @@
-services:
   - type: web
     name: altf-api
     env: node
+    plan: free
     buildCommand: npm install
     startCommand: npm start
     envVars:
