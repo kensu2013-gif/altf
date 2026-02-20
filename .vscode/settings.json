@@ -1,3 +1,9 @@
 {
-    "css.lint.unknownAtRules": "ignore"
+    "css.lint.unknownAtRules": "ignore",
+    "n8n.host": "https://kensu2000.app.n8n.cloud",
+    "n8n.apiKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYmJjNDM3OS02NGRkLTQxNTQtODdkZC00NmEzODg4ZmMxYWUiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiZWM3MGM2MDQtYTVmNC00MTM5LTg0ZGYtODgyNTA2ODIxZTY2IiwiaWF0IjoxNzcxNjAzNDQwfQ.zxXSfOVU1S33oIWdItEHQwPqQHEYbe1edZTEvbX2tlQ",
+    "n8n.syncFolder": "workflows",
+    "n8n.syncMode": "auto",
+    "n8n.projectId": "vQm3qZzFnXO1I2JI",
+    "n8n.projectName": "Personal"
 }

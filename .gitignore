@@ -27,3 +27,7 @@ dist-ssr
 data/
 inventory.json
 db.json
+
+# n8n-as-code AI helpers
+n8nac-skills
+n8nac-skills.cmd
