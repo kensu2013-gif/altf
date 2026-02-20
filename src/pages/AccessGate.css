@@ -1,0 +1,5 @@
+.access-gate-bg {
+    background-image: linear-gradient(to bottom right, rgba(15, 23, 42, 0.3), rgba(30, 58, 138, 0.2)), url('../assets/welcome_pipes.png');
+    background-position: center center;
+    background-size: cover;
+}

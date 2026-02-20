@@ -1,0 +1,18 @@
+[
+  "sku_key",
+  "item",
+  "thickness",
+  "size",
+  "material",
+  "location",
+  "maker",
+  "ready_qty",
+  "final_price",
+  "base_price",
+  "rate_pct",
+  "od_eq_key",
+  "marking_wait_qty",
+  "location1",
+  "maker1",
+  "sh_qty"
+]

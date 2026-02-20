@@ -1,0 +1,21 @@
+{
+  "id": "45E(L)-S10S-300A-STS304L-S",
+  "name": "45E(L)",
+  "thickness": "S10S",
+  "size": "300A",
+  "material": "STS304L-S",
+  "unitPrice": 1143730,
+  "currentStock": 0,
+  "stockStatus": "OUT_OF_STOCK",
+  "location": "",
+  "maker": "",
+  "locationStock": {},
+  "location1": "",
+  "maker1": "",
+  "shQty": 0,
+  "marking_wait_qty": 0,
+  "base_price": 1759590,
+  "rate_pct": 35,
+  "rate_act": 0,
+  "rate_act2": 0
+}
