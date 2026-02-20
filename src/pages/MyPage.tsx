@@ -104,11 +104,11 @@ export default function MyPage() {
         setIsLoading(true);
         try {
             // Fetch Quotations
-            const quotesRes = await fetch(`/api/my/quotations?userId=${user?.id}`);
+            const quotesRes = await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations?userId=${user?.id}`);
             if (quotesRes.ok) setQuotations(await quotesRes.json());
 
             // Fetch Orders
-            const ordersRes = await fetch(`/api/my/orders?userId=${user?.id}`);
+            const ordersRes = await fetch(`${import.meta.env.VITE_API_URL}/api/my/orders?userId=${user?.id}`);
             if (ordersRes.ok) setOrders(await ordersRes.json());
         } catch (error) {
             console.error("Failed to fetch history", error);
@@ -180,7 +180,7 @@ export default function MyPage() {
         }
         else if (type === 'DELETE_QUOTE' && targetId) {
             try {
-                const res = await fetch(`/api/my/quotations/${targetId}`, { method: 'DELETE' });
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations/${targetId}`, { method: 'DELETE' });
                 if (res.ok) {
                     setQuotations(prev => prev.filter(q => q.id !== targetId));
                 } else {
@@ -193,7 +193,7 @@ export default function MyPage() {
         }
         else if (type === 'DELETE_ORDER' && targetId) {
             try {
-                const res = await fetch(`/api/my/orders/${targetId}`, { method: 'DELETE' });
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/my/orders/${targetId}`, { method: 'DELETE' });
                 if (res.ok) {
                     setOrders(prev => prev.filter(o => o.id !== targetId));
                 } else {

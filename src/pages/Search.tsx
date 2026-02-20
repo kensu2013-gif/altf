@@ -594,7 +594,7 @@ export default function Search() {
         const interval = setInterval(async () => {
             attempts++;
             try {
-                const res = await fetch(`/api/quote/session/${sessionId}`);
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/quote/session/${sessionId}`);
                 if (res.ok) {
                     const data = await res.json();
                     const currentCount = data.items ? data.items.length : 0;

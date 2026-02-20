@@ -147,7 +147,7 @@ export const OrderService = {
 
     // GET /api/my/orders (handled directly in MyPage for now, but could be here)
     listOrders: async (userId: string): Promise<OrderRecord[]> => {
-        const res = await fetch(`/api/my/orders?userId=${userId}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/my/orders?userId=${userId}`);
         if (res.ok) return await res.json();
         return [];
     },

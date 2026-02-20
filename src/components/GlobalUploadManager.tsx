@@ -55,7 +55,7 @@ export function GlobalUploadManager() {
             }
 
             try {
-                const res = await fetch(`/api/quote/session/${sessionId}`);
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/quote/session/${sessionId}`);
                 if (res.ok) {
                     const data = await res.json();
 

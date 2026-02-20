@@ -97,7 +97,7 @@ export const WeatherService = {
         // 2. IP Geolocation (via backend)
         try {
 
-            const res = await fetch('/api/geo/ip');
+            const res = await fetch(import.meta.env.VITE_API_URL + '/api/geo/ip');
             if (res.ok) {
                 const data = await res.json();
                 if (data.lat && data.lon) {
@@ -117,7 +117,7 @@ export const WeatherService = {
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
         try {
-            const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/weather?lat=${lat}&lon=${lon}`, {
                 signal: controller.signal
             });
             clearTimeout(timeoutId);

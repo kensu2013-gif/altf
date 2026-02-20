@@ -25,7 +25,7 @@ export default function AdminQuotes() {
         if (user.id) headers['x-requester-id'] = user.id;
         if (user.role) headers['x-requester-role'] = user.role;
 
-        fetch('/api/my/quotations', { headers })
+        fetch(import.meta.env.VITE_API_URL + '/api/my/quotations', { headers })
             .then(res => {
                 if (res.ok) return res.json();
                 throw new Error('Failed to fetch');
