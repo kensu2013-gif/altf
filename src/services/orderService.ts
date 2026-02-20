@@ -77,7 +77,7 @@ export const OrderService = {
                 customerBizNo: user.bizNo || '',
                 items: mappedItems, // Send standardized LineItems
                 totalAmount: payload.totals.total_amount,
-                status: 'SUBMITTED',
+                status: 'SUBMITTED' as const,
                 createdAt: new Date().toISOString(),
                 // Persist Buyer/Shipping Info
                 buyerInfo: {
@@ -104,7 +104,7 @@ export const OrderService = {
                     additionalCharges: payload.totals.additional_charges
                 },
                 po_items: mappedItems, // For Admin consistency
-                payload: payload // Keep original document payload as backup
+                payload: payload as unknown as Record<string, unknown> // Keep original document payload as backup
             };
 
             // Send to Make.com Webhook for Order Automation
