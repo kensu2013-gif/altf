@@ -104,11 +104,11 @@ export default function MyPage() {
         setIsLoading(true);
         try {
             // Fetch Quotations
-            const quotesRes = await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations?userId=${user?.id}`);
+            const quotesRes = await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations?userId=${user?.id}`, { cache: 'no-store' });
             if (quotesRes.ok) setQuotations(await quotesRes.json());
 
             // Fetch Orders
-            const ordersRes = await fetch(`${import.meta.env.VITE_API_URL}/api/my/orders?userId=${user?.id}`);
+            const ordersRes = await fetch(`${import.meta.env.VITE_API_URL}/api/my/orders?userId=${user?.id}`, { cache: 'no-store' });
             if (ordersRes.ok) setOrders(await ordersRes.json());
         } catch (error) {
             console.error("Failed to fetch history", error);

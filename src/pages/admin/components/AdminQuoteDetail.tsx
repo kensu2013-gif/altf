@@ -450,21 +450,23 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         };
 
         // 3. Update Local Store
-        updateQuotation(quote.id, updatePayload);
+        updateQuotation(quote.id, updatePayload); // This also attempts save under the hood, but we explicitly do it here for UX.
 
         // 4. API Call
         try {
-            await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations/${quote.id}`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations/${quote.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updatePayload)
             });
+            if (!res.ok) throw new Error(`Server returned ${res.status}`);
+
             alert('견적서가 전송되었습니다.');
             onSuccess?.(); // Notify parent to update view
             _onClose();
         } catch (error) {
             console.error(error);
-            alert('전송에 실패했습니다.');
+            alert('전송에 실패했습니다. (네트워크/서버 오류)');
         }
     };
 
@@ -980,15 +982,16 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         updateQuotation(quote.id, updatePayload); // Local Update
 
                                         try {
-                                            await fetch(`/ api / my / quotations / ${quote.id} `, {
+                                            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations/${quote.id}`, {
                                                 method: 'PATCH',
                                                 headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify(updatePayload)
                                             });
+                                            if (!res.ok) throw new Error(`Server returned ${res.status}`);
                                             alert('수정사항이 저장되었습니다.');
                                         } catch (error) {
                                             console.error(error);
-                                            alert('저장에 실패했습니다.');
+                                            alert('저장에 실패했습니다. (네트워크/서버 오류)');
                                         }
                                     }}
                                     className="bg-slate-800 hover:bg-slate-900 text-white gap-2"
