@@ -626,7 +626,6 @@ export const useStore = create<AppState>()(
                 auth: state.auth,
                 users: state.users, // Persist Mock DB
                 quotation: state.quotation,
-                inventory: state.inventory,
                 deliveryPreferences: state.deliveryPreferences,
                 orders: state.orders,
                 quotes: state.quotes,
