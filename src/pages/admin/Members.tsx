@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 
 export default function AdminMembers() {
-    const { users, updateUserStatus, fetchUsers, deleteUser, updateUser, auth } = useStore((state) => state);
+    const { users, fetchUsers, deleteUser, updateUser, auth } = useStore((state) => state);
     const [searchTerm, setSearchTerm] = useState('');
     const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'APPROVED'>('ALL');
     const [openManagerDropdown, setOpenManagerDropdown] = useState<string | null>(null); // userId of open dropdown
@@ -54,13 +54,13 @@ export default function AdminMembers() {
 
     const handleApprove = async (id: string, name: string) => {
         if (confirm(`${name} 님의 가입을 승인하시겠습니까?`)) {
-            await updateUserStatus(id, 'APPROVED');
+            await updateUser(id, { status: 'APPROVED' });
         }
     };
 
     const handleReject = (id: string, name: string) => {
         if (confirm(`${name} 님의 가입을 거절(보류)하시겠습니까?`)) {
-            updateUserStatus(id, 'REJECTED');
+            updateUser(id, { status: 'REJECTED' });
         }
     };
 
