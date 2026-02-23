@@ -250,11 +250,9 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
         </style>
     </head>
     <body>
-        <!-- Screen Controls Removed -->
-
-
-
-
+        <div class="screen-controls">
+            <button class="btn btn-close" onclick="window.close()">닫기 (Close)</button>
+        </div>
         <div class="container">
             <header>
                 <div class="brand" style="display: flex; align-items: center; gap: 12px;">
