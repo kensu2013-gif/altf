@@ -181,7 +181,7 @@ export default function AdminMembers() {
                                                             const name = firstManager ? firstManager.contactName : 'Unknown';
                                                             return currentManagerIds.length > 1
                                                                 ? `${name} 외 ${currentManagerIds.length - 1}명`
-                                                                : `${name} (${firstManager?.companyName || ''})`;
+                                                                : `${name} ${firstManager?.companyName ? `(${firstManager.companyName})` : ''}`;
                                                         })()
                                                         : <span className="text-slate-400">(미배정 - 전체)</span>}
                                                 </span>

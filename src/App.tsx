@@ -145,11 +145,15 @@ function AnimatedRoutes() {
   );
 }
 
+import { ErrorBoundary } from './components/ErrorBoundary';
+
 function App() {
   return (
-    <BrowserRouter>
-      <AnimatedRoutes />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AnimatedRoutes />
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 
