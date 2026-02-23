@@ -111,10 +111,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     // PO Specific State
     const [supplierInfo, setSupplierInfo] = useState(order.supplierInfo || {
-        company_name: '대경벤드',
+        company_name: '(주)대경벤드',
         contact_name: '정호근 과장',
-        tel: '',
-        email: '',
+        tel: '055-364-1800',
+        email: 'dksales@daekyungbend.com',
         address: '',
         note: ''
     });
