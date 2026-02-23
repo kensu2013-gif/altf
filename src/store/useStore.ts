@@ -163,7 +163,7 @@ export const useStore = create<AppState>()(
                     formData.append('file', file);
                     formData.append('refId', refId);
 
-                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/upload/${type}`, {
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/upload/${type}`, {
                         method: 'POST',
                         body: formData
                     });
@@ -197,7 +197,7 @@ export const useStore = create<AppState>()(
                 }
 
                 try {
-                    const response = await fetch(import.meta.env.VITE_API_URL + '/api/inventory/inventory.json', { cache: 'no-store' });
+                    const response = await fetch((import.meta.env.VITE_API_URL || '') + '/api/inventory/inventory.json', { cache: 'no-store' });
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     // Note: Actual data mapping is currently done in Search.tsx
                     // Ideally we should move it here, but keeping as is for now 
@@ -213,7 +213,7 @@ export const useStore = create<AppState>()(
             // --- Auth ---
             signup: async (formData) => {
                 try {
-                    const res = await fetch(import.meta.env.VITE_API_URL + '/api/users', {
+                    const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/users', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(formData)
@@ -232,7 +232,7 @@ export const useStore = create<AppState>()(
             // --- Auth & User Management (API) ---
             fetchUsers: async () => {
                 try {
-                    const res = await fetch(import.meta.env.VITE_API_URL + '/api/users');
+                    const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/users');
                     if (res.ok) {
                         const data = await res.json();
                         set({ users: data });
@@ -244,7 +244,7 @@ export const useStore = create<AppState>()(
 
             createUser: async (userData) => {
                 try {
-                    const res = await fetch(import.meta.env.VITE_API_URL + '/api/users', {
+                    const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/users', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(userData)
@@ -263,7 +263,7 @@ export const useStore = create<AppState>()(
 
             updateUser: async (id, updates) => { // Changed signature to (id, updates)
                 try {
-                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${id}`, {
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/users/${id}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(updates)
@@ -287,7 +287,7 @@ export const useStore = create<AppState>()(
 
             deleteUser: async (id) => {
                 try {
-                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${id}`, { method: 'DELETE' });
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/users/${id}`, { method: 'DELETE' });
                     if (res.ok) {
                         set(state => ({
                             users: state.users.filter(u => u.id !== id)
@@ -301,7 +301,7 @@ export const useStore = create<AppState>()(
             login: async (email, password) => {
                 try {
 
-                    const res = await fetch(import.meta.env.VITE_API_URL + '/api/auth/login', {
+                    const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/auth/login', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email, password })
@@ -407,7 +407,7 @@ export const useStore = create<AppState>()(
 
                 // 2. Persist to API
                 try {
-                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/my/orders/${orderId}`, {
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders/${orderId}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(enrichedUpdates)
@@ -428,7 +428,7 @@ export const useStore = create<AppState>()(
 
             permanentDeleteOrder: async (orderId) => {
                 try {
-                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/my/orders/${orderId}`, { method: 'DELETE' });
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders/${orderId}`, { method: 'DELETE' });
                     if (res.ok) {
                         set((state) => ({
                             orders: state.orders.filter(o => o.id !== orderId)
@@ -463,7 +463,7 @@ export const useStore = create<AppState>()(
 
                 // 2. Persist to API
                 try {
-                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations/${quoteId}`, {
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quoteId}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(updates)
@@ -484,7 +484,7 @@ export const useStore = create<AppState>()(
 
             permanentDeleteQuotation: async (quoteId) => {
                 try {
-                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations/${quoteId}`, { method: 'DELETE' });
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quoteId}`, { method: 'DELETE' });
                     if (res.ok) {
                         set((state) => ({
                             quotes: state.quotes.filter(q => q.id !== quoteId)

@@ -13,6 +13,8 @@ export default function AdminManagers() {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
 
+    const currentUser = useStore((state) => state.auth.user);
+
     const [newUser, setNewUser] = useState<Partial<User>>({
         email: '', password: '', contactName: '', companyName: '', phone: '', address: '', role: 'MANAGER'
     });
@@ -161,9 +163,11 @@ export default function AdminManagers() {
                                         <Button size="sm" variant="ghost" onClick={() => handleEditClick(user)} className="text-slate-400 hover:text-teal-600 h-8 w-8 p-0" aria-label="수정">
                                             <Pencil className="w-4 h-4" />
                                         </Button>
-                                        <Button size="sm" variant="ghost" onClick={() => handleDelete(user.id, user.contactName)} className="text-slate-400 hover:text-red-600 h-8 w-8 p-0" aria-label="삭제">
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
+                                        {currentUser?.role === 'MASTER' && (
+                                            <Button size="sm" variant="ghost" onClick={() => handleDelete(user.id, user.contactName)} className="text-slate-400 hover:text-red-600 h-8 w-8 p-0" aria-label="삭제">
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                 </td>
                             </tr>

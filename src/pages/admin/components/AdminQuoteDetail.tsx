@@ -393,7 +393,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
         // 3. API Call
         try {
-            await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations/${quote.id}`, {
+            await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quote.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updatePayload)
@@ -454,7 +454,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
         // 4. API Call
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations/${quote.id}`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quote.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updatePayload)
@@ -909,7 +909,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                     // Switch to IN_REVIEW
                                     updateQuotation(quote.id, { status: 'IN_REVIEW' });
                                     try {
-                                        await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations/${quote.id}`, {
+                                        await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quote.id}`, {
                                             method: 'PATCH',
                                             headers: { 'Content-Type': 'application/json' },
                                             body: JSON.stringify({ status: 'IN_REVIEW' })
@@ -982,7 +982,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         updateQuotation(quote.id, updatePayload); // Local Update
 
                                         try {
-                                            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations/${quote.id}`, {
+                                            const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quote.id}`, {
                                                 method: 'PATCH',
                                                 headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify(updatePayload)

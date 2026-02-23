@@ -130,7 +130,7 @@ export const OrderService = {
             // POST to Backend API
             let apiId = `ORD-${Date.now()}`;
             try {
-                const apiRes = await fetch(`${import.meta.env.VITE_API_URL}/api/my/orders`, {
+                const apiRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(apiPayload)
@@ -167,7 +167,7 @@ export const OrderService = {
 
     // GET /api/my/orders (handled directly in MyPage for now, but could be here)
     listOrders: async (userId: string): Promise<OrderRecord[]> => {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/my/orders?userId=${userId}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders?userId=${userId}`);
         if (res.ok) return await res.json();
         return [];
     },

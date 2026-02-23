@@ -270,7 +270,7 @@ export default function QuotationEditor() {
             };
 
             try {
-                const apiRes = await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations`, {
+                const apiRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payloadData)

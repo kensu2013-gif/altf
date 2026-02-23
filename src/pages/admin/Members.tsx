@@ -243,7 +243,7 @@ export default function AdminMembers() {
                                             {currentStatus === 'REJECTED' && (
                                                 <Button size="sm" onClick={() => handleApprove(user.id, user.companyName)} className="bg-teal-600 h-8 text-xs">다시 승인</Button>
                                             )}
-                                            {currentStatus !== 'PENDING' && (
+                                            {currentStatus !== 'PENDING' && user?.role === 'MASTER' && (
                                                 <Button size="sm" variant="ghost" onClick={() => handleDelete(user.id, user.companyName || user.contactName)} className="text-slate-400 hover:text-red-600 h-8 w-8 p-0" aria-label="삭제">
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>
