@@ -123,8 +123,14 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const [supplierPoFiles, setSupplierPoFiles] = useState<File[]>([]);
 
     // Webhook Email States
-    const defaultSubject = `[알트에프] ${supplierInfo.company_name.replace('(주)', '').trim()} 발주서 첨부건 - ${order.id.split('-').pop()}`;
-    const defaultFileName = `${order.id.split('-').pop()} 발주서 ${supplierInfo.company_name.replace('(주)', '').trim()}${new Date().toISOString().slice(2, 10).replace(/-/g, '')} (ALTF, ${order.buyerInfo?.company_name || '에스제이엔브이'}).pdf`;
+    const poDateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+    const poNumMatch = order.id.match(/\d+$/);
+    const poNum = poNumMatch ? poNumMatch[0] : order.id;
+    const cleanSupplierName = supplierInfo.company_name.replace('(주)', '').trim();
+    const cleanBuyerName = order.buyerInfo?.company_name?.replace('(주)', '').trim() || '에스제이엔브이';
+
+    const defaultSubject = `[알트에프] ${cleanSupplierName} 발주서 첨부건 - ${poNum}`;
+    const defaultFileName = `${poNum} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${cleanBuyerName}).pdf`;
     const [emailSubject, setEmailSubject] = useState(defaultSubject);
     const [emailAttachmentName, setEmailAttachmentName] = useState(defaultFileName);
     const [isSendingWebhook, setIsSendingWebhook] = useState(false);
@@ -268,6 +274,14 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             } else {
                 alert('팝업 차단을 해제해주세요.');
             }
+
+            // [MOD] Auto-Attach Document for Webhook
+            const blob = new Blob([html], { type: 'text/html' });
+            const file = new File([blob], emailAttachmentName.replace('.pdf', '.html'), { type: 'text/html' });
+
+            setSupplierPoFiles([file]);
+            alert("발주서가 새 창으로 열렸습니다. (인쇄하여 PDF로 보관하시거나 바로 화면 하단의 '발주 메일 전송' 버튼을 누르시면 이 발주서가 웹훅으로 자동 전송됩니다.)");
+
         } catch (e) {
             console.error('Error generating PO:', e);
             alert('발주서 생성 중 오류가 발생했습니다.');
@@ -569,6 +583,12 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 event: "purchase_order_sent",
                 data: {
                     orderId: order.id,
+                    supplier: {
+                        company_name: supplierInfo.company_name,
+                        contact_name: supplierInfo.contact_name,
+                        tel: supplierInfo.tel,
+                        email: supplierInfo.email || "dksales@daekyungbend.com"
+                    },
                     email: {
                         from: "ALTF@ALTF.KR",
                         bcc: "AIRSPACE@ALTF.KR",
