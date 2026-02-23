@@ -268,7 +268,7 @@ export default function MyPage() {
             supplier: {
                 company_name: '알트에프(ALTF)',
                 contact_name: '관리자',
-                address: '부산광역시 사상구 낙동대로 1330번길 66',
+                address: '부산광역시 사상구 낙동대로 1330번길 67',
                 tel: '051-303-3751',
                 fax: '0504-376-3751',
                 email: 'altf@altf.kr',
@@ -367,7 +367,7 @@ export default function MyPage() {
             supplier: {
                 company_name: '알트에프(ALTF)',
                 contact_name: '관리자',
-                address: '부산광역시 사상구 낙동대로 1330번길 66',
+                address: '부산광역시 사상구 낙동대로 1330번길 67',
                 tel: '051-303-3751',
                 fax: '0504-376-3751',
                 email: 'altf@altf.kr',
@@ -448,7 +448,7 @@ export default function MyPage() {
                 company_name: '알트에프(ALTF)',
                 // Contact Name from Admin who last updated it, or fallback to Admin
                 contact_name: order.lastUpdatedBy?.name || '관리자',
-                address: '부산광역시 사상구 낙동대로 1330번길 66',
+                address: '부산광역시 사상구 낙동대로 1330번길 67',
                 tel: '051-303-3751',
                 fax: '0504-376-3751',
                 email: 'altf@altf.kr',
@@ -1011,7 +1011,7 @@ function DetailModal({ record, isOrder, onClose, onOrder }: { record: QuotationR
             supplier: {
                 company_name: '알트에프(ALTF)',
                 contact_name: '관리자',
-                address: '부산광역시 사상구 낙동대로 1330번길 66',
+                address: '부산광역시 사상구 낙동대로 1330번길 67',
                 tel: '051-303-3751',
                 fax: '0504-376-3751',
                 email: 'altf@altf.kr',
