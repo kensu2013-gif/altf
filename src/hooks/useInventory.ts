@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import { useEffect } from 'react';
 import type { Product } from '../types';
 
-const INVENTORY_URL = '/api/inventory/inventory.json';
+const INVENTORY_URL = (import.meta.env.VITE_API_URL || '') + '/api/inventory/inventory.json';
 
 interface RawInventoryItem {
     // S3 snake_case keys

@@ -21,6 +21,7 @@
     "dotenv": "^17.3.1",
     "framer-motion": "^12.29.2",
     "lucide-react": "^0.562.0",
+    "multer": "^2.0.2",
     "react": "^19.2.0",
     "react-daum-postcode": "^3.2.0",
     "react-dom": "^19.2.0",

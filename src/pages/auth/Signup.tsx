@@ -11,7 +11,7 @@ import { validateFileSignature, sanitizeInput } from '../../lib/security';
 
 export default function Signup() {
     const navigate = useNavigate();
-    const signup = useStore((state) => state.signup);
+    const { signup, uploadFile } = useStore();
 
     const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
     const [formData, setFormData] = useState({
@@ -43,8 +43,8 @@ export default function Signup() {
         });
     };
 
-    // Mock file state
-    const [fileName, setFileName] = useState<string | null>(null);
+    // Form file state
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
     // Alert State
     const [alertState, setAlertState] = useState<{
@@ -119,7 +119,7 @@ export default function Signup() {
                 return;
             }
 
-            setFileName(file.name);
+            setSelectedFile(file);
         }
     };
 
@@ -132,13 +132,28 @@ export default function Signup() {
             return;
         }
 
+        // --- S3 File Upload Step ---
+        let uploadedFileUrl = '';
+        if (selectedFile) {
+            // Using bizNo as the reference ID for folder grouping
+            const refId = formData.companyName + '_' + formData.bizNo.replace(/[^0-9]/g, '');
+            const uploadResult = await uploadFile(selectedFile, 'member', refId);
+            if (uploadResult) {
+                uploadedFileUrl = uploadResult.url;
+            } else {
+                showAlert('업로드 실패', '파일 업로드에 실패했습니다. 다시 시도해주세요.', 'error');
+                return;
+            }
+        }
+
         // 1. Attempt to create user first (validates duplicate email)
-        const success = signup({
+        const success = await signup({
             ...formData,
             agreedToTerms: agreements.terms,
             agreedToPrivacy: agreements.privacy,
             agreedToMarketing: agreements.marketing,
-            consentDate: new Date().toISOString()
+            consentDate: new Date().toISOString(),
+            bizLicenseFile: uploadedFileUrl
         });
 
         if (!success) {
@@ -155,7 +170,7 @@ export default function Signup() {
                 },
                 body: JSON.stringify({
                     ...formData,
-                    attachedFile: fileName
+                    attachedFileUrl: uploadedFileUrl
                 }),
             });
         } catch (error) {
@@ -265,9 +280,9 @@ export default function Signup() {
                                     <label className="text-sm font-bold text-blue-50/90 ml-1">사업자등록증 사본</label>
                                     <div className="flex items-center gap-3">
                                         <label className="flex-1 cursor-pointer group">
-                                            <div className={`w-full py-3 px-4 rounded-xl border border-dashed hover:border-teal-400 hover:bg-teal-400/10 transition-all text-sm flex items-center justify-center gap-2 ${fileName ? 'text-teal-300 font-medium border-teal-400/50 bg-teal-400/5' : 'border-white/20 text-blue-100/40'}`}>
+                                            <div className={`w-full py-3 px-4 rounded-xl border border-dashed hover:border-teal-400 hover:bg-teal-400/10 transition-all text-sm flex items-center justify-center gap-2 ${selectedFile ? 'text-teal-300 font-medium border-teal-400/50 bg-teal-400/5' : 'border-white/20 text-blue-100/40'}`}>
                                                 <Upload className="w-4 h-4" />
-                                                {fileName || "클릭하여 파일 업로드 (JPG, PDF)"}
+                                                {selectedFile?.name || "클릭하여 파일 업로드 (JPG, PDF)"}
                                             </div>
                                             <input type="file" className="hidden" onChange={handleFileChange} accept=".jpg,.jpeg,.png,.pdf" />
                                         </label>
@@ -376,7 +391,7 @@ export default function Signup() {
                 type={alertState.type}
                 onClose={closeAlert}
             />
-        </div >
+        </div>
     );
 }
 

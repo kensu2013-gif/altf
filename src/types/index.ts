@@ -70,6 +70,8 @@ export interface Quotation {
     memo?: string; // Inquiry/Request
     adminResponse?: AdminResponse;
     isDeleted?: boolean; // Soft Delete Flag
+    attachments?: { name: string; url: string; }[]; // Customer request files
+    adminAttachments?: { name: string; url: string; }[]; // Official ALTF quote files
 }
 
 export interface User {
@@ -147,6 +149,11 @@ export interface Order {
         email: string;
         at: string; // ISO Date
     };
+    // S3 File Attachments
+    customerPO?: { name: string; url: string; }; // Original PO from customer
+    deliveryNote?: { name: string; url: string; }; // ALTF delivery note to customer
+    supplierPO?: { name: string; url: string; }; // ALTF purchase order to supplier (internal)
+    attachments?: { name: string; url: string; }[]; // General attachments added by customer
     // Generic Payload for flexible data (e.g. from Order Form)
     payload?: {
         customer?: {

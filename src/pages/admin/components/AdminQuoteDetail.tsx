@@ -37,7 +37,11 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const user = useStore((state) => state.auth.user); // Get Admin User
     const updateQuotation = useStore((state) => state.updateQuotation);
     const updateUser = useStore((state) => state.updateUser);
+    const uploadFile = useStore((state) => state.uploadFile);
     const customerUser = useStore((state) => state.users.find(u => u.id === quote.userId));
+
+    // Local state for admin attachments
+    const [adminAttachmentFiles, setAdminAttachmentFiles] = useState<File[]>([]);
 
     // Local state for customer info
 
@@ -423,9 +427,18 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             });
         }
 
-        // 2. Prepare Payload
+        // 2. Upload Admin Attachments to S3
+        const uploadedAttachments: { name: string, url: string }[] = quote.adminAttachments || [];
+        for (const file of adminAttachmentFiles) {
+            const refId = quote.id + '_admin';
+            const res = await uploadFile(file, 'quote', refId);
+            if (res) uploadedAttachments.push(res);
+        }
+
+        // 3. Prepare Payload
         const updatePayload = {
             items: items,
+            adminAttachments: uploadedAttachments,
             totalAmount: totalWithCharges,
             adminResponse: {
                 confirmedPrice: totalWithCharges,
@@ -840,6 +853,38 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         onChange={(e) => setResponse({ ...response, note: e.target.value })}
                                     />
                                 </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">관리자 첨부파일 (공식 견적서 등)</label>
+                                    <div className="flex flex-col gap-2">
+                                        <input
+                                            title="Admin Attachments"
+                                            type="file"
+                                            multiple
+                                            className="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border border-slate-200 file:text-sm file:font-medium file:bg-white file:text-slate-700 hover:file:bg-slate-50 transition-all cursor-pointer w-full max-w-sm"
+                                            onChange={(e) => setAdminAttachmentFiles(Array.from(e.target.files || []))}
+                                        />
+                                        {(quote.adminAttachments && quote.adminAttachments.length > 0) && (
+                                            <div className="mt-2 p-3 bg-white rounded border border-slate-200">
+                                                <p className="text-xs font-bold text-slate-500 mb-2">기존 첨부파일:</p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {quote.adminAttachments.map((file, i) => (
+                                                        <a key={i} href={file.url} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-600 hover:text-teal-700 underline flex items-center gap-1">
+                                                            <FileText className="w-3 h-3" /> {file.name}
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {adminAttachmentFiles.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-600 mt-2">
+                                                <span className="text-slate-400 font-bold mr-1">새로 추가됨:</span>
+                                                {adminAttachmentFiles.map(f => (
+                                                    <span key={f.name} className="px-2 py-1 bg-slate-100 rounded border border-slate-200">{f.name}</span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div >
 
@@ -910,9 +955,18 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             });
                                         }
 
+                                        // 2. Upload Admin Attachments to S3
+                                        const uploadedAttachments: { name: string, url: string }[] = quote.adminAttachments || [];
+                                        for (const file of adminAttachmentFiles) {
+                                            const refId = quote.id + '_admin';
+                                            const res = await uploadFile(file, 'quote', refId);
+                                            if (res) uploadedAttachments.push(res);
+                                        }
+
                                         // Same logic as send but keep status as PROCESSED and just update details
                                         const updatePayload = {
                                             items: items,
+                                            adminAttachments: uploadedAttachments,
                                             totalAmount: totalWithCharges,
                                             adminResponse: {
                                                 confirmedPrice: totalWithCharges,

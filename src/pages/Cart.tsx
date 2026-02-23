@@ -21,9 +21,10 @@ export default function QuotationEditor() {
     const { items, memo: quotationMemo } = useStore((state) => state.quotation);
     // Use selector for stable reference
     const user = useStore(state => state.auth.user);
-    const { updateItem, removeItem, inventory, clearQuotation, incrementNewOrderCount, setQuotationMemo } = useStore((state) => state);
+    const { updateItem, removeItem, inventory, clearQuotation, incrementNewOrderCount, setQuotationMemo, uploadFile } = useStore((state) => state);
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
     const [currentPayload, setCurrentPayload] = useState<DocumentPayload | null>(null);
@@ -250,6 +251,13 @@ export default function QuotationEditor() {
                 console.error('Quote Webhook error:', err);
             }
 
+            const uploadedAttachments: { name: string, url: string }[] = [];
+            for (const file of attachmentFiles) {
+                const refId = user.companyName + '_' + Date.now().toString();
+                const res = await uploadFile(file, 'quote', refId);
+                if (res) uploadedAttachments.push(res);
+            }
+
             // Persist to Local Store for Admin Visibility
             useStore.getState().addQuotation({
                 userId: user.id,
@@ -257,7 +265,8 @@ export default function QuotationEditor() {
                 items: items,
                 status: 'DRAFT',
                 totalAmount: totalAmount,
-                memo: quotationMemo
+                memo: quotationMemo,
+                attachments: uploadedAttachments // [Added Attachments]
             });
 
             setSuccessConfig({
@@ -331,7 +340,23 @@ export default function QuotationEditor() {
                 : deliveryNote;
         }
 
-        const result = await OrderService.submitOrder(finalPayload);
+        const uploadedAttachments: { name: string, url: string }[] = [];
+        for (const file of attachmentFiles) {
+            const refId = user?.companyName + '_' + Date.now().toString();
+            const res = await uploadFile(file, 'order', refId);
+            if (res) uploadedAttachments.push(res);
+        }
+
+        const payloadWithFiles = {
+            ...finalPayload,
+            customerPO: uploadedAttachments.length > 0 ? uploadedAttachments[0] : undefined, // Assign first file as PO if any, or keep in attachments logic
+            // Assuming we pass attachments in payload for OrderService to handle
+            payload: {
+                attachments: uploadedAttachments
+            }
+        };
+
+        const result = await OrderService.submitOrder(payloadWithFiles as unknown as DocumentPayload);
         if (result.success) {
             setIsSubmitting(false);
             incrementNewOrderCount();
@@ -684,6 +709,34 @@ export default function QuotationEditor() {
                                     </Button>
                                 </Link>
                             </div >
+                        </motion.div>
+
+                        {/* Attachments Section */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+                            className="mt-6 p-5 bg-white/70 backdrop-blur-xl border border-white/40 rounded-3xl shadow-lg ring-1 ring-white/60 mb-6"
+                        >
+                            <h3 className="text-[15px] font-extrabold text-slate-800 mb-3 flex items-center gap-2">
+                                <Search className="w-4 h-4 text-teal-600" />
+                                도면 및 요청서 첨부 (선택)
+                            </h3>
+                            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                <input
+                                    type="file"
+                                    multiple
+                                    aria-label="도면 및 요청서 첨부"
+                                    title="도면 및 요청서 첨부"
+                                    className="text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-5 file:rounded-xl file:border border-slate-200 file:text-sm file:font-bold file:bg-white file:text-slate-700 hover:file:bg-slate-50 transition-all cursor-pointer w-full sm:w-auto"
+                                    onChange={(e) => setAttachmentFiles(Array.from(e.target.files || []))}
+                                />
+                                {attachmentFiles.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-600">
+                                        {attachmentFiles.map(f => (
+                                            <span key={f.name} className="px-3 py-1 bg-slate-100 rounded-full border border-slate-200 shadow-sm">{f.name}</span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </motion.div>
 
                         {/* Legend / Status */}

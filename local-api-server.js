@@ -5,7 +5,7 @@ import crypto from 'crypto';
 const PORT = process.env.PORT || 3001;
 
 // --- Persistence Setup ---
-import { loadDbFromS3, saveDbToS3, uploadFileToS3 } from './s3-db.js';
+import { loadDbFromS3, saveDbToS3, uploadFileToS3, getInventoryFromS3 } from './s3-db.js';
 
 import multer from 'multer';
 
@@ -225,6 +225,23 @@ const server = http.createServer(async (req, res) => {
             // Return 404 or empty to indicate "not ready"
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Not found' }));
+        }
+        return;
+    }
+
+    // GET /api/inventory/inventory.json
+    if (req.method === 'GET' && url.pathname === '/api/inventory/inventory.json') {
+        try {
+            const inventoryData = await getInventoryFromS3();
+            res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate'
+            });
+            res.end(JSON.stringify(inventoryData));
+        } catch (error) {
+            console.error('[API] Failed to serve inventory.json:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Failed to fetch inventory data' }));
         }
         return;
     }

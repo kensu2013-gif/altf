@@ -45,6 +45,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     }), [order, linkedUser]);
     // ...
 
+    const uploadFile = useStore(state => state.uploadFile);
+
     // ... (state initialization) ...
 
     // Supplier Mode State
@@ -116,6 +118,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         address: '경상남도 양산시 어실로 115',
         note: ''
     });
+
+    const [deliveryNoteFiles, setDeliveryNoteFiles] = useState<File[]>([]);
+    const [supplierPoFiles, setSupplierPoFiles] = useState<File[]>([]);
 
     const [buyerInfo, setBuyerInfo] = useState(() => {
         if (order.buyerInfo) return order.buyerInfo;
@@ -429,7 +434,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         setDisplayedItems(newItems);
     };
 
-    const handleJustSave = () => {
+    const handleJustSave = async () => {
         const updateData: Partial<Order> = {
             totalAmount: totalWithCharges,
             adminResponse: {
@@ -453,11 +458,21 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             }
         };
 
+        // Process Uploads
+        if (deliveryNoteFiles.length > 0) {
+            const res = await uploadFile(deliveryNoteFiles[0], 'order', order.id + '_delivery');
+            if (res) updateData.deliveryNote = res;
+        }
+        if (supplierPoFiles.length > 0) {
+            const res = await uploadFile(supplierPoFiles[0], 'po', order.id + '_po');
+            if (res) updateData.supplierPO = res;
+        }
+
         onUpdate(order.id, updateData);
         alert('저장되었습니다.');
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         const updateData: Partial<Order> = {
             totalAmount: totalWithCharges,
             adminResponse: {
@@ -493,6 +508,16 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             email: user?.email || '',
             at: new Date().toISOString()
         };
+
+        // Process Uploads
+        if (deliveryNoteFiles.length > 0) {
+            const res = await uploadFile(deliveryNoteFiles[0], 'order', order.id + '_delivery');
+            if (res) updateData.deliveryNote = res;
+        }
+        if (supplierPoFiles.length > 0) {
+            const res = await uploadFile(supplierPoFiles[0], 'po', order.id + '_po');
+            if (res) updateData.supplierPO = res;
+        }
 
         onUpdate(order.id, updateData);
         onClose();
@@ -617,7 +642,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                             <div className="grid grid-cols-2 gap-6">
                                 {/* Vendor Info */}
                                 <div className="space-y-3">
-                                    <h4 className="text-xs font-bold text-indigo-700 uppercase">공급자 (Vendor) - 매입처</h4>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-xs font-bold text-indigo-700 uppercase">공급자 (Vendor) - 매입처</h4>
+                                    </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <input
                                             placeholder="상호 (Company)"
@@ -706,6 +733,30 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                             onChange={e => setBuyerInfo({ ...buyerInfo, address: e.target.value })}
                                             className="col-span-2 px-2 py-1.5 text-sm border rounded bg-slate-50"
                                         />
+                                    </div>
+                                </div>
+                                <div className="col-span-2 pt-4 border-t border-indigo-100">
+                                    <h4 className="text-xs font-bold text-indigo-700 uppercase mb-2">매입발주서 첨부 (Supplier PO)</h4>
+                                    <div className="flex flex-col gap-2">
+                                        <input
+                                            type="file"
+                                            title="매입발주서 첨부 (Supplier PO)"
+                                            className="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border border-indigo-200 file:text-sm file:font-medium file:bg-white file:text-indigo-700 hover:file:bg-indigo-50 transition-all cursor-pointer w-full max-w-sm"
+                                            onChange={(e) => setSupplierPoFiles(Array.from(e.target.files || []))}
+                                        />
+                                        {order.supplierPO && (
+                                            <div className="mt-2 text-xs">
+                                                <span className="text-slate-500 mr-2">기존 매입발주서:</span>
+                                                <a href={order.supplierPO.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                                                    {order.supplierPO.name}
+                                                </a>
+                                            </div>
+                                        )}
+                                        {supplierPoFiles.length > 0 && (
+                                            <div className="text-xs text-indigo-600 font-bold mt-1">
+                                                선택된 파일: {supplierPoFiles[0].name}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1423,6 +1474,54 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                             value={response.note}
                                             onChange={(e) => setResponse({ ...response, note: e.target.value })}
                                         />
+                                    </div>
+
+                                    <div className="pt-4 border-t border-slate-200">
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">최종 문서 첨부 (납품명세서/공식 서류 등)</label>
+                                        <div className="flex flex-col gap-2">
+                                            <input
+                                                type="file"
+                                                title="최종 문서 첨부 (납품명세서/공식 서류 등)"
+                                                className="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border border-slate-200 file:text-sm file:font-medium file:bg-white file:text-slate-700 hover:file:bg-slate-50 transition-all cursor-pointer w-full max-w-sm"
+                                                onChange={(e) => setDeliveryNoteFiles(Array.from(e.target.files || []))}
+                                            />
+                                            {order.deliveryNote && (
+                                                <div className="mt-2 text-xs">
+                                                    <span className="text-slate-500 mr-2">기존 첨부문서:</span>
+                                                    <a href={order.deliveryNote.url} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">
+                                                        {order.deliveryNote.name}
+                                                    </a>
+                                                </div>
+                                            )}
+                                            {deliveryNoteFiles.length > 0 && (
+                                                <div className="text-xs text-teal-600 font-bold mt-1">
+                                                    선택된 파일: {deliveryNoteFiles[0].name}
+                                                </div>
+                                            )}
+
+                                            {order.customerPO && (
+                                                <div className="mt-2 text-xs bg-slate-100 p-2 rounded">
+                                                    <span className="text-slate-500 mr-2">고객 발주서 원본 (PO):</span>
+                                                    <a href={order.customerPO.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">
+                                                        {order.customerPO.name}
+                                                    </a>
+                                                </div>
+                                            )}
+                                            {(order.attachments && order.attachments.length > 0) && (
+                                                <div className="mt-2 text-xs bg-slate-100 p-2 rounded">
+                                                    <span className="text-slate-500 mr-2">일반 첨부파일:</span>
+                                                    <ul className="list-disc pl-4">
+                                                        {order.attachments.map((file, i) => (
+                                                            <li key={i}>
+                                                                <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                                                    {file.name}
+                                                                </a>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
