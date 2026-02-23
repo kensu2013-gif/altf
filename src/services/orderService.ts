@@ -89,11 +89,11 @@ export const OrderService = {
                 },
                 // Persist Supplier Info
                 supplierInfo: {
-                    company_name: '알트에프(ALTF)',
-                    contact_name: '관리자',
-                    tel: '051-303-3751',
-                    email: 'altf@altf.kr',
-                    address: '부산광역시 사상구 낙동대로 1330번길 66',
+                    company_name: '(주)대경벤드',
+                    contact_name: '정호근 과장님',
+                    tel: '055-364-1800',
+                    email: 'dksales@daekyungbend.com',
+                    address: '경상남도 양산시 어실로 115',
                     note: payload.supplier?.note || ''
                 },
                 memo: payload.customer.memo, // Delivery requests etc.
