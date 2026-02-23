@@ -250,11 +250,8 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
         </style>
     </head>
     <body>
-        <!-- Screen Controls -->
-        <div class="screen-controls">
-            <button onclick="window.print()" class="btn btn-print">인쇄하기 (Print)</button>
-            <button onclick="window.close()" class="btn btn-close">닫기 (Close)</button>
-        </div>
+        <!-- Screen Controls Removed -->
+
 
 
 

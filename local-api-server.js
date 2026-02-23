@@ -512,6 +512,35 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // PATCH /api/my/quotations/:id (Update Quotation)
+    if (req.method === 'PATCH' && url.pathname.startsWith('/api/my/quotations/')) {
+        const id = url.pathname.split('/').pop();
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const updates = JSON.parse(body);
+                const index = db.quotations.findIndex(q => q.id === id);
+
+                if (index !== -1) {
+                    db.quotations[index] = { ...db.quotations[index], ...updates };
+                    await saveData();
+                    console.log(`[API] Updated quotation ${id}`);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(db.quotations[index]));
+                } else {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Quotation not found' }));
+                }
+            } catch (e) {
+                console.error(e);
+                res.writeHead(500);
+                res.end(JSON.stringify({ error: 'Server Error' }));
+            }
+        });
+        return;
+    }
+
     // POST /api/my/orders (Submit Order)
     if (req.method === 'POST' && url.pathname === '/api/my/orders') {
         let body = '';

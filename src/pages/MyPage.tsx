@@ -481,26 +481,44 @@ export default function MyPage() {
         });
     };
 
-    const getStatusBadge = (status: string) => {
+    const getStatusBadge = (status: string, type: 'QUOTE' | 'ORDER' = 'QUOTE') => {
         const styles: Record<string, string> = {
             SUBMITTED: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+            PROCESSING: 'bg-blue-100 text-blue-800 border-blue-200',
             PROCESSED: 'bg-teal-100 text-teal-800 border-teal-200',
             COMPLETED: 'bg-green-100 text-green-800 border-green-200',
+            HOLD: 'bg-orange-100 text-orange-800 border-orange-200',
+            WITHDRAW: 'bg-rose-100 text-rose-800 border-rose-200',
+            SHIPPED: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+            CANCELED: 'bg-slate-100 text-slate-800 border-slate-200',
             processing: 'bg-blue-100 text-blue-800 border-blue-200',
             shipped: 'bg-indigo-100 text-indigo-800 border-indigo-200',
             completed: 'bg-green-100 text-green-800 border-green-200',
+            submitted: 'bg-yellow-100 text-yellow-800 border-yellow-200',
         };
-        const labels: Record<string, string> = {
+        const quoteLabels: Record<string, string> = {
             SUBMITTED: '견적확인중',
             PROCESSING: '답변작성중',
             PROCESSED: '답변 완료',
-            COMPLETED: '주문 접수', // Mapped to '주문 접수' as requested
+            COMPLETED: '주문 접수',
             CANCELED: '취소됨',
-            submitted: '주문 접수', // Mapped to '주문 접수' (Order)
+            processing: '답변작성중',
+        };
+        const orderLabels: Record<string, string> = {
+            SUBMITTED: '주문 접수',
+            PROCESSING: '처리중',
+            HOLD: '보류 (Hold)',
+            WITHDRAW: '회수 (Withdraw)',
+            SHIPPED: '배송중',
+            COMPLETED: '완료됨',
+            CANCELED: '취소됨',
             processing: '처리중',
             shipped: '배송중',
             completed: '완료됨',
+            submitted: '주문 접수'
         };
+
+        const labels = type === 'ORDER' ? orderLabels : quoteLabels;
         const displayStatus = status || 'SUBMITTED';
         return (
             <span className={`px-2 py-0.5 rounded text-xs font-bold border ${styles[displayStatus] || styles[status] || 'bg-slate-100 text-slate-500 border-slate-200'}`}>
@@ -644,7 +662,7 @@ export default function MyPage() {
                                                         <div key={order.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-md transition-shadow">
                                                             <div>
                                                                 <div className="flex items-center gap-2 mb-1">
-                                                                    {getStatusBadge(order.status)}
+                                                                    {getStatusBadge(order.status, 'ORDER')}
                                                                     <span className="text-slate-300">|</span>
                                                                     <span className="text-slate-600 font-medium text-sm">{formatDate(order.createdAt)}</span>
                                                                 </div>
