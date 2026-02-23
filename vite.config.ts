@@ -13,7 +13,11 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  esbuild: {
+    drop: ['console', 'debugger'], // [SECURITY] Remove all console.logs and debuggers in production
+  },
   build: {
+    sourcemap: false, // [SECURITY] Prevent source code leak in production
     rollupOptions: {
       output: {
         manualChunks: {
