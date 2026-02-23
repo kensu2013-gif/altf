@@ -237,6 +237,12 @@ export default function AdminMembers() {
                                                     <Button size="sm" variant="outline" onClick={() => handleReject(user.id, user.companyName)} className="text-rose-600 h-8 text-xs">거절</Button>
                                                 </>
                                             )}
+                                            {currentStatus === 'APPROVED' && (
+                                                <Button size="sm" variant="outline" onClick={() => handleReject(user.id, user.companyName)} className="text-rose-600 border-rose-200 hover:bg-rose-50 h-8 text-xs">승인 취소 (보류)</Button>
+                                            )}
+                                            {currentStatus === 'REJECTED' && (
+                                                <Button size="sm" onClick={() => handleApprove(user.id, user.companyName)} className="bg-teal-600 h-8 text-xs">다시 승인</Button>
+                                            )}
                                             {currentStatus !== 'PENDING' && (
                                                 <Button size="sm" variant="ghost" onClick={() => handleDelete(user.id, user.companyName || user.contactName)} className="text-slate-400 hover:text-red-600 h-8 w-8 p-0" aria-label="삭제">
                                                     <Trash2 className="w-4 h-4" />
