@@ -2,7 +2,7 @@ import { useState, memo, useMemo, useCallback } from 'react';
 import type { Order, LineItem, Product } from '../../../types';
 // import { generateSku } from '../../../lib/sku'; // REMOVED: Managed in useInventoryIndex
 import { useStore } from '../../../store/useStore';
-import { X, AlertTriangle, Check, Calendar, Package, User, Trash2, Plus, Download, FileText, Minus, Equal } from 'lucide-react';
+import { X, AlertTriangle, Check, Calendar, Package, User, Trash2, Plus, Download, FileText, Minus, Equal, Send } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { useInventoryIndex } from '../../../hooks/useInventoryIndex';
 
@@ -115,12 +115,19 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         contact_name: '정호근 과장',
         tel: '055-364-1800',
         email: 'dksales@daekyungbend.com',
-        address: '',
+        address: '경상남도 양산시 어실로 115',
         note: ''
     });
 
     const [deliveryNoteFiles, setDeliveryNoteFiles] = useState<File[]>([]);
     const [supplierPoFiles, setSupplierPoFiles] = useState<File[]>([]);
+
+    // Webhook Email States
+    const defaultSubject = `[알트에프] ${supplierInfo.company_name.replace('(주)', '').trim()} 발주서 첨부건 - ${order.id.split('-').pop()}`;
+    const defaultFileName = `${order.id.split('-').pop()} 발주서 ${supplierInfo.company_name.replace('(주)', '').trim()}${new Date().toISOString().slice(2, 10).replace(/-/g, '')} (ALTF, ${order.buyerInfo?.company_name || '에스제이엔브이'}).pdf`;
+    const [emailSubject, setEmailSubject] = useState(defaultSubject);
+    const [emailAttachmentName, setEmailAttachmentName] = useState(defaultFileName);
+    const [isSendingWebhook, setIsSendingWebhook] = useState(false);
 
     const [buyerInfo, setBuyerInfo] = useState(() => {
         if (order.buyerInfo) return order.buyerInfo;
@@ -535,6 +542,62 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         handleSave();
     };
 
+    const handleSendWebhookEmail = async () => {
+        if (supplierPoFiles.length === 0 && !order.supplierPO) {
+            alert("발주서 PDF 파일이 첨부되지 않았습니다. 파일 선택 후 전송해주세요.");
+            return;
+        }
+
+        if (!confirm("입력하신 메일 정보로 발주서를 전송하시겠습니까?")) return;
+        setIsSendingWebhook(true);
+
+        try {
+            let attachmentUrl = order.supplierPO?.url;
+
+            if (supplierPoFiles.length > 0) {
+                const { uploadFile } = useStore.getState();
+                const res = await uploadFile(supplierPoFiles[0], 'po', order.id + '_po');
+                if (res) {
+                    attachmentUrl = res.url;
+                    order.supplierPO = res; // Temporary update for subsequent clicks
+                }
+            }
+
+            if (!attachmentUrl) throw new Error("첨부파일 URL을 서버에서 받아오지 못했습니다.");
+
+            const payload = {
+                event: "purchase_order_sent",
+                data: {
+                    orderId: order.id,
+                    email: {
+                        from: "ALTF@ALTF.KR",
+                        bcc: "AIRSPACE@ALTF.KR",
+                        to: supplierInfo.email || "dksales@daekyungbend.com",
+                        subject: emailSubject,
+                        attachmentName: emailAttachmentName
+                    },
+                    attachmentUrl: attachmentUrl
+                }
+            };
+
+            const response = await fetch("https://hook.make.com/PLACEHOLDER_WEBHOOK_URL", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok || response.type === 'opaque') {
+                alert("발주 메일 전송 요청이 웹훅(Webhook) 시스템에 성공적으로 전달되었습니다.");
+            } else {
+                throw new Error("웹훅 호출 실패: " + response.statusText);
+            }
+        } catch (error) {
+            console.error("Webhook Error:", error);
+            alert("메일 전송 요청 중 오류가 발생했습니다.");
+        } finally {
+            setIsSendingWebhook(false);
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
@@ -736,27 +799,72 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                     </div>
                                 </div>
                                 <div className="col-span-2 pt-4 border-t border-indigo-100">
-                                    <h4 className="text-xs font-bold text-indigo-700 uppercase mb-2">매입발주서 첨부 (Supplier PO)</h4>
-                                    <div className="flex flex-col gap-2">
-                                        <input
-                                            type="file"
-                                            title="매입발주서 첨부 (Supplier PO)"
-                                            className="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border border-indigo-200 file:text-sm file:font-medium file:bg-white file:text-indigo-700 hover:file:bg-indigo-50 transition-all cursor-pointer w-full max-w-sm"
-                                            onChange={(e) => setSupplierPoFiles(Array.from(e.target.files || []))}
-                                        />
-                                        {order.supplierPO && (
-                                            <div className="mt-2 text-xs">
-                                                <span className="text-slate-500 mr-2">기존 매입발주서:</span>
-                                                <a href={order.supplierPO.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                                                    {order.supplierPO.name}
-                                                </a>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        {/* Left: Supplier PO File */}
+                                        <div>
+                                            <h4 className="text-xs font-bold text-indigo-700 uppercase mb-2">매입발주서 첨부 (Supplier PO)</h4>
+                                            <div className="flex flex-col gap-2">
+                                                <input
+                                                    type="file"
+                                                    title="매입발주서 첨부 (Supplier PO)"
+                                                    className="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border border-indigo-200 file:text-sm file:font-medium file:bg-white file:text-indigo-700 hover:file:bg-indigo-50 transition-all cursor-pointer w-full max-w-sm"
+                                                    onChange={(e) => setSupplierPoFiles(Array.from(e.target.files || []))}
+                                                />
+                                                {order.supplierPO && (
+                                                    <div className="mt-2 text-xs">
+                                                        <span className="text-slate-500 mr-2">기존 매입발주서:</span>
+                                                        <a href={order.supplierPO.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                                                            {order.supplierPO.name}
+                                                        </a>
+                                                    </div>
+                                                )}
+                                                {supplierPoFiles.length > 0 && (
+                                                    <div className="text-xs text-indigo-600 font-bold mt-1">
+                                                        선택된 파일: {supplierPoFiles[0].name}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                        {supplierPoFiles.length > 0 && (
-                                            <div className="text-xs text-indigo-600 font-bold mt-1">
-                                                선택된 파일: {supplierPoFiles[0].name}
+                                        </div>
+
+                                        {/* Right: Webhook Email Integration */}
+                                        <div className="bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 relative">
+                                            <h4 className="text-xs font-bold text-indigo-700 mb-2 flex items-center gap-1">
+                                                <Send className="w-3 h-3" /> 매입 발주서 이메일 전송 (Webhook)
+                                            </h4>
+                                            <div className="space-y-2">
+                                                <div>
+                                                    <label className="block text-[10px] text-indigo-500 font-bold mb-1">메일 제목 (Email Subject)</label>
+                                                    <input
+                                                        type="text"
+                                                        title="메일 제목 (Email Subject)"
+                                                        placeholder="이메일 제목 입력"
+                                                        value={emailSubject}
+                                                        onChange={(e) => setEmailSubject(e.target.value)}
+                                                        className="w-full px-2 py-1 text-xs border border-indigo-200 rounded outline-none focus:border-indigo-500 bg-white"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] text-indigo-500 font-bold mb-1">첨부파일명 (Attachment Name)</label>
+                                                    <input
+                                                        type="text"
+                                                        title="첨부파일명 (Attachment Name)"
+                                                        placeholder="첨부파일명 입력"
+                                                        value={emailAttachmentName}
+                                                        onChange={(e) => setEmailAttachmentName(e.target.value)}
+                                                        className="w-full px-2 py-1 text-xs border border-indigo-200 rounded outline-none focus:border-indigo-500 bg-white"
+                                                    />
+                                                </div>
+                                                <div className="pt-2 flex justify-end">
+                                                    <Button
+                                                        onClick={handleSendWebhookEmail}
+                                                        disabled={isSendingWebhook}
+                                                        className="h-7 px-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white gap-1"
+                                                    >
+                                                        {isSendingWebhook ? '전송 처리중...' : '발주 메일 전송'}
+                                                    </Button>
+                                                </div>
                                             </div>
-                                        )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
