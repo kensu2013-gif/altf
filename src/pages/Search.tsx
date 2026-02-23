@@ -565,7 +565,16 @@ export default function Search() {
         const formData = new FormData();
         formData.append('file', attachedFile);
         formData.append('session_id', sessionId);
-        formData.append('callback_url', 'https://callosal-loni-formulable.ngrok-free.dev/api/quote/import');
+
+        // Dynamically set the Callback URL
+        // In local development, use ngrok so Make.com can reach it. In production, use the live Render API.
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const isLocalhost = !apiUrl || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1');
+        const callbackUrl = isLocalhost
+            ? 'https://callosal-loni-formulable.ngrok-free.dev/api/quote/import'
+            : `${apiUrl}/api/quote/import`;
+
+        formData.append('callback_url', callbackUrl);
 
         try {
             // 3. Send to Make.com Webhook
