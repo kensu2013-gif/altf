@@ -1,8 +1,13 @@
 import type { DocumentPayload } from '../types/document';
 import { formatCurrency } from './utils';
+import logo from '../assets/logo_v5.png';
+import logoDaekyung from '../assets/logo_daekyung.png.png';
 
 export const renderDocumentHTML = (payload: DocumentPayload): string => {
     const { document_type, meta, supplier, customer, items, totals, footer } = payload;
+
+    // ... keeping the rest the same up to header
+    // wait, replace_file_content needs precisely the replaced block. Let's make it simpler.
 
     // Unified Template Logic
     const isPurchaseOrder = document_type === 'PURCHASE_ORDER';
@@ -255,7 +260,11 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
 
         <div class="container">
             <header>
-                <div class="brand">ALT.F</div>
+                <div class="brand" style="display: flex; align-items: center; gap: 12px;">
+                    <img src="${logo}" alt="ALT.F" style="height: 28px; object-fit: contain;" />
+                    <span style="color: #cbd5e1; font-size: 20px; font-weight: 300;">|</span>
+                    <img src="${logoDaekyung}" alt="(주)대경벤드" style="height: 22px; object-fit: contain;" />
+                </div>
                 <div class="doc-title">
                     <h1>${title}</h1>
                     <p>No. ${meta.doc_no} | Date. ${meta.created_at}</p>

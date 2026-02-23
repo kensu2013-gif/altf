@@ -126,16 +126,35 @@ export const OrderService = {
                 // Fallback to true for local testing if needed, or handle failure
             }
 
+            // POST to Backend API
+            let apiId = `ORD-${Date.now()}`;
+            try {
+                const apiRes = await fetch(`${import.meta.env.VITE_API_URL}/api/my/orders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(apiPayload)
+                });
+
+                if (apiRes.ok) {
+                    const result = await apiRes.json();
+                    if (result.orderId) apiId = result.orderId;
+                } else {
+                    console.error('Failed to submit order to API');
+                }
+            } catch (err) {
+                console.error('API Error submitting order:', err);
+            }
+
             // Still persist to local store (Zustand) so Admin/MyPage can see it immediately
             // regardless of backend success for now until full DB is ready
             store.getState().submitOrder({
                 ...apiPayload,
-                id: `ORD-${Date.now()}`
+                id: apiId
             });
 
             // eslint-disable-next-line no-constant-condition
             if (webhookSuccess || true) { // Forced true for UX until they add real URL
-                return { success: true, order_id: `ORD-${Date.now()}` };
+                return { success: true, order_id: apiId };
             } else {
                 return { success: false, order_id: '', message: 'Failed to submit order to server' };
             }

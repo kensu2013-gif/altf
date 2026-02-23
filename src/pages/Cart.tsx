@@ -258,16 +258,32 @@ export default function QuotationEditor() {
                 if (res) uploadedAttachments.push(res);
             }
 
-            // Persist to Local Store for Admin Visibility
-            useStore.getState().addQuotation({
+            const payloadData = {
                 userId: user.id,
+                customerName: user.companyName || 'Guest',
                 customerNumber: user.companyName || 'Guest',
                 items: items,
-                status: 'DRAFT',
                 totalAmount: totalAmount,
                 memo: quotationMemo,
+                status: 'SUBMITTED' as const,
                 attachments: uploadedAttachments // [Added Attachments]
-            });
+            };
+
+            try {
+                const apiRes = await fetch(`${import.meta.env.VITE_API_URL}/api/my/quotations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadData)
+                });
+                if (!apiRes.ok) {
+                    console.error('Failed to save quotation to backend API');
+                }
+            } catch (err) {
+                console.error('API Error saving quotation:', err);
+            }
+
+            // Persist to Local Store for Admin Visibility (fallback)
+            useStore.getState().addQuotation(payloadData);
 
             setSuccessConfig({
                 isOpen: true,
