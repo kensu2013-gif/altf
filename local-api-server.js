@@ -5,7 +5,15 @@ import crypto from 'crypto';
 const PORT = process.env.PORT || 3001;
 
 // --- Persistence Setup ---
-import { loadDbFromS3, saveDbToS3 } from './s3-db.js';
+import { loadDbFromS3, saveDbToS3, uploadFileToS3 } from './s3-db.js';
+
+import multer from 'multer';
+
+// Internal Multer setup for raw HTTP
+const uploadMiddleware = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 20 * 1024 * 1024 } // 20MB limit
+}).single('file');
 
 // Initial Data Structure
 let db = {
@@ -58,6 +66,7 @@ async function saveData() {
         // console.log('[API] Data saved to S3');
     } catch (e) {
         console.error('[API] Failed to save data to S3:', e);
+        throw e; // Throw so that routes can catch it and return 500
     }
 }
 
@@ -156,6 +165,47 @@ const server = http.createServer(async (req, res) => {
                 console.error(e);
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Internal Server Error' }));
+            }
+        });
+        return;
+    }
+
+    // POST /api/upload/:type
+    // type: member, quote, order, po
+    if (req.method === 'POST' && url.pathname.startsWith('/api/upload/')) {
+        uploadMiddleware(req, res, async (err) => {
+            if (err) {
+                console.error('[API] File upload parsing error:', err);
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ error: err.message }));
+            }
+
+            try {
+                if (!req.file) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    return res.end(JSON.stringify({ error: 'No file uploaded' }));
+                }
+
+                const uploadType = url.pathname.split('/')[3] || 'misc'; // member, quote, etc.
+                const userRef = req.body.refId || 'unknown'; // Optional: ID to categorize folders
+
+                let targetFolder = 'documents/misc';
+                if (uploadType === 'member') targetFolder = `documents/members/${userRef}`;
+                if (uploadType === 'quote') targetFolder = `documents/quotes/${userRef}`;
+                if (uploadType === 'order') targetFolder = `documents/orders/${userRef}`;
+                if (uploadType === 'po') targetFolder = `documents/purchase_orders/${userRef}`;
+
+                const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8'); // Handle unicode filenames
+
+                const fileUtl = await uploadFileToS3(targetFolder, originalName, req.file.buffer, req.file.mimetype);
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ url: fileUtl, filename: originalName }));
+
+            } catch (error) {
+                console.error('[API] S3 Upload error:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'S3 Upload Failed' }));
             }
         });
         return;
@@ -304,19 +354,29 @@ const server = http.createServer(async (req, res) => {
                         delete updates.managerId;
                     }
 
+                    // Save original state for rollback
+                    const originalState = { ...db.users[index] };
                     db.users[index] = { ...db.users[index], ...updates };
-                    await saveData(); // <--- SAVE
-                    console.log(`[API] Updated user ${id}`);
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(db.users[index]));
+
+                    try {
+                        await saveData(); // <--- SAVE
+                        console.log(`[API] Updated user ${id}`);
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify(db.users[index]));
+                    } catch (saveError) {
+                        // Rollback on S3 save failure
+                        db.users[index] = originalState;
+                        throw saveError;
+                    }
 
                 } else {
                     res.writeHead(404);
                     res.end(JSON.stringify({ error: 'Not found' }));
                 }
             } catch (e) {
+                console.error('[API] Error updating user:', e);
                 res.writeHead(500);
-                res.end(JSON.stringify({ error: 'Server Error' }));
+                res.end(JSON.stringify({ error: 'Server Error: Failed to save to S3.' }));
             }
         });
         return;

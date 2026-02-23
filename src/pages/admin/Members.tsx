@@ -54,13 +54,21 @@ export default function AdminMembers() {
 
     const handleApprove = async (id: string, name: string) => {
         if (confirm(`${name} 님의 가입을 승인하시겠습니까?`)) {
-            await updateUser(id, { status: 'APPROVED' });
+            try {
+                await updateUser(id, { status: 'APPROVED' });
+            } catch {
+                // Error is already alerted in store, but we catch to prevent unhandled promise rejection
+            }
         }
     };
 
-    const handleReject = (id: string, name: string) => {
+    const handleReject = async (id: string, name: string) => {
         if (confirm(`${name} 님의 가입을 거절(보류)하시겠습니까?`)) {
-            updateUser(id, { status: 'REJECTED' });
+            try {
+                await updateUser(id, { status: 'REJECTED' });
+            } catch {
+                // Error is already alerted in store
+            }
         }
     };
 

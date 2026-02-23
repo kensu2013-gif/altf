@@ -105,6 +105,9 @@ interface AppState {
     setUploadStatus: (status: 'IDLE' | 'PROCESSING' | 'DONE') => void;
     updateProcessedCount: (count: number) => void;
     resetUpload: () => void;
+
+    // --- S3 Generic File Upload ---
+    uploadFile: (file: File, type: 'member' | 'quote' | 'order' | 'po', refId: string) => Promise<{ url: string, name: string } | null>;
 }
 
 export const useStore = create<AppState>()(
@@ -152,6 +155,30 @@ export const useStore = create<AppState>()(
             resetUpload: () => set({
                 uploadState: { status: 'IDLE', sessionId: null, processedCount: 0, attachedFile: null }
             }),
+
+            // --- S3 Generic File Upload ---
+            uploadFile: async (file, type, refId) => {
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('refId', refId);
+
+                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/upload/${type}`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        return { url: data.url, name: data.filename };
+                    } else {
+                        throw new Error('Upload failed');
+                    }
+                } catch (e) {
+                    console.error('[Store] uploadFile error', e);
+                    return null;
+                }
+            },
 
             // --- Order Notification ---
             incrementNewOrderCount: () => set((state) => ({ newOrderCount: state.newOrderCount + 1 })),
@@ -248,9 +275,13 @@ export const useStore = create<AppState>()(
                             // Also update current auth user if it matches
                             auth: state.auth.user?.id === id ? { ...state.auth, user: updatedUser } : state.auth
                         }));
+                    } else {
+                        throw new Error(`Failed to update user. Status: ${res.status}`);
                     }
                 } catch (e) {
-                    console.error(e);
+                    console.error('Failed to update user:', e);
+                    alert('사용자 정보 업데이트(승인/거절)에 실패했습니다. (서버/권한 오류)');
+                    throw e; // Rethrow so components mapping this can react to the failure
                 }
             },
 
