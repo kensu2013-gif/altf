@@ -16,6 +16,24 @@
 
 <body class="font-sans text-slate-900 bg-slate-50">
   <div id="root"></div>
+  <script>
+    // [AUTO-FIX] Safely clean up oversized 'inventory' data from localStorage to prevent QuotaExceededError crashes
+    try {
+      const storageKey = 'altf-b2b-storage';
+      const rawData = localStorage.getItem(storageKey);
+      if (rawData && rawData.includes('"inventory"')) {
+        const parsed = JSON.parse(rawData);
+        if (parsed?.state?.inventory) {
+          delete parsed.state.inventory;
+          localStorage.setItem(storageKey, JSON.stringify(parsed));
+          console.log('[Auto-Fix] Successfully purged oversized inventory from localStorage.');
+        }
+      }
+    } catch (e) {
+      console.warn('[Auto-Fix] Failed to clean localStorage, attempting full removal.', e);
+      localStorage.removeItem('altf-b2b-storage');
+    }
+  </script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 
