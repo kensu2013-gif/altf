@@ -125,6 +125,7 @@ export interface Order {
     createdAt: string;
     memo?: string;
     isDeleted?: boolean; // Soft Delete Flag
+    linkedQuoteId?: string; // Link to original Quote if originated from one
     // Supplier PO Data
     supplierInfo?: {
         company_name: string;

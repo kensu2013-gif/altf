@@ -253,17 +253,34 @@ const server = http.createServer(async (req, res) => {
         let companyEng = aromanize.romanize(companyBase);
         // Remove spaces and special chars, uppercase
         companyEng = companyEng.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-        const companyAbbr = companyEng.slice(0, 5);
+        const companyAbbr = companyEng.slice(0, 5).padEnd(3, 'X'); // Min 3 chars
 
-        // 2. Date (YYMMDD)
+        // 2. Date (YYYYMMDD)
         const now = new Date();
-        const yymmdd = now.toISOString().slice(2, 10).replace(/-/g, ''); // 260210
+        // Adjust for Korean Timezone (UTC+9) safely for ID generation
+        const kstOffset = 9 * 60 * 60 * 1000;
+        const kstDate = new Date(now.getTime() + kstOffset);
+        const yyyymmdd = kstDate.toISOString().slice(0, 10).replace(/-/g, ''); // e.g. 20260223
 
         // 3. Sequence (Count items with same date prefix)
-        // Simple mock approach: filter list for IDs containing current date or just list length + 1
-        const seq = String(list.length + 1).padStart(3, '0');
+        const todayPrefix = `${type}-${yyyymmdd}-${companyAbbr}`;
+        let maxSeq = 0;
+        for (const item of list) {
+            if (item.id && item.id.startsWith(todayPrefix)) {
+                const parts = item.id.split('-');
+                if (parts.length > 3) {
+                    const seqStr = parts[parts.length - 1]; // last part
+                    const seqNum = parseInt(seqStr, 10);
+                    if (!isNaN(seqNum) && seqNum > maxSeq) {
+                        maxSeq = seqNum;
+                    }
+                }
+            }
+        }
 
-        return `${type}-${companyAbbr}-${yymmdd}-${seq}`;
+        const seq = String(maxSeq + 1).padStart(3, '0');
+
+        return `${type}-${yyyymmdd}-${companyAbbr}-${seq}`;
     }
 
     // Use db.users instead of users array
@@ -506,7 +523,7 @@ const server = http.createServer(async (req, res) => {
                 // Extract Customer Name (try top level or inside customer object)
                 const custName = data.customerName || (data.customer && data.customer.company_name) || '';
 
-                const newId = generateId('O', data.userId, custName, db.orders);
+                const newId = generateId('PO', data.userId, custName, db.orders);
 
                 const newOrder = {
                     id: newId,

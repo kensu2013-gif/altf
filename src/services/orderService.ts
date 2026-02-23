@@ -97,6 +97,7 @@ export const OrderService = {
                     note: payload.supplier?.note || ''
                 },
                 memo: payload.customer.memo, // Delivery requests etc.
+                linkedQuoteId: payload.meta?.linkedQuoteId as string | undefined, // Link to original quote
                 adminResponse: {
                     confirmedPrice: payload.totals.total_amount,
                     deliveryDate: payload.meta.delivery_date,

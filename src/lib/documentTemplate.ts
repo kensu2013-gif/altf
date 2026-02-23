@@ -340,7 +340,16 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                         <td class="col-mat">${item.material || '-'}</td>
                         ${!isTransaction ? `
                         <td class="col-stock">${item.stock_qty !== undefined ? item.stock_qty.toLocaleString() : '-'}</td>
-                        <td class="col-status">${item.stock_status || '-'}</td>
+                        <td class="col-status">
+                            ${(() => {
+                const st = item.stock_status || '-';
+                let c = '#334155';
+                if (st.includes('출고가능')) c = '#0f766e';
+                else if (st.includes('일부 주문생산')) c = '#d97706';
+                else if (st.includes('재고없음') || st.includes('재고 없음')) c = '#e11d48';
+                return `<span style="color: ${c}; font-weight: 800;">${st}</span>`;
+            })()}
+                        </td>
                         <td class="col-loc">${item.location_maker || '-'}</td>
                         ` : ''}
                         <td class="col-qty">${item.qty}</td>

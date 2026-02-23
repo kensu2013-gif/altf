@@ -30,6 +30,7 @@ export interface DocumentPayload {
         delivery_date?: string; // For Quote/Order
         page_count?: number; // Total pages (if pre-calc needed)
         title?: string; // Custom Title Overwrite
+        linkedQuoteId?: string; // Origin Quote ID
     };
     supplier: { // Sender Info (Us or Vendor)
         company_name: string;

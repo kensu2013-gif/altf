@@ -262,7 +262,8 @@ export default function MyPage() {
                 doc_no: docNo,
                 created_at: now.toLocaleString(),
                 channel: 'WEB',
-                delivery_date: quote.adminResponse?.deliveryDate // Carry over confirmed date
+                delivery_date: quote.adminResponse?.deliveryDate, // Carry over confirmed date
+                linkedQuoteId: quote.id
             },
             supplier: {
                 company_name: '알트에프(ALTF)',
@@ -938,6 +939,7 @@ function ProfileField({ label, value, onSave }: { label: string, value: string, 
 }
 
 function DetailModal({ record, isOrder, onClose, onOrder }: { record: QuotationRecord | OrderRecord, isOrder: boolean, onClose: () => void, onOrder?: () => void }) {
+    const user = useStore(state => state.auth.user);
     const [previewContent, setPreviewContent] = useState<string | null>(null);
     const [previewDocType, setPreviewDocType] = useState<DocumentType>('QUOTATION');
 
@@ -998,10 +1000,11 @@ function DetailModal({ record, isOrder, onClose, onOrder }: { record: QuotationR
                 business_no: '838-05-01054'
             },
             customer: {
-                company_name: record.customerName || '고객사',
-                contact_name: '-', // History might not have full contact details if not stored.
-                tel: '-',
-                email: '-'
+                company_name: record.customerName || user?.companyName || '고객사',
+                contact_name: user?.contactName || '-',
+                tel: user?.phone || '-',
+                email: user?.email || '-',
+                address: user?.address || '-'
             },
             items: docItems,
             totals: {
@@ -1083,24 +1086,25 @@ function DetailModal({ record, isOrder, onClose, onOrder }: { record: QuotationR
                         </table>
                     </div>
 
-                    {quotation?.adminResponse && (
+                    {/* Admin Response Section (Both Quotes and Orders) */}
+                    {record.adminResponse && (
                         <div className="mx-6 mb-4 space-y-3">
                             {/* Admin Note */}
-                            {quotation.adminResponse.note && (
+                            {record.adminResponse.note && (
                                 <div className="px-4 py-3 bg-teal-50 border border-teal-100 rounded-lg text-sm text-teal-900 mt-4">
                                     <h4 className="font-bold text-teal-700 text-xs uppercase mb-1 flex items-center gap-1">
                                         <div className="w-2 h-2 rounded-full bg-teal-500" /> 관리자 답변 (Admin Note)
                                     </h4>
-                                    <p className="whitespace-pre-wrap">{quotation.adminResponse.note}</p>
+                                    <p className="whitespace-pre-wrap">{record.adminResponse.note}</p>
                                 </div>
                             )}
 
                             {/* Delivery Date */}
-                            {quotation.adminResponse.deliveryDate && (
+                            {record.adminResponse.deliveryDate && (
                                 <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg border border-slate-100 text-sm">
                                     <span className="font-bold text-slate-500 text-xs uppercase">납품 가능일:</span>
                                     <span className="font-mono font-bold text-slate-800">
-                                        {new Date(quotation.adminResponse.deliveryDate).toLocaleDateString()}
+                                        {new Date(record.adminResponse.deliveryDate).toLocaleDateString()}
                                     </span>
                                 </div>
                             )}
