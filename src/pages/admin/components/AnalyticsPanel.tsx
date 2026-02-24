@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
-import type { Order } from '../../../types';
+import type { Order, Product } from '../../../types';
 import { TrendingUp, TrendingDown, DollarSign, Users } from 'lucide-react';
 
 interface AnalyticsPanelProps {
     orders: Order[];
-    inventory: any[]; // Assuming generic array to bypass strict type dependencies here if needed, or proper type
+    inventory: Product[];
 }
 
 export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
