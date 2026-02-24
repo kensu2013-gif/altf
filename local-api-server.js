@@ -1,6 +1,7 @@
 import http from 'http';
 import aromanize from 'aromanize';
 import crypto from 'crypto';
+import zlib from 'zlib';
 
 const PORT = process.env.PORT || 3001;
 
@@ -78,6 +79,13 @@ await loadData();
 
 const sessionStore = new Map(); // session_id -> items[]
 
+// --- Global Memory Cache ---
+let inventoryCache = {
+    gzippedData: null,
+    rawData: null,
+    timestamp: 0
+};
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 const server = http.createServer(async (req, res) => {
     // CORS headers
@@ -232,12 +240,38 @@ const server = http.createServer(async (req, res) => {
     // GET /api/inventory/inventory.json
     if (req.method === 'GET' && url.pathname === '/api/inventory/inventory.json') {
         try {
-            const inventoryData = await getInventoryFromS3();
-            res.writeHead(200, {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache, no-store, must-revalidate'
-            });
-            res.end(JSON.stringify(inventoryData));
+            const now = Date.now();
+
+            // Check memory cache first
+            if (!inventoryCache.gzippedData || (now - inventoryCache.timestamp) > CACHE_TTL) {
+                console.log('[API] Cache miss. Fetching inventory from S3...');
+                const inventoryData = await getInventoryFromS3();
+
+                const rawJson = JSON.stringify(inventoryData);
+                inventoryCache.rawData = Buffer.from(rawJson, 'utf-8');
+                inventoryCache.gzippedData = zlib.gzipSync(inventoryCache.rawData);
+                inventoryCache.timestamp = now;
+            } else {
+                console.log('[API] Cache hit. Serving inventory from memory.');
+            }
+
+            const acceptEncoding = req.headers['accept-encoding'] || '';
+
+            // Serve Gzip if supported by browser
+            if (acceptEncoding.includes('gzip')) {
+                res.writeHead(200, {
+                    'Content-Type': 'application/json',
+                    'Content-Encoding': 'gzip',
+                    'Cache-Control': 'public, max-age=300'
+                });
+                res.end(inventoryCache.gzippedData);
+            } else {
+                res.writeHead(200, {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'public, max-age=300'
+                });
+                res.end(inventoryCache.rawData);
+            }
         } catch (error) {
             console.error('[API] Failed to serve inventory.json:', error);
             res.writeHead(500, { 'Content-Type': 'application/json' });
