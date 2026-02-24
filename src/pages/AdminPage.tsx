@@ -41,15 +41,22 @@ export default function AdminPage() {
             ? '/api/orders'
             : '/api/my/orders';
 
-        fetch(endpoint, { headers, cache: 'no-store' })
-            .then(res => {
-                if (res.ok) return res.json();
-                throw new Error('Failed to fetch');
-            })
-            .then(data => {
-                if (Array.isArray(data)) setOrders(data);
-            })
-            .catch(console.error);
+        const fetchOrders = () => {
+            fetch(endpoint, { headers, cache: 'no-store' })
+                .then(res => {
+                    if (res.ok) return res.json();
+                    throw new Error('Failed to fetch');
+                })
+                .then(data => {
+                    if (Array.isArray(data)) setOrders(data);
+                })
+                .catch(console.error);
+        };
+
+        fetchOrders();
+
+        window.addEventListener('focus', fetchOrders);
+        return () => window.removeEventListener('focus', fetchOrders);
     }, [setOrders, user]);
 
     // UI State

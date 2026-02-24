@@ -639,7 +639,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
 
             {/* Slide-over Panel */}
-            <div className="w-full max-w-7xl h-full bg-white shadow-2xl pointer-events-auto flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="w-full xl:max-w-7xl h-full bg-white shadow-2xl pointer-events-auto flex flex-col animate-in slide-in-from-right duration-300">
 
                 {/* Header */}
                 <div className={`flex items-center justify-between p-6 border-b ${isSupplierMode ? 'bg-indigo-50/50 border-indigo-100' : 'bg-slate-50/50 border-slate-100'}`}>

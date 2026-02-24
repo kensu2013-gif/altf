@@ -153,6 +153,20 @@ export const OrderService = {
                 id: apiId
             });
 
+            // Update linked quote status to COMPLETED if it exists
+            if (apiPayload.linkedQuoteId) {
+                store.getState().updateQuotation(apiPayload.linkedQuoteId, { status: 'COMPLETED' });
+                try {
+                    await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${apiPayload.linkedQuoteId}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: 'COMPLETED' })
+                    });
+                } catch (err) {
+                    console.error('Failed to update quote status on server:', err);
+                }
+            }
+
             // eslint-disable-next-line no-constant-condition
             if (webhookSuccess || true) { // Forced true for UX until they add real URL
                 return { success: true, order_id: apiId };

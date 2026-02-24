@@ -487,7 +487,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
     return (
         <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
-            <div className="w-full max-w-[95%] h-full bg-white shadow-2xl pointer-events-auto flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="w-full xl:max-w-[95%] h-full bg-white shadow-2xl pointer-events-auto flex flex-col animate-in slide-in-from-right duration-300">
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
                     <div className="space-y-6">
                         {/* Customer Info Edit Section */}

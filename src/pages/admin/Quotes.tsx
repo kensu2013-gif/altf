@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/Button';
 import type { Quotation } from '../../types';
 
 export default function AdminQuotes() {
-    const { quotes, updateQuotation, trashQuotation, restoreQuotation, permanentDeleteQuotation, setQuotes } = useStore((state) => state);
+    const { quotes, updateQuotation, trashQuotation, restoreQuotation, permanentDeleteQuotation, setQuotes, fetchUsers } = useStore((state) => state);
     const [selectedQuote, setSelectedQuote] = useState<typeof quotes[0] | null>(null);
     const [filterStatus, setFilterStatus] = useState<string>('all');
 
@@ -17,6 +17,8 @@ export default function AdminQuotes() {
     // Sync with Server on Mount
     useEffect(() => {
         if (!user) return;
+
+        fetchUsers();
 
         const headers: Record<string, string> = {
             'Content-Type': 'application/json'
@@ -37,7 +39,7 @@ export default function AdminQuotes() {
                 if (Array.isArray(data)) setQuotes(data);
             })
             .catch(console.error);
-    }, [setQuotes, user]);
+    }, [setQuotes, user, fetchUsers]);
 
     const filteredQuotes = quotes.filter(q => {
         if (filterStatus === 'TRASH') return q.isDeleted;
