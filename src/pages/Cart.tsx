@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useStore, type DeliveryInfo } from '../store/useStore';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -21,8 +21,24 @@ export default function QuotationEditor() {
     const { items, memo: quotationMemo } = useStore((state) => state.quotation);
     // Use selector for stable reference
     const user = useStore(state => state.auth.user);
-    const { updateItem, removeItem, inventory, clearQuotation, incrementNewOrderCount, setQuotationMemo, uploadFile } = useStore((state) => state);
+    const { updateItem, removeItem, inventory, clearQuotation, incrementNewOrderCount, setQuotationMemo, uploadFile, pullDraftQuotation } = useStore((state) => state);
 
+    // Draft Sync Polling
+    useEffect(() => {
+        if (!user) return;
+
+        // Initial pull
+        pullDraftQuotation();
+
+        // Poll every 10 seconds
+        const intervalId = setInterval(() => {
+            pullDraftQuotation();
+        }, 10000);
+
+        return () => clearInterval(intervalId);
+    }, [user, pullDraftQuotation]);
+
+    const navigate = useNavigate();
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -716,14 +732,16 @@ export default function QuotationEditor() {
                                 </table >
                             </div >
 
-                            {/* Quick Add Row */}
                             <div className="p-3 bg-slate-50/50 border-t border-slate-200/50 backdrop-blur-sm" >
-                                <Link to="/search" state={{ returnToSearch: true }}>
-                                    <Button variant="ghost" size="sm" className="w-full text-slate-500 hover:text-teal-700 hover:bg-teal-50/50 gap-2 font-bold border border-dashed border-slate-300 hover:border-teal-300 rounded-xl h-10 transition-all">
-                                        <Plus className="w-4 h-4" />
-                                        제품 추가하기 (Add Item)
-                                    </Button>
-                                </Link>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => navigate('/search', { state: { returnToSearch: true } })}
+                                    className="w-full text-slate-500 hover:text-teal-700 hover:bg-teal-50/50 gap-2 font-bold border border-dashed border-slate-300 hover:border-teal-300 rounded-xl h-10 transition-all"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    제품 추가하기 (Add Item)
+                                </Button>
                             </div >
                         </motion.div>
 

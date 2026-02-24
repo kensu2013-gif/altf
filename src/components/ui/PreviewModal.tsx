@@ -57,8 +57,37 @@ export function PreviewModal({ htmlContent, onClose, onSend, onPrint, onOrder, d
     }, [onClose]);
 
     const handlePrint = async () => {
-        if (onPrint) await onPrint();
-        if (iframeRef.current && iframeRef.current.contentWindow) {
+        // Open a new window immediately to avoid iOS/Safari popup blockers
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.open();
+            printWindow.document.write('<div style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;color:#666;">문서를 준비 중입니다... (Preparing document...)</div>');
+            printWindow.document.close();
+        }
+
+        if (onPrint) {
+            try {
+                await onPrint();
+            } catch (err) {
+                console.error("Print pre-action error:", err);
+                if (printWindow) printWindow.close();
+                return;
+            }
+        }
+
+        if (printWindow) {
+            // Rewrite with the actual HTML content
+            printWindow.document.open();
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+
+            // Use a short timeout to let the DOM and external CSS (Tailwind) parse
+            setTimeout(() => {
+                printWindow.focus();
+                printWindow.print();
+            }, 800);
+        } else if (iframeRef.current && iframeRef.current.contentWindow) {
+            // Fallback
             iframeRef.current.contentWindow.print();
         }
     };

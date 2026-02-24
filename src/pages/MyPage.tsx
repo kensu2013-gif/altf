@@ -105,11 +105,17 @@ export default function MyPage() {
         try {
             // Fetch Quotations
             const quotesRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations?userId=${user?.id}`, { cache: 'no-store' });
-            if (quotesRes.ok) setQuotations(await quotesRes.json());
+            if (quotesRes.ok) {
+                const quotes = await quotesRes.json();
+                setQuotations(quotes.filter((q: QuotationRecord) => !('isDeleted' in q && q.isDeleted)));
+            }
 
             // Fetch Orders
             const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders?userId=${user?.id}`, { cache: 'no-store' });
-            if (ordersRes.ok) setOrders(await ordersRes.json());
+            if (ordersRes.ok) {
+                const orders = await ordersRes.json();
+                setOrders(orders.filter((o: OrderRecord) => !('isDeleted' in o && o.isDeleted)));
+            }
         } catch (error) {
             console.error("Failed to fetch history", error);
         } finally {

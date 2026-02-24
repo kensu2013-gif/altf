@@ -64,6 +64,8 @@ interface AppState {
     clearQuotation: () => void;
     setQuotationMemo: (memo: string) => void;
     loadQuotation: (items: (QuoteImportItem | LineItem)[]) => void;
+    syncDraftQuotation: () => Promise<void>;
+    pullDraftQuotation: () => Promise<void>;
 
     // Inventory Actions
     setInventory: (data: Product[]) => void;
@@ -501,124 +503,171 @@ export const useStore = create<AppState>()(
             setQuotes: (quotes) => set({ quotes }),
             setOrders: (orders) => set({ orders }),
 
-            // --- Quotation ---
-            addItem: (item) => set((state) => {
-                const normalizedItem = {
-                    ...item,
-                    itemId: generateSku(item),
-                    unitPrice: item.unitPrice,
-                    amount: Number(item.unitPrice) * Number(item.quantity)
-                };
-                return {
-                    quotation: {
-                        ...state.quotation,
-                        items: [...state.quotation.items, normalizedItem]
-                    }
-                };
-            }),
-            loadQuotation: (items: (QuoteImportItem | LineItem)[]) => set((state) => {
-                // Normalize and generate IDs
-                const normalizedItems: LineItem[] = items.map(item => {
-                    // Cast to QuoteImportItem
-                    const raw = item as QuoteImportItem;
-
-                    const name = raw.item_name || raw.name || '';
-                    const thickness = raw.thickness || '';
-                    const size = raw.size || '';
-                    const material = raw.material || '';
-
-                    // --- Unified Verification Logic ---
-                    // Try to find matching product in inventory to link it
-                    const match = state.inventory.find(p =>
-                        p.name === name &&
-                        p.thickness === thickness &&
-                        p.size === size &&
-                        p.material === material
-                    );
-
-                    let baseItem: Partial<LineItem> = {};
-
-                    if (match) {
-                        // Found in inventory -> Link it!
-                        baseItem = {
-                            productId: match.id,
-                            unitPrice: match.unitPrice,
-                            stockStatus: match.stockStatus,
-                            location: match.location,
-                            maker: match.maker,
-                            isVerified: true,
-                            currentStock: match.currentStock,
-
-                            locationStock: match.locationStock,
-                            marking_wait_qty: match.marking_wait_qty, // Restore Marking Wait Quantity from Live Inventory
-                        };
-                    } else {
-                        // Not found -> Manual
-                        const rawPrice = Number(raw.unit_price || raw.unitPrice || 0);
-                        baseItem = {
-                            productId: (raw['productId'] as string) || null,
-                            unitPrice: rawPrice,
-                            isVerified: false,
-                        };
-                    }
-
-                    const qty = Number(raw.qty || raw.quantity || 1);
-                    const price = baseItem.unitPrice || 0;
-
-                    return {
+            addItem: (item) => {
+                set((state) => {
+                    const normalizedItem = {
                         ...item,
-                        id: generateUUID(), // Always new ID
-                        name: name,
-                        thickness: thickness,
-                        size: size,
-                        material: material,
-                        quantity: qty,
-                        amount: price * qty, // Restore amount calculation
-                        // Generate Composite ID
-                        itemId: generateSku({ name, thickness, size, material }),
-                        ...baseItem
-                    } as LineItem;
+                        itemId: generateSku(item),
+                        unitPrice: item.unitPrice,
+                        amount: Number(item.unitPrice) * Number(item.quantity)
+                    };
+                    return {
+                        quotation: {
+                            ...state.quotation,
+                            items: [...state.quotation.items, normalizedItem]
+                        }
+                    };
                 });
-                return {
-                    quotation: {
-                        ...state.quotation,
-                        items: normalizedItems
-                    }
-                };
-            }),
-            updateItem: (itemId, updates) => set((state) => {
-                return {
-                    quotation: {
-                        ...state.quotation,
-                        items: state.quotation.items.map(i => {
-                            if (i.id === itemId) {
-                                const updatedItem = { ...i, ...updates };
-                                // Re-calculate amount if price/qty changed
-                                updatedItem.amount = Number(updatedItem.unitPrice) * Number(updatedItem.quantity);
+                get().syncDraftQuotation();
+            },
+            loadQuotation: (items: (QuoteImportItem | LineItem)[]) => {
+                set((state) => {
+                    // Normalize and generate IDs
+                    const normalizedItems: LineItem[] = items.map(item => {
+                        // Cast to QuoteImportItem
+                        const raw = item as QuoteImportItem;
 
-                                // Re-generate composite ID if key fields changed
-                                if (updates.name !== undefined || updates.thickness !== undefined || updates.size !== undefined || updates.material !== undefined) {
-                                    updatedItem.itemId = generateSku(updatedItem);
+                        const name = raw.item_name || raw.name || '';
+                        const thickness = raw.thickness || '';
+                        const size = raw.size || '';
+                        const material = raw.material || '';
+
+                        // --- Unified Verification Logic ---
+                        // Try to find matching product in inventory to link it
+                        const match = state.inventory.find(p =>
+                            p.name === name &&
+                            p.thickness === thickness &&
+                            p.size === size &&
+                            p.material === material
+                        );
+
+                        let baseItem: Partial<LineItem> = {};
+
+                        if (match) {
+                            // Found in inventory -> Link it!
+                            baseItem = {
+                                productId: match.id,
+                                unitPrice: match.unitPrice,
+                                stockStatus: match.stockStatus,
+                                location: match.location,
+                                maker: match.maker,
+                                isVerified: true,
+                                currentStock: match.currentStock,
+
+                                locationStock: match.locationStock,
+                                marking_wait_qty: match.marking_wait_qty, // Restore Marking Wait Quantity from Live Inventory
+                            };
+                        } else {
+                            // Not found -> Manual
+                            const rawPrice = Number(raw.unit_price || raw.unitPrice || 0);
+                            baseItem = {
+                                productId: (raw['productId'] as string) || null,
+                                unitPrice: rawPrice,
+                                isVerified: false,
+                            };
+                        }
+
+                        const qty = Number(raw.qty || raw.quantity || 1);
+                        const price = baseItem.unitPrice || 0;
+
+                        return {
+                            ...item,
+                            id: generateUUID(), // Always new ID
+                            name: name,
+                            thickness: thickness,
+                            size: size,
+                            material: material,
+                            quantity: qty,
+                            amount: price * qty, // Restore amount calculation
+                            // Generate Composite ID
+                            itemId: generateSku({ name, thickness, size, material }),
+                            ...baseItem
+                        } as LineItem;
+                    });
+                    return {
+                        quotation: {
+                            ...state.quotation,
+                            items: normalizedItems
+                        }
+                    };
+                });
+                get().syncDraftQuotation();
+            },
+            updateItem: (itemId, updates) => {
+                set((state) => {
+                    return {
+                        quotation: {
+                            ...state.quotation,
+                            items: state.quotation.items.map(i => {
+                                if (i.id === itemId) {
+                                    const updatedItem = { ...i, ...updates };
+                                    // Re-calculate amount if price/qty changed
+                                    updatedItem.amount = Number(updatedItem.unitPrice) * Number(updatedItem.quantity);
+
+                                    // Re-generate composite ID if key fields changed
+                                    if (updates.name !== undefined || updates.thickness !== undefined || updates.size !== undefined || updates.material !== undefined) {
+                                        updatedItem.itemId = generateSku(updatedItem);
+                                    }
+                                    return updatedItem;
                                 }
-                                return updatedItem;
-                            }
-                            return i;
-                        })
+                                return i;
+                            })
+                        }
+                    };
+                });
+                get().syncDraftQuotation();
+            },
+            removeItem: (itemId) => {
+                set((state) => ({
+                    quotation: {
+                        ...state.quotation,
+                        items: state.quotation.items.filter(i => i.id !== itemId)
                     }
-                };
-            }),
-            removeItem: (itemId) => set((state) => ({
-                quotation: {
-                    ...state.quotation,
-                    items: state.quotation.items.filter(i => i.id !== itemId)
+                }));
+                get().syncDraftQuotation();
+            },
+            clearQuotation: () => {
+                set((state) => ({ quotation: { ...state.quotation, items: [], memo: '' } }));
+                get().syncDraftQuotation();
+            },
+            setQuotationMemo: (memo) => {
+                set((state) => ({ quotation: { ...state.quotation, memo } }));
+                get().syncDraftQuotation();
+            },
+            syncDraftQuotation: async () => {
+                const { auth, quotation } = get();
+                if (!auth.isAuthenticated || !auth.user) return;
+                try {
+                    // Save draft to user profile
+                    await fetch(`${import.meta.env.VITE_API_URL || ''}/api/users/${auth.user.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ draftQuotation: quotation })
+                    });
+                } catch (e) {
+                    console.error('Failed to sync draft', e);
                 }
-            })),
-            clearQuotation: () => set((state) => ({
-                quotation: { ...state.quotation, items: [], memo: '' }
-            })),
-            setQuotationMemo: (memo) => set((state) => ({
-                quotation: { ...state.quotation, memo }
-            }))
+            },
+            pullDraftQuotation: async () => {
+                const { auth, quotation } = get();
+                if (!auth.isAuthenticated || !auth.user) return;
+                try {
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/users`);
+                    if (res.ok) {
+                        const users = await res.json();
+                        const user = users.find((u: User) => u.id === auth.user?.id);
+                        if (user && user.draftQuotation) {
+                            // Only overwrite if local is empty or we want to force sync
+                            // For simplicity, we just merge or replace if local is empty
+                            if (quotation.items.length === 0 && user.draftQuotation.items.length > 0) {
+                                set({ quotation: user.draftQuotation });
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to pull draft', e);
+                }
+            }
         }),
         {
             name: 'altf-b2b-storage',
