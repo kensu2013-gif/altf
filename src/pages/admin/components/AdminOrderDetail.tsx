@@ -563,17 +563,34 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
         try {
             let attachmentUrl = order.supplierPO?.url;
+            let attachmentBase64 = null;
+            let attachmentMimeType = null;
 
             if (supplierPoFiles.length > 0) {
+                const file = supplierPoFiles[0];
+                attachmentMimeType = file.type || 'application/pdf'; // Basic fallback for printing forms
+
+                // Read file as base64 string simultaneously
+                attachmentBase64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const base64String = (reader.result as string).split(',')[1];
+                        resolve(base64String);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
+                // Attempt S3 Upload
                 const { uploadFile } = useStore.getState();
-                const res = await uploadFile(supplierPoFiles[0], 'po', order.id + '_po');
+                const res = await uploadFile(file, 'po', order.id + '_po');
                 if (res) {
                     attachmentUrl = res.url;
                     order.supplierPO = res; // Temporary update for subsequent clicks
                 }
             }
 
-            if (!attachmentUrl) throw new Error("첨부파일 URL을 서버에서 받아오지 못했습니다.");
+            if (!attachmentUrl && !attachmentBase64) throw new Error("첨부파일 데이터 확보에 실패했습니다.");
 
             const payload = {
                 event: "purchase_order_sent",
@@ -594,7 +611,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         subject: emailSubject,
                         attachmentName: emailAttachmentName
                     },
-                    attachmentUrl: attachmentUrl
+                    attachmentUrl: attachmentUrl || null,
+                    attachmentBase64: attachmentBase64 || null,
+                    attachmentMimeType: attachmentMimeType || null
                 }
             };
 
