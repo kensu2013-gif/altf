@@ -598,7 +598,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 }
             };
 
-            const response = await fetch("https://hook.make.com/PLACEHOLDER_WEBHOOK_URL", {
+            const response = await fetch("https://hook.us2.make.com/hyb2pdm95pae17a8f96sqyexj82lyhnw", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
