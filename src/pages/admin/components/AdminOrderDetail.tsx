@@ -10,6 +10,7 @@ import { useInventoryIndex } from '../../../hooks/useInventoryIndex';
 import { formatCurrency } from '../../../lib/utils';
 import { renderDocumentHTML } from '../../../lib/documentTemplate';
 import type { DocumentPayload } from '../../../types/document';
+import { PreviewModal } from '../../../components/ui/PreviewModal';
 
 interface AdminOrderDetailProps {
     order: Order;
@@ -51,6 +52,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     // Supplier Mode State
     const [isSupplierMode, setIsSupplierMode] = useState(initialMode === 'SUPPLIER');
+
+    const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+    const [previewType, setPreviewType] = useState<'PO' | 'SALES'>('PO');
 
     const [items, setItems] = useState<LineItem[]>(order.items || []);
     const [poItems, setPoItems] = useState<LineItem[]>(() => {
@@ -276,26 +280,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         };
 
         try {
-            let html = renderDocumentHTML(payload);
-
-            html = html.replace('</body>', '</body>');
-
-            const printWindow = window.open('', '_blank');
-            if (printWindow) {
-                printWindow.document.write(html);
-                printWindow.document.close();
-                // Printing is now handled by the template's window.onload script or user button
-            } else {
-                alert('팝업 차단을 해제해주세요.');
-            }
-
-            // [MOD] Auto-Attach Document for Webhook
-            const blob = new Blob([html], { type: 'text/html' });
-            const file = new File([blob], emailAttachmentName.replace('.pdf', '.html'), { type: 'text/html' });
-
-            setSupplierPoFiles([file]);
-            alert("발주서가 새 창으로 열렸습니다. (인쇄하여 PDF로 보관하시거나 바로 화면 하단의 '발주 메일 전송' 버튼을 누르시면 이 발주서가 웹훅으로 자동 전송됩니다.)");
-
+            const html = renderDocumentHTML(payload);
+            setPreviewHtml(html);
+            setPreviewType('PO');
         } catch (e) {
             console.error('Error generating PO:', e);
             alert('발주서 생성 중 오류가 발생했습니다.');
@@ -373,13 +360,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
         try {
             const html = renderDocumentHTML(payload);
-            const printWindow = window.open('', '_blank');
-            if (printWindow) {
-                printWindow.document.write(html);
-                printWindow.document.close();
-            } else {
-                alert('팝업 차단을 해제해주세요.');
-            }
+            setPreviewHtml(html);
+            setPreviewType('SALES');
         } catch (e) {
             console.error('Error generating Sales Order:', e);
             alert('문서 생성 중 오류가 발생했습니다.');
@@ -603,6 +585,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         tel: supplierInfo.tel,
                         email: supplierInfo.email || "dksales@daekyungbend.com"
                     },
+                    buyer: { ...buyerInfo },
+                    shipping: { memo: shippingMemo },
                     email: {
                         from: "ALTF@ALTF.KR",
                         bcc: "AIRSPACE@ALTF.KR",
@@ -1713,6 +1697,13 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 </div>
 
             </div >
+            {previewHtml && (
+                <PreviewModal
+                    htmlContent={previewHtml}
+                    docType={previewType === 'PO' ? 'ORDER' : 'TRANSACTION'}
+                    onClose={() => setPreviewHtml(null)}
+                />
+            )}
         </div >
     );
 });
