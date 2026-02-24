@@ -3,9 +3,10 @@ import { useStore } from '../store/useStore';
 import { CalmPageShell } from '../components/ui/CalmPageShell';
 import { PageTransition } from '../components/ui/PageTransition';
 import {
-    LayoutDashboard, ChevronDown, Building2, Trash2, ArchiveRestore
+    LayoutDashboard, ChevronDown, Building2, Trash2, ArchiveRestore, Download
 } from 'lucide-react';
 import { AdminOrderDetail } from './admin/components/AdminOrderDetail';
+import { AnalyticsPanel } from './admin/components/AnalyticsPanel';
 import type { Order } from '../types';
 import { useInventoryIndex } from '../hooks/useInventoryIndex';
 
@@ -104,32 +105,111 @@ export default function AdminPage() {
         }
     };
 
+    const handleExportCSV = () => {
+        if (filteredOrders.length === 0) {
+            alert("다운로드할 데이터가 없습니다.");
+            return;
+        }
+
+        const headers = ['주문번호', '주문일시', '고객사', '주문항목', '담당자', '매출금액', '매입금액(원가)', '이익금', '상태'];
+        const csvRows = [headers.join(',')];
+
+        filteredOrders.forEach(order => {
+            const dateStr = new Date(order.createdAt).toLocaleString('ko-KR');
+            const itemName = order.items.length > 0
+                ? (order.items[0].name + (order.items.length > 1 ? ` 외 ${order.items.length - 1}건` : ''))
+                : '항목없음';
+            const managerName = order.lastUpdatedBy?.name || '미배정';
+
+            // Re-calculate Cost (logic matching the table display)
+            const targetItems = (order.po_items && order.po_items.length > 0) ? order.po_items : order.items;
+            const cost = targetItems.reduce((acc, item) => {
+                const product = findProduct(item);
+                const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
+                let itemCost = 0;
+                if (item.supplierRate !== undefined) {
+                    itemCost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
+                } else {
+                    const rate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
+                    itemCost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+                }
+                return acc + (itemCost * item.quantity);
+            }, 0);
+
+            const sales = order.totalAmount || 0;
+            const profit = sales - cost;
+
+            // Escape commas and quotes for CSV cells
+            const row = [
+                `"${order.id}"`,
+                `"${dateStr}"`,
+                `"${order.customerName}"`,
+                `"${itemName}"`,
+                `"${managerName}"`,
+                sales,
+                cost,
+                profit,
+                `"${order.status}"`
+            ];
+
+            csvRows.push(row.join(','));
+        });
+
+        const csvString = csvRows.join('\n');
+        // Add BOM for Excel UTF-8 display
+        const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `주문내역통계_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <CalmPageShell>
             <div className="mb-6 flex flex-col gap-1">
                 <h1 className="text-2xl font-bold text-slate-900">관리자 대시보드</h1>
                 <p className="text-sm text-slate-500">전체 주문 내역 및 상태 관리</p>
             </div>
+
+            {user?.role === 'MASTER' && (
+                <AnalyticsPanel orders={filteredOrders} inventory={inventory} />
+            )}
+
             <PageTransition>
                 <div className="space-y-6">
-                    {/* Status Filters */}
-                    <div className="flex bg-white p-1 rounded-lg border border-slate-200 shadow-sm w-fit">
-                        <FilterButton active={filterStatus === 'all'} onClick={() => setFilterStatus('all')} label="전체" />
-                        <FilterButton active={filterStatus === 'SUBMITTED'} onClick={() => setFilterStatus('SUBMITTED')} label="주문접수" />
-                        <FilterButton active={filterStatus === 'PROCESSING'} onClick={() => setFilterStatus('PROCESSING')} label="처리중" />
-                        <FilterButton active={filterStatus === 'ON_HOLD'} onClick={() => setFilterStatus('ON_HOLD')} label="보류" />
-                        <FilterButton active={filterStatus === 'WITHDRAWN'} onClick={() => setFilterStatus('WITHDRAWN')} label="회수" />
-                        <FilterButton active={filterStatus === 'SHIPPED'} onClick={() => setFilterStatus('SHIPPED')} label="배송중" />
-                        <FilterButton active={filterStatus === 'COMPLETED'} onClick={() => setFilterStatus('COMPLETED')} label="완료" />
-                        <FilterButton active={filterStatus === 'CANCELLED'} onClick={() => setFilterStatus('CANCELLED')} label="취소" />
-                        <div className="w-[1px] h-4 bg-slate-200 mx-1" />
-                        <button
-                            onClick={() => setFilterStatus('TRASH')}
-                            className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${filterStatus === 'TRASH' ? 'bg-red-50 text-red-600 shadow-sm ring-1 ring-red-200' : 'text-slate-400 hover:text-red-500'}`}
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            휴지통
-                        </button>
+                    {/* Status Filters & Utilities */}
+                    <div className="flex items-center justify-between">
+                        <div className="flex bg-white p-1 rounded-lg border border-slate-200 shadow-sm w-fit">
+                            <FilterButton active={filterStatus === 'all'} onClick={() => setFilterStatus('all')} label="전체" />
+                            <FilterButton active={filterStatus === 'SUBMITTED'} onClick={() => setFilterStatus('SUBMITTED')} label="주문접수" />
+                            <FilterButton active={filterStatus === 'PROCESSING'} onClick={() => setFilterStatus('PROCESSING')} label="처리중" />
+                            <FilterButton active={filterStatus === 'ON_HOLD'} onClick={() => setFilterStatus('ON_HOLD')} label="보류" />
+                            <FilterButton active={filterStatus === 'WITHDRAWN'} onClick={() => setFilterStatus('WITHDRAWN')} label="회수" />
+                            <FilterButton active={filterStatus === 'SHIPPED'} onClick={() => setFilterStatus('SHIPPED')} label="배송중" />
+                            <FilterButton active={filterStatus === 'COMPLETED'} onClick={() => setFilterStatus('COMPLETED')} label="완료" />
+                            <FilterButton active={filterStatus === 'CANCELLED'} onClick={() => setFilterStatus('CANCELLED')} label="취소" />
+                            <div className="w-[1px] h-4 bg-slate-200 mx-1" />
+                            <button
+                                onClick={() => setFilterStatus('TRASH')}
+                                className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${filterStatus === 'TRASH' ? 'bg-red-50 text-red-600 shadow-sm ring-1 ring-red-200' : 'text-slate-400 hover:text-red-500'}`}
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                휴지통
+                            </button>
+                        </div>
+
+                        {user?.role === 'MASTER' && (
+                            <button
+                                onClick={handleExportCSV}
+                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors"
+                            >
+                                <Download className="w-4 h-4" />
+                                엑셀(CSV) 다운로드
+                            </button>
+                        )}
                     </div>
 
                     {/* Orders Table */}
@@ -282,8 +362,8 @@ export default function AdminPage() {
                                                                     setSelectedOrder(order);
                                                                 }}
                                                                 className={`text-xs font-bold border rounded px-3 py-1.5 transition-colors whitespace-nowrap ${order.poSent
-                                                                        ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
-                                                                        : 'text-indigo-600 border-indigo-200 hover:bg-indigo-50'
+                                                                    ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                                                                    : 'text-indigo-600 border-indigo-200 hover:bg-indigo-50'
                                                                     }`}
                                                             >
                                                                 매입
