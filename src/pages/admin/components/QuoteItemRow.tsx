@@ -16,6 +16,8 @@ interface QuoteItemRowProps {
     onPriceChange: (index: number, newPrice: number) => void;
     onSupplierRateChange: (index: number, value: number) => void;
     onDiscountRateChange: (index: number, value: number) => void;
+    isSelected?: boolean;
+    onItemSelect?: (index: number, isSelected: boolean) => void;
 }
 
 export const QuoteItemRow = React.memo(({
@@ -25,7 +27,9 @@ export const QuoteItemRow = React.memo(({
     onItemChange,
     onPriceChange,
     onSupplierRateChange,
-    onDiscountRateChange
+    onDiscountRateChange,
+    isSelected = true,
+    onItemSelect
 }: QuoteItemRowProps) => {
 
     // Memoize product lookup to prevent unnecessary recalcs if inventory/item identity changes but data is same
@@ -60,8 +64,17 @@ export const QuoteItemRow = React.memo(({
     const isPriceModified = product ? item.unitPrice !== product.unitPrice : false;
 
     return (
-        <tr className={isUnlinked ? 'bg-red-50/30' : 'bg-white hover:bg-slate-50 transition-colors'}>
-            <td className="px-2 py-3 text-center align-middle text-xs text-slate-400">
+        <tr className={`${isSelected ? '' : 'opacity-40 grayscale'} ${isUnlinked ? 'bg-red-50/30' : 'bg-white hover:bg-slate-50'} transition-all`}>
+            <td className="px-2 py-3 text-center align-middle">
+                <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={(e) => onItemSelect?.(index, e.target.checked)}
+                    className="w-3.5 h-3.5 cursor-pointer accent-teal-600"
+                    title="품목 선택"
+                />
+            </td>
+            <td className="px-1 py-3 text-center align-middle text-xs font-bold text-slate-500">
                 {index + 1}
             </td>
             <td className="px-4 py-3 text-left align-middle">

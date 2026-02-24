@@ -76,6 +76,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 location: product.location,
                 marking_wait_qty: product.marking_wait_qty || 0,
                 base_price: product.base_price ?? product.unitPrice,
+                isSelected: item.isSelected ?? true // default to true
             };
         }
 
@@ -86,7 +87,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             currentStock: 0,
             stockStatus: undefined,
             base_price: 0,
-            marking_wait_qty: 0
+            marking_wait_qty: 0,
+            isSelected: item.isSelected ?? true // default to true
         };
     }, [findProduct]);
 
@@ -98,6 +100,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     // Computed Properties for "Current View" - Use Enriched Versions
     const displayedItems = isSupplierMode ? enrichedPoItems : enrichedItems;
     const setDisplayedItems = isSupplierMode ? setPoItems : setItems;
+    const selectedItems = useMemo(() => displayedItems.filter(item => item.isSelected !== false), [displayedItems]);
 
     const [charges, setCharges] = useState<{ name: string; amount: number; }[]>(order.adminResponse?.additionalCharges || []);
 
@@ -169,8 +172,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const [poNumber, setPoNumber] = useState(order.poNumber || `PO-${order.id.slice(0, 8)}`);
     const [poTitle, setPoTitle] = useState(order.poTitle || '발주서 (PURCHASE ORDER)');
 
-    // Calculation based on Displayed Items
-    const calculatedTotal = displayedItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+    // Calculation based on Selected Items
+    const calculatedTotal = selectedItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
     // [MOD] Apply Global Discount to the Total Calculation
     // Logic: (ItemTotal + AdditionalCharges) * (1 - GlobalDiscount/100)
     const subTotalWithCharges = calculatedTotal + charges.reduce((sum, c) => sum + c.amount, 0);
@@ -178,7 +181,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const totalWithCharges = subTotalWithCharges - globalDiscountAmount;
 
     // Supplier Totals Calculation
-    const { totalSupplierAmount, totalProfit } = displayedItems.reduce((acc, item) => {
+    const { totalSupplierAmount, totalProfit } = selectedItems.reduce((acc, item) => {
         const product = inventory.find(p => p.id === item.productId);
         const basePrice = product?.base_price ?? product?.unitPrice ?? 0;
         const rate = item.supplierRate ?? 0;
@@ -191,6 +194,17 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             totalProfit: acc.totalProfit + profit
         };
     }, { totalSupplierAmount: 0, totalProfit: 0 });
+
+    const handleItemSelect = (index: number, isSelected: boolean) => {
+        const newItems = [...displayedItems];
+        newItems[index] = { ...newItems[index], isSelected };
+        setDisplayedItems(newItems);
+    };
+
+    const handleSelectAll = (isSelected: boolean) => {
+        const newItems = displayedItems.map(item => ({ ...item, isSelected }));
+        setDisplayedItems(newItems);
+    };
 
     const handleAddItem = () => {
         setDisplayedItems([...displayedItems, {
@@ -229,7 +243,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 address: buyerInfo.address, // Use Buyer Address
                 memo: shippingMemo // Pass Shipping Memo explicitly
             },    // Buyer (ALTF)
-            items: displayedItems.map((item, idx) => {
+            items: selectedItems.map((item, idx) => {
                 const product = inventory.find(i => i.id === item.productId);
                 const basePrice = product?.base_price ?? product?.unitPrice ?? 0;
                 const supplierRate = item.supplierRate ?? 0;
@@ -314,7 +328,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 address: linkedUser?.address || '',
                 memo: shippingMemo
             },
-            items: displayedItems.map((item, idx) => ({
+            items: selectedItems.map((item, idx) => ({
                 no: idx + 1,
                 item_name: item.name || '',
                 spec: `${item.thickness || ''} ${item.size || ''} ${item.material || ''}`.trim(),
@@ -1007,7 +1021,16 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                             <table className="w-full text-sm text-left">
                                 <thead className={`${isSupplierMode ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-50 text-slate-600'} border-b ${isSupplierMode ? 'border-indigo-200' : 'border-slate-200'} text-sm font-bold uppercase`}>
                                     <tr>
-                                        <th className="px-2 py-3 w-[3%] text-center font-normal text-slate-400">No.</th>
+                                        <th className="px-2 py-3 w-[2%] text-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={displayedItems.length > 0 && selectedItems.length === displayedItems.length}
+                                                onChange={(e) => handleSelectAll(e.target.checked)}
+                                                className="w-3.5 h-3.5 cursor-pointer accent-teal-600"
+                                                title="전체 선택/해제"
+                                            />
+                                        </th>
+                                        <th className="px-1 py-3 w-[2%] text-center font-normal text-slate-400">No.</th>
                                         <th className="px-4 py-3 w-[30%] text-left">품목명 / 규격 (Item/Spec)</th>
                                         <th className="px-2 py-3 text-center w-[5%]">수량</th>
                                         {isSupplierMode ? (
@@ -1189,10 +1212,20 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         const supplierAmount = supplierPrice * item.quantity;
                                         // Profit = (Customer Sales Price - Supplier Cost Price) * Quantity
                                         const profit = (item.unitPrice - supplierPrice) * item.quantity;
+                                        const isSelected = item.isSelected !== false;
 
                                         return (
-                                            <tr key={idx} className={isUnlinked ? 'bg-red-50/30' : (isSupplierMode ? 'bg-white hover:bg-indigo-50/30' : (isStockInsufficient ? 'bg-red-50/50' : 'bg-white hover:bg-slate-50')) + ' transition-colors'}>
-                                                <td className="px-2 py-3 text-center align-middle text-xs font-bold text-slate-500">
+                                            <tr key={idx} className={`${isSelected ? '' : 'opacity-40 grayscale'} ${isUnlinked ? 'bg-red-50/30' : (isSupplierMode ? 'bg-white hover:bg-indigo-50/30' : (isStockInsufficient ? 'bg-red-50/50' : 'bg-white hover:bg-slate-50'))} transition-all`}>
+                                                <td className="px-2 py-3 text-center align-middle">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={(e) => handleItemSelect(idx, e.target.checked)}
+                                                        className="w-3.5 h-3.5 cursor-pointer accent-teal-600"
+                                                        title="품목 선택"
+                                                    />
+                                                </td>
+                                                <td className="px-1 py-3 text-center align-middle text-xs font-bold text-slate-500">
                                                     {idx + 1}
                                                 </td>
                                                 <td className="px-4 py-3 text-left align-middle">
@@ -1363,7 +1396,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         {isSupplierMode ? (
                                             <>
                                                 {/* Supplier Mode Footer: Sales - Cost = Profit */}
-                                                <td colSpan={9} className="px-6 py-4 text-right bg-indigo-50/30 align-middle">
+                                                <td colSpan={10} className="px-6 py-4 text-right bg-indigo-50/30 align-middle">
                                                     <div className="flex items-center justify-end gap-6 select-none">
 
                                                         {/* Sales Total */}
@@ -1405,7 +1438,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         ) : (
                                             <>
                                                 {/* Customer Mode Footer */}
-                                                <td colSpan={7} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">
+                                                <td colSpan={8} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">
                                                     Total Amount (VAT 별도)
                                                 </td>
                                                 <td colSpan={2} className="px-4 py-3 text-right font-mono text-lg font-bold text-teal-700">

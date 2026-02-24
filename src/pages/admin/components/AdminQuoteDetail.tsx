@@ -3,7 +3,7 @@ import type { Quotation, LineItem } from '../../../types';
 import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { formatCurrency } from '../../../lib/utils';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useStore } from '../../../store/useStore';
 import { renderDocumentHTML } from '../../../lib/documentTemplate';
 
@@ -161,7 +161,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                     ? (Math.round(Math.round(standardPrice * (1 - initialRate / 100)) / 10) * 10) * (Number(item.quantity) || 0)
                     : (Number(item.amount) || 0),
 
-                marking_wait_qty: product?.marking_wait_qty || 0
+                marking_wait_qty: product?.marking_wait_qty || 0,
+                isSelected: item.isSelected ?? true
             };
         })
     );
@@ -308,8 +309,22 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
 
 
+    const selectedItems = useMemo(() => items.filter(item => item.isSelected !== false), [items]);
+
+    const handleItemSelect = useCallback((index: number, isSelected: boolean) => {
+        setItems(prev => {
+            const newItems = [...prev];
+            newItems[index] = { ...newItems[index], isSelected };
+            return newItems;
+        });
+    }, []);
+
+    const handleSelectAll = useCallback((isSelected: boolean) => {
+        setItems(prev => prev.map(item => ({ ...item, isSelected })));
+    }, []);
+
     const handleDownload = () => {
-        const calculatedTotal = items.reduce((sum, item) => sum + item.amount, 0);
+        const calculatedTotal = selectedItems.reduce((sum, item) => sum + item.amount, 0);
         const totalWithCharges = calculatedTotal + charges.reduce((sum, c) => sum + c.amount, 0);
 
         const payload: DocumentPayload = {
@@ -337,7 +352,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 business_no: customerInfo.bizNo,
                 fax: customerInfo.fax
             },
-            items: items.map((item, idx) => {
+            items: selectedItems.map((item, idx) => {
                 const product = inventory.find(p => p.id === item.productId);
                 return {
                     no: idx + 1,
@@ -377,7 +392,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     };
 
     // Calculate totals for display
-    const calculatedTotal = items.reduce((sum, item) => sum + item.amount, 0);
+    const calculatedTotal = selectedItems.reduce((sum, item) => sum + item.amount, 0);
     const totalWithCharges = calculatedTotal + charges.reduce((sum, c) => sum + c.amount, 0);
 
     const handleProcessing = async () => {
@@ -561,6 +576,15 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                 <table className="w-full text-sm text-left min-w-[1000px]">
                                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-sm font-bold uppercase">
                                         <tr>
+                                            <th className="px-2 py-3 w-[2%] text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={items.length > 0 && selectedItems.length === items.length}
+                                                    onChange={(e) => handleSelectAll(e.target.checked)}
+                                                    className="w-3.5 h-3.5 cursor-pointer accent-teal-600"
+                                                    title="전체 선택/해제"
+                                                />
+                                            </th>
                                             <th className="px-2 py-3 w-[3%] text-center text-slate-400 font-normal">No.</th>
                                             <th className="px-4 py-3 w-[25%] text-left">품목명 / 규격 (Item/Spec)</th>
                                             <th className="px-2 py-3 text-center w-[4%]">현재고</th>
@@ -660,15 +684,17 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                 onPriceChange={handlePriceChange}
                                                 onSupplierRateChange={handleSupplierRateChange}
                                                 onDiscountRateChange={handleDiscountRateChange}
+                                                isSelected={item.isSelected}
+                                                onItemSelect={handleItemSelect}
                                             />
                                         ))}
                                     </tbody>
                                     <tfoot className="bg-slate-50 border-t border-slate-200">
                                         <tr>
-                                            <td colSpan={6} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">
+                                            <td colSpan={7} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">
                                                 Total Summary (VAT 별도)
                                             </td>
-                                            <td colSpan={4} className="px-4 py-3 text-right font-mono text-sm">
+                                            <td colSpan={5} className="px-4 py-3 text-right font-mono text-sm">
                                                 <div className="flex items-center justify-end gap-4">
                                                     <div className="text-slate-500">
                                                         <span className="text-xs mr-2">매출 합계:</span>
@@ -679,7 +705,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                         <span className="text-xs mr-2">매입 합계 (Cost):</span>
                                                         <span className="font-bold">
                                                             {formatCurrency(
-                                                                items.reduce((sum, item) => {
+                                                                selectedItems.reduce((sum, item) => {
                                                                     const product = getProductInfo(item.productId);
                                                                     const basePrice = product?.base_price || 0;
                                                                     const supplierRate = item.supplierRate ?? 0;
@@ -690,17 +716,17 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                         </span>
                                                     </div>
                                                     <div className="text-slate-400">=</div>
-                                                    <div className={`${(calculatedTotal - items.reduce((sum, item) => {
+                                                    <div className={`${(calculatedTotal - selectedItems.reduce((sum, item) => {
                                                         const product = getProductInfo(item.productId);
                                                         const basePrice = product?.base_price || 0;
                                                         const supplierRate = item.supplierRate ?? 0;
                                                         const costPrice = Math.round((basePrice * (100 - supplierRate) / 100) / 10) * 10;
                                                         return sum + (costPrice * item.quantity);
                                                     }, 0)) >= 0 ? 'text-green-600' : 'text-red-500'
-                                                        } font - bold text - lg`}>
+                                                        } font-bold text-lg`}>
                                                         <span className="text-xs mr-2">이익 (Profit):</span>
                                                         {formatCurrency(
-                                                            calculatedTotal - items.reduce((sum, item) => {
+                                                            calculatedTotal - selectedItems.reduce((sum, item) => {
                                                                 const product = getProductInfo(item.productId);
                                                                 const basePrice = product?.base_price || 0;
                                                                 const supplierRate = item.supplierRate ?? 0;

@@ -57,6 +57,9 @@ export interface LineItem {
     item_id?: string;
     unit_price?: number;
     qty?: number;
+
+    // UI State
+    isSelected?: boolean; // True if included in documents
 }
 
 export interface Quotation {
