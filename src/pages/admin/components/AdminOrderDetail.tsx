@@ -489,7 +489,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         alert('저장되었습니다.');
     };
 
-    const handleSave = async () => {
+    const handleSave = async (extraUpdate: Partial<Order> = {}) => {
         const updateData: Partial<Order> = {
             totalAmount: totalWithCharges,
             adminResponse: {
@@ -497,41 +497,29 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 confirmedPrice: totalWithCharges,
                 additionalCharges: charges
             },
-            status: 'PROCESSING',
+            status: order.status === 'SUBMITTED' ? 'PROCESSING' : order.status,
             supplierInfo: supplierInfo,
             buyerInfo: buyerInfo,
             poNumber: poNumber,
             poTitle: poTitle,
-            memo: shippingMemo
+            memo: shippingMemo,
+            items: enrichedItems,
+            po_items: enrichedPoItems,
+            lastUpdatedBy: {
+                name: user?.contactName || '관리자',
+                id: user?.id || 'admin',
+                email: user?.email || '',
+                at: new Date().toISOString()
+            },
+            ...extraUpdate
         };
 
-        // Update Separate Item Lists
-        // If in Supplier Mode, we are editing PO items -> Save to po_items
-        // If in Customer Mode, we are editing Customer items -> Save to items
-        // HOWEVER, we should probably save BOTH states regardless of which mode we are in,
-        // because we sync them constantly?
-        // No, we sync only on inventory init.
-        // User edits are in local state.
-
-        // We should save the current local states.
-        // Use enriched versions to ensure we persist the latest product matches/IDs
-        updateData.items = enrichedItems;
-        updateData.po_items = enrichedPoItems;
-
-        // [MOD] Track Last Update (Task 19)
-        updateData.lastUpdatedBy = {
-            name: user?.contactName || '관리자',
-            id: user?.id || 'admin',
-            email: user?.email || '',
-            at: new Date().toISOString()
-        };
-
-        // Process Uploads
         if (deliveryNoteFiles.length > 0) {
             const res = await uploadFile(deliveryNoteFiles[0], 'order', order.id + '_delivery');
             if (res) updateData.deliveryNote = res;
         }
-        if (supplierPoFiles.length > 0) {
+        if (!extraUpdate.supplierPO && supplierPoFiles.length > 0) {
+            // Only upload PO here if we haven't already uploaded it in handleSupplierSave
             const res = await uploadFile(supplierPoFiles[0], 'po', order.id + '_po');
             if (res) updateData.supplierPO = res;
         }
@@ -540,37 +528,33 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         onClose();
     };
 
-    const handleSupplierSave = () => {
+    const handleSupplierSave = async () => {
         if (user?.role !== 'MASTER' && user?.role !== 'MANAGER') {
             alert('권한이 없습니다 (Only Master/Manager allowed).');
             return;
         }
-        if (!confirm('발주서를 전송하시겠습니까? (외부로 파일을 보낼 준비를 합니다)')) {
-            return;
-        }
-        handleDownloadPO();
-        handleSave();
-    };
 
-    const handleSendWebhookEmail = async () => {
-        if (supplierPoFiles.length === 0 && !order.supplierPO) {
-            alert("발주서 PDF 파일이 첨부되지 않았습니다. 파일 선택 후 전송해주세요.");
+        const fileStatus = supplierPoFiles.length > 0 ? "있음 (새 첨부)" : (order.supplierPO ? "있음 (기존 파일)" : "없음");
+        const priceStr = new Intl.NumberFormat('ko-KR').format(totalSupplierAmount);
+
+        const confirmMsg = `[매입 발주서 전송 확인]\n\n첨부파일: ${fileStatus}\n메일 제목: ${emailSubject}\n매입 금액: ${priceStr}원\n\n이대로 벤더사에 매입 발주서를 전송하시겠습니까? (확인을 누르면 전송됩니다)`;
+
+        if (!confirm(confirmMsg)) {
             return;
         }
 
-        if (!confirm("입력하신 메일 정보로 발주서를 전송하시겠습니까?")) return;
         setIsSendingWebhook(true);
 
         try {
             let attachmentUrl = order.supplierPO?.url;
             let attachmentBase64 = null;
             let attachmentMimeType = null;
+            let newSupplierPO = order.supplierPO;
 
             if (supplierPoFiles.length > 0) {
                 const file = supplierPoFiles[0];
-                attachmentMimeType = file.type || 'application/pdf'; // Basic fallback for printing forms
+                attachmentMimeType = file.type || 'application/pdf';
 
-                // Read file as base64 string simultaneously
                 attachmentBase64 = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = () => {
@@ -581,16 +565,19 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     reader.readAsDataURL(file);
                 });
 
-                // Attempt S3 Upload
                 const { uploadFile } = useStore.getState();
                 const res = await uploadFile(file, 'po', order.id + '_po');
                 if (res) {
                     attachmentUrl = res.url;
-                    order.supplierPO = res; // Temporary update for subsequent clicks
+                    newSupplierPO = res;
                 }
             }
 
-            if (!attachmentUrl && !attachmentBase64) throw new Error("첨부파일 데이터 확보에 실패했습니다.");
+            if (!attachmentUrl && !attachmentBase64) {
+                alert("첨부파일 데이터 확보에 실패했습니다.");
+                setIsSendingWebhook(false);
+                return;
+            }
 
             const payload = {
                 event: "purchase_order_sent",
@@ -624,7 +611,14 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             });
 
             if (response.ok || response.type === 'opaque') {
-                alert("발주 메일 전송 요청이 웹훅(Webhook) 시스템에 성공적으로 전달되었습니다.");
+                alert("매입 발주서 전송이 완료되었습니다. 상태가 [배송중]으로 변경됩니다.");
+
+                await handleSave({
+                    status: 'SHIPPED',
+                    poSent: true,
+                    supplierPO: newSupplierPO
+                });
+
             } else {
                 throw new Error("웹훅 호출 실패: " + response.statusText);
             }
@@ -891,15 +885,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                         className="w-full px-2 py-1 text-xs border border-indigo-200 rounded outline-none focus:border-indigo-500 bg-white"
                                                     />
                                                 </div>
-                                                <div className="pt-2 flex justify-end">
-                                                    <Button
-                                                        onClick={handleSendWebhookEmail}
-                                                        disabled={isSendingWebhook}
-                                                        className="h-7 px-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white gap-1"
-                                                    >
-                                                        {isSendingWebhook ? '전송 처리중...' : '발주 메일 전송'}
-                                                    </Button>
-                                                </div>
+                                                {/* Old Webhook Send button removed since it's merged into foot Save/Send */}
                                             </div>
                                         </div>
                                     </div>
@@ -1700,12 +1686,13 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         닫기
                     </Button>
                     <Button
-                        onClick={isSupplierMode ? handleSupplierSave : handleSave}
+                        onClick={() => isSupplierMode ? handleSupplierSave() : handleSave()}
+                        disabled={isSendingWebhook}
                         className={`shadow-lg px-6 ${isSupplierMode
                             ? 'bg-red-600 hover:bg-red-700 shadow-red-500/20'
                             : 'bg-teal-600 hover:bg-teal-700 shadow-teal-500/20'} text-white`}
                     >
-                        {isSupplierMode ? '매입 발주서 저장/전송' : '주문 확정 및 답변 전송'}
+                        {isSendingWebhook ? '처리중...' : (isSupplierMode ? '매입 발주서 저장/전송' : '주문 확정 및 답변 전송')}
                     </Button>
                     <Button
                         onClick={handleJustSave}

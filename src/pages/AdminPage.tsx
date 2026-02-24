@@ -281,9 +281,12 @@ export default function AdminPage() {
                                                                     setDetailInitialMode('SUPPLIER'); // Set to Supplier Mode
                                                                     setSelectedOrder(order);
                                                                 }}
-                                                                className="text-xs font-bold text-indigo-600 border border-indigo-200 rounded px-3 py-1.5 hover:bg-indigo-50 transition-colors whitespace-nowrap"
+                                                                className={`text-xs font-bold border rounded px-3 py-1.5 transition-colors whitespace-nowrap ${order.poSent
+                                                                        ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                                                                        : 'text-indigo-600 border-indigo-200 hover:bg-indigo-50'
+                                                                    }`}
                                                             >
-                                                                매입{/* [MOD] Added whitespace-nowrap */}
+                                                                매입
                                                             </button>
 
                                                             {/* Master/Admin Delete Button */}
