@@ -14,31 +14,37 @@ export default function AdminQuotes() {
 
     const user = useStore((state) => state.auth.user);
 
-    // Sync with Server on Mount
+    // Sync with Server on Mount and Focus
     useEffect(() => {
         if (!user) return;
 
-        fetchUsers();
+        const fetchQuotes = () => {
+            fetchUsers();
 
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json'
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json'
+            };
+            // Inject Role/ID for Scope Control
+            if (user.id) headers['x-requester-id'] = user.id;
+            if (user.role) headers['x-requester-role'] = user.role;
+
+            fetch((import.meta.env.VITE_API_URL || '') + '/api/my/quotations', {
+                headers,
+                cache: 'no-store'
+            })
+                .then(res => {
+                    if (res.ok) return res.json();
+                    throw new Error('Failed to fetch');
+                })
+                .then(data => {
+                    if (Array.isArray(data)) setQuotes(data);
+                })
+                .catch(console.error);
         };
-        // Inject Role/ID for Scope Control
-        if (user.id) headers['x-requester-id'] = user.id;
-        if (user.role) headers['x-requester-role'] = user.role;
 
-        fetch((import.meta.env.VITE_API_URL || '') + '/api/my/quotations', {
-            headers,
-            cache: 'no-store'
-        })
-            .then(res => {
-                if (res.ok) return res.json();
-                throw new Error('Failed to fetch');
-            })
-            .then(data => {
-                if (Array.isArray(data)) setQuotes(data);
-            })
-            .catch(console.error);
+        fetchQuotes();
+        window.addEventListener('focus', fetchQuotes);
+        return () => window.removeEventListener('focus', fetchQuotes);
     }, [setQuotes, user, fetchUsers]);
 
     const filteredQuotes = quotes.filter(q => {

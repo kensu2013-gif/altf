@@ -673,11 +673,8 @@ export const useStore = create<AppState>()(
             name: 'altf-b2b-storage',
             partialize: (state) => ({
                 auth: state.auth,
-                users: state.users, // Persist Mock DB
                 quotation: state.quotation,
                 deliveryPreferences: state.deliveryPreferences,
-                orders: state.orders,
-                quotes: state.quotes,
                 newOrderCount: state.newOrderCount
             }),
         }

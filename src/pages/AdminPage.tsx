@@ -37,10 +37,8 @@ export default function AdminPage() {
         if (user.id) headers['x-requester-id'] = user.id;
         if (user.role) headers['x-requester-role'] = user.role;
 
-        // [MOD] If Admin/Manager, fetch ALL orders. Else fetch MY orders.
-        const endpoint = (user.role === 'MASTER' || user.role === 'MANAGER' || user.role === 'admin')
-            ? '/api/orders'
-            : '/api/my/orders';
+        // [MOD] Ensure we use VITE_API_URL and the correct endpoint (/api/my/orders handles admin scope)
+        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders`;
 
         const fetchOrders = () => {
             fetch(endpoint, { headers, cache: 'no-store' })
