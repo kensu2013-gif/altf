@@ -557,8 +557,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                 <Package className="w-4 h-4 text-teal-600" />
                                 견적 품목 및 단가 조정 (Negotiation)
                             </h3>
-                            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                                <table className="w-full text-sm text-left">
+                            <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-sm custom-scrollbar">
+                                <table className="w-full text-sm text-left min-w-[1000px]">
                                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-sm font-bold uppercase">
                                         <tr>
                                             <th className="px-2 py-3 w-[3%] text-center text-slate-400 font-normal">No.</th>
