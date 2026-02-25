@@ -69,6 +69,13 @@ export interface Quotation {
     id: string;
     userId: string; // [NEW] Link to User
     customerNumber: string; // From auth/invite
+    customerName?: string;
+    customerInfo?: {
+        companyName?: string;
+        contactName?: string;
+        phone?: string;
+        email?: string;
+    };
     items: LineItem[];
     status: 'DRAFT' | 'SUBMITTED' | 'IN_REVIEW' | 'PROCESSING' | 'PROCESSED' | 'COMPLETED';
     totalAmount: number;

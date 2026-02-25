@@ -132,6 +132,10 @@ export default function AdminQuotes() {
                                         <span className="font-bold text-slate-800 text-lg">{quote.customerNumber}</span>
                                         <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{quote.id}</span>
                                     </div>
+                                    <div className="text-sm font-bold text-indigo-700 mb-1 flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block"></span>
+                                        {quote.customerName || '알 수 없음'} <span className="text-slate-400 font-normal text-xs ml-1">{quote.customerInfo?.contactName ? `(${quote.customerInfo.contactName})` : ''}</span>
+                                    </div>
                                     <div className="text-sm text-slate-500 flex items-center gap-4">
                                         <span className="flex items-center gap-1">
                                             <Calendar className="w-3 h-3" />
