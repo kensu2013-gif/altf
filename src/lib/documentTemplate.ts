@@ -321,7 +321,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                         ` : ''}
                         <th class="col-qty">수량<br><span class="sub-text">QTY</span></th>
                         <th class="col-price">단가<br><span class="sub-text">PRICE</span></th>
-                        <th class="col-amt">금액<br><span class="sub-text">AMT</span></th>
+                        <th class="col-amt">합계<br><span class="sub-text">AMT</span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -357,12 +357,6 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             <div class="footer-wrapper">
                 <div class="delivery-section">
                 ${isPurchaseOrder ? `
-                    ${customer.memo ? `
-                        <div style="margin-bottom: 12px;">
-                            <span class="delivery-title">배송 요청사항 (Delivery Request)</span>
-                            <div class="delivery-content">${customer.memo}</div>
-                        </div>
-                    ` : ''}
                      ${(() => {
                 // Fixed texts for Purchase Order
                 let appendedNote = footer?.note || '';

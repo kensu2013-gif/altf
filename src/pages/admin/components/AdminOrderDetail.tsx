@@ -185,6 +185,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     // PO Info State
     const [poNumber, setPoNumber] = useState(order.poNumber || autoPoNumber);
     const [poTitle, setPoTitle] = useState(order.poTitle || '발주서 (PURCHASE ORDER)');
+    const [poEndCustomer, setPoEndCustomer] = useState(order.poEndCustomer || order.customerName || '');
 
     // Calculation based on Selected Items
     const calculatedTotal = selectedItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
@@ -250,7 +251,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 created_at: new Date().toLocaleDateString(),
                 channel: 'WEB',
                 title: poTitle, // Custom Title in meta
-                end_customer: order.customerName // The actual user who made the order
+                end_customer: poEndCustomer // Editable end customer field
             },
             supplier: supplierInfo, // Vendor
             customer: {
@@ -532,6 +533,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             buyerInfo: buyerInfo,
             poNumber: poNumber,
             poTitle: poTitle,
+            poEndCustomer: poEndCustomer,
             memo: shippingMemo,
             items: enrichedItems,
             po_items: enrichedPoItems,
@@ -826,7 +828,19 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                             </button>
                                         </div>
                                     )}
-                                    <h4 className="text-xs font-bold text-indigo-700 uppercase">발주자 (Buyer) / 배송지 (Ship To)</h4>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-xs font-bold text-indigo-700 uppercase">발주자 (Buyer) / 배송지 (Ship To)</h4>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] text-indigo-500 font-bold uppercase">요청 고객사:</span>
+                                            <input
+                                                value={poEndCustomer}
+                                                onChange={e => setPoEndCustomer(e.target.value)}
+                                                className="px-2 py-0.5 text-xs text-indigo-900 border border-indigo-200 rounded min-w-[140px] shadow-inner"
+                                                placeholder="고객사 이름"
+                                                title="PO에 표시될 요청 고객사 이름을 수정할 수 있습니다."
+                                            />
+                                        </div>
+                                    </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <input
                                             placeholder="상호"

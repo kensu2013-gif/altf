@@ -137,6 +137,7 @@ export interface Order {
     adminResponse?: AdminResponse;
     createdAt: string;
     memo?: string;
+    poEndCustomer?: string; // Editable End Customer for Purchase Order Prints
     isDeleted?: boolean; // Soft Delete Flag
     linkedQuoteId?: string; // Link to original Quote if originated from one
     // Supplier PO Data
