@@ -274,9 +274,11 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 <div class="box">
                     <h3>공급받는자 (Customer)</h3>
                     <div class="row"><span class="label">상호</span><span class="value">${customer.company_name || '-'}</span></div>
-                    <div class="row"><span class="label">주소</span><span class="value">${customer.address || '-'}</span></div>
                     <div class="row"><span class="label">담당자</span><span class="value">${customer.contact_name || '-'}</span></div>
-                    <div class="row"><span class="label">연락처</span><span class="value">${customer.tel || '-'} / ${customer.email || '-'}</span></div>
+                    <div class="row"><span class="label">연락처</span><span class="value">${customer.tel || '-'}</span></div>
+                    ${customer.email ? `<div class="row"><span class="label">이메일</span><span class="value">${customer.email}</span></div>` : ''}
+                    <div class="row"><span class="label">주소</span><span class="value">${customer.address || '-'}</span></div>
+                    ${meta.end_customer ? `<div class="row" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed #cbd5e1;"><span class="label" style="color: #6366f1; font-weight: 800;">요청 고객사</span><span class="value" style="color: #6366f1; font-weight: 800; font-size: ${document_type === 'PURCHASE_ORDER' ? '14px' : '11px'};">${meta.end_customer}</span></div>` : ''}
                 </div>
             </div>
 
@@ -367,7 +369,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 if (document_type === 'PURCHASE_ORDER') {
                     const requiredTexts = [
                         "(1) 원소재 성적서, 완제품 성적서 이메일 첨부조건",
-                        "(2) 패킹리스트 부착 을 반드시"
+                        "(2) 패킹리스트 부착"
                     ].join('\n'); // Use \n for pre-wrap
 
                     if (!appendedNote.includes(requiredTexts)) {

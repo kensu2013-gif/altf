@@ -31,6 +31,7 @@ export interface DocumentPayload {
         page_count?: number; // Total pages (if pre-calc needed)
         title?: string; // Custom Title Overwrite
         linkedQuoteId?: string; // Origin Quote ID
+        end_customer?: string; // Actual end customer (for POs)
     };
     supplier: { // Sender Info (Us or Vendor)
         company_name: string;

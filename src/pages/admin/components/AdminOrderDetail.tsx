@@ -249,13 +249,14 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 doc_no: poNumber, // Custom PO Number
                 created_at: new Date().toLocaleDateString(),
                 channel: 'WEB',
-                title: poTitle // Custom Title in meta
+                title: poTitle, // Custom Title in meta
+                end_customer: order.customerName // The actual user who made the order
             },
             supplier: supplierInfo, // Vendor
             customer: {
-                ...buyerInfo,
-                address: buyerInfo.address, // Use Buyer Address
-                memo: shippingMemo // Pass Shipping Memo explicitly
+                ...buyerInfo, // Defaults to ALTF or Manager Info
+                address: buyerInfo.address,
+                memo: shippingMemo // Keep memo if it's used elsewhere, but we'll prioritize footer.note below
             },    // Buyer (ALTF)
             items: selectedItems.map((item, idx) => {
                 const product = inventory.find(i => i.id === item.productId);
@@ -285,7 +286,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 final_amount: totalSupplierAmount // VAT excluded in display usually, but PO total fits here
             },
             footer: {
-                message: ''
+                message: '',
+                note: [shippingMemo, supplierInfo?.note].filter(Boolean).join('\n\n') // Combine notes into footer block designed for POs
             }
         };
 
