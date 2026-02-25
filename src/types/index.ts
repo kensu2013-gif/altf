@@ -51,6 +51,9 @@ export interface LineItem {
     // Supplier Fields
     supplierRate?: number;
     discountRate?: number;
+    supplierPriceOverride?: number; // Added for manual vendor price override
+    poSent?: boolean; // Track if this line item has been ordered
+    vendorName?: string; // Track which vendor it was sent to
 
     // Legacy Fields (Snake Case)
     item_name?: string;

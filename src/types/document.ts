@@ -66,5 +66,6 @@ export interface DocumentPayload {
     footer?: {
         message?: string;
         terms?: string[];
+        note?: string;
     };
 }

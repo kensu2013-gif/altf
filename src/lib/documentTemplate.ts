@@ -36,13 +36,13 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Nanum+Brush+Script&display=swap');
             
             @page {
-                size: A4;
+                size: A4 ${document_type === 'PURCHASE_ORDER' ? 'landscape' : 'portrait'};
                 margin: 10mm;
             }
             
             body { 
                 font-family: 'Pretendard', sans-serif; 
-                font-size: 10px;
+                font-size: ${document_type === 'PURCHASE_ORDER' ? '14px' : '11px'};
                 line-height: 1.4;
                 color: #333;
                 margin: 0;
@@ -129,7 +129,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             .value { flex: 1; font-weight: 500; }
 
             /* Items Table */
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed; font-size: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed; font-size: ${document_type === 'PURCHASE_ORDER' ? '13px' : '10px'}; }
             thead { display: table-header-group; }
             tfoot { display: table-footer-group; }
             tr { page-break-inside: avoid; }
@@ -258,8 +258,8 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                     <img src="${logoDaekyung}" alt="(주)대경벤드" style="height: 22px; object-fit: contain;" />
                 </div>
                 <div class="doc-title">
-                    <h1>${title}</h1>
-                    <p>No. ${meta.doc_no} | Date. ${meta.created_at}</p>
+                    <h1 style="margin: 0; font-size: ${document_type === 'PURCHASE_ORDER' ? '28px' : '24px'}; font-weight: 800; color: ${colorTheme};">${title}</h1>
+                    <p style="margin: 4px 0 0 0; font-size: ${document_type === 'PURCHASE_ORDER' ? '14px' : '11px'}; color: #666;">No. ${meta.doc_no} | Date. ${meta.created_at}</p>
                 </div>
             </header>
 
@@ -361,12 +361,26 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                             <div class="delivery-content">${customer.memo}</div>
                         </div>
                     ` : ''}
-                     ${supplier.note ? `
-                        <div style="margin-bottom: 12px; padding: 8px; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px;">
-                            <span class="delivery-title" style="color:#15803d;">비고 (Note)</span>
-                            <div class="delivery-content" style="white-space: pre-wrap; color: #166534;">${supplier.note}</div>
-                        </div>
-                    ` : ''}
+                     ${(() => {
+                // Fixed texts for Purchase Order
+                let appendedNote = footer?.note || '';
+                if (document_type === 'PURCHASE_ORDER') {
+                    const requiredTexts = [
+                        "(1) 원소재 성적서, 완제품 성적서 이메일 첨부조건",
+                        "(2) 패킹리스트 부착 을 반드시"
+                    ].join('\n'); // Use \n for pre-wrap
+
+                    if (!appendedNote.includes(requiredTexts)) {
+                        appendedNote = requiredTexts + (appendedNote ? '\n\n' + appendedNote : '');
+                    }
+                }
+
+                return appendedNote ? `
+    <div style="margin-top: 15px; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; background-color: #f8fafc;">
+        <div style="font-weight: 700; color: #475569; margin-bottom: 4px; ${document_type === 'PURCHASE_ORDER' ? 'font-size: 14px;' : 'font-size: 11px;'}">배송요청사항 / DELIVERY REQUEST</div>
+        <div style="white-space: pre-wrap; color: #334155; ${document_type === 'PURCHASE_ORDER' ? 'font-size: 14px; font-weight: bold;' : 'font-size: 10px;'}">${appendedNote}</div>
+    </div>` : '';
+            })()}
                 ` : `
                     ${(() => {
             // Estimated Delivery Logic

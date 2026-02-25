@@ -426,21 +426,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         if (!confirm('견적서를 전송하시겠습니까? (상태가 답변완료로 변경됩니다)')) return;
 
         // 1. Update User Info
-        if (customerUser) {
-            updateUser(customerUser.id, {
-                companyName: customerInfo.companyName,
-                contactName: customerInfo.contactName,
-                phone: customerInfo.phone,
-                email: customerInfo.email,
-                bizNo: customerInfo.bizNo,
-                address: customerInfo.address,
-                fax: customerInfo.fax,
-                contactInfo: {
-                    phone: customerInfo.phone,
-                    email: customerInfo.email
-                }
-            });
-        }
+        // Removed `updateUser` call to prevent overwriting the customer's base profile.
+        // The quote document itself will retain the edited customer info.
 
         // 2. Upload Admin Attachments to S3
         const uploadedAttachments: { name: string, url: string }[] = quote.adminAttachments || [];

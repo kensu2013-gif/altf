@@ -138,8 +138,18 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     const defaultSubject = `[알트에프] ${cleanSupplierName} 발주서 첨부건 - ${poNum}`;
     const defaultFileName = `${poNum} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${cleanBuyerName}).pdf`;
-    const [emailSubject, setEmailSubject] = useState(defaultSubject);
-    const [emailAttachmentName, setEmailAttachmentName] = useState(defaultFileName);
+
+    // Calculate daily sequence from all orders
+    const highestIdxForToday = useStore.getState().orders
+        .filter(o => o.poNumber?.startsWith(`ES${poDateStr}-`))
+        .map(o => parseInt(o.poNumber!.split('-')[1], 10))
+        .filter(n => !isNaN(n))
+        .reduce((max, cur) => Math.max(max, cur), 0);
+    const nextSeqStr = String(highestIdxForToday + 1).padStart(3, '0');
+    const autoPoNumber = `ES${poDateStr}-${nextSeqStr}`;
+
+    const [emailSubject, setEmailSubject] = useState(order.poNumber ? defaultSubject : `[알트에프] ${cleanSupplierName} 발주서 첨부건 - ${nextSeqStr}`);
+    const [emailAttachmentName, setEmailAttachmentName] = useState(order.poNumber ? defaultFileName : `${autoPoNumber} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${cleanBuyerName}).pdf`);
     const [isSendingWebhook, setIsSendingWebhook] = useState(false);
 
     const [buyerInfo, setBuyerInfo] = useState(() => {
@@ -173,7 +183,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     });
 
     // PO Info State
-    const [poNumber, setPoNumber] = useState(order.poNumber || `PO-${order.id.slice(0, 8)}`);
+    const [poNumber, setPoNumber] = useState(order.poNumber || autoPoNumber);
     const [poTitle, setPoTitle] = useState(order.poTitle || '발주서 (PURCHASE ORDER)');
 
     // Calculation based on Selected Items
@@ -424,6 +434,24 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         setDisplayedItems(newItems);
     };
 
+    const handleSupplierPriceChange = (index: number, newPrice: number) => {
+        const newItems = [...displayedItems];
+        const item = newItems[index];
+        const product = inventory.find(p => p.id === item.productId);
+        const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? 0;
+
+        // If price is manually set, we set the supplierRate such that base * (100-rate)/100 = price
+        let newRate = item.supplierRate ?? 0;
+        if (basePrice > 0) {
+            newRate = (1 - (newPrice / basePrice)) * 100;
+            // Cap at 2 decimals for precision
+            newRate = Math.round(newRate * 100) / 100;
+        }
+
+        newItems[index] = { ...item, supplierRate: newRate, supplierPriceOverride: newPrice };
+        setDisplayedItems(newItems);
+    };
+
     // Helper to find stock (Simple Match)
     const getProductStock = (item: LineItem) => {
         return findProduct(item);
@@ -616,7 +644,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 await handleSave({
                     status: 'SHIPPED',
                     poSent: true,
-                    supplierPO: newSupplierPO
+                    supplierPO: newSupplierPO,
+                    po_items: enrichedPoItems.map(item => ({ ...item, poSent: true, vendorName: supplierInfo.company_name }))
                 });
 
             } else {
@@ -854,6 +883,48 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                         선택된 파일: {supplierPoFiles[0].name}
                                                     </div>
                                                 )}
+                                            </div>
+
+                                            <div className="mt-4 p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
+                                                <h4 className="text-xs font-bold text-indigo-700 mb-2 flex items-center gap-1">
+                                                    추가 발주 조건
+                                                </h4>
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="no-marking-checkbox"
+                                                        className="w-4 h-4 cursor-pointer"
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                if (!shippingMemo.includes('(3) 무마킹 조건')) {
+                                                                    setShippingMemo(prev => prev ? prev + '\n(3) 무마킹 조건' : '(3) 무마킹 조건');
+                                                                }
+                                                            } else {
+                                                                setShippingMemo(prev => prev.replace(/\n?\(3\) 무마킹 조건/g, ''));
+                                                            }
+                                                        }}
+                                                        checked={shippingMemo.includes('(3) 무마킹 조건')}
+                                                    />
+                                                    <label htmlFor="no-marking-checkbox" className="text-xs font-bold text-slate-700 cursor-pointer">
+                                                        무마킹 조건 표기
+                                                    </label>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-700 mb-1">납기지정 (비고란에 추가)</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="예: 2026-03-01까지 도착요망"
+                                                        className="w-full px-2 py-1.5 text-xs border rounded"
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            // For simplicity just append it, user can refine
+                                                            setSupplierInfo(prev => ({
+                                                                ...prev,
+                                                                note: prev.note.replace(/\n\[납기지정\]: .*/, '') + (val ? `\n[납기지정]: ${val}` : '')
+                                                            }));
+                                                        }}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
 
@@ -1197,7 +1268,12 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
                                         const supplierRate = item.supplierRate ?? 0;
                                         // Formula: Base * (100 - Rate) / 100
-                                        const supplierPrice = Math.round((basePrice * (100 - supplierRate) / 100) / 10) * 10;
+
+                                        // Use override if available
+                                        let supplierPrice = item.supplierPriceOverride;
+                                        if (supplierPrice === undefined) {
+                                            supplierPrice = Math.round((basePrice * (100 - supplierRate) / 100) / 10) * 10;
+                                        }
                                         const supplierAmount = supplierPrice * item.quantity;
                                         // Profit = (Customer Sales Price - Supplier Cost Price) * Quantity
                                         const profit = (item.unitPrice - supplierPrice) * item.quantity;
@@ -1290,8 +1366,16 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-indigo-300">%</span>
                                                                 </div>
                                                             </td>
-                                                            <td className="px-4 py-3 text-right align-middle font-mono font-extrabold text-indigo-700 text-xs">
-                                                                {formatCurrency(supplierPrice)}
+                                                            <td className="px-4 py-3 text-right align-middle font-mono font-extrabold text-indigo-700 text-xs text-right">
+                                                                <input
+                                                                    type="number"
+                                                                    inputMode="numeric"
+                                                                    title="Supplier Price Override"
+                                                                    placeholder="수기단가"
+                                                                    value={supplierPrice}
+                                                                    className="w-full text-right bg-transparent outline-none focus:border-b focus:border-indigo-400 font-mono font-extrabold text-indigo-700"
+                                                                    onChange={(e) => handleSupplierPriceChange(idx, Number(e.target.value))}
+                                                                />
                                                             </td>
                                                             <td className="px-4 py-3 text-right align-middle font-mono font-extrabold text-slate-900 text-sm">
                                                                 {formatCurrency(supplierAmount)}
@@ -1318,6 +1402,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                             <td className="px-4 py-3 text-center align-middle">
                                                                 {isUnlinked ? (
                                                                     <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">미연동</span>
+                                                                ) : item.poSent ? (
+                                                                    <div className="flex flex-col items-center justify-center gap-0.5">
+                                                                        <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded font-bold border border-indigo-100 whitespace-nowrap">발주완료</span>
+                                                                        <span className="text-[9px] text-slate-500 max-w-[50px] overflow-hidden text-ellipsis whitespace-nowrap" title={item.vendorName}>{item.vendorName}</span>
+                                                                    </div>
                                                                 ) : isStockInsufficient ? (
                                                                     <div className="flex items-center justify-center gap-1 text-red-600 font-bold text-xs bg-red-100 px-2 py-1 rounded">
                                                                         <AlertTriangle className="w-3 h-3" /> 부족
