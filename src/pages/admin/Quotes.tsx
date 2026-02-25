@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/Button';
 import type { Quotation } from '../../types';
 
 export default function AdminQuotes() {
-    const { quotes, updateQuotation, trashQuotation, restoreQuotation, permanentDeleteQuotation, setQuotes, fetchUsers } = useStore((state) => state);
+    const { quotes, users, updateQuotation, trashQuotation, restoreQuotation, permanentDeleteQuotation, setQuotes, fetchUsers } = useStore((state) => state);
     const [selectedQuote, setSelectedQuote] = useState<typeof quotes[0] | null>(null);
     const [filterStatus, setFilterStatus] = useState<string>('all');
 
@@ -121,113 +121,119 @@ export default function AdminQuotes() {
                         <p className="text-slate-500 font-medium">해당 상태의 견적서가 없습니다.</p>
                     </div>
                 ) : (
-                    filteredQuotes.map((quote) => (
-                        <div key={quote.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:shadow-md transition-all">
-                            <div className="flex items-start gap-4">
-                                <div className="p-3 bg-teal-50 text-teal-600 rounded-lg group-hover:bg-teal-100 transition-colors">
-                                    <FileText className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="font-bold text-slate-800 text-lg">{quote.customerNumber}</span>
-                                        <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{quote.id}</span>
-                                    </div>
-                                    <div className="text-sm font-bold text-indigo-700 mb-1 flex items-center gap-1.5">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block"></span>
-                                        {quote.customerName || '알 수 없음'} <span className="text-slate-400 font-normal text-xs ml-1">{quote.customerInfo?.contactName ? `(${quote.customerInfo.contactName})` : ''}</span>
-                                    </div>
-                                    <div className="text-sm text-slate-500 flex items-center gap-4">
-                                        <span className="flex items-center gap-1">
-                                            <Calendar className="w-3 h-3" />
-                                            {new Date(quote.createdAt).toLocaleString()}
-                                        </span>
-                                        <span className="flex items-center gap-1">
-                                            <span className="font-bold text-slate-700">{quote.items.length}</span> 개 품목
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
+                    filteredQuotes.map((quote) => {
+                        const quoteUser = users.find(u => u.id === quote.userId);
+                        const displayCompany = quoteUser?.companyName || quote.customerName || '알 수 없음';
+                        const displayContact = quoteUser?.contactName || quote.customerInfo?.contactName || '';
 
-                            <div className="flex items-center gap-6 pl-14 md:pl-0">
-                                <div>
-                                    <StatusSelect
-                                        status={quote.status}
-                                        onChange={(val) => handleStatusUpdate(quote.id, val)}
-                                    />
+                        return (
+                            <div key={quote.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:shadow-md transition-all">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 bg-teal-50 text-teal-600 rounded-lg group-hover:bg-teal-100 transition-colors">
+                                        <FileText className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-bold text-slate-800 text-lg">{quote.customerNumber}</span>
+                                            <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{quote.id}</span>
+                                        </div>
+                                        <div className="text-sm font-bold text-indigo-700 mb-1 flex items-center gap-1.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block"></span>
+                                            {displayCompany} <span className="text-slate-400 font-normal text-xs ml-1">{displayContact ? `(${displayContact})` : ''}</span>
+                                        </div>
+                                        <div className="text-sm text-slate-500 flex items-center gap-4">
+                                            <span className="flex items-center gap-1">
+                                                <Calendar className="w-3 h-3" />
+                                                {new Date(quote.createdAt).toLocaleString()}
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <span className="font-bold text-slate-700">{quote.items.length}</span> 개 품목
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div className="text-right">
-                                    <div className="text-xs text-slate-400 font-medium">총 견적금액</div>
-                                    <div className="text-xl font-bold text-teal-700 font-mono">
-                                        {formatCurrency(quote.totalAmount)}
+                                <div className="flex items-center gap-6 pl-14 md:pl-0">
+                                    <div>
+                                        <StatusSelect
+                                            status={quote.status}
+                                            onChange={(val) => handleStatusUpdate(quote.id, val)}
+                                        />
                                     </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    {user?.role === 'MASTER' && (
-                                        <>
-                                            {filterStatus === 'TRASH' ? (
-                                                <>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-slate-400 hover:text-teal-600 hover:bg-teal-50"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleRestore(quote.id);
-                                                        }}
-                                                        title="복구"
-                                                    >
-                                                        <ArchiveRestore className="w-4 h-4" />
-                                                    </Button>
+
+                                    <div className="text-right">
+                                        <div className="text-xs text-slate-400 font-medium">총 견적금액</div>
+                                        <div className="text-xl font-bold text-teal-700 font-mono">
+                                            {formatCurrency(quote.totalAmount)}
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {user?.role === 'MASTER' && (
+                                            <>
+                                                {filterStatus === 'TRASH' ? (
+                                                    <>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="text-slate-400 hover:text-teal-600 hover:bg-teal-50"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleRestore(quote.id);
+                                                            }}
+                                                            title="복구"
+                                                        >
+                                                            <ArchiveRestore className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handlePermanentDelete(quote.id);
+                                                            }}
+                                                            title="영구 삭제"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </>
+                                                ) : (
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
                                                         className="text-slate-400 hover:text-red-600 hover:bg-red-50"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            handlePermanentDelete(quote.id);
+                                                            handleDelete(quote.id);
                                                         }}
-                                                        title="영구 삭제"
+                                                        title="휴지통으로 이동"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
                                                     </Button>
-                                                </>
-                                            ) : (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDelete(quote.id);
-                                                    }}
-                                                    title="휴지통으로 이동"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            )}
-                                        </>
-                                    )}
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="gap-2"
-                                        onClick={() => setSelectedQuote(quote)}
-                                    >
-                                        <FileText className="w-4 h-4" /> 상세
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-slate-400 hover:text-teal-600"
-                                        onClick={handlePdfDownload}
-                                    >
-                                        <Download className="w-4 h-4" /> PDF
-                                    </Button>
+                                                )}
+                                            </>
+                                        )}
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-2"
+                                            onClick={() => setSelectedQuote(quote)}
+                                        >
+                                            <FileText className="w-4 h-4" /> 상세
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-slate-400 hover:text-teal-600"
+                                            onClick={handlePdfDownload}
+                                        >
+                                            <Download className="w-4 h-4" /> PDF
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
 
