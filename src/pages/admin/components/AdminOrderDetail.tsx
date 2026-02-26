@@ -199,9 +199,17 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     useEffect(() => {
         if (!order || !isSupplierMode) return;
 
-        let newMemo = order.memo || '';
-        if (poOptionNoMarking) newMemo += '\n[무마킹 조건]';
-        if (poOptionStockCheck) newMemo += '\n[재고장 확인 조건]';
+        let baseMemo = order.memo || '';
+        if (baseMemo.includes('[배송:')) {
+            baseMemo = baseMemo
+                .replace(/\[배송:\s*([^\]]+)\]/g, '배송:$1 -')
+                .replace(/\s*\|\s*담당자:/g, '\n담당자:')
+                .replace(/\s*\|\s*요청:/g, '\n요청사항:');
+        }
+
+        let newMemo = baseMemo;
+        if (poOptionNoMarking) newMemo += '\n[무마킹 출고 조건]';
+        if (poOptionStockCheck) newMemo += '\n[재고장 확인의 건]';
         if (poOptionCustomOrder) newMemo += '\n[주문제작 요청건]';
 
         setShippingMemo(newMemo);
@@ -1005,8 +1013,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                 <div className="mt-3 pt-3 border-t border-indigo-200 border-dashed">
                                                     <label className="block text-xs font-bold text-slate-700 mb-1">납기지정 (비고란에 추가)</label>
                                                     <input
-                                                        type="text"
-                                                        placeholder="예: 2026-03-01까지 도착요망"
+                                                        type="date"
+                                                        title="납기지정 (Delivery Date)"
                                                         className="w-full px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500"
                                                         onChange={(e) => {
                                                             const val = e.target.value;
