@@ -462,7 +462,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
 
             <div class="disclaimer">
                 ${isPurchaseOrder
-            ? '재고 부족품이 있는경우, 납기 확인하셔서 연락부탁드립니다.'
+            ? ''
             : isTransaction
                 ? '' // [MOD] No disclaimer for Transaction Statement
                 : isOrder
