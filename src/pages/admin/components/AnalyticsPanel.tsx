@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { Order, Product } from '../../../types';
 import { TrendingUp, TrendingDown, DollarSign, Users } from 'lucide-react';
+import { useInventoryIndex } from '../../../hooks/useInventoryIndex';
 
 interface AnalyticsPanelProps {
     orders: Order[];
@@ -8,6 +9,8 @@ interface AnalyticsPanelProps {
 }
 
 export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
+    const { findProduct } = useInventoryIndex(inventory);
+
     const stats = useMemo(() => {
         let totalSales = 0;
         let totalCost = 0;
@@ -28,11 +31,18 @@ export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
             const itemsToCalc = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
 
             itemsToCalc.forEach(item => {
-                const product = inventory.find(p => p.id === item.productId);
-                const basePrice = product?.base_price ?? product?.unitPrice ?? 0;
-                const rate = item.supplierRate ?? 0;
-                const supplierPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
-                orderCost += (supplierPrice * item.quantity);
+                const product = findProduct(item);
+                let cost = 0;
+                const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
+
+                if (item.supplierRate !== undefined) {
+                    cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
+                } else {
+                    const rate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
+                    cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+                }
+
+                orderCost += (cost * item.quantity);
             });
 
             totalCost += orderCost;
@@ -69,7 +79,7 @@ export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
             marginRate,
             topManagers
         };
-    }, [orders, inventory]);
+    }, [orders, findProduct]);
 
     const formatCur = (num: number) => new Intl.NumberFormat('ko-KR').format(num);
 
