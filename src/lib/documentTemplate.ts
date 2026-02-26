@@ -268,17 +268,17 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 <div class="box" style="${isPurchaseOrder ? 'font-size: 13px;' : 'font-size: 10px;'}">
                     <h3>공급자 (Supplier)</h3>
                     <div class="row"><span class="label">상호</span><span class="value">${supplier.company_name}</span></div>
-                    <div class="row"><span class="label" style="color: #6366f1; font-weight: 800;">요청고객사</span><span class="value" style="color: #6366f1; font-weight: 800;">${meta.end_customer || '-'}</span></div>
+                    <div class="row"><span class="label">주소</span><span class="value">${supplier.address}</span></div>
                     <div class="row"><span class="label">담당자</span><span class="value">${supplier.contact_name || '-'}</span></div>
                     <div class="row"><span class="label">연락처</span><span class="value">${supplier.tel} / ${supplier.email}</span></div>
                 </div>
                 <div class="box" style="${isPurchaseOrder ? 'font-size: 13px;' : 'font-size: 10px;'}">
                     <h3>공급받는자 (Customer)</h3>
                     <div class="row"><span class="label">상호</span><span class="value">${customer.company_name || '-'}</span></div>
-                    <div class="row"><span class="label" style="color: #6366f1; font-weight: 800;">요청고객사</span><span class="value" style="color: #6366f1; font-weight: 800;">${meta.end_customer || '-'}</span></div>
                     <div class="row"><span class="label">담당자</span><span class="value">${customer.contact_name || '-'}</span></div>
                     <div class="row"><span class="label">연락처</span><span class="value">${customer.tel || '-'}</span></div>
                     ${customer.email ? `<div class="row"><span class="label">이메일</span><span class="value">${customer.email}</span></div>` : ''}
+                    ${meta.end_customer ? `<div class="row"><span class="label" style="color: #6366f1; font-weight: 800;">요청고객사</span><span class="value" style="color: #6366f1; font-weight: 800;">${meta.end_customer}</span></div>` : ''}
                 </div>
             </div>
 
