@@ -18,7 +18,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
     if (document_type === 'ORDER') title = '주문서 (ORDER SHEET)';
     if (document_type === 'PURCHASE_ORDER') title = '발주서 (PURCHASE ORDER)';
     if (document_type === 'ORDER_RECEIPT') title = '발주 접수증 (ORDER RECEIPT)';
-    if (document_type === 'TRANSACTION') title = '거래명세서 (TRANSACTION STATEMENT)';
+    if (document_type === 'TRANSACTION') title = '거래명세서(공급받는자 보관용)';
 
     // Theme Color (Indigo for PO, Slate for others)
     const colorTheme = isPurchaseOrder ? '#312e81' : (isTransaction ? '#0f766e' : '#1e293b');
@@ -123,7 +123,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 align-items: stretch;
             }
             .box { border: 1px solid #ddd; padding: 12px; border-radius: 4px; }
-            .box h3 { margin: 0 0 10px 0; font-size: 13px; font-weight: 700; color: ${colorTheme}; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+            .box h3 { margin: 0 0 10px 0; font-size: 14px; font-weight: 700; color: ${colorTheme}; border-bottom: 1px solid #eee; padding-bottom: 6px; }
             .row { display: flex; margin-bottom: 6px; }
             .label { width: 80px; color: #666; font-weight: 600; }
             .value { flex: 1; font-weight: 500; }
@@ -274,14 +274,14 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             </header>
 
             <div class="info-grid">
-                <div class="box" style="${isPurchaseOrder ? 'font-size: 13px;' : 'font-size: 10px;'}">
+                <div class="box" style="${isPurchaseOrder ? 'font-size: 14px;' : 'font-size: 11px;' /* [MOD] Increased by 1 point */}">
                     <h3>공급자 (Supplier)</h3>
                     <div class="row"><span class="label">상호</span><span class="value">${supplier.company_name}</span></div>
                     <div class="row"><span class="label">주소</span><span class="value">${supplier.address}</span></div>
                     <div class="row"><span class="label">담당자</span><span class="value">${supplier.contact_name || '-'}</span></div>
                     <div class="row"><span class="label">연락처</span><span class="value">${supplier.tel} / ${supplier.email}</span></div>
                 </div>
-                <div class="box" style="${isPurchaseOrder ? 'font-size: 13px;' : 'font-size: 10px;'}">
+                <div class="box" style="${isPurchaseOrder ? 'font-size: 14px;' : 'font-size: 11px;' /* [MOD] Increased by 1 point */}">
                     <h3>공급받는자 (Customer)</h3>
                     <div class="row"><span class="label">상호</span><span class="value">${customer.company_name || '-'}</span></div>
                     <div class="row"><span class="label">담당자</span><span class="value">${customer.contact_name || '-'}</span></div>
