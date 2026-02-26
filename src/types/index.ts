@@ -117,6 +117,15 @@ export interface User {
     // Admin 2.0
     status: 'PENDING' | 'APPROVED' | 'REJECTED';
     bizLicenseFile?: string; // Mock path
+
+    // Analytics & Metrics
+    activityMetrics?: {
+        loginCount: number;
+        lastLoginAt?: string;
+        aiSearchCount: number;
+        inquiryCount: number;
+        poCount?: number;
+    };
 }
 
 export interface AdminResponse {

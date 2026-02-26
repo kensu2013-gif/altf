@@ -27,7 +27,6 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const inventory = useStore((state) => state.inventory);
     const user = useStore((state) => state.auth.user); // Get Admin User
     const updateQuotation = useStore((state) => state.updateQuotation);
-    const updateUser = useStore((state) => state.updateUser);
     const uploadFile = useStore((state) => state.uploadFile);
     const customerUser = useStore((state) => state.users.find(u => u.id === quote.userId));
 
@@ -956,24 +955,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                             {quote.status === 'PROCESSED' && (
                                 <Button
                                     onClick={async () => {
-                                        // Update User Info First
-                                        if (customerUser) {
-                                            updateUser(customerUser.id, {
-                                                companyName: customerInfo.companyName,
-                                                contactName: customerInfo.contactName,
-                                                phone: customerInfo.phone,
-                                                email: customerInfo.email,
-                                                bizNo: customerInfo.bizNo,
-                                                address: customerInfo.address,
-                                                fax: customerInfo.fax,
-                                                contactInfo: {
-                                                    phone: customerInfo.phone,
-                                                    email: customerInfo.email
-                                                }
-                                            });
-                                        }
-
-                                        // 2. Upload Admin Attachments to S3
+                                        // 1. Upload Admin Attachments to S3
                                         const uploadedAttachments: { name: string, url: string }[] = quote.adminAttachments || [];
                                         for (const file of adminAttachmentFiles) {
                                             const refId = quote.id + '_admin';
@@ -992,7 +974,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                 note: response.note,
                                                 additionalCharges: charges
                                             },
-                                            // status: 'PROCESSED' // Keep as processed (or update if needed, but usually redundant if already processed)
+                                            customerInfo: customerInfo // [FIX] Isolate save
                                         };
 
                                         updateQuotation(quote.id, updatePayload); // Local Update
