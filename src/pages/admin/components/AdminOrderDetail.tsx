@@ -195,6 +195,13 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const [poOptionStockCheck, setPoOptionStockCheck] = useState(false);
     const [poOptionCustomOrder, setPoOptionCustomOrder] = useState(false);
 
+    // UX Animation Trackers
+    const [poNumTouched, setPoNumTouched] = useState(false);
+    const [customerTouched, setCustomerTouched] = useState(false);
+    const [printOptionTouched, setPrintOptionTouched] = useState(false);
+    const [deliveryDateTouched, setDeliveryDateTouched] = useState(false);
+    const [hasSavedPO, setHasSavedPO] = useState(false);
+
     // Effect to compose shippingMemo automatically for POs
     useEffect(() => {
         if (!order || !isSupplierMode) return;
@@ -749,11 +756,15 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         {isSupplierMode && (
                             <Button
                                 variant="outline"
-                                onClick={handleDownloadPO}
+                                onClick={() => {
+                                    setHasSavedPO(true);
+                                    alert('새 창이 열리면 "PDF로 저장" 기능 등을 이용해 PC에 문서를 저장해주세요!\n\n저장 후, 아래 "매입발주서 첨부" 영역에 파일을 등록해 주시면 전송이 가능합니다.');
+                                    setTimeout(() => handleDownloadPO(), 100);
+                                }}
                                 className="gap-2 font-bold bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50"
                             >
                                 <Download className="w-4 h-4" />
-                                발주서 출력
+                                발주서 인쇄 / PDF 저장 (SAVE)
                             </Button>
                         )}
                         {!isSupplierMode && (
@@ -812,24 +823,29 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                     <input
                                         type="text"
                                         value={poNumber}
-                                        onChange={(e) => handlePoNumberChange(e.target.value)}
-                                        className="w-full px-2 py-1.5 text-sm border border-indigo-200 rounded focus:border-indigo-500 outline-none font-mono font-bold text-indigo-900"
+                                        onChange={(e) => {
+                                            handlePoNumberChange(e.target.value);
+                                            if (!poNumTouched) setPoNumTouched(true);
+                                        }}
+                                        className={`w-full px-2 py-1.5 text-sm border rounded outline-none font-mono font-bold transition-all ${!poNumTouched ? 'border-red-400 ring-2 ring-red-400 animate-pulse text-red-900' : 'border-indigo-200 focus:border-indigo-500 text-indigo-900'}`}
                                         placeholder="ESYYDDMM-000"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-indigo-700 mb-1">발주서 제목 (Title)</label>
-                                    <input
-                                        type="text"
-                                        value={poTitle}
-                                        onChange={(e) => {
-                                            setPoTitle(e.target.value);
-                                            setEmailSubject(e.target.value);
-                                        }}
-                                        className="w-full px-2 py-1.5 text-sm border border-indigo-200 rounded focus:border-indigo-500 outline-none font-bold text-indigo-900"
-                                        placeholder="[알트에프] 대경벤드 발주서 첨부건 - 000"
-                                    />
-                                </div>
+                                {poNumTouched && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-indigo-700 mb-1">발주서 제목 (Title)</label>
+                                        <input
+                                            type="text"
+                                            value={poTitle}
+                                            onChange={(e) => {
+                                                setPoTitle(e.target.value);
+                                                setEmailSubject(e.target.value);
+                                            }}
+                                            className="w-full px-2 py-1.5 text-sm border border-indigo-200 rounded focus:border-indigo-500 outline-none font-bold text-indigo-900"
+                                            placeholder="[알트에프] 대경벤드 발주서 첨부건 - 000"
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-6">
@@ -900,8 +916,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                             <span className="text-xs font-bold text-indigo-700 uppercase">CUSTOMER</span>
                                             <input
                                                 value={poEndCustomer}
-                                                onChange={e => handlePoEndCustomerChange(e.target.value)}
-                                                className="px-2 py-1 text-sm text-indigo-900 font-bold border border-indigo-200 rounded min-w-[140px] shadow-sm focus:border-indigo-500 outline-none"
+                                                onChange={e => {
+                                                    handlePoEndCustomerChange(e.target.value);
+                                                    if (!customerTouched) setCustomerTouched(true);
+                                                }}
+                                                className={`px-2 py-1 text-sm font-bold border rounded min-w-[140px] shadow-sm outline-none transition-all ${!customerTouched ? 'border-red-400 ring-2 ring-red-400 animate-pulse text-red-900' : 'border-indigo-200 focus:border-indigo-500 text-indigo-900'}`}
                                                 placeholder="고객사 이름"
                                                 title="PO에 표시될 요청 고객사 이름을 수정할 수 있습니다."
                                             />
@@ -945,7 +964,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         {/* Left: Supplier PO File */}
                                         <div>
                                             <h4 className="text-xs font-bold text-indigo-700 uppercase mb-2">매입발주서 첨부 (Supplier PO)</h4>
-                                            <div className="flex flex-col gap-2">
+                                            <div className={`flex flex-col gap-2 transition-all p-2 rounded-lg -ml-2 ${hasSavedPO && supplierPoFiles.length === 0 && !order.supplierPO ? 'ring-4 ring-indigo-500 ring-offset-2 animate-pulse bg-indigo-50' : ''}`}>
                                                 <input
                                                     type="file"
                                                     title="매입발주서 첨부 (Supplier PO)"
@@ -967,7 +986,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                 )}
                                             </div>
 
-                                            <div className="mt-4 p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
+                                            <div className={`mt-4 p-3 rounded-lg border transition-all ${!printOptionTouched ? 'bg-indigo-50/20 border-red-300 ring-2 ring-red-400 animate-pulse' : 'bg-indigo-50/50 border-indigo-100'}`}>
                                                 <h4 className="text-xs font-bold text-indigo-700 mb-2 flex items-center gap-1">
                                                     발주서 인쇄 옵션 (Print Options)
                                                 </h4>
@@ -979,7 +998,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                             id="po-opt-nomarking"
                                                             className="w-4 h-4 cursor-pointer accent-indigo-600"
                                                             checked={poOptionNoMarking}
-                                                            onChange={(e) => setPoOptionNoMarking(e.target.checked)}
+                                                            onChange={(e) => { setPoOptionNoMarking(e.target.checked); if (!printOptionTouched) setPrintOptionTouched(true); }}
                                                         />
                                                         <label htmlFor="po-opt-nomarking" className="text-xs font-bold text-slate-700 cursor-pointer">
                                                             무마킹 출고 조건
@@ -991,7 +1010,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                             id="po-opt-stock"
                                                             className="w-4 h-4 cursor-pointer accent-indigo-600"
                                                             checked={poOptionStockCheck}
-                                                            onChange={(e) => setPoOptionStockCheck(e.target.checked)}
+                                                            onChange={(e) => { setPoOptionStockCheck(e.target.checked); if (!printOptionTouched) setPrintOptionTouched(true); }}
                                                         />
                                                         <label htmlFor="po-opt-stock" className="text-xs font-bold text-slate-700 cursor-pointer">
                                                             재고장 확인의 건                                                        </label>
@@ -1002,7 +1021,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                             id="po-opt-custom"
                                                             className="w-4 h-4 cursor-pointer accent-indigo-600"
                                                             checked={poOptionCustomOrder}
-                                                            onChange={(e) => setPoOptionCustomOrder(e.target.checked)}
+                                                            onChange={(e) => { setPoOptionCustomOrder(e.target.checked); if (!printOptionTouched) setPrintOptionTouched(true); }}
                                                         />
                                                         <label htmlFor="po-opt-custom" className="text-xs font-bold text-slate-700 cursor-pointer">
                                                             주문제작 요청건
@@ -1010,7 +1029,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                     </div>
                                                 </div>
 
-                                                <div className="mt-3 pt-3 border-t border-indigo-200 border-dashed">
+                                                <div className={`mt-3 pt-3 border-t border-indigo-200 border-dashed transition-all ${!deliveryDateTouched ? 'ring-2 ring-red-400 bg-red-50 p-2 -mx-2 rounded' : ''}`}>
                                                     <label className="block text-xs font-bold text-slate-700 mb-1">납기지정 (비고란에 추가)</label>
                                                     <input
                                                         type="date"
@@ -1022,6 +1041,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 ...prev,
                                                                 note: prev.note.replace(/\n?\[납기지정\]: .*/, '') + (val ? `\n[납기지정]: ${val}` : '')
                                                             }));
+                                                            if (!deliveryDateTouched) setDeliveryDateTouched(true);
                                                         }}
                                                     />
                                                 </div>
@@ -1029,36 +1049,56 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         </div>
 
                                         {/* Right: Webhook Email Integration */}
-                                        <div className="bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 relative">
-                                            <h4 className="text-xs font-bold text-indigo-700 mb-2 flex items-center gap-1">
-                                                <Send className="w-3 h-3" /> 매입 발주서 이메일 전송 (Webhook)
-                                            </h4>
-                                            <div className="space-y-2">
-                                                <div>
-                                                    <label className="block text-[10px] text-indigo-500 font-bold mb-1">메일 제목 (Email Subject)</label>
-                                                    <input
-                                                        type="text"
-                                                        title="메일 제목 (Email Subject)"
-                                                        placeholder="이메일 제목 입력"
-                                                        value={emailSubject}
-                                                        onChange={(e) => setEmailSubject(e.target.value)}
-                                                        className="w-full px-2 py-1 text-xs border border-indigo-200 rounded outline-none focus:border-indigo-500 bg-white"
-                                                    />
+                                        {poNumTouched && (
+                                            <div className="bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 relative">
+                                                <h4 className="text-xs font-bold text-indigo-700 mb-2 flex items-center gap-1">
+                                                    <Send className="w-3 h-3" /> 매입 발주서 이메일 전송 (Webhook)
+                                                </h4>
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <label className="block text-[10px] text-indigo-500 font-bold mb-1">메일 제목 (Email Subject)</label>
+                                                        <input
+                                                            type="text"
+                                                            title="메일 제목 (Email Subject)"
+                                                            placeholder="이메일 제목 입력"
+                                                            value={emailSubject}
+                                                            onChange={(e) => setEmailSubject(e.target.value)}
+                                                            className="w-full px-2 py-1 text-xs border border-indigo-200 rounded outline-none focus:border-indigo-500 bg-white"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] text-indigo-500 font-bold mb-1">첨부파일명 (Attachment Name)</label>
+                                                        <input
+                                                            type="text"
+                                                            title="첨부파일명 (Attachment Name)"
+                                                            placeholder="첨부파일명 입력"
+                                                            value={emailAttachmentName}
+                                                            onChange={(e) => setEmailAttachmentName(e.target.value)}
+                                                            className="w-full px-2 py-1 text-xs border border-indigo-200 rounded outline-none focus:border-indigo-500 bg-white"
+                                                        />
+                                                    </div>
+
+                                                    {!hasSavedPO ? (
+                                                        <div className="text-xs text-slate-500 text-center py-2 bg-white/50 rounded border border-slate-100">
+                                                            먼저 <b>발주서를 PDF로 저장(SAVE)</b> 해주세요.
+                                                        </div>
+                                                    ) : (!order.supplierPO && supplierPoFiles.length === 0) ? (
+                                                        <div className="text-xs text-indigo-600 font-bold text-center py-2 bg-indigo-50/80 rounded border border-indigo-200 animate-pulse">
+                                                            저장한 발주서 파일을 <b>좌측에 첨부</b>해주세요!
+                                                        </div>
+                                                    ) : (
+                                                        <Button
+                                                            onClick={handleSupplierSave}
+                                                            disabled={isSendingWebhook}
+                                                            className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
+                                                        >
+                                                            <Send className="w-4 h-4" />
+                                                            매입 발주서 전송
+                                                        </Button>
+                                                    )}
                                                 </div>
-                                                <div>
-                                                    <label className="block text-[10px] text-indigo-500 font-bold mb-1">첨부파일명 (Attachment Name)</label>
-                                                    <input
-                                                        type="text"
-                                                        title="첨부파일명 (Attachment Name)"
-                                                        placeholder="첨부파일명 입력"
-                                                        value={emailAttachmentName}
-                                                        onChange={(e) => setEmailAttachmentName(e.target.value)}
-                                                        className="w-full px-2 py-1 text-xs border border-indigo-200 rounded outline-none focus:border-indigo-500 bg-white"
-                                                    />
-                                                </div>
-                                                {/* Old Webhook Send button removed since it's merged into foot Save/Send */}
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
