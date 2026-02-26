@@ -139,7 +139,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 color: #334155; 
                 border-top: 2px solid #cbd5e1;
                 border-bottom: 1px solid #cbd5e1;
-                padding: 8px 4px;
+                padding: 10px 4px;
                 text-align: center; 
                 font-weight: 700;
                 vertical-align: middle;
@@ -149,17 +149,17 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
-                line-height: 1.2;
+                line-height: 1.3;
             }
             .th-ko { font-size: ${isPurchaseOrder ? '13px' : '11px'}; font-weight: 800; color: #1e293b; }
             .th-en { font-size: ${isPurchaseOrder ? '12px' : '10px'}; font-weight: 600; color: #64748b; margin-top: 2px; }
 
             td { 
                 border-bottom: 1px solid #e2e8f0; 
-                padding: 8px 4px;
+                padding: 10px 4px;
                 vertical-align: middle;
                 word-break: break-word;
-                ${isPurchaseOrder ? 'font-size: 14px; font-weight: bold; line-height: 1.3;' : ''}
+                ${isPurchaseOrder ? 'font-size: 14px; font-weight: bold; line-height: 1.5; letter-spacing: 0.3px;' : 'line-height: 1.4;'}
             }
 
             .text-center { text-align: center; }
@@ -169,19 +169,19 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             
             /* Columns */
             .col-no { width: 3%; text-align: center; }
-            .col-item { width: 10%; text-align: center; }
+            .col-item { width: 12%; text-align: center; }
             .col-spec { width: 6%; text-align: center; }
-            .col-size { width: 11%; text-align: center; }
-            .col-mat { width: 11%; text-align: center; }
+            .col-size { width: 14%; text-align: center; }
+            .col-mat { width: 13%; text-align: center; }
             
-            .col-stock { width: 8%; text-align: center; } 
-            .col-status { width: 10%; text-align: center; } 
-            .col-loc { width: 8%; text-align: center; }
+            .col-stock { width: 10%; text-align: center; } 
+            .col-status { width: 12%; text-align: center; } 
+            /* LOC Column hidden by dynamically not rendering or reallocating width */
             
-            .col-qty { width: 5%; text-align: center; } 
+            .col-qty { width: 6%; text-align: center; } 
             
             .col-price { width: 11%; text-align: right; padding-right: 5px; }
-            .col-amt { width: 14%; text-align: right; padding-right: 5px; }
+            .col-amt { width: 13%; text-align: right; padding-right: 5px; }
 
             /* Footer Layout */
             .footer-wrapper {
@@ -317,7 +317,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                         ${!isTransaction ? `
                         <th class="col-stock">재고<br><span class="sub-text">STOCK</span></th>
                         <th class="col-status">상태<br><span class="sub-text">STAT</span></th>
-                        <th class="col-loc">위치<br><span class="sub-text">LOC</span></th>
+                        ${!isPurchaseOrder ? `<th class="col-loc">위치<br><span class="sub-text">LOC</span></th>` : ''}
                         ` : ''}
                         <th class="col-qty">수량<br><span class="sub-text">QTY</span></th>
                         <th class="col-price">단가<br><span class="sub-text">PRICE</span></th>
@@ -344,7 +344,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 return `<span style="color: ${c}; font-weight: 800;">${st}</span>`;
             })()}
                         </td>
-                        <td class="col-loc">${item.location_maker || '-'}</td>
+                        ${!isPurchaseOrder ? `<td class="col-loc">${item.location_maker || '-'}</td>` : ''}
                         ` : ''}
                         <td class="col-qty">${item.qty}</td>
                         <td class="col-price text-right">${formatCurrency(item.unit_price)}</td>
