@@ -1209,29 +1209,31 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                 placeholder="배송 요청사항을 입력하세요."
                                             />
                                         </div>
-                                        <div className="flex gap-4 p-3 bg-teal-50/30 border border-teal-100 rounded-lg">
-                                            <div className="flex-1">
-                                                <label className="block text-xs font-bold text-teal-700 mb-1">출고일자 (Shipment Date) *명세서 출력용</label>
-                                                <input
-                                                    type="date"
-                                                    value={transactionShipDate}
-                                                    onChange={(e) => setTransactionShipDate(e.target.value)}
-                                                    className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:border-teal-500 outline-none bg-white"
-                                                    title="거래명세서에 '출고일자'로 표시됩니다."
-                                                />
+                                        {order.status === 'COMPLETED' && (
+                                            <div className="flex gap-4 p-3 bg-teal-50/30 border border-teal-100 rounded-lg">
+                                                <div className="flex-1">
+                                                    <label className="block text-xs font-bold text-teal-700 mb-1">출고일자 (Shipment Date) *명세서 출력용</label>
+                                                    <input
+                                                        type="date"
+                                                        value={transactionShipDate}
+                                                        onChange={(e) => setTransactionShipDate(e.target.value)}
+                                                        className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:border-teal-500 outline-none bg-white"
+                                                        title="거래명세서에 '출고일자'로 표시됩니다."
+                                                    />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <label className="block text-xs font-bold text-teal-700 mb-1">제품송장 번호 (Tracking No.) *명세서 출력용</label>
+                                                    <input
+                                                        type="text"
+                                                        value={transactionTrackingNo}
+                                                        onChange={(e) => setTransactionTrackingNo(e.target.value)}
+                                                        className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:border-teal-500 outline-none bg-white"
+                                                        placeholder="예: CJ대한통운 12345678"
+                                                        title="거래명세서의 배송요청사항(물건 받으실 방법) 하단에 추가됩니다."
+                                                    />
+                                                </div>
                                             </div>
-                                            <div className="flex-1">
-                                                <label className="block text-xs font-bold text-teal-700 mb-1">제품송장 번호 (Tracking No.) *명세서 출력용</label>
-                                                <input
-                                                    type="text"
-                                                    value={transactionTrackingNo}
-                                                    onChange={(e) => setTransactionTrackingNo(e.target.value)}
-                                                    className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:border-teal-500 outline-none bg-white"
-                                                    placeholder="예: CJ대한통운 12345678"
-                                                    title="거래명세서의 배송요청사항(물건 받으실 방법) 하단에 추가됩니다."
-                                                />
-                                            </div>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
