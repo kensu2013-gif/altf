@@ -190,34 +190,22 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         return payload?.customer?.memo || '';
     });
 
-    // State for PO Delivery Options (Parse from shippingMemo if possible)
-    const initialPoType = shippingMemo.includes('[발주진행건]') ? '발주진행건' : (shippingMemo.includes('[재고장 확인건]') ? '재고장 확인건' : '발주진행건');
-    const [poDeliveryMethod, setPoDeliveryMethod] = useState('');
-    const [poDeliveryContact, setPoDeliveryContact] = useState('');
-    const [poDeliveryRequest, setPoDeliveryRequest] = useState('');
-    const [poType, setPoType] = useState(initialPoType);
-
-    // Initial parsing
-    useEffect(() => {
-        if (!shippingMemo) return;
-        const lines = shippingMemo.split('\n');
-        lines.forEach(line => {
-            if (line.startsWith('배송:')) setPoDeliveryMethod(line.substring(3).trim());
-            else if (line.startsWith('담당자:')) setPoDeliveryContact(line.substring(4).trim());
-            else if (line.startsWith('요청:')) setPoDeliveryRequest(line.substring(3).trim());
-        });
-    }, [shippingMemo]);
+    // PO Options State
+    const [poOptionNoMarking, setPoOptionNoMarking] = useState(false);
+    const [poOptionStockCheck, setPoOptionStockCheck] = useState(false);
+    const [poOptionCustomOrder, setPoOptionCustomOrder] = useState(false);
 
     // Effect to compose shippingMemo automatically for POs
     useEffect(() => {
         if (!order || !isSupplierMode) return;
 
-        let newMemo = `배송: ${poDeliveryMethod}\n담당자: ${poDeliveryContact}\n요청: ${poDeliveryRequest}\n[${poType}]`;
-        if (shippingMemo.includes('(3) 무마킹 조건')) {
-            newMemo += '\n(3) 무마킹 조건';
-        }
+        let newMemo = order.memo || '';
+        if (poOptionNoMarking) newMemo += '\n[무마킹 조건]';
+        if (poOptionStockCheck) newMemo += '\n[재고장 확인 조건]';
+        if (poOptionCustomOrder) newMemo += '\n[주문제작 요청건]';
+
         setShippingMemo(newMemo);
-    }, [poDeliveryMethod, poDeliveryContact, poDeliveryRequest, poType, isSupplierMode, order, shippingMemo]);
+    }, [poOptionNoMarking, poOptionStockCheck, poOptionCustomOrder, isSupplierMode, order]);
 
     // PO Info State
     const [poEndCustomer, setPoEndCustomer] = useState(order.poEndCustomer || order.customerName || '');
@@ -973,98 +961,58 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
                                             <div className="mt-4 p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
                                                 <h4 className="text-xs font-bold text-indigo-700 mb-2 flex items-center gap-1">
-                                                    추가 발주 조건 (PO Request Info)
+                                                    발주서 인쇄 옵션 (Print Options)
                                                 </h4>
 
-                                                <div className="space-y-2 mb-3">
+                                                <div className="space-y-2 mb-2">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-bold text-slate-700 w-12">배송</span>
                                                         <input
-                                                            type="text"
-                                                            value={poDeliveryMethod}
-                                                            onChange={e => setPoDeliveryMethod(e.target.value)}
-                                                            className="flex-1 px-2 py-1 text-xs border rounded focus:border-indigo-500 outline-none"
-                                                            placeholder="화물 - 광주흑석지점"
+                                                            type="checkbox"
+                                                            id="po-opt-nomarking"
+                                                            className="w-4 h-4 cursor-pointer accent-indigo-600"
+                                                            checked={poOptionNoMarking}
+                                                            onChange={(e) => setPoOptionNoMarking(e.target.checked)}
                                                         />
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-bold text-slate-700 w-12">담당자</span>
-                                                        <input
-                                                            type="text"
-                                                            value={poDeliveryContact}
-                                                            onChange={e => setPoDeliveryContact(e.target.value)}
-                                                            className="flex-1 px-2 py-1 text-xs border rounded focus:border-indigo-500 outline-none"
-                                                            placeholder="에스제이앤브이 (전화번호)"
-                                                        />
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-bold text-slate-700 w-12">요청</span>
-                                                        <input
-                                                            type="text"
-                                                            value={poDeliveryRequest}
-                                                            onChange={e => setPoDeliveryRequest(e.target.value)}
-                                                            className="flex-1 px-2 py-1 text-xs border rounded focus:border-indigo-500 outline-none"
-                                                            placeholder="현물화물"
-                                                        />
-                                                    </div>
-                                                    <div className="flex items-center gap-4 py-1 mt-1 border-t border-indigo-200 border-dashed">
-                                                        <label className="flex items-center gap-1 cursor-pointer">
-                                                            <input
-                                                                type="radio"
-                                                                name="poType"
-                                                                value="발주진행건"
-                                                                checked={poType === '발주진행건'}
-                                                                onChange={() => setPoType('발주진행건')}
-                                                                className="accent-indigo-600"
-                                                            />
-                                                            <span className="text-xs font-bold text-slate-700">발주진행건</span>
+                                                        <label htmlFor="po-opt-nomarking" className="text-xs font-bold text-slate-700 cursor-pointer">
+                                                            무마킹 출고 조건
                                                         </label>
-                                                        <label className="flex items-center gap-1 cursor-pointer">
-                                                            <input
-                                                                type="radio"
-                                                                name="poType"
-                                                                value="재고장 확인건"
-                                                                checked={poType === '재고장 확인건'}
-                                                                onChange={() => setPoType('재고장 확인건')}
-                                                                className="accent-indigo-600"
-                                                            />
-                                                            <span className="text-xs font-bold text-slate-700">재고장 확인건</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            id="po-opt-stock"
+                                                            className="w-4 h-4 cursor-pointer accent-indigo-600"
+                                                            checked={poOptionStockCheck}
+                                                            onChange={(e) => setPoOptionStockCheck(e.target.checked)}
+                                                        />
+                                                        <label htmlFor="po-opt-stock" className="text-xs font-bold text-slate-700 cursor-pointer">
+                                                            재고장 확인의 건                                                        </label>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            id="po-opt-custom"
+                                                            className="w-4 h-4 cursor-pointer accent-indigo-600"
+                                                            checked={poOptionCustomOrder}
+                                                            onChange={(e) => setPoOptionCustomOrder(e.target.checked)}
+                                                        />
+                                                        <label htmlFor="po-opt-custom" className="text-xs font-bold text-slate-700 cursor-pointer">
+                                                            주문제작 요청건
                                                         </label>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        id="no-marking-checkbox"
-                                                        className="w-4 h-4 cursor-pointer"
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                if (!shippingMemo.includes('(3) 무마킹 조건')) {
-                                                                    setShippingMemo(prev => prev ? prev + '\n(3) 무마킹 조건' : '(3) 무마킹 조건');
-                                                                }
-                                                            } else {
-                                                                setShippingMemo(prev => prev.replace(/\n?\(3\) 무마킹 조건/g, ''));
-                                                            }
-                                                        }}
-                                                        checked={shippingMemo.includes('(3) 무마킹 조건')}
-                                                    />
-                                                    <label htmlFor="no-marking-checkbox" className="text-xs font-bold text-slate-700 cursor-pointer">
-                                                        [옵션] 무마킹 조건 표기
-                                                    </label>
-                                                </div>
-                                                <div>
+                                                <div className="mt-3 pt-3 border-t border-indigo-200 border-dashed">
                                                     <label className="block text-xs font-bold text-slate-700 mb-1">납기지정 (비고란에 추가)</label>
                                                     <input
                                                         type="text"
                                                         placeholder="예: 2026-03-01까지 도착요망"
-                                                        className="w-full px-2 py-1.5 text-xs border rounded"
+                                                        className="w-full px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500"
                                                         onChange={(e) => {
                                                             const val = e.target.value;
-                                                            // For simplicity just append it, user can refine
                                                             setSupplierInfo(prev => ({
                                                                 ...prev,
-                                                                note: prev.note.replace(/\n\[납기지정\]: .*/, '') + (val ? `\n[납기지정]: ${val}` : '')
+                                                                note: prev.note.replace(/\n?\[납기지정\]: .*/, '') + (val ? `\n[납기지정]: ${val}` : '')
                                                             }));
                                                         }}
                                                     />
