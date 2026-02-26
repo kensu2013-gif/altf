@@ -227,6 +227,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const [poNumber, setPoNumber] = useState(order.poNumber || autoPoNumber);
     const [poTitle, setPoTitle] = useState(order.poTitle || defaultSubject);
 
+    // Transaction Statement Specific State
+    const [transactionShipDate, setTransactionShipDate] = useState('');
+    const [transactionTrackingNo, setTransactionTrackingNo] = useState('');
+
     // Sync PO numbering dynamically if user changes poNumber but keep it smart
     const handlePoNumberChange = (newPoNum: string) => {
         setPoNumber(newPoNum);
@@ -367,7 +371,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 doc_no: `ORD-${order.id.slice(0, 8)}`,
                 created_at: new Date(order.createdAt).toLocaleDateString(),
                 channel: 'WEB',
-                delivery_date: order.adminResponse?.deliveryDate,
+                delivery_date: transactionShipDate, // Map dynamic shipment date to template meta
                 title: '거래명세서 (Transaction Statement)'
             },
             supplier: {
@@ -384,7 +388,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 tel: linkedUser?.phone || customerInfo.tel,
                 email: linkedUser?.email || '',
                 address: linkedUser?.address || '',
-                memo: shippingMemo
+                memo: transactionTrackingNo ? `[제품송장 번호]: ${transactionTrackingNo}\n${shippingMemo}` : shippingMemo
             },
             items: selectedItems.map((item, idx) => ({
                 no: idx + 1,
@@ -1204,6 +1208,29 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                 className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:border-teal-500 outline-none resize-none h-16 bg-yellow-50/50"
                                                 placeholder="배송 요청사항을 입력하세요."
                                             />
+                                        </div>
+                                        <div className="flex gap-4 p-3 bg-teal-50/30 border border-teal-100 rounded-lg">
+                                            <div className="flex-1">
+                                                <label className="block text-xs font-bold text-teal-700 mb-1">출고일자 (Shipment Date) *명세서 출력용</label>
+                                                <input
+                                                    type="date"
+                                                    value={transactionShipDate}
+                                                    onChange={(e) => setTransactionShipDate(e.target.value)}
+                                                    className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:border-teal-500 outline-none bg-white"
+                                                    title="거래명세서에 '출고일자'로 표시됩니다."
+                                                />
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="block text-xs font-bold text-teal-700 mb-1">제품송장 번호 (Tracking No.) *명세서 출력용</label>
+                                                <input
+                                                    type="text"
+                                                    value={transactionTrackingNo}
+                                                    onChange={(e) => setTransactionTrackingNo(e.target.value)}
+                                                    className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:border-teal-500 outline-none bg-white"
+                                                    placeholder="예: CJ대한통운 12345678"
+                                                    title="거래명세서의 배송요청사항(물건 받으실 방법) 하단에 추가됩니다."
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

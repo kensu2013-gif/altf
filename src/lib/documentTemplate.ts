@@ -159,7 +159,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 padding: 10px 4px;
                 vertical-align: middle;
                 white-space: nowrap;
-                ${isPurchaseOrder ? 'font-size: 14px; font-weight: bold; line-height: 1.5; letter-spacing: 0.3px;' : 'line-height: 1.4;'}
+                ${(isPurchaseOrder || isTransaction) ? 'font-size: 14px; font-weight: bold; line-height: 1.5; letter-spacing: 0.3px;' : 'line-height: 1.4;'}
             }
             td.col-size {
                 white-space: normal;
@@ -389,8 +389,8 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 ` : `
                     ${(() => {
             // Estimated Delivery Logic
-            // [MOD] Hide Estimated Delivery if Confirmed Delivery exists
-            if (meta.delivery_date) return '';
+            // [MOD] Hide Estimated Delivery if Confirmed Delivery exists or if it's a Transaction Statement
+            if (isTransaction || meta.delivery_date) return '';
 
             let deliveryText = '당일~1일내 출고 가능'; // Default (Available/Marking Wait)
             const hasOutOfStock = items.some(i => i.stock_status?.includes('재고없음'));
@@ -411,7 +411,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
         })()}
                     ${meta.delivery_date ? `
                             <div style="margin-bottom: 12px;">
-                                <span class="delivery-title" style="color:#0f766e;">확정 납기 (Confirmed Delivery)</span>
+                                <span class="delivery-title" style="color:#0f766e;">${isTransaction ? '출고일자 (Shipment Date)' : '확정 납기 (Confirmed Delivery)'}</span>
                                 <div class="delivery-content" style="font-weight:800; color:#0f766e; font-size: 14px;">
                                     ${new Date(meta.delivery_date).toLocaleDateString()}
                                 </div>
@@ -427,7 +427,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
 
                     ${customer.memo ? `
                         <span class="delivery-title">${isOrder ? '물건 받으실 방법 (Delivery Request)' : '문의 및 요청사항 (Inquiries & Requests)'}</span>
-                        <div class="delivery-content">${customer.memo}</div>
+                        <div class="delivery-content" ${isTransaction ? 'style="font-size: 14px; font-weight: bold; line-height: 1.5; color: #1e293b; white-space: pre-wrap;"' : ''}>${customer.memo}</div>
                     ` : ''}
                 `}
                 </div>
