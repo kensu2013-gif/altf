@@ -158,8 +158,8 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 border-bottom: 1px solid #e2e8f0; 
                 padding: 8px 4px;
                 vertical-align: middle;
-                overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-                ${isPurchaseOrder ? 'font-size: 14.5px; font-weight: bold;' : ''}
+                word-break: break-word;
+                ${isPurchaseOrder ? 'font-size: 14px; font-weight: bold; line-height: 1.3;' : ''}
             }
 
             .text-center { text-align: center; }

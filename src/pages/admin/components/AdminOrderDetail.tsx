@@ -828,7 +828,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                             if (!poNumTouched) setPoNumTouched(true);
                                         }}
                                         className={`w-full px-2 py-1.5 text-sm border rounded outline-none font-mono font-bold transition-all ${!poNumTouched ? 'border-red-400 ring-2 ring-red-400 animate-pulse text-red-900' : 'border-indigo-200 focus:border-indigo-500 text-indigo-900'}`}
-                                        placeholder="ESYYDDMM-000"
+                                        placeholder="ESYYMMDD-000"
                                     />
                                 </div>
                                 {poNumTouched && (
