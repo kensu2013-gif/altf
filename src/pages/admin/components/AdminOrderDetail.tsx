@@ -503,7 +503,13 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 id: user?.id || 'admin',
                 email: user?.email || '',
                 at: new Date().toISOString()
-            }
+            },
+            // [NEW] Permanent Manager Assignment
+            manager: order.manager || (user ? {
+                name: user.contactName || user.companyName || '관리자',
+                id: user.id || 'admin',
+                email: user.email || ''
+            } : undefined)
         };
 
         // Process Uploads
@@ -543,6 +549,12 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 email: user?.email || '',
                 at: new Date().toISOString()
             },
+            // [NEW] Permanent Manager Assignment
+            manager: order.manager || (user ? {
+                name: user.contactName || user.companyName || '관리자',
+                id: user.id || 'admin',
+                email: user.email || ''
+            } : undefined),
             ...extraUpdate
         };
 

@@ -38,13 +38,21 @@ export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
             totalCost += orderCost;
 
             // Track by Manager
-            const managerName = order.lastUpdatedBy?.name || '미배정/시스템';
-            if (!managerStats[managerName]) {
-                managerStats[managerName] = { count: 0, profit: 0, sales: 0 };
+            // 1) Get Manager (Fallback to lastUpdatedBy for Legacy Data, then '미배정/시스템')
+            const managerSource = order.manager || order.lastUpdatedBy;
+            const managerName = managerSource?.name || '미배정/시스템';
+
+            // 2) Exclude explicit 'admin' account from Performance Stats (but keep their sales/profit in Global Totals)
+            const isManagerAdmin = managerSource?.id?.toLowerCase() === 'admin' || managerName.toLowerCase() === 'admin' || managerName === '관리자';
+
+            if (!isManagerAdmin) {
+                if (!managerStats[managerName]) {
+                    managerStats[managerName] = { count: 0, profit: 0, sales: 0 };
+                }
+                managerStats[managerName].count += 1;
+                managerStats[managerName].sales += sales;
+                managerStats[managerName].profit += (sales - orderCost);
             }
-            managerStats[managerName].count += 1;
-            managerStats[managerName].sales += sales;
-            managerStats[managerName].profit += (sales - orderCost);
         });
 
         const totalProfit = totalSales - totalCost;

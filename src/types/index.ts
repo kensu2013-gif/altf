@@ -82,6 +82,7 @@ export interface Quotation {
     createdAt: string;
     memo?: string; // Inquiry/Request
     adminResponse?: AdminResponse;
+    manager?: { name: string; id: string; email: string; }; // Permanent Sales Rep
     isDeleted?: boolean; // Soft Delete Flag
     attachments?: { name: string; url: string; }[]; // Customer request files
     adminAttachments?: { name: string; url: string; }[]; // Official ALTF quote files
@@ -165,6 +166,7 @@ export interface Order {
         email: string;
         at: string; // ISO Date
     };
+    manager?: { name: string; id: string; email: string; }; // Permanent Sales Rep
     // S3 File Attachments
     customerPO?: { name: string; url: string; }; // Original PO from customer
     deliveryNote?: { name: string; url: string; }; // ALTF delivery note to customer

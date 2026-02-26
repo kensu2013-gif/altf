@@ -443,7 +443,13 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 note: response.note,
                 additionalCharges: charges
             },
-            status: 'PROCESSED' as const // Mark as Processed (Answered)
+            status: 'PROCESSED' as const, // Mark as Processed (Answered)
+            // [NEW] Assign permanent manager to first responder
+            manager: quote.manager || (user ? {
+                name: user.contactName || user.companyName || '관리자',
+                id: user.id,
+                email: user.email
+            } : undefined)
         };
 
         // 3. Update Local Store
