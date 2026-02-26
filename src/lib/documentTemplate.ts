@@ -168,10 +168,10 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             .font-bold { font-weight: 700; }
             
             /* Columns */
-            .col-no { width: 3%; text-align: center; }
-            .col-item { width: 12%; text-align: center; }
+            .col-no { width: 4%; text-align: left; padding-left: 8px; }
+            .col-item { width: 13%; text-align: center; }
             .col-spec { width: 6%; text-align: center; }
-            .col-size { width: 14%; text-align: center; }
+            .col-size { width: 15%; text-align: center; }
             .col-mat { width: 13%; text-align: center; }
             
             .col-stock { width: 10%; text-align: center; } 
@@ -180,8 +180,8 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             
             .col-qty { width: 6%; text-align: center; } 
             
-            .col-price { width: 11%; text-align: right; padding-right: 5px; }
-            .col-amt { width: 13%; text-align: right; padding-right: 5px; }
+            .col-price { width: 11%; text-align: right; }
+            .col-amt { width: 10%; text-align: right; padding-right: 8px; }
 
             /* Footer Layout */
             .footer-wrapper {
@@ -301,7 +301,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                     <col class="col-mat">
                     <col class="col-stock">
                     <col class="col-status">
-                    <col class="col-loc">
+                    ${!isPurchaseOrder ? `<col class="col-loc">` : ''}
                     <col class="col-qty">
                     <col class="col-price">
                     <col class="col-amt">
