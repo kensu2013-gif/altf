@@ -158,8 +158,12 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 border-bottom: 1px solid #e2e8f0; 
                 padding: 10px 4px;
                 vertical-align: middle;
-                word-break: break-word;
+                white-space: nowrap;
                 ${isPurchaseOrder ? 'font-size: 14px; font-weight: bold; line-height: 1.5; letter-spacing: 0.3px;' : 'line-height: 1.4;'}
+            }
+            td.col-size {
+                white-space: normal;
+                word-break: break-word;
             }
 
             .text-center { text-align: center; }
@@ -169,19 +173,24 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             
             /* Columns */
             .col-no { width: 4%; text-align: left; padding-left: 8px; }
-            .col-item { width: 13%; text-align: center; }
-            .col-spec { width: 6%; text-align: center; }
-            .col-size { width: 15%; text-align: center; }
+            .col-item { width: 14%; text-align: center; }
+            .col-spec { width: 7%; text-align: center; }
+            .col-size { width: 14%; text-align: center; }
             .col-mat { width: 13%; text-align: center; }
             
-            .col-stock { width: 10%; text-align: center; } 
-            .col-status { width: 12%; text-align: center; } 
+            .col-stock { width: 8%; text-align: center; } 
+            .col-status { width: 10%; text-align: center; } 
             /* LOC Column hidden by dynamically not rendering or reallocating width */
             
-            .col-qty { width: 6%; text-align: center; } 
+            .col-qty { width: 5%; text-align: center; } 
             
-            .col-price { width: 11%; text-align: right; }
-            .col-amt { width: 10%; text-align: right; padding-right: 8px; }
+            .col-price { width: 12%; }
+            th.col-price { text-align: center; }
+            td.col-price { text-align: right; }
+            
+            .col-amt { width: 13%; }
+            th.col-amt { text-align: center; }
+            td.col-amt { text-align: right; padding-right: 8px; }
 
             /* Footer Layout */
             .footer-wrapper {
@@ -373,8 +382,8 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
 
                 return appendedNote ? `
     <div style="margin-top: 15px; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; background-color: #f8fafc;">
-        <div style="font-weight: 700; color: #475569; margin-bottom: 4px; ${document_type === 'PURCHASE_ORDER' ? 'font-size: 14px;' : 'font-size: 11px;'}">배송요청사항 / DELIVERY REQUEST</div>
-        <div style="white-space: pre-wrap; color: #334155; ${document_type === 'PURCHASE_ORDER' ? 'font-size: 14px; font-weight: bold;' : 'font-size: 10px;'}">${appendedNote}</div>
+        <div style="font-weight: 700; color: #475569; margin-bottom: 4px; ${document_type === 'PURCHASE_ORDER' ? 'font-size: 14px;' : 'font-size: 11px;'}">배송요청사항 </div>
+        <div style="white-space: pre-wrap; color: #334155; ${document_type === 'PURCHASE_ORDER' ? 'font-size: 14px; font-weight: bold;' : 'font-size: 10px;'}">${appendedNote.replace(/\[재고장 확인의 건\]/g, '<span style="color: #e11d48; font-size: 16px; font-weight: 900;">[재고장 확인의 건]</span>')}</div>
     </div>` : '';
             })()}
                 ` : `
