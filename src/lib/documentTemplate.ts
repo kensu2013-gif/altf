@@ -36,7 +36,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Nanum+Brush+Script&display=swap');
             
             @page {
-                size: A4 ${document_type === 'PURCHASE_ORDER' ? 'landscape' : 'portrait'};
+                size: A4 portrait;
                 margin: 10mm;
             }
             
@@ -151,14 +151,15 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 justify-content: center;
                 line-height: 1.2;
             }
-            .th-ko { font-size: 11px; font-weight: 800; color: #1e293b; }
-            .th-en { font-size: 10px; font-weight: 600; color: #64748b; margin-top: 2px; }
+            .th-ko { font-size: ${isPurchaseOrder ? '13px' : '11px'}; font-weight: 800; color: #1e293b; }
+            .th-en { font-size: ${isPurchaseOrder ? '12px' : '10px'}; font-weight: 600; color: #64748b; margin-top: 2px; }
 
             td { 
                 border-bottom: 1px solid #e2e8f0; 
                 padding: 8px 4px;
                 vertical-align: middle;
                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                ${isPurchaseOrder ? 'font-size: 14.5px; font-weight: bold;' : ''}
             }
 
             .text-center { text-align: center; }
@@ -264,21 +265,20 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             </header>
 
             <div class="info-grid">
-                <div class="box">
+                <div class="box" style="${isPurchaseOrder ? 'font-size: 13px;' : 'font-size: 10px;'}">
                     <h3>공급자 (Supplier)</h3>
                     <div class="row"><span class="label">상호</span><span class="value">${supplier.company_name}</span></div>
-                    <div class="row"><span class="label">주소</span><span class="value">${supplier.address}</span></div>
+                    <div class="row"><span class="label" style="color: #6366f1; font-weight: 800;">요청고객사</span><span class="value" style="color: #6366f1; font-weight: 800;">${meta.end_customer || '-'}</span></div>
                     <div class="row"><span class="label">담당자</span><span class="value">${supplier.contact_name || '-'}</span></div>
                     <div class="row"><span class="label">연락처</span><span class="value">${supplier.tel} / ${supplier.email}</span></div>
                 </div>
-                <div class="box">
+                <div class="box" style="${isPurchaseOrder ? 'font-size: 13px;' : 'font-size: 10px;'}">
                     <h3>공급받는자 (Customer)</h3>
                     <div class="row"><span class="label">상호</span><span class="value">${customer.company_name || '-'}</span></div>
+                    <div class="row"><span class="label" style="color: #6366f1; font-weight: 800;">요청고객사</span><span class="value" style="color: #6366f1; font-weight: 800;">${meta.end_customer || '-'}</span></div>
                     <div class="row"><span class="label">담당자</span><span class="value">${customer.contact_name || '-'}</span></div>
                     <div class="row"><span class="label">연락처</span><span class="value">${customer.tel || '-'}</span></div>
                     ${customer.email ? `<div class="row"><span class="label">이메일</span><span class="value">${customer.email}</span></div>` : ''}
-                    <div class="row"><span class="label">주소</span><span class="value">${customer.address || '-'}</span></div>
-                    ${meta.end_customer ? `<div class="row" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed #cbd5e1;"><span class="label" style="color: #6366f1; font-weight: 800;">요청 고객사</span><span class="value" style="color: #6366f1; font-weight: 800; font-size: ${document_type === 'PURCHASE_ORDER' ? '14px' : '11px'};">${meta.end_customer}</span></div>` : ''}
                 </div>
             </div>
 

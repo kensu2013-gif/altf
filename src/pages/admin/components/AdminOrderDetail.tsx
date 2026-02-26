@@ -130,16 +130,13 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const [supplierPoFiles, setSupplierPoFiles] = useState<File[]>([]);
 
     // Webhook Email States
-    const poDateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
-    const poNumMatch = order.id.match(/\d+$/);
-    const poNum = poNumMatch ? poNumMatch[0] : order.id;
-    const cleanSupplierName = supplierInfo.company_name.replace('(주)', '').trim();
-    const cleanBuyerName = order.buyerInfo?.company_name?.replace('(주)', '').trim() || '에스제이엔브이';
+    const today = new Date();
+    const yy = String(today.getFullYear()).slice(2);
+    const dd = String(today.getDate()).padStart(2, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const poDateStr = `${yy}${dd}${mm}`; // User requested YYDDMM
 
-    const defaultSubject = `[알트에프] ${cleanSupplierName} 발주서 첨부건 - ${poNum}`;
-    const defaultFileName = `${poNum} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${cleanBuyerName}).pdf`;
-
-    // Calculate daily sequence from all orders
+    // Calculate sequence first
     const highestIdxForToday = useStore.getState().orders
         .filter(o => o.poNumber?.startsWith(`ES${poDateStr}-`))
         .map(o => parseInt(o.poNumber!.split('-')[1], 10))
@@ -148,8 +145,19 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const nextSeqStr = String(highestIdxForToday + 1).padStart(3, '0');
     const autoPoNumber = `ES${poDateStr}-${nextSeqStr}`;
 
-    const [emailSubject, setEmailSubject] = useState(order.poNumber ? defaultSubject : `[알트에프] ${cleanSupplierName} 발주서 첨부건 - ${nextSeqStr}`);
-    const [emailAttachmentName, setEmailAttachmentName] = useState(order.poNumber ? defaultFileName : `${autoPoNumber} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${cleanBuyerName}).pdf`);
+    const poNumMatch = (order.poNumber || autoPoNumber).match(/\d+$/);
+    const poNum = poNumMatch ? poNumMatch[0] : (order.poNumber || autoPoNumber);
+
+    const cleanSupplierName = supplierInfo.company_name.replace('(주)', '').trim();
+    // Use poEndCustomer for buyer name if available, else fallback
+    const currentEndCustomer = order.poEndCustomer || order.customerName || '';
+    const cleanBuyerName = currentEndCustomer.replace('(주)', '').trim() || '에스제이엔브이';
+
+    const defaultSubject = `[알트에프] ${cleanSupplierName} 발주서 첨부건 - ${poNum}`;
+    const defaultFileName = `${poNum} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${cleanBuyerName}).pdf`;
+
+    const [emailSubject, setEmailSubject] = useState(order.poNumber ? order.poTitle || defaultSubject : defaultSubject);
+    const [emailAttachmentName, setEmailAttachmentName] = useState(order.poNumber ? defaultFileName : defaultFileName);
     const [isSendingWebhook, setIsSendingWebhook] = useState(false);
 
     const [buyerInfo, setBuyerInfo] = useState(() => {
@@ -183,9 +191,27 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     });
 
     // PO Info State
-    const [poNumber, setPoNumber] = useState(order.poNumber || autoPoNumber);
-    const [poTitle, setPoTitle] = useState(order.poTitle || '발주서 (PURCHASE ORDER)');
     const [poEndCustomer, setPoEndCustomer] = useState(order.poEndCustomer || order.customerName || '');
+    const [poNumber, setPoNumber] = useState(order.poNumber || autoPoNumber);
+    const [poTitle, setPoTitle] = useState(order.poTitle || defaultSubject);
+
+    // Sync PO numbering dynamically if user changes poNumber but keep it smart
+    const handlePoNumberChange = (newPoNum: string) => {
+        setPoNumber(newPoNum);
+        const match = newPoNum.match(/\d+$/);
+        const seq = match ? match[0] : newPoNum;
+        const newTitle = `[알트에프] ${cleanSupplierName} 발주서 첨부건 - ${seq}`;
+        setPoTitle(newTitle);
+        setEmailSubject(newTitle);
+        setEmailAttachmentName(`${seq} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${poEndCustomer.replace('(주)', '').trim() || '에스제이엔브이'}).pdf`);
+    };
+
+    const handlePoEndCustomerChange = (newCustomer: string) => {
+        setPoEndCustomer(newCustomer);
+        const match = poNumber.match(/\d+$/);
+        const seq = match ? match[0] : poNumber;
+        setEmailAttachmentName(`${seq} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${newCustomer.replace('(주)', '').trim() || '에스제이엔브이'}).pdf`);
+    };
 
     // Calculation based on Selected Items
     const calculatedTotal = selectedItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
@@ -761,9 +787,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                     <input
                                         type="text"
                                         value={poNumber}
-                                        onChange={(e) => setPoNumber(e.target.value)}
+                                        onChange={(e) => handlePoNumberChange(e.target.value)}
                                         className="w-full px-2 py-1.5 text-sm border border-indigo-200 rounded focus:border-indigo-500 outline-none font-mono font-bold text-indigo-900"
-                                        placeholder="PO-..."
+                                        placeholder="ESYYDDMM-000"
                                     />
                                 </div>
                                 <div>
@@ -771,9 +797,12 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                     <input
                                         type="text"
                                         value={poTitle}
-                                        onChange={(e) => setPoTitle(e.target.value)}
+                                        onChange={(e) => {
+                                            setPoTitle(e.target.value);
+                                            setEmailSubject(e.target.value);
+                                        }}
                                         className="w-full px-2 py-1.5 text-sm border border-indigo-200 rounded focus:border-indigo-500 outline-none font-bold text-indigo-900"
-                                        placeholder="발주서 (PURCHASE ORDER)"
+                                        placeholder="[알트에프] 대경벤드 발주서 첨부건 - 000"
                                     />
                                 </div>
                             </div>
@@ -843,11 +872,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                     <div className="flex items-center justify-between mb-2">
                                         <h4 className="text-xs font-bold text-indigo-700 uppercase">발주자 (Buyer) / 배송지 (Ship To)</h4>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[10px] text-indigo-500 font-bold uppercase">요청 고객사:</span>
+                                            <span className="text-xs font-bold text-indigo-700 uppercase">CUSTOMER</span>
                                             <input
                                                 value={poEndCustomer}
-                                                onChange={e => setPoEndCustomer(e.target.value)}
-                                                className="px-2 py-0.5 text-xs text-indigo-900 border border-indigo-200 rounded min-w-[140px] shadow-inner"
+                                                onChange={e => handlePoEndCustomerChange(e.target.value)}
+                                                className="px-2 py-1 text-sm text-indigo-900 font-bold border border-indigo-200 rounded min-w-[140px] shadow-sm focus:border-indigo-500 outline-none"
                                                 placeholder="고객사 이름"
                                                 title="PO에 표시될 요청 고객사 이름을 수정할 수 있습니다."
                                             />
