@@ -24,6 +24,13 @@ interface QuotationRecord {
     items: LineItem[];
     totalAmount: number;
     customerName: string;
+    customerInfo?: {
+        companyName?: string;
+        contactName?: string;
+        phone?: string;
+        email?: string;
+        address?: string;
+    };
     status: 'DRAFT' | 'SUBMITTED' | 'PROCESSING' | 'PROCESSED' | 'COMPLETED';
     createdAt: string;
     adminResponse?: {
@@ -283,11 +290,11 @@ export default function MyPage() {
                 business_no: '838-05-01054'
             },
             customer: {
-                company_name: quote.customerName || '고객사',
-                contact_name: user?.contactName || '-',
-                tel: user?.phone || '-',
-                email: user?.email || '-',
-                address: user?.address || '-',
+                company_name: quote.customerInfo?.companyName || quote.customerName || '고객사',
+                contact_name: quote.customerInfo?.contactName || user?.contactName || '-',
+                tel: quote.customerInfo?.phone || user?.phone || '-',
+                email: quote.customerInfo?.email || user?.email || '-',
+                address: quote.customerInfo?.address || user?.address || '-',
                 memo: quote.adminResponse?.note // Pass generic note if needed
             },
             items: docItems,
@@ -385,11 +392,11 @@ export default function MyPage() {
                 note: quote.adminResponse?.note
             },
             customer: {
-                company_name: quote.customerName || '고객사',
-                contact_name: user?.contactName || '-',
-                tel: user?.phone || '-',
-                email: user?.email || '-',
-                address: user?.address || '-' // [FIX] Add Address
+                company_name: quote.customerInfo?.companyName || quote.customerName || '고객사',
+                contact_name: quote.customerInfo?.contactName || user?.contactName || '-',
+                tel: quote.customerInfo?.phone || user?.phone || '-',
+                email: quote.customerInfo?.email || user?.email || '-',
+                address: quote.customerInfo?.address || user?.address || '-' // [FIX] Add Address
             },
             items: docItems,
             totals: {

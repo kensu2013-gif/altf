@@ -4,7 +4,7 @@ import { useStore, type DeliveryInfo } from '../store/useStore';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { formatCurrency } from '../lib/utils';
-import { Trash2, Send, Plus, Minus, Search, RotateCcw, Printer, ArrowRight } from 'lucide-react';
+import { Trash2, Send, Plus, Minus, Search, RotateCcw, Printer, ArrowRight, User } from 'lucide-react';
 import type { LineItem } from '../types';
 import { PreviewModal } from '../components/ui/PreviewModal';
 import type { DocumentPayload, DocumentItem, DocumentType } from '../types/document';
@@ -71,6 +71,15 @@ export default function QuotationEditor() {
         isOpen: false,
         title: '',
         description: ''
+    });
+
+    // Standalone Customer Info for Quotation
+    const [quotationCustomerInfo, setQuotationCustomerInfo] = useState({
+        companyName: user?.companyName || '',
+        contactName: user?.contactName || '',
+        phone: user?.phone || '',
+        email: user?.email || '',
+        address: user?.address || ''
     });
 
     const handleClearAll = () => {
@@ -224,11 +233,11 @@ export default function QuotationEditor() {
                 business_no: '838-05-01054'
             },
             customer: {
-                company_name: user?.companyName || '고객사 (Guest)',
-                contact_name: user?.contactName || (user?.email ? user.email.split('@')[0] : '-'),
-                tel: user?.phone || '-',
-                email: user?.email || '-',
-                address: user?.address || '-',
+                company_name: type === 'QUOTATION' ? quotationCustomerInfo.companyName : (user?.companyName || '고객사 (Guest)'),
+                contact_name: type === 'QUOTATION' ? quotationCustomerInfo.contactName : (user?.contactName || (user?.email ? user.email.split('@')[0] : '-')),
+                tel: type === 'QUOTATION' ? quotationCustomerInfo.phone : (user?.phone || '-'),
+                email: type === 'QUOTATION' ? quotationCustomerInfo.email : (user?.email || '-'),
+                address: type === 'QUOTATION' ? quotationCustomerInfo.address : (user?.address || '-'),
                 memo: type === 'QUOTATION' ? quotationMemo : undefined // Pass Inquiry Memo for Quotation
             },
             items: docItems,
@@ -276,8 +285,9 @@ export default function QuotationEditor() {
 
             const payloadData = {
                 userId: user.id,
-                customerName: user.companyName || 'Guest',
+                customerName: quotationCustomerInfo.companyName || user.companyName || 'Guest',
                 customerNumber: user.companyName || 'Guest',
+                customerInfo: quotationCustomerInfo, // [NEW] Pass explicit standalone info to DB
                 items: items,
                 totalAmount: totalAmount,
                 memo: quotationMemo,
@@ -319,11 +329,11 @@ export default function QuotationEditor() {
                 newPayload.customer.memo = newMemo;
             } else {
                 newPayload.customer = {
-                    company_name: user?.companyName || 'Guest',
-                    contact_name: user?.contactName || '-',
-                    tel: user?.phone || '-',
-                    email: user?.email || '-',
-                    address: user?.address || '-',
+                    company_name: quotationCustomerInfo.companyName || user?.companyName || 'Guest',
+                    contact_name: quotationCustomerInfo.contactName || user?.contactName || '-',
+                    tel: quotationCustomerInfo.phone || user?.phone || '-',
+                    email: quotationCustomerInfo.email || user?.email || '-',
+                    address: quotationCustomerInfo.address || user?.address || '-',
                     memo: newMemo
                 };
             }
@@ -770,6 +780,58 @@ export default function QuotationEditor() {
                                         ))}
                                     </div>
                                 )}
+                            </div>
+                        </motion.div>
+
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
+                            className="mt-6 p-5 bg-white/70 backdrop-blur-xl border border-white/40 rounded-3xl shadow-lg ring-1 ring-white/60 mb-6"
+                        >
+                            <h3 className="text-[15px] font-extrabold text-slate-800 mb-4 flex items-center gap-2">
+                                <User className="w-4 h-4 text-teal-600" />
+                                견적 요청자 정보 (발송 시 적용됨)
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500">회사/기관명</label>
+                                    <input
+                                        type="text"
+                                        value={quotationCustomerInfo.companyName}
+                                        onChange={e => setQuotationCustomerInfo(p => ({ ...p, companyName: e.target.value }))}
+                                        className="w-full text-sm py-2 px-3 border border-slate-200 rounded-lg focus:border-teal-500 outline-none"
+                                        placeholder="회사명 입력"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500">담당자 성함</label>
+                                    <input
+                                        type="text"
+                                        value={quotationCustomerInfo.contactName}
+                                        onChange={e => setQuotationCustomerInfo(p => ({ ...p, contactName: e.target.value }))}
+                                        className="w-full text-sm py-2 px-3 border border-slate-200 rounded-lg focus:border-teal-500 outline-none"
+                                        placeholder="담당자 입력"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500">연락처</label>
+                                    <input
+                                        type="text"
+                                        value={quotationCustomerInfo.phone}
+                                        onChange={e => setQuotationCustomerInfo(p => ({ ...p, phone: e.target.value }))}
+                                        className="w-full text-sm py-2 px-3 border border-slate-200 rounded-lg focus:border-teal-500 outline-none"
+                                        placeholder="연락처 입력"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500">이메일</label>
+                                    <input
+                                        type="email"
+                                        value={quotationCustomerInfo.email}
+                                        onChange={e => setQuotationCustomerInfo(p => ({ ...p, email: e.target.value }))}
+                                        className="w-full text-sm py-2 px-3 border border-slate-200 rounded-lg focus:border-teal-500 outline-none"
+                                        placeholder="이메일 입력"
+                                    />
+                                </div>
                             </div>
                         </motion.div>
 

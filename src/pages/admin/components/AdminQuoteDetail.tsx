@@ -37,12 +37,12 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     // Local state for customer info
 
     const [customerInfo, setCustomerInfo] = useState(() => ({
-        companyName: customerUser?.companyName || quote.customerNumber,
-        contactName: customerUser?.contactName || '',
-        email: customerUser?.email || '',
-        phone: customerUser?.phone || customerUser?.contactInfo?.phone || '',
+        companyName: quote.customerInfo?.companyName || customerUser?.companyName || quote.customerNumber,
+        contactName: quote.customerInfo?.contactName || customerUser?.contactName || '',
+        email: quote.customerInfo?.email || customerUser?.email || '',
+        phone: quote.customerInfo?.phone || customerUser?.phone || customerUser?.contactInfo?.phone || '',
         bizNo: customerUser?.bizNo || '',
-        address: customerUser?.address || '',
+        address: quote.customerInfo?.address || customerUser?.address || '',
         fax: customerUser?.fax || ''
     }));
 
@@ -51,7 +51,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
     if (customerUser !== prevCustomerUser) {
         setPrevCustomerUser(customerUser);
-        if (customerUser) {
+        if (customerUser && !quote.customerInfo) { // Only override if quote lacks custom info
             setCustomerInfo({
                 companyName: customerUser.companyName || quote.customerNumber,
                 contactName: customerUser.contactName || '',
@@ -395,7 +395,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
         // 1. Prepare Payload (Revert to PROCESSING)
         const updatePayload = {
-            status: 'PROCESSING' as const
+            status: 'PROCESSING' as const,
+            customerInfo: customerInfo // [NEW] Explicitly isolate custom info fields
         };
 
         // 2. Update Local Store
@@ -449,7 +450,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 name: user.contactName || user.companyName || '관리자',
                 id: user.id,
                 email: user.email
-            } : undefined)
+            } : undefined),
+            customerInfo: customerInfo // [NEW] Explicitly isolate custom info fields
         };
 
         // 3. Update Local Store

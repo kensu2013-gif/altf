@@ -75,6 +75,7 @@ export interface Quotation {
         contactName?: string;
         phone?: string;
         email?: string;
+        address?: string;
     };
     items: LineItem[];
     status: 'DRAFT' | 'SUBMITTED' | 'IN_REVIEW' | 'PROCESSING' | 'PROCESSED' | 'COMPLETED';
