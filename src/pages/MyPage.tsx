@@ -251,9 +251,11 @@ export default function MyPage() {
                 size: item.size,
                 material: item.material,
                 stock_qty: item.currentStock || 0,
-                stock_status: (item.currentStock !== undefined)
-                    ? (item.currentStock === 0 ? '재고없음' : ((mixed.qty || item.quantity) > item.currentStock ? '일부 주문생산' : '출고가능'))
-                    : '-',
+                stock_status: (item.marking_wait_qty || 0) > 0
+                    ? `마킹대기:${item.marking_wait_qty}`
+                    : (item.currentStock !== undefined
+                        ? (item.currentStock === 0 ? '재고없음' : ((mixed.qty || item.quantity) > item.currentStock ? '일부 주문생산' : '출고가능'))
+                        : '-'),
                 location_maker: item.maker ? `${item.location || ''} / ${item.maker}` : (item.location || '-'),
                 qty: mixed.qty || item.quantity,
                 unit_price: mixed.unit_price || item.unitPrice,
@@ -352,9 +354,11 @@ export default function MyPage() {
                 size: item.size,
                 material: item.material,
                 stock_qty: item.currentStock || 0,
-                stock_status: (item.currentStock !== undefined)
-                    ? (item.currentStock === 0 ? '재고없음' : ((mixed.qty || item.quantity) > item.currentStock ? '일부 주문생산' : '출고가능'))
-                    : '-',
+                stock_status: (item.marking_wait_qty || 0) > 0
+                    ? `마킹대기:${item.marking_wait_qty}`
+                    : (item.currentStock !== undefined
+                        ? (item.currentStock === 0 ? '재고없음' : ((mixed.qty || item.quantity) > item.currentStock ? '일부 주문생산' : '출고가능'))
+                        : '-'),
                 location_maker: item.maker ? `${item.location || ''} / ${item.maker}` : (item.location || '-'),
                 qty: mixed.qty || item.quantity,
                 unit_price: mixed.unit_price || item.unitPrice,

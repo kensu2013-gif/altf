@@ -22,15 +22,6 @@ import { findMatchingProduct } from '../../../lib/productUtils';
 
 // Helper: Get Stock Status Text
 
-// Helper: Get Stock Status Text
-const getStockStatusText = (status: string | undefined) => {
-    switch (status) {
-        case 'AVAILABLE': return '출고가능';
-        case 'CHECK_LEAD_TIME': return '일부출고'; // Or '문의' depending on business logic, but '일부출고' matches 'Partial'
-        case 'OUT_OF_STOCK': return '재고없음';
-        default: return '-';
-    }
-};
 
 export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQuoteDetailProps) {
     const inventory = useStore((state) => state.inventory);
@@ -366,7 +357,11 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                     amount: item.amount,
                     note: '',
                     stock_qty: product?.currentStock || 0,
-                    stock_status: getStockStatusText(product?.stockStatus),
+                    stock_status: (item.marking_wait_qty || 0) > 0
+                        ? `마킹대기:${item.marking_wait_qty}`
+                        : (product?.currentStock !== undefined
+                            ? (product.currentStock === 0 ? '재고없음' : (item.quantity > product.currentStock ? '일부 주문생산' : '출고가능'))
+                            : '-'),
                     location_maker: product?.location || '-'
                 };
             }),
