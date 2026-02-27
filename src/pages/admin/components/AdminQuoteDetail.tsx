@@ -37,11 +37,11 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
     const [customerInfo, setCustomerInfo] = useState(() => ({
         companyName: quote.customerInfo?.companyName || customerUser?.companyName || quote.customerNumber,
-        contactName: quote.customerInfo?.contactName || customerUser?.contactName || '',
-        email: quote.customerInfo?.email || customerUser?.email || '',
-        phone: quote.customerInfo?.phone || customerUser?.phone || customerUser?.contactInfo?.phone || '',
+        contactName: quote.customerInfo?.contactName ?? (customerUser?.contactName || ''),
+        email: quote.customerInfo?.email ?? (customerUser?.email || ''), // Use ?? to allow empty string from previous save
+        phone: quote.customerInfo?.phone ?? (customerUser?.phone || customerUser?.contactInfo?.phone || ''),
         bizNo: customerUser?.bizNo || '',
-        address: quote.customerInfo?.address || customerUser?.address || '',
+        address: quote.customerInfo?.address ?? (customerUser?.address || ''),
         fax: customerUser?.fax || ''
     }));
 

@@ -395,8 +395,8 @@ export default function MyPage() {
                 company_name: quote.customerInfo?.companyName || quote.customerName || '고객사',
                 contact_name: quote.customerInfo?.contactName || user?.contactName || '-',
                 tel: quote.customerInfo?.phone || user?.phone || '-',
-                email: quote.customerInfo?.email || user?.email || '-',
-                address: quote.customerInfo?.address || user?.address || '-' // [FIX] Add Address
+                email: quote.customerInfo?.email || user?.email || '-', // [FIX] Updated to prioritize quote.customerInfo
+                address: quote.customerInfo?.address || user?.address || '-'
             },
             items: docItems,
             totals: {
@@ -1035,11 +1035,11 @@ function DetailModal({ record, isOrder, onClose, onOrder }: { record: QuotationR
                 business_no: '838-05-01054'
             },
             customer: {
-                company_name: record.customerName || user?.companyName || '고객사',
-                contact_name: user?.contactName || '-',
-                tel: user?.phone || '-',
-                email: user?.email || '-',
-                address: user?.address || '-'
+                company_name: isOrder ? (record.customerName || user?.companyName || '고객사') : ((record as QuotationRecord).customerInfo?.companyName || record.customerName || user?.companyName || '고객사'),
+                contact_name: isOrder ? (user?.contactName || '-') : ((record as QuotationRecord).customerInfo?.contactName || user?.contactName || '-'),
+                tel: isOrder ? (user?.phone || '-') : ((record as QuotationRecord).customerInfo?.phone || user?.phone || '-'),
+                email: isOrder ? (user?.email || '-') : ((record as QuotationRecord).customerInfo?.email || '-'), // [FIX] Remove user?.email fallback for quotations
+                address: isOrder ? (user?.address || '-') : ((record as QuotationRecord).customerInfo?.address || user?.address || '-')
             },
             items: docItems,
             totals: {

@@ -269,7 +269,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 </div>
                 <div class="doc-title">
                     <h1 style="margin: 0; font-size: ${document_type === 'PURCHASE_ORDER' ? '28px' : '24px'}; font-weight: 800; color: ${colorTheme};">${title}</h1>
-                    <p style="margin: 4px 0 0 0; font-size: ${document_type === 'PURCHASE_ORDER' ? '14px' : '11px'}; color: #666;">No. ${meta.doc_no} | Date. ${meta.created_at}</p>
+                    <p style="margin: 4px 0 0 0; font-size: ${document_type === 'PURCHASE_ORDER' ? '14px' : '11px'}; color: ${document_type === 'PURCHASE_ORDER' ? '#000' : '#666'}; font-weight: ${document_type === 'PURCHASE_ORDER' ? '800' : 'normal'};">No. ${meta.doc_no} | Date. ${meta.created_at}</p>
                 </div>
             </header>
 
@@ -310,7 +310,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                     <col class="col-mat">
                     <col class="col-stock">
                     <col class="col-status">
-                    ${!isPurchaseOrder ? `<col class="col-loc">` : ''}
+                    ${!isPurchaseOrder && document_type !== 'QUOTATION' ? `<col class="col-loc">` : ''}
                     <col class="col-qty">
                     <col class="col-price">
                     <col class="col-amt">
@@ -326,7 +326,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                         ${!isTransaction ? `
                         <th class="col-stock">재고<br><span class="sub-text">STOCK</span></th>
                         <th class="col-status">상태<br><span class="sub-text">STAT</span></th>
-                        ${!isPurchaseOrder ? `<th class="col-loc">위치<br><span class="sub-text">LOC</span></th>` : ''}
+                        ${!isPurchaseOrder && document_type !== 'QUOTATION' ? `<th class="col-loc">위치<br><span class="sub-text">LOC</span></th>` : ''}
                         ` : ''}
                         <th class="col-qty">수량<br><span class="sub-text">QTY</span></th>
                         <th class="col-price">단가<br><span class="sub-text">PRICE</span></th>
@@ -353,7 +353,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 return `<span style="color: ${c}; font-weight: 800;">${st}</span>`;
             })()}
                         </td>
-                        ${!isPurchaseOrder ? `<td class="col-loc">${item.location_maker || '-'}</td>` : ''}
+                        ${!isPurchaseOrder && document_type !== 'QUOTATION' ? `<td class="col-loc">${item.location_maker || '-'}</td>` : ''}
                         ` : ''}
                         <td class="col-qty">${item.qty}</td>
                         <td class="col-price text-right">${formatCurrency(item.unit_price)}</td>

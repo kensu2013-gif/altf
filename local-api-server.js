@@ -492,9 +492,12 @@ const server = http.createServer(async (req, res) => {
                     items: data.items,
                     totalAmount: data.totalAmount || 0,
                     customerName: data.customerName || '',
-                    status: 'SUBMITTED',
+                    customerNumber: data.customerNumber || '',
+                    customerInfo: data.customerInfo,
+                    status: data.status || 'SUBMITTED',
                     createdAt: new Date().toISOString(),
-                    memo: data.memo // Save Inquiry Memo
+                    memo: data.memo, // Save Inquiry Memo
+                    attachments: data.attachments || []
                 };
 
                 db.quotations.unshift(newQuote); // Add to beginning
@@ -590,9 +593,16 @@ const server = http.createServer(async (req, res) => {
 
                 const newOrder = {
                     id: newId,
-                    ...data,
-                    status: 'submitted',
-                    createdAt: new Date().toISOString()
+                    userId: data.userId,
+                    items: data.items,
+                    totalAmount: data.totalAmount || 0,
+                    customerName: custName,
+                    customerNumber: data.customerNumber || '',
+                    customerInfo: data.customerInfo,
+                    status: data.status || 'submitted',
+                    createdAt: new Date().toISOString(),
+                    memo: data.memo,
+                    attachments: data.attachments || []
                 };
 
                 db.orders.unshift(newOrder);

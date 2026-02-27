@@ -76,16 +76,21 @@ app.get('/api/my/quotations', (req, res) => {
 
 // POST /api/my/quotations
 app.post('/api/my/quotations', (req, res) => {
-    const { userId, items, totalAmount, customerName } = req.body;
+    const { userId, items, totalAmount, customerName, customerInfo, customerNumber, memo, status, attachments } = req.body;
     if (!userId || !items) return res.status(400).json({ error: 'Missing data' });
 
     const quotations = readData('quotations.json');
     const newQuote = {
         id: crypto.randomUUID(),
         userId,
+        customerName,
+        customerNumber,
+        customerInfo,
+        memo,
+        status: status || 'SUBMITTED',
+        attachments,
         items,
         totalAmount,
-        customerName,
         createdAt: new Date().toISOString()
     };
 
@@ -107,17 +112,21 @@ app.get('/api/my/orders', (req, res) => {
 
 // POST /api/my/orders
 app.post('/api/my/orders', (req, res) => {
-    const { userId, items, totalAmount, customerName } = req.body;
+    const { userId, items, totalAmount, customerName, customerInfo, customerNumber, memo, status, attachments } = req.body;
     if (!userId || !items) return res.status(400).json({ error: 'Missing data' });
 
     const orders = readData('orders.json');
     const newOrder = {
         id: crypto.randomUUID(),
         userId,
+        customerName,
+        customerNumber,
+        customerInfo,
+        memo,
+        status: status || 'submitted',
+        attachments,
         items,
         totalAmount,
-        customerName,
-        status: 'submitted', // submitted, processing, shipped, completed
         createdAt: new Date().toISOString()
     };
 

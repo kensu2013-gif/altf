@@ -450,7 +450,7 @@ export const useStore = create<AppState>()(
                     ...quotationData,
                     id: newId,
                     createdAt: new Date().toISOString(),
-                    status: 'DRAFT'
+                    status: (quotationData as Partial<Quotation>).status || 'DRAFT'
                 };
                 set((state) => ({
                     quotes: [newQuotation, ...state.quotes]

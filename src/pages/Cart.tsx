@@ -78,7 +78,7 @@ export default function QuotationEditor() {
         companyName: user?.companyName || '',
         contactName: user?.contactName || '',
         phone: user?.phone || '',
-        email: user?.email || '',
+        email: '', // [FIX] Default to empty to prevent registration email leakage
         address: user?.address || ''
     });
 

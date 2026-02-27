@@ -123,8 +123,9 @@ export default function AdminQuotes() {
                 ) : (
                     filteredQuotes.map((quote) => {
                         const quoteUser = users.find(u => u.id === quote.userId);
-                        const displayCompany = quoteUser?.companyName || quote.customerName || '알 수 없음';
-                        const displayContact = quoteUser?.contactName || quote.customerInfo?.contactName || '';
+                        const isModified = !!(quote.customerInfo?.companyName || quote.customerInfo?.contactName);
+                        const displayCompany = quote.customerInfo?.companyName || quoteUser?.companyName || quote.customerName || '알 수 없음';
+                        const displayContact = quote.customerInfo?.contactName || quoteUser?.contactName || '';
 
                         return (
                             <div key={quote.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:shadow-md transition-all">
@@ -137,9 +138,10 @@ export default function AdminQuotes() {
                                             <span className="font-bold text-slate-800 text-lg">{quote.customerNumber}</span>
                                             <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{quote.id}</span>
                                         </div>
-                                        <div className="text-sm font-bold text-indigo-700 mb-1 flex items-center gap-1.5">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block"></span>
+                                        <div className={`text-sm font-bold ${isModified ? 'text-teal-700' : 'text-indigo-700'} mb-1 flex items-center gap-1.5`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${isModified ? 'bg-teal-400' : 'bg-indigo-400'} inline-block`}></span>
                                             {displayCompany} <span className="text-slate-400 font-normal text-xs ml-1">{displayContact ? `(${displayContact})` : ''}</span>
+                                            {isModified && <span className="text-[10px] font-normal text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded ml-1 border border-teal-100">수정됨</span>}
                                         </div>
                                         <div className="text-sm text-slate-500 flex items-center gap-4">
                                             <span className="flex items-center gap-1">
