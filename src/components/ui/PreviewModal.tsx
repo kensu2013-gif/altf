@@ -112,7 +112,7 @@ export function PreviewModal({ htmlContent, onClose, onSend, onPrint, onOrder, d
     const isOrder = docType === 'ORDER';
 
     return (
-        <div className="fixed inset-0 z-[60] pointer-events-auto flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] pointer-events-auto flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             {/* Click backdrop to close */}
             <div className="absolute inset-0" onClick={onClose} />
 

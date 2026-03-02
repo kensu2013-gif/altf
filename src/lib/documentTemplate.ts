@@ -111,22 +111,22 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             }
             .brand { font-size: 24px; font-weight: 800; color: ${colorTheme}; letter-spacing: -1px; }
             .doc-title { text-align: right; }
-            .doc-title h1 { margin: 0; font-size: 24px; font-weight: 800; color: ${colorTheme}; }
-            .doc-title p { margin: 4px 0 0 0; font-size: 11px; color: #666; }
+            .doc-title h1 { margin: 0; font-size: 20px; font-weight: 800; color: ${colorTheme}; }
+            .doc-title p { margin: 2px 0 0 0; font-size: 10px; color: #666; }
 
             /* Info Block */
             .info-grid {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
-                gap: 20px;
-                margin-bottom: 20px;
+                gap: 14px;
+                margin-bottom: 16px;
                 align-items: stretch;
             }
-            .box { border: 1px solid #ddd; padding: 12px; border-radius: 4px; }
-            .box h3 { margin: 0 0 10px 0; font-size: 14px; font-weight: 700; color: ${colorTheme}; border-bottom: 1px solid #eee; padding-bottom: 6px; }
-            .row { display: flex; margin-bottom: 6px; }
-            .label { width: 80px; color: #666; font-weight: 600; }
-            .value { flex: 1; font-weight: 500; }
+            .box { border: 1px solid #ddd; padding: 10px; border-radius: 4px; }
+            .box h3 { margin: 0 0 6px 0; font-size: 11px; font-weight: 700; color: ${colorTheme}; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+            .row { display: flex; margin-bottom: 4px; }
+            .label { width: 60px; color: #666; font-weight: 600; font-size: 9px; }
+            .value { flex: 1; font-weight: 500; font-size: 10px; }
 
             /* Items Table */
             table { width: 100%; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed; font-size: ${document_type === 'PURCHASE_ORDER' ? '13px' : '10px'}; }
@@ -176,7 +176,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             .col-item { width: 14%; text-align: center; }
             .col-spec { width: 7%; text-align: center; }
             .col-size { width: 14%; text-align: center; }
-            .col-mat { width: 13%; text-align: center; }
+            .col-mat { width: 12%; text-align: center; }
             
             .col-stock { width: 8%; text-align: center; } 
             .col-status { width: 10%; text-align: center; } 
@@ -184,13 +184,13 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             
             .col-qty { width: 5%; text-align: center; } 
             
-            .col-price { width: 12%; }
-            th.col-price { text-align: center; }
-            td.col-price { text-align: right; }
+            .col-price { width: 13%; }
+            th.col-price { text-align: right; padding-right: 12px; }
+            td.col-price { text-align: right; padding-right: 12px; }
             
-            .col-amt { width: 13%; }
-            th.col-amt { text-align: center; }
-            td.col-amt { text-align: right; padding-right: 8px; }
+            .col-amt { width: 14%; }
+            th.col-amt { text-align: right; padding-right: 12px; }
+            td.col-amt { text-align: right; padding-right: 12px; }
 
             /* Footer Layout */
             .footer-wrapper {
@@ -268,20 +268,20 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                     <img src="${logoDaekyung}" alt="(주)대경벤드" style="height: 22px; object-fit: contain;" />
                 </div>
                 <div class="doc-title">
-                    <h1 style="margin: 0; font-size: ${document_type === 'PURCHASE_ORDER' ? '28px' : '24px'}; font-weight: 800; color: ${colorTheme};">${title}</h1>
-                    <p style="margin: 4px 0 0 0; font-size: ${document_type === 'PURCHASE_ORDER' ? '14px' : '11px'}; color: ${document_type === 'PURCHASE_ORDER' ? '#000' : '#666'}; font-weight: ${document_type === 'PURCHASE_ORDER' ? '800' : 'normal'};">No. ${meta.doc_no} | Date. ${meta.created_at}</p>
+                    <h1 style="margin: 0; font-size: ${document_type === 'PURCHASE_ORDER' ? '24px' : '20px'}; font-weight: 800; color: ${colorTheme};">${title}</h1>
+                    <p style="margin: 2px 0 0 0; font-size: ${document_type === 'PURCHASE_ORDER' ? '12px' : '10px'}; color: ${document_type === 'PURCHASE_ORDER' ? '#000' : '#666'}; font-weight: ${document_type === 'PURCHASE_ORDER' ? '800' : 'normal'};">No. ${meta.doc_no} | Date. ${meta.created_at}</p>
                 </div>
             </header>
 
             <div class="info-grid">
-                <div class="box" style="${isPurchaseOrder ? 'font-size: 14px;' : 'font-size: 11px;' /* [MOD] Increased by 1 point */}">
+                <div class="box">
                     <h3>공급자 (Supplier)</h3>
                     <div class="row"><span class="label">상호</span><span class="value">${supplier.company_name}</span></div>
                     <div class="row"><span class="label">주소</span><span class="value">${supplier.address}</span></div>
                     <div class="row"><span class="label">담당자</span><span class="value">${supplier.contact_name || '-'}</span></div>
                     <div class="row"><span class="label">연락처</span><span class="value">${supplier.tel} / ${supplier.email}</span></div>
                 </div>
-                <div class="box" style="${isPurchaseOrder ? 'font-size: 14px;' : 'font-size: 11px;' /* [MOD] Increased by 1 point */}">
+                <div class="box">
                     <h3>공급받는자 (Customer)</h3>
                     <div class="row"><span class="label">상호</span><span class="value">${customer.company_name || '-'}</span></div>
                     <div class="row"><span class="label">담당자</span><span class="value">${customer.contact_name || '-'}</span></div>
