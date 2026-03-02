@@ -185,12 +185,12 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             .col-qty { width: 5%; text-align: center; } 
             
             .col-price { width: 13%; }
-            th.col-price { text-align: right; padding-right: 12px; }
-            td.col-price { text-align: right; padding-right: 12px; }
+            th.col-price { text-align: right !important; padding-right: 12px !important; }
+            td.col-price { text-align: right !important; padding-right: 12px !important; }
             
             .col-amt { width: 14%; }
-            th.col-amt { text-align: right; padding-right: 12px; }
-            td.col-amt { text-align: right; padding-right: 12px; }
+            th.col-amt { text-align: right !important; padding-right: 12px !important; }
+            td.col-amt { text-align: right !important; padding-right: 12px !important; }
 
             /* Footer Layout */
             .footer-wrapper {
