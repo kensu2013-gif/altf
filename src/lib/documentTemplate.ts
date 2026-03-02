@@ -29,7 +29,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
     <html lang="ko">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=840">
         <title>${title} - ${meta.doc_no}</title>
         <style>
             @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -256,48 +256,6 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 .no-print { display: none !important; }
                 .screen-controls { display: none !important; }
                 @page { margin: 10mm; }
-            @media (max-width: 768px) {
-                body { 
-                    padding: 10px; 
-                    background-color: white;
-                }
-                .container {
-                    padding: 15px;
-                    box-shadow: none;
-                }
-                header {
-                    flex-direction: column;
-                    align-items: flex-start;
-                    border-bottom: 2px solid ${colorTheme};
-                }
-                .doc-title { text-align: left; margin-top: 10px; }
-                .info-grid { grid-template-columns: 1fr; gap: 12px; }
-                .box { padding: 10px; }
-                
-                .table-wrapper {
-                    width: 100%;
-                    overflow-x: auto;
-                    margin-bottom: 20px;
-                    -webkit-overflow-scrolling: touch;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 4px;
-                }
-                table { margin-bottom: 0; min-width: 600px; }
-                
-                .footer-wrapper {
-                    flex-direction: column;
-                    gap: 20px;
-                }
-                .delivery-section { max-width: 100%; margin-bottom: 10px; }
-                .totals-section { width: 100%; }
-                
-                .signature-block {
-                    flex-direction: column;
-                    gap: 30px;
-                    align-items: center;
-                    margin-top: 40px;
-                }
-                .sig-box { width: 80%; }
             }
         </style>
     </head>

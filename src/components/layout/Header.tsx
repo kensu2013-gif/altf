@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from 'react-router-dom';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, FileText } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { cn } from '../../lib/utils';
 import { useStore } from '../../store/useStore';
@@ -74,6 +74,16 @@ export function Header() {
                     {isAuthenticated ? (
                         <>
                             <div className="w-px h-4 bg-slate-300 hidden md:block" />
+                            <Link to="/quote" className="md:hidden">
+                                <Button variant="ghost" size="sm" className="text-slate-500 hover:text-teal-600 gap-2 relative">
+                                    <FileText className="w-5 h-5" />
+                                    {cartCount > 0 && (
+                                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-teal-500 text-[10px] text-white font-bold ring-2 ring-white">
+                                            {cartCount}
+                                        </span>
+                                    )}
+                                </Button>
+                            </Link>
                             <Link to="/my-page">
                                 <Button variant="ghost" size="sm" className="text-slate-500 hover:text-teal-600 gap-2 relative text-base">
                                     <User className="w-5 h-5" />
