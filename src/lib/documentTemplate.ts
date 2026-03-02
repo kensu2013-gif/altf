@@ -256,6 +256,48 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 .no-print { display: none !important; }
                 .screen-controls { display: none !important; }
                 @page { margin: 10mm; }
+            @media (max-width: 768px) {
+                body { 
+                    padding: 10px; 
+                    background-color: white;
+                }
+                .container {
+                    padding: 15px;
+                    box-shadow: none;
+                }
+                header {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    border-bottom: 2px solid ${colorTheme};
+                }
+                .doc-title { text-align: left; margin-top: 10px; }
+                .info-grid { grid-template-columns: 1fr; gap: 12px; }
+                .box { padding: 10px; }
+                
+                .table-wrapper {
+                    width: 100%;
+                    overflow-x: auto;
+                    margin-bottom: 20px;
+                    -webkit-overflow-scrolling: touch;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 4px;
+                }
+                table { margin-bottom: 0; min-width: 600px; }
+                
+                .footer-wrapper {
+                    flex-direction: column;
+                    gap: 20px;
+                }
+                .delivery-section { max-width: 100%; margin-bottom: 10px; }
+                .totals-section { width: 100%; }
+                
+                .signature-block {
+                    flex-direction: column;
+                    gap: 30px;
+                    align-items: center;
+                    margin-top: 40px;
+                }
+                .sig-box { width: 80%; }
             }
         </style>
     </head>
@@ -291,60 +333,61 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 </div>
             </div>
 
-            <table>
-                <colgroup>
-                    ${isTransaction ? `
-                    <col style="width: 5%">
-                    <col style="width: 20%">
-                    <col style="width: 10%">
-                    <col style="width: 12%">
-                    <col style="width: 15%">
-                    <col style="width: 8%">
-                    <col style="width: 15%">
-                    <col style="width: 15%">
-                    ` : `
-                    <col class="col-no">
-                    <col class="col-item">
-                    <col class="col-spec">
-                    <col class="col-size">
-                    <col class="col-mat">
-                    <col class="col-stock">
-                    <col class="col-status">
-                    ${!isPurchaseOrder && document_type !== 'QUOTATION' ? `<col class="col-loc">` : ''}
-                    <col class="col-qty">
-                    <col class="col-price">
-                    <col class="col-amt">
-                    `}
-                </colgroup>
-                <thead>
-                    <tr>
-                        <th>No</th>
-                        <th class="col-item">품명<br><span class="sub-text">ITEM</span></th>
-                        <th class="col-spec">두께<br><span class="sub-text">THK</span></th>
-                        <th class="col-size">규격<br><span class="sub-text">SIZE</span></th>
-                        <th class="col-mat">재질<br><span class="sub-text">MATERIAL</span></th>
-                        ${!isTransaction ? `
-                        <th class="col-stock">재고<br><span class="sub-text">STOCK</span></th>
-                        <th class="col-status">상태<br><span class="sub-text">STAT</span></th>
-                        ${!isPurchaseOrder && document_type !== 'QUOTATION' ? `<th class="col-loc">위치<br><span class="sub-text">LOC</span></th>` : ''}
-                        ` : ''}
-                        <th class="col-qty">수량<br><span class="sub-text">QTY</span></th>
-                        <th class="col-price">단가<br><span class="sub-text">PRICE</span></th>
-                        <th class="col-amt">합계<br><span class="sub-text">AMT</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${items.map(item => `
-                    <tr>
-                        <td class="text-center">${item.no}</td>
-                        <td class="col-item">${item.item_name}</td>
-                        <td class="col-spec">${item.thickness || '-'}</td>
-                        <td class="col-size">${item.size || '-'}</td>
-                        <td class="col-mat">${item.material || '-'}</td>
-                        ${!isTransaction ? `
-                        <td class="col-stock">${item.stock_qty !== undefined ? item.stock_qty.toLocaleString() : '-'}</td>
-                        <td class="col-status">
-                            ${(() => {
+            <div class="table-wrapper">
+                <table>
+                    <colgroup>
+                        ${isTransaction ? `
+                        <col style="width: 5%">
+                        <col style="width: 20%">
+                        <col style="width: 10%">
+                        <col style="width: 12%">
+                        <col style="width: 15%">
+                        <col style="width: 8%">
+                        <col style="width: 15%">
+                        <col style="width: 15%">
+                        ` : `
+                        <col class="col-no">
+                        <col class="col-item">
+                        <col class="col-spec">
+                        <col class="col-size">
+                        <col class="col-mat">
+                        <col class="col-stock">
+                        <col class="col-status">
+                        ${!isPurchaseOrder && document_type !== 'QUOTATION' ? `<col class="col-loc">` : ''}
+                        <col class="col-qty">
+                        <col class="col-price">
+                        <col class="col-amt">
+                        `}
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th class="col-item">품명<br><span class="sub-text">ITEM</span></th>
+                            <th class="col-spec">두께<br><span class="sub-text">THK</span></th>
+                            <th class="col-size">규격<br><span class="sub-text">SIZE</span></th>
+                            <th class="col-mat">재질<br><span class="sub-text">MATERIAL</span></th>
+                            ${!isTransaction ? `
+                            <th class="col-stock">재고<br><span class="sub-text">STOCK</span></th>
+                            <th class="col-status">상태<br><span class="sub-text">STAT</span></th>
+                            ${!isPurchaseOrder && document_type !== 'QUOTATION' ? `<th class="col-loc">위치<br><span class="sub-text">LOC</span></th>` : ''}
+                            ` : ''}
+                            <th class="col-qty">수량<br><span class="sub-text">QTY</span></th>
+                            <th class="col-price">단가<br><span class="sub-text">PRICE</span></th>
+                            <th class="col-amt">합계<br><span class="sub-text">AMT</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map(item => `
+                        <tr>
+                            <td class="text-center">${item.no}</td>
+                            <td class="col-item">${item.item_name}</td>
+                            <td class="col-spec">${item.thickness || '-'}</td>
+                            <td class="col-size">${item.size || '-'}</td>
+                            <td class="col-mat">${item.material || '-'}</td>
+                            ${!isTransaction ? `
+                            <td class="col-stock">${item.stock_qty !== undefined ? item.stock_qty.toLocaleString() : '-'}</td>
+                            <td class="col-status">
+                                ${(() => {
                 const st = item.stock_status || '-';
                 let c = '#334155';
                 if (st.includes('출고가능')) c = '#0f766e';
@@ -352,16 +395,17 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 else if (st.includes('재고없음') || st.includes('재고 없음')) c = '#e11d48';
                 return `<span style="color: ${c}; font-weight: 800;">${st}</span>`;
             })()}
-                        </td>
-                        ${!isPurchaseOrder && document_type !== 'QUOTATION' ? `<td class="col-loc">${item.location_maker || '-'}</td>` : ''}
-                        ` : ''}
-                        <td class="col-qty">${item.qty}</td>
-                        <td class="col-price text-right">${formatCurrency(item.unit_price)}</td>
-                        <td class="col-amt text-right">${formatCurrency(item.amount)}</td>
-                    </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+                            </td>
+                            ${!isPurchaseOrder && document_type !== 'QUOTATION' ? `<td class="col-loc">${item.location_maker || '-'}</td>` : ''}
+                            ` : ''}
+                            <td class="col-qty">${item.qty}</td>
+                            <td class="col-price text-right">${formatCurrency(item.unit_price)}</td>
+                            <td class="col-amt text-right">${formatCurrency(item.amount)}</td>
+                        </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
 
             <div class="footer-wrapper">
                 <div class="delivery-section">

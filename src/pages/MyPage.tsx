@@ -612,43 +612,43 @@ export default function MyPage() {
                                             ) : (
                                                 <div className="space-y-3">
                                                     {quotations.map(quote => (
-                                                        <div key={quote.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow">
+                                                        <div key={quote.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-md transition-shadow">
                                                             <div>
-                                                                <div className="flex items-center gap-2 mb-1">
+                                                                <div className="flex flex-wrap items-center gap-2 mb-1">
                                                                     {getStatusBadge(quote.status)}
-                                                                    <span className="text-slate-300">|</span>
+                                                                    <span className="text-slate-300 hidden sm:inline">|</span>
                                                                     <span className="text-slate-400 text-xs font-mono">{quote.id.slice(0, 8)}</span>
-                                                                    <span className="text-slate-300">|</span>
-                                                                    <span className="text-slate-600 font-medium text-sm">{formatDate(quote.createdAt)}</span>
+                                                                    <span className="text-slate-300 hidden sm:inline">|</span>
+                                                                    <span className="text-slate-600 font-medium text-sm mt-1 sm:mt-0 w-full sm:w-auto">{formatDate(quote.createdAt)}</span>
                                                                 </div>
-                                                                <div className="flex items-center gap-3">
+                                                                <div className="flex flex-wrap items-center gap-3">
                                                                     <span className="font-bold text-slate-800">{formatCurrency(quote.totalAmount)}</span>
                                                                     <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
                                                                         {quote.items.length}개 품목
                                                                     </span>
                                                                 </div>
                                                             </div>
-                                                            <div className="flex items-center gap-2">
+                                                            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
                                                                 {quote.status === 'PROCESSED' || quote.status === 'COMPLETED' ? (
-                                                                    <Button size="sm" onClick={() => handleViewAnswer(quote)} className="gap-1 bg-yellow-400 text-slate-900 hover:bg-yellow-500 shadow-md shadow-yellow-500/20 font-bold border border-yellow-500/50">
+                                                                    <Button size="sm" onClick={() => handleViewAnswer(quote)} className="flex-1 sm:flex-none gap-1 bg-yellow-400 text-slate-900 hover:bg-yellow-500 shadow-md shadow-yellow-500/20 font-bold border border-yellow-500/50">
                                                                         <FileText className="w-3 h-3" />
                                                                         답변서 보기
                                                                     </Button>
                                                                 ) : (
-                                                                    <Button size="sm" disabled className="gap-1 bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed">
+                                                                    <Button size="sm" disabled className="flex-1 sm:flex-none gap-1 bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed">
                                                                         <FileText className="w-3 h-3" />
                                                                         답변서 대기중
                                                                     </Button>
                                                                 )}
-                                                                <Button size="sm" variant="outline" onClick={() => setViewingRecord({ type: 'QUOTE', record: quote })} className="border-slate-200 text-slate-600 hover:bg-slate-50">
+                                                                <Button size="sm" variant="outline" onClick={() => setViewingRecord({ type: 'QUOTE', record: quote })} className="flex-1 sm:flex-none border-slate-200 text-slate-600 hover:bg-slate-50">
                                                                     상세보기
                                                                 </Button>
-                                                                <Button size="sm" onClick={() => handleReorder(quote.items)} className="gap-1 bg-teal-50 text-teal-700 hover:bg-teal-100 border-teal-200">
+                                                                <Button size="sm" onClick={() => handleReorder(quote.items)} className="flex-1 sm:flex-none gap-1 bg-teal-50 text-teal-700 hover:bg-teal-100 border-teal-200">
                                                                     <RefreshCw className="w-3 h-3" />
-                                                                    품목 불러오기
+                                                                    불러오기
                                                                 </Button>
 
-                                                                <Button size="sm" variant="outline" onClick={() => handleDeleteQuotation(quote.id)} className="border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200">
+                                                                <Button size="sm" variant="outline" onClick={() => handleDeleteQuotation(quote.id)} className="flex-none border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200">
                                                                     <Trash2 className="w-3 h-3" />
                                                                 </Button>
                                                             </div>
@@ -678,19 +678,19 @@ export default function MyPage() {
                                                     {orders.map(order => (
                                                         <div key={order.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-md transition-shadow">
                                                             <div>
-                                                                <div className="flex items-center gap-2 mb-1">
+                                                                <div className="flex flex-wrap items-center gap-2 mb-1">
                                                                     {getStatusBadge(order.status, 'ORDER')}
-                                                                    <span className="text-slate-300">|</span>
-                                                                    <span className="text-slate-600 font-medium text-sm">{formatDate(order.createdAt)}</span>
+                                                                    <span className="text-slate-300 hidden sm:inline">|</span>
+                                                                    <span className="text-slate-600 font-medium text-sm mt-1 sm:mt-0 w-full sm:w-auto">{formatDate(order.createdAt)}</span>
                                                                 </div>
-                                                                <div className="flex items-center gap-3 mt-1">
+                                                                <div className="flex flex-wrap items-center gap-3 mt-1">
                                                                     <span className="font-bold text-slate-800">{formatCurrency(order.totalAmount)}</span>
                                                                     <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
                                                                         {order.items.length}개 품목
                                                                     </span>
                                                                 </div>
                                                             </div>
-                                                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                                            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
                                                                 {/* View Receipt Button - Show only if status starts processing (Admin handles it) */}
                                                                 {['PROCESSING', 'PROCESSED', 'SHIPPED', 'COMPLETED', 'processing', 'shipped', 'completed'].includes(order.status) && (
                                                                     <Button size="sm" onClick={() => handleViewOrderReceipt(order)} className="gap-1 bg-yellow-400 text-slate-900 hover:bg-yellow-500 shadow-md shadow-yellow-500/20 font-bold border border-yellow-500/50 flex-1 sm:flex-none">
