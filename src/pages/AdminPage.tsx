@@ -64,6 +64,18 @@ export default function AdminPage() {
     const [detailInitialMode, setDetailInitialMode] = useState<'CUSTOMER' | 'SUPPLIER'>('CUSTOMER'); // [MOD] Added Initial Mode State
 
     // Derived Data
+    const orderCounts = orders.reduce((acc, order) => {
+        if (order.isDeleted) {
+            acc.TRASH = (acc.TRASH || 0) + 1;
+            return acc;
+        }
+        acc.all = (acc.all || 0) + 1;
+        if (order.status) {
+            acc[order.status] = (acc[order.status] || 0) + 1;
+        }
+        return acc;
+    }, {} as Record<string, number>);
+
     const filteredOrders = orders.filter(order => {
         if (filterStatus === 'TRASH') return order.isDeleted; // Show only deleted items in Trash
         if (order.isDeleted) return false; // Hide deleted items from other views
@@ -181,21 +193,21 @@ export default function AdminPage() {
                     {/* Status Filters & Utilities */}
                     <div className="flex items-center justify-between">
                         <div className="flex bg-white p-1 rounded-lg border border-slate-200 shadow-sm w-fit">
-                            <FilterButton active={filterStatus === 'all'} onClick={() => setFilterStatus('all')} label="전체" />
-                            <FilterButton active={filterStatus === 'SUBMITTED'} onClick={() => setFilterStatus('SUBMITTED')} label="주문접수" />
-                            <FilterButton active={filterStatus === 'PROCESSING'} onClick={() => setFilterStatus('PROCESSING')} label="처리중" />
-                            <FilterButton active={filterStatus === 'ON_HOLD'} onClick={() => setFilterStatus('ON_HOLD')} label="보류" />
-                            <FilterButton active={filterStatus === 'WITHDRAWN'} onClick={() => setFilterStatus('WITHDRAWN')} label="회수" />
-                            <FilterButton active={filterStatus === 'SHIPPED'} onClick={() => setFilterStatus('SHIPPED')} label="배송중" />
-                            <FilterButton active={filterStatus === 'COMPLETED'} onClick={() => setFilterStatus('COMPLETED')} label="완료" />
-                            <FilterButton active={filterStatus === 'CANCELLED'} onClick={() => setFilterStatus('CANCELLED')} label="취소" />
+                            <FilterButton active={filterStatus === 'all'} onClick={() => setFilterStatus('all')} label="전체" count={orderCounts.all} />
+                            <FilterButton active={filterStatus === 'SUBMITTED'} onClick={() => setFilterStatus('SUBMITTED')} label="주문접수" count={orderCounts.SUBMITTED} />
+                            <FilterButton active={filterStatus === 'PROCESSING'} onClick={() => setFilterStatus('PROCESSING')} label="처리중" count={orderCounts.PROCESSING} />
+                            <FilterButton active={filterStatus === 'ON_HOLD'} onClick={() => setFilterStatus('ON_HOLD')} label="보류" count={orderCounts.ON_HOLD} />
+                            <FilterButton active={filterStatus === 'WITHDRAWN'} onClick={() => setFilterStatus('WITHDRAWN')} label="회수" count={orderCounts.WITHDRAWN} />
+                            <FilterButton active={filterStatus === 'SHIPPED'} onClick={() => setFilterStatus('SHIPPED')} label="배송중" count={orderCounts.SHIPPED} />
+                            <FilterButton active={filterStatus === 'COMPLETED'} onClick={() => setFilterStatus('COMPLETED')} label="완료" count={orderCounts.COMPLETED} />
+                            <FilterButton active={filterStatus === 'CANCELLED'} onClick={() => setFilterStatus('CANCELLED')} label="취소" count={orderCounts.CANCELLED} />
                             <div className="w-[1px] h-4 bg-slate-200 mx-1" />
                             <button
                                 onClick={() => setFilterStatus('TRASH')}
                                 className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${filterStatus === 'TRASH' ? 'bg-red-50 text-red-600 shadow-sm ring-1 ring-red-200' : 'text-slate-400 hover:text-red-500'}`}
                             >
                                 <Trash2 className="w-3.5 h-3.5" />
-                                휴지통
+                                휴지통 {orderCounts.TRASH ? `(${orderCounts.TRASH})` : ''}
                             </button>
                         </div>
 
@@ -439,14 +451,19 @@ export default function AdminPage() {
     );
 }
 
-function FilterButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+function FilterButton({ active, onClick, label, count }: { active: boolean; onClick: () => void; label: string; count?: number }) {
     return (
         <button
             onClick={onClick}
-            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${active ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
+            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1.5 ${active ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
                 }`}
         >
             {label}
+            {count !== undefined && count > 0 && (
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono leading-none ${active ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-400'}`}>
+                    {count}
+                </span>
+            )}
         </button>
     );
 }
