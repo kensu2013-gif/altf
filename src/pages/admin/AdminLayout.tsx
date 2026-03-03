@@ -16,6 +16,7 @@ export default function AdminLayout() {
     const navigate = useNavigate();
     const logout = useStore((state) => state.logout);
     const user = useStore((state) => state.auth.user);
+    const { orders, quotes } = useStore((state) => state);
     const [isSidebarOpen, setSidebarOpen] = useState(true);
 
     // [MOD] Ensure inventory is loaded/validated when accessing Admin Panel
@@ -30,9 +31,9 @@ export default function AdminLayout() {
         // { label: '대시보드', path: '/admin', icon: LayoutDashboard, exact: true }, // Maybe later
         { label: '회원 관리', path: '/admin/members', icon: User },
         { label: '담당자 관리', path: '/admin/managers', icon: User },
-        { label: '주문 관리', path: '/admin/orders', icon: ShoppingCart },
+        { label: '주문 관리', path: '/admin/orders', icon: ShoppingCart, badge: orders.filter(o => o.status === 'SUBMITTED' && !o.isDeleted).length },
         { label: '미결 관리', path: '/admin/pending', icon: ShoppingCart }, // Using ShoppingCart or equivalent as ListTodo is not imported
-        { label: '견적 관리', path: '/admin/quotes', icon: FileText },
+        { label: '견적 관리', path: '/admin/quotes', icon: FileText, badge: quotes.filter(q => q.status === 'SUBMITTED' && !q.isDeleted).length },
         { label: '재고 관리', path: '/admin/inventory', icon: Package },
         { label: '설정', path: '/admin/settings', icon: Settings },
     ];
@@ -65,14 +66,21 @@ export default function AdminLayout() {
                             key={item.path}
                             to={item.path}
                             className={({ isActive }) => `
-                                flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors
+                                flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-colors
                                 ${isActive
                                     ? 'bg-teal-600 text-white shadow-lg shadow-teal-900/20'
                                     : 'text-slate-400 hover:text-white hover:bg-slate-800'}
                             `}
                         >
-                            <item.icon className="w-5 h-5 flex-shrink-0" />
-                            {isSidebarOpen && <span>{item.label}</span>}
+                            <div className="flex items-center gap-3">
+                                <item.icon className="w-5 h-5 flex-shrink-0" />
+                                {isSidebarOpen && <span>{item.label}</span>}
+                            </div>
+                            {isSidebarOpen && item.badge !== undefined && item.badge > 0 && (
+                                <span className="bg-yellow-400 text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                                    {item.badge}
+                                </span>
+                            )}
                         </NavLink>
                     ))}
                 </nav>

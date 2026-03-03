@@ -111,7 +111,7 @@ export default function AdminQuotes() {
                 {/* Status Filters */}
                 <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
                     <FilterButton active={filterStatus === 'all'} onClick={() => setFilterStatus('all')} label="All" count={quoteCounts.all} />
-                    <FilterButton active={filterStatus === 'SUBMITTED'} onClick={() => setFilterStatus('SUBMITTED')} label="접수 (Submitted)" count={quoteCounts.SUBMITTED} />
+                    <FilterButton active={filterStatus === 'SUBMITTED'} onClick={() => setFilterStatus('SUBMITTED')} label="접수 (Submitted)" count={quoteCounts.SUBMITTED} variant="highlight" />
                     <FilterButton active={filterStatus === 'PROCESSING'} onClick={() => setFilterStatus('PROCESSING')} label="응답대기 (Processing)" count={quoteCounts.PROCESSING} />
                     <FilterButton active={filterStatus === 'PROCESSED'} onClick={() => setFilterStatus('PROCESSED')} label="답변완료 (Processed)" count={quoteCounts.PROCESSED} />
                     <FilterButton active={filterStatus === 'COMPLETED'} onClick={() => setFilterStatus('COMPLETED')} label="주문접수 (Completed)" count={quoteCounts.COMPLETED} />
@@ -265,16 +265,23 @@ export default function AdminQuotes() {
     );
 }
 
-function FilterButton({ active, onClick, label, count }: { active: boolean; onClick: () => void; label: string; count?: number }) {
+function FilterButton({ active, onClick, label, count, variant = 'default' }: { active: boolean; onClick: () => void; label: string; count?: number; variant?: 'default' | 'highlight' }) {
+    let buttonStyle = active ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50';
+    let badgeStyle = active ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-400';
+
+    if (variant === 'highlight') {
+        buttonStyle = active ? 'bg-slate-900 text-yellow-500 shadow-md ring-2 ring-yellow-400/50' : 'text-slate-500 hover:bg-slate-50';
+        badgeStyle = active ? 'bg-yellow-400 text-slate-900 font-bold px-2 py-0.5' : 'bg-slate-100 text-slate-400';
+    }
+
     return (
         <button
             onClick={onClick}
-            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1.5 ${active ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
-                }`}
+            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1.5 ${buttonStyle}`}
         >
             {label}
             {count !== undefined && count > 0 && (
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono leading-none ${active ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-400'}`}>
+                <span className={`rounded-full text-[10px] font-mono leading-none ${badgeStyle} ${variant !== 'highlight' || !active ? 'px-1.5 py-0.5' : ''}`}>
                     {count}
                 </span>
             )}
