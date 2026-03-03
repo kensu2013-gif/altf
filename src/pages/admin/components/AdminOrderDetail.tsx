@@ -164,7 +164,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         if (order.buyerInfo) return order.buyerInfo;
         // Default to ALTF info
         return {
-            company_name: '(주)알트에프',
+            company_name: '알트에프',
             contact_name: user?.contactName || '조현진 대표',
             tel: user?.phone || '051-303-3751',
             email: user?.email || 'altf@altf.kr',
@@ -375,11 +375,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 title: '거래명세서 (Transaction Statement)'
             },
             supplier: {
-                company_name: '(주)알트에프',
-                contact_name: user?.contactName || '조현진 대표',
-                tel: user?.phone || '051-303-3751',
-                email: user?.email || 'altf@altf.kr',
-                address: user?.address || '부산시 사상구 낙동대로1330번길 67'
+                company_name: '알트에프',
+                contact_name: buyerInfo.contact_name || user?.contactName || '조현진 대표',
+                tel: '051-303-3751',
+                email: 'altf@altf.kr',
+                address: '부산광역시 사상구 낙동대로1330번길, 67'
             },
             customer: {
                 // [MOD] Use Signup Info (linkedUser) specifically for Transaction Statement
