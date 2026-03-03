@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
-import { FileText, PackageX, Calendar, Search, Filter, MessageSquare, Send, X } from 'lucide-react';
+import { FileText, PackageX, Calendar, Search, Filter, MessageSquare, Send, X, Trash2 } from 'lucide-react';
 import { CalmPageShell } from '../../components/ui/CalmPageShell';
 import { PageTransition } from '../../components/ui/PageTransition';
 
@@ -156,6 +156,27 @@ export default function PendingOrders() {
         setNewComment('');
     };
 
+    const handleDeleteComment = (orderId: string, itemId: string, commentIndex: number) => {
+        if (!user || user.role !== 'MASTER') return;
+
+        const targetOrder = orders.find(o => o.id === orderId);
+        if (!targetOrder || !targetOrder.po_items) return;
+
+        const updatedPoItems = targetOrder.po_items.map(pi => {
+            if (pi.id === itemId) {
+                const existingComments = pi.comments || [];
+                return {
+                    ...pi,
+                    comments: existingComments.filter((_, idx) => idx !== commentIndex)
+                };
+            }
+            return pi;
+        });
+
+        // Optimistic UI update and sync with store/backend
+        updateOrder(orderId, { po_items: updatedPoItems });
+    };
+
     const isUrgent = (dateStr: string) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -303,7 +324,18 @@ export default function PendingOrders() {
                                                                     <div key={idx} className="bg-slate-50 rounded-lg p-2 border border-slate-100 text-xs shadow-sm">
                                                                         <div className="flex justify-between items-center mb-1">
                                                                             <span className="font-bold text-slate-700">{comment.author}</span>
-                                                                            <span className="text-[9px] text-slate-400">{new Date(comment.timestamp).toLocaleDateString()} {new Date(comment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-[9px] text-slate-400">{new Date(comment.timestamp).toLocaleDateString()} {new Date(comment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                                {user?.role === 'MASTER' && (
+                                                                                    <button
+                                                                                        onClick={() => handleDeleteComment(item.orderId, item.itemId, idx)}
+                                                                                        className="text-slate-300 hover:text-red-500 transition-colors p-0.5 rounded"
+                                                                                        title="코멘트 삭제 (MASTER 권한)"
+                                                                                    >
+                                                                                        <Trash2 className="w-3 h-3" />
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
                                                                         <p className="text-slate-600 leading-snug break-words whitespace-pre-wrap">{comment.content}</p>
                                                                     </div>
