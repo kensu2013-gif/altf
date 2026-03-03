@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Calendar, Download, Trash2, ArchiveRestore } from 'lucide-react';
+import { FileText, Calendar, Download, Trash2, ArchiveRestore, Search } from 'lucide-react';
 import { AdminQuoteDetail } from './components/AdminQuoteDetail';
 import { useStore } from '../../store/useStore';
 import { formatCurrency } from '../../lib/utils';
@@ -11,6 +11,7 @@ export default function AdminQuotes() {
     const { quotes, users, updateQuotation, trashQuotation, restoreQuotation, permanentDeleteQuotation, setQuotes, fetchUsers } = useStore((state) => state);
     const [selectedQuote, setSelectedQuote] = useState<typeof quotes[0] | null>(null);
     const [filterStatus, setFilterStatus] = useState<string>('all');
+    const [searchQuery, setSearchQuery] = useState('');
 
     const user = useStore((state) => state.auth.user);
 
@@ -60,10 +61,38 @@ export default function AdminQuotes() {
     }, {} as Record<string, number>);
 
     const filteredQuotes = quotes.filter(q => {
-        if (filterStatus === 'TRASH') return q.isDeleted;
-        if (q.isDeleted) return false;
-        if (filterStatus === 'all') return true;
-        return q.status === filterStatus;
+        // Status Match
+        let statusMatch = true;
+        if (filterStatus === 'TRASH') {
+            if (!q.isDeleted) statusMatch = false;
+        } else {
+            if (q.isDeleted) statusMatch = false;
+            if (filterStatus !== 'all' && q.status !== filterStatus) statusMatch = false;
+        }
+
+        if (!statusMatch) return false;
+
+        // Search Match
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            const customerName = q.customerName?.toLowerCase() || '';
+            const companyName = q.customerInfo?.companyName?.toLowerCase() || '';
+            const contactName = q.customerInfo?.contactName?.toLowerCase() || '';
+
+            const quoteUser = users.find(u => u.id === q.userId);
+            const userCompany = quoteUser?.companyName?.toLowerCase() || '';
+            const userContact = quoteUser?.contactName?.toLowerCase() || '';
+
+            if (!customerName.includes(query) &&
+                !companyName.includes(query) &&
+                !contactName.includes(query) &&
+                !userCompany.includes(query) &&
+                !userContact.includes(query)) {
+                return false;
+            }
+        }
+
+        return true;
     });
 
     const handlePdfDownload = (e: React.MouseEvent) => {
@@ -107,9 +136,9 @@ export default function AdminQuotes() {
                 <p className="text-slate-500 text-sm mt-1">고객들이 온라인으로 생성/출력한 견적서 내역입니다.</p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 {/* Status Filters */}
-                <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm overflow-x-auto w-full sm:w-auto">
                     <FilterButton active={filterStatus === 'all'} onClick={() => setFilterStatus('all')} label="All" count={quoteCounts.all} />
                     <FilterButton active={filterStatus === 'SUBMITTED'} onClick={() => setFilterStatus('SUBMITTED')} label="접수 (Submitted)" count={quoteCounts.SUBMITTED} variant="highlight" />
                     <FilterButton active={filterStatus === 'PROCESSING'} onClick={() => setFilterStatus('PROCESSING')} label="응답대기 (Processing)" count={quoteCounts.PROCESSING} />
@@ -118,11 +147,23 @@ export default function AdminQuotes() {
                     <div className="w-[1px] h-4 bg-slate-200 mx-1" />
                     <button
                         onClick={() => setFilterStatus('TRASH')}
-                        className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${filterStatus === 'TRASH' ? 'bg-red-50 text-red-600 shadow-sm ring-1 ring-red-200' : 'text-slate-400 hover:text-red-500'}`}
+                        className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-md transition-all whitespace-nowrap ${filterStatus === 'TRASH' ? 'bg-red-50 text-red-600 shadow-sm ring-1 ring-red-200' : 'text-slate-400 hover:text-red-500'}`}
                     >
                         <Trash2 className="w-3.5 h-3.5" />
                         휴지통 {quoteCounts.TRASH ? `(${quoteCounts.TRASH})` : ''}
                     </button>
+                </div>
+
+                {/* Search */}
+                <div className="relative w-full sm:w-64">
+                    <input
+                        type="text"
+                        placeholder="고객명, 회사명 검색..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all font-medium placeholder-slate-400"
+                    />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 </div>
             </div>
 

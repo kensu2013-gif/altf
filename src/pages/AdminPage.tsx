@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import { CalmPageShell } from '../components/ui/CalmPageShell';
 import { PageTransition } from '../components/ui/PageTransition';
 import {
-    LayoutDashboard, ChevronDown, Building2, Trash2, ArchiveRestore, Download
+    LayoutDashboard, ChevronDown, Building2, Trash2, ArchiveRestore, Download, Search
 } from 'lucide-react';
 import { AdminOrderDetail } from './admin/components/AdminOrderDetail';
 import { AnalyticsPanel } from './admin/components/AnalyticsPanel';
@@ -60,6 +60,7 @@ export default function AdminPage() {
 
     // UI State
     const [filterStatus, setFilterStatus] = useState<string>('all');
+    const [searchQuery, setSearchQuery] = useState('');
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [detailInitialMode, setDetailInitialMode] = useState<'CUSTOMER' | 'SUPPLIER'>('CUSTOMER'); // [MOD] Added Initial Mode State
 
@@ -77,10 +78,36 @@ export default function AdminPage() {
     }, {} as Record<string, number>);
 
     const filteredOrders = orders.filter(order => {
-        if (filterStatus === 'TRASH') return order.isDeleted; // Show only deleted items in Trash
-        if (order.isDeleted) return false; // Hide deleted items from other views
-        if (filterStatus === 'all') return true;
-        return order.status === filterStatus;
+        // Status Match
+        let statusMatch = true;
+        if (filterStatus === 'TRASH') {
+            if (!order.isDeleted) statusMatch = false;
+        } else {
+            if (order.isDeleted) statusMatch = false;
+            if (filterStatus !== 'all' && order.status !== filterStatus) statusMatch = false;
+        }
+
+        if (!statusMatch) return false;
+
+        // Search Match
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            const customerName = order.customerName?.toLowerCase() || '';
+            const poEndCustomer = order.poEndCustomer?.toLowerCase() || '';
+            const poCompany = order.payload?.customer?.company_name?.toLowerCase() || '';
+            const poContact = order.payload?.customer?.contact_name?.toLowerCase() || '';
+            const poNumber = order.poNumber?.toLowerCase() || '';
+
+            if (!customerName.includes(query) &&
+                !poEndCustomer.includes(query) &&
+                !poCompany.includes(query) &&
+                !poContact.includes(query) &&
+                !poNumber.includes(query)) {
+                return false;
+            }
+        }
+
+        return true;
     }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     // Handlers
@@ -191,8 +218,8 @@ export default function AdminPage() {
             <PageTransition>
                 <div className="space-y-6">
                     {/* Status Filters & Utilities */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex bg-white p-1 rounded-lg border border-slate-200 shadow-sm w-fit">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex bg-white p-1 rounded-lg border border-slate-200 shadow-sm w-fit overflow-x-auto">
                             <FilterButton active={filterStatus === 'all'} onClick={() => setFilterStatus('all')} label="전체" count={orderCounts.all} />
                             <FilterButton active={filterStatus === 'SUBMITTED'} onClick={() => setFilterStatus('SUBMITTED')} label="주문접수" count={orderCounts.SUBMITTED} variant="highlight" />
                             <FilterButton active={filterStatus === 'PROCESSING'} onClick={() => setFilterStatus('PROCESSING')} label="처리중" count={orderCounts.PROCESSING} />
@@ -211,15 +238,29 @@ export default function AdminPage() {
                             </button>
                         </div>
 
-                        {user?.role === 'MASTER' && (
-                            <button
-                                onClick={handleExportCSV}
-                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors"
-                            >
-                                <Download className="w-4 h-4" />
-                                엑셀(CSV) 다운로드
-                            </button>
-                        )}
+                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                            {/* Search */}
+                            <div className="relative flex-1 sm:w-64">
+                                <input
+                                    type="text"
+                                    placeholder="고객명, 회사명, 발주번호 검색..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all font-medium placeholder-slate-400"
+                                />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            </div>
+
+                            {user?.role === 'MASTER' && (
+                                <button
+                                    onClick={handleExportCSV}
+                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors whitespace-nowrap"
+                                >
+                                    <Download className="w-4 h-4" />
+                                    엑셀 다운로드
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* Orders Table */}
