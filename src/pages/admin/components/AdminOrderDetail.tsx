@@ -191,16 +191,18 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     });
 
     // PO Options State
-    const [poOptionNoMarking, setPoOptionNoMarking] = useState(false);
-    const [poOptionStockCheck, setPoOptionStockCheck] = useState(false);
-    const [poOptionCustomOrder, setPoOptionCustomOrder] = useState(false);
+    const initialMemo = order.memo || '';
+    const [poOptionNoMarking, setPoOptionNoMarking] = useState(initialMemo.includes('[무마킹 출고 조건]'));
+    const [poOptionStockCheck, setPoOptionStockCheck] = useState(initialMemo.includes('[재고장 확인의 건]'));
+    const [poOptionCustomOrder, setPoOptionCustomOrder] = useState(initialMemo.includes('[주문제작 요청건]'));
 
     // UX Animation Trackers
-    const [poNumTouched, setPoNumTouched] = useState(false);
-    const [customerTouched, setCustomerTouched] = useState(false);
-    const [printOptionTouched, setPrintOptionTouched] = useState(false);
-    const [deliveryDateTouched, setDeliveryDateTouched] = useState(false);
-    const [hasSavedPO, setHasSavedPO] = useState(false);
+    const isPoPersisted = !!order.supplierPO || !!order.poSent;
+    const [poNumTouched, setPoNumTouched] = useState(isPoPersisted);
+    const [customerTouched, setCustomerTouched] = useState(isPoPersisted);
+    const [printOptionTouched, setPrintOptionTouched] = useState(isPoPersisted);
+    const [deliveryDateTouched, setDeliveryDateTouched] = useState(isPoPersisted);
+    const [hasSavedPO, setHasSavedPO] = useState(isPoPersisted);
 
     // Effect to compose shippingMemo automatically for POs
     useEffect(() => {
@@ -217,7 +219,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         let newMemo = baseMemo;
         if (poOptionNoMarking) newMemo += '\n[무마킹 출고 조건]';
         if (poOptionStockCheck) newMemo += '\n[재고장 확인의 건]';
-        if (poOptionCustomOrder) newMemo += '\n[재고 확인 필요]';
+        if (poOptionCustomOrder) newMemo += '\n[주문제작 요청건]'; // Ensure matching string with check above
+
+        // Remove duplicates easily if initialized with them
+        newMemo = Array.from(new Set(newMemo.split('\n'))).join('\n').trim();
 
         setShippingMemo(newMemo);
     }, [poOptionNoMarking, poOptionStockCheck, poOptionCustomOrder, isSupplierMode, order]);
@@ -984,7 +989,12 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                         type="file"
                                                         title="매입발주서 첨부 (Supplier PO)"
                                                         className="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border border-indigo-200 file:text-sm file:font-medium file:bg-white file:text-indigo-700 hover:file:bg-indigo-50 transition-all cursor-pointer w-full max-w-sm"
-                                                        onChange={(e) => setSupplierPoFiles(Array.from(e.target.files || []))}
+                                                        onChange={(e) => {
+                                                            setSupplierPoFiles(Array.from(e.target.files || []));
+                                                            if (!hasSavedPO && e.target.files && e.target.files.length > 0) {
+                                                                setHasSavedPO(true); // Treat attaching a file as "Saving/Persisting" progress visually
+                                                            }
+                                                        }}
                                                     />
                                                     {
                                                         order.supplierPO && (
