@@ -1,3 +1,4 @@
+
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useStore } from './store/useStore';
 import { Layout } from './components/layout/Layout';
@@ -28,6 +29,7 @@ const AdminMembers = lazy(() => import('./pages/admin/Members'));
 const AdminManagers = lazy(() => import('./pages/admin/Managers'));
 const AdminOrders = lazy(() => import('./pages/AdminPage'));
 const AdminQuotes = lazy(() => import('./pages/admin/Quotes')); // [RENAME]
+const PendingOrders = lazy(() => import('./pages/admin/Pending'));
 const AdminInventory = lazy(() => import('./pages/admin/Inventory'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
 const AdminProfile = lazy(() => import('./pages/admin/Profile'));
@@ -113,6 +115,7 @@ function AnimatedRoutes() {
               <Route path="managers" element={<PageTransition><AdminManagers /></PageTransition>} />
               <Route path="orders" element={<PageTransition><AdminOrders /></PageTransition>} />
               <Route path="quotes" element={<PageTransition><AdminQuotes /></PageTransition>} />
+              <Route path="pending" element={<PageTransition><PendingOrders /></PageTransition>} />
               <Route path="inventory" element={<PageTransition><AdminInventory /></PageTransition>} />
               <Route path="settings" element={<PageTransition><AdminSettings /></PageTransition>} />
               <Route path="profile" element={<PageTransition><AdminProfile /></PageTransition>} />
@@ -158,3 +161,4 @@ function App() {
 }
 
 export default App;
+

@@ -31,6 +31,7 @@ export default function AdminLayout() {
         { label: '회원 관리', path: '/admin/members', icon: User },
         { label: '담당자 관리', path: '/admin/managers', icon: User },
         { label: '주문 관리', path: '/admin/orders', icon: ShoppingCart },
+        { label: '미결 관리', path: '/admin/pending', icon: ShoppingCart }, // Using ShoppingCart or equivalent as ListTodo is not imported
         { label: '견적 관리', path: '/admin/quotes', icon: FileText },
         { label: '재고 관리', path: '/admin/inventory', icon: Package },
         { label: '설정', path: '/admin/settings', icon: Settings },
@@ -55,7 +56,7 @@ export default function AdminLayout() {
                 <nav className="flex-1 py-6 px-2 space-y-1">
                     {NAV_ITEMS.filter(item => {
                         if (user?.role === 'MANAGER') {
-                            return ['/admin/orders', '/admin/quotes'].includes(item.path);
+                            return ['/admin/orders', '/admin/pending', '/admin/quotes'].includes(item.path);
                         }
                         // MASTER or admin sees everything
                         return true;

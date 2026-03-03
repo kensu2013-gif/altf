@@ -302,7 +302,10 @@ export default function AdminPage() {
                                                         <div className="flex flex-col">
                                                             <div className="flex items-center gap-1.5 font-bold text-slate-700">
                                                                 <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                                                                {order.customerName}
+                                                                {order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName}
+                                                                {(order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name) && ((order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name) !== order.customerName) && (
+                                                                    <span className="text-[10px] font-normal text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded ml-1 border border-teal-100">수정됨</span>
+                                                                )}
                                                             </div>
                                                             <span className="text-xs text-slate-400 mt-0.5 pl-5">
                                                                 {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

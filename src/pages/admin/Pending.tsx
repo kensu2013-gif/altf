@@ -1,0 +1,368 @@
+import { useMemo, useState, useEffect } from 'react';
+import { useStore } from '../../store/useStore';
+import { FileText, PackageX, Calendar, Search, Filter, MessageSquare, Send, X } from 'lucide-react';
+import { CalmPageShell } from '../../components/ui/CalmPageShell';
+import { PageTransition } from '../../components/ui/PageTransition';
+
+interface PendingItem {
+    orderId: string;
+    poNumber: string;
+    poDate: string;
+    customerName: string;
+    targetCustomerName: string;
+    itemId: string;
+    itemName: string;
+    thickness: string;
+    size: string;
+    material: string;
+    quantity: number;
+    memo: string;
+    createdAt: string;
+    deliveryDate: string; // Used for "납기 임박" calculation
+    comments?: { author: string; timestamp: string; content: string; authorId?: string }[];
+}
+
+export default function PendingOrders() {
+    const { orders, setOrders, updateOrder } = useStore((state) => state);
+    const user = useStore((state) => state.auth.user);
+
+    // Filters
+    const [searchCustomer, setSearchCustomer] = useState('');
+    const [searchPo, setSearchPo] = useState('');
+    const [dateFilter, setDateFilter] = useState<'ALL' | 'URGENT'>('ALL'); // URGENT = <= 7 days
+
+    // Comment State
+    const [activeCommentItemId, setActiveCommentItemId] = useState<string | null>(null);
+    const [newComment, setNewComment] = useState('');
+
+    // Sync Orders on Mount
+    useEffect(() => {
+        if (!user) return;
+
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+        };
+        if (user.id) headers['x-requester-id'] = user.id;
+        if (user.role) headers['x-requester-role'] = user.role;
+
+        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders`;
+
+        const fetchOrders = () => {
+            fetch(endpoint, { headers, cache: 'no-store' })
+                .then(res => {
+                    if (res.ok) return res.json();
+                    throw new Error('Failed to fetch');
+                })
+                .then(data => {
+                    if (Array.isArray(data)) setOrders(data);
+                })
+                .catch(console.error);
+        };
+
+        fetchOrders();
+        window.addEventListener('focus', fetchOrders);
+        return () => window.removeEventListener('focus', fetchOrders);
+    }, [setOrders, user]);
+
+    // Flatten and Filter Items
+    const pendingItems: PendingItem[] = useMemo(() => {
+        const itemsList: PendingItem[] = [];
+
+        orders.forEach(order => {
+            if (order.isDeleted || order.status === 'CANCELLED') return;
+            if (!order.po_items || order.po_items.length === 0) return;
+
+            const poDateRaw = order.createdAt;
+            const poDateFormatted = new Date(poDateRaw).toLocaleDateString();
+
+            // Extract delivery date. Order adminResponse or order memo might hold it, fallback to createdAt + 7 for demo if nothing
+            const deliveryDateStr = order.adminResponse?.deliveryDate || poDateRaw;
+
+            const targetCustomer = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName;
+
+            order.po_items.forEach(poItem => {
+                if (poItem.poSent && !poItem.transactionIssued) {
+                    itemsList.push({
+                        orderId: order.id,
+                        poNumber: order.poNumber || 'N/A',
+                        poDate: poDateFormatted,
+                        customerName: order.customerName,
+                        targetCustomerName: targetCustomer,
+                        itemId: poItem.id,
+                        itemName: poItem.name,
+                        thickness: poItem.thickness || '',
+                        size: poItem.size || '',
+                        material: poItem.material || '',
+                        quantity: poItem.quantity,
+                        memo: order.memo || '',
+                        createdAt: order.createdAt,
+                        deliveryDate: deliveryDateStr,
+                        comments: poItem.comments || []
+                    });
+                }
+            });
+        });
+
+        // Apply Filters
+        const filtered = itemsList.filter(item => {
+            const matchCust = item.targetCustomerName.toLowerCase().includes(searchCustomer.toLowerCase()) ||
+                item.customerName.toLowerCase().includes(searchCustomer.toLowerCase());
+            const matchPo = item.poNumber.toLowerCase().includes(searchPo.toLowerCase());
+
+            let matchDate = true;
+            if (dateFilter === 'URGENT') {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const dDate = new Date(item.deliveryDate);
+                const diffTime = dDate.getTime() - today.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                matchDate = diffDays <= 7;
+            }
+
+            return matchCust && matchPo && matchDate;
+        });
+
+        // Sort by 납기 임박순 (Delivery Date ascending)
+        return filtered.sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
+    }, [orders, searchCustomer, searchPo, dateFilter]);
+
+    // Handlers
+    const handleAddComment = (orderId: string, itemId: string) => {
+        if (!newComment.trim() || !user) return;
+
+        const targetOrder = orders.find(o => o.id === orderId);
+        if (!targetOrder || !targetOrder.po_items) return;
+
+        const updatedPoItems = targetOrder.po_items.map(pi => {
+            if (pi.id === itemId) {
+                const existingComments = pi.comments || [];
+                return {
+                    ...pi,
+                    comments: [
+                        ...existingComments,
+                        {
+                            author: user.contactName || user.email.split('@')[0],
+                            authorId: user.id,
+                            timestamp: new Date().toISOString(),
+                            content: newComment.trim()
+                        }
+                    ]
+                };
+            }
+            return pi;
+        });
+
+        updateOrder(orderId, { po_items: updatedPoItems });
+        setNewComment('');
+    };
+
+    const isUrgent = (dateStr: string) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dDate = new Date(dateStr);
+        const diffTime = dDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays <= 7;
+    };
+
+    return (
+        <CalmPageShell>
+            <div className="mb-6 flex flex-col gap-1">
+                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                    <FileText className="w-6 h-6 text-teal-600" />
+                    미결 관리 (Pending Orders)
+                </h1>
+                <p className="text-sm text-slate-500">
+                    매입발주서는 발송 완료되었으나 아직 거래명세서가 발행되지 않은 품목(납기 대기) 목록입니다. 납기 임박순으로 표시됩니다.
+                </p>
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-3 mb-4 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-teal-500/20 focus-within:border-teal-500 transition-all flex-1 min-w-[200px]">
+                    <Search className="w-4 h-4 text-slate-400 mr-2" />
+                    <input
+                        type="text"
+                        placeholder="고객명 검색..."
+                        value={searchCustomer}
+                        onChange={(e) => setSearchCustomer(e.target.value)}
+                        className="bg-transparent border-none outline-none text-sm w-full placeholder:text-slate-400 font-medium"
+                    />
+                </div>
+                <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-teal-500/20 focus-within:border-teal-500 transition-all flex-1 min-w-[200px]">
+                    <Search className="w-4 h-4 text-slate-400 mr-2" />
+                    <input
+                        type="text"
+                        placeholder="발주번호 검색 (ex: 456)"
+                        value={searchPo}
+                        onChange={(e) => setSearchPo(e.target.value)}
+                        className="bg-transparent border-none outline-none text-sm w-full placeholder:text-slate-400 font-medium"
+                    />
+                </div>
+                <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-slate-400" />
+                    <select
+                        value={dateFilter}
+                        onChange={(e) => setDateFilter(e.target.value as 'ALL' | 'URGENT')}
+                        className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                        title="Filter by delivery date"
+                        aria-label="Filter by delivery date"
+                    >
+                        <option value="ALL">전체 기간</option>
+                        <option value="URGENT">🔥 납기 임박 (7일 이내)</option>
+                    </select>
+                </div>
+            </div>
+
+            <PageTransition>
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 whitespace-nowrap">
+                                <tr>
+                                    <th scope="col" className="px-5 py-3 font-bold w-[15%]">고객명 (Customer)</th>
+                                    <th scope="col" className="px-5 py-3 font-bold w-[15%]">발주번호 / 납기일자</th>
+                                    <th scope="col" className="px-5 py-3 font-bold w-[30%]">품목 정보 (Item Spec)</th>
+                                    <th scope="col" className="px-5 py-3 font-bold text-right w-[10%]">수량</th>
+                                    <th scope="col" className="px-5 py-3 font-bold w-[30%] text-center">코멘트 (의견/일정 공유)</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {pendingItems.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-16 text-center text-slate-400">
+                                            <div className="flex flex-col items-center gap-3">
+                                                <div className="bg-slate-50 p-4 rounded-full border border-slate-100 shadow-inner">
+                                                    <PackageX className="w-8 h-8 text-slate-300" />
+                                                </div>
+                                                <span className="font-medium text-slate-500">
+                                                    {searchCustomer || searchPo || dateFilter === 'URGENT'
+                                                        ? '검색 조건에 맞는 미결 품목이 없습니다.'
+                                                        : '발주 대기 중인(미결) 품목이 없습니다.'}
+                                                </span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    pendingItems.map((item) => {
+                                        const urgent = isUrgent(item.deliveryDate);
+                                        const uniqueId = `${item.orderId}-${item.itemId}`;
+                                        const isCommenting = activeCommentItemId === uniqueId;
+
+                                        return (
+                                            <tr key={uniqueId} className="hover:bg-slate-50 transition-colors group align-top">
+                                                {/* Customer Name */}
+                                                <td className="px-5 py-4">
+                                                    <div className="font-bold text-slate-800">
+                                                        {item.targetCustomerName}
+                                                    </div>
+                                                    {item.customerName !== item.targetCustomerName && (
+                                                        <div className="text-[10px] text-slate-400 mt-1">
+                                                            원주문: {item.customerName}
+                                                        </div>
+                                                    )}
+                                                </td>
+
+                                                {/* PO Number & Date */}
+                                                <td className="px-5 py-4">
+                                                    <div className="flex flex-col gap-1.5 align-top">
+                                                        <span className="font-mono font-bold text-indigo-700 text-xs bg-indigo-50 px-2 py-1 rounded w-fit border border-indigo-100 shadow-sm">
+                                                            {item.poNumber.includes('-') ? item.poNumber.split('-')[1] : item.poNumber}
+                                                        </span>
+                                                        <span className={`text-xs flex items-center gap-1 font-medium ${urgent ? 'text-red-500' : 'text-slate-500'}`}>
+                                                            <Calendar className="w-3.5 h-3.5" />
+                                                            {new Date(item.deliveryDate).toLocaleDateString()}
+                                                            {urgent && <span className="ml-1 px-1 bg-red-100 text-red-600 rounded text-[10px] font-bold">임박</span>}
+                                                        </span>
+                                                    </div>
+                                                </td>
+
+                                                {/* Combined Item Spec */}
+                                                <td className="px-5 py-4">
+                                                    <div className="flex flex-col gap-1.5">
+                                                        <div className="font-bold text-slate-900 text-base">{item.itemName}</div>
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            {item.thickness && <span className="text-xs font-mono font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-100 shadow-sm">{item.thickness}</span>}
+                                                            {item.size && <span className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded shadow-sm">{item.size}</span>}
+                                                            {item.material && <span className="text-xs font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 shadow-sm">{item.material}</span>}
+                                                        </div>
+                                                    </div>
+                                                </td>
+
+                                                {/* Quantity */}
+                                                <td className="px-5 py-4 text-right font-bold text-slate-900 font-mono text-lg">
+                                                    {item.quantity.toLocaleString()}
+                                                </td>
+
+                                                {/* Comments System */}
+                                                <td className="px-5 py-4">
+                                                    <div className="flex flex-col gap-2">
+                                                        {item.comments && item.comments.length > 0 && (
+                                                            <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
+                                                                {item.comments.map((comment, idx) => (
+                                                                    <div key={idx} className="bg-slate-50 rounded-lg p-2 border border-slate-100 text-xs shadow-sm">
+                                                                        <div className="flex justify-between items-center mb-1">
+                                                                            <span className="font-bold text-slate-700">{comment.author}</span>
+                                                                            <span className="text-[9px] text-slate-400">{new Date(comment.timestamp).toLocaleDateString()} {new Date(comment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                        </div>
+                                                                        <p className="text-slate-600 leading-snug break-words whitespace-pre-wrap">{comment.content}</p>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {!isCommenting ? (
+                                                            <button
+                                                                onClick={() => setActiveCommentItemId(uniqueId)}
+                                                                className="flex items-center justify-center gap-1.5 w-full py-1.5 mt-1 border border-dashed border-slate-300 rounded text-xs font-medium text-slate-500 hover:text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                                                            >
+                                                                <MessageSquare className="w-3.5 h-3.5" />
+                                                                {item.comments && item.comments.length > 0 ? '코멘트 추가' : '첫 코멘트 남기기'}
+                                                            </button>
+                                                        ) : (
+                                                            <div className="flex flex-col gap-2 mt-1 bg-white p-2 rounded border border-teal-200 shadow-md">
+                                                                <textarea
+                                                                    autoFocus
+                                                                    value={newComment}
+                                                                    onChange={(e) => setNewComment(e.target.value)}
+                                                                    placeholder="담당자 의견, 배차 정보 등..."
+                                                                    className="w-full text-xs p-2 border border-slate-200 rounded outline-none focus:border-teal-400 resize-none h-[60px]"
+                                                                />
+                                                                <div className="flex justify-end gap-1">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setActiveCommentItemId(null);
+                                                                            setNewComment('');
+                                                                        }}
+                                                                        className="p-1 text-slate-400 hover:bg-slate-100 rounded"
+                                                                        title="Cancel"
+                                                                        aria-label="Cancel commenting"
+                                                                    >
+                                                                        <X className="w-4 h-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleAddComment(item.orderId, item.itemId)}
+                                                                        disabled={!newComment.trim()}
+                                                                        className="flex items-center gap-1 px-3 py-1 bg-teal-600 disabled:bg-slate-300 text-white rounded text-xs font-bold hover:bg-teal-700 transition-colors"
+                                                                    >
+                                                                        <Send className="w-3 h-3" />
+                                                                        등록
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </PageTransition>
+        </CalmPageShell>
+    );
+}
+

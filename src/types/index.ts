@@ -54,6 +54,8 @@ export interface LineItem {
     supplierPriceOverride?: number; // Added for manual vendor price override
     poSent?: boolean; // Track if this line item has been ordered
     vendorName?: string; // Track which vendor it was sent to
+    transactionIssued?: boolean; // [NEW] True if transaction statement has been issued
+    comments?: { author: string; timestamp: string; content: string; authorId?: string }[]; // [NEW] Chat/Comments per item
 
     // Legacy Fields (Snake Case)
     item_name?: string;

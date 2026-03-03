@@ -1,0 +1,6 @@
+
+F:\altf-kr-web-skeleton\src\pages\admin\components\AdminOrderDetail.tsx
+  810:5  error  Parsing error: Identifier expected
+
+✖ 1 problem (1 error, 0 warnings)
+
