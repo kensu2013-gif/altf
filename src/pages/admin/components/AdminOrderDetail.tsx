@@ -1465,6 +1465,31 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                 < tbody className={`divide-y ${isSupplierMode ? 'divide-indigo-100' : 'divide-slate-100'}`}>
                                     {
                                         displayedItems.map((item, idx) => {
+                                            const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+                                                if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                                                    e.preventDefault();
+                                                    const currentInput = e.currentTarget;
+                                                    const currentTr = currentInput.closest('tr');
+                                                    if (!currentTr) return;
+
+                                                    const inputs = Array.from(currentTr.querySelectorAll('input:not([type="checkbox"])'));
+                                                    const colIndex = inputs.indexOf(currentInput);
+                                                    if (colIndex === -1) return;
+
+                                                    const targetTr = e.key === 'ArrowUp'
+                                                        ? currentTr.previousElementSibling
+                                                        : currentTr.nextElementSibling;
+
+                                                    if (targetTr) {
+                                                        const targetInputs = Array.from(targetTr.querySelectorAll('input:not([type="checkbox"])'));
+                                                        const targetInput = targetInputs[colIndex] as HTMLInputElement;
+                                                        if (targetInput) {
+                                                            targetInput.focus();
+                                                            targetInput.select();
+                                                        }
+                                                    }
+                                                }
+                                            };
                                             // 1. Try to find live product
                                             let product = getProductStock(item);
 
@@ -1539,6 +1564,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 title="Item Name"
                                                                 placeholder="품목명"
                                                                 onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
+                                                                onKeyDown={handleKeyDown}
                                                                 className="w-[4.5rem] px-2 py-1.5 rounded border border-slate-200 focus:border-teal-500 outline-none text-xs font-bold text-slate-800"
                                                             />
                                                             <span className="text-slate-300 select-none" > -</span>
@@ -1547,6 +1573,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 value={item.thickness}
                                                                 title="Thickness"
                                                                 onChange={(e) => handleItemChange(idx, 'thickness', e.target.value)}
+                                                                onKeyDown={handleKeyDown}
                                                                 className="w-14 px-1 py-1.5 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
                                                                 placeholder="T"
                                                             />
@@ -1556,6 +1583,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 value={item.size}
                                                                 title="Size"
                                                                 onChange={(e) => handleItemChange(idx, 'size', e.target.value)}
+                                                                onKeyDown={handleKeyDown}
                                                                 className="w-[6.5rem] px-1 py-1.5 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
                                                                 placeholder="Size"
                                                             />
@@ -1565,6 +1593,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 value={item.material}
                                                                 title="Material"
                                                                 onChange={(e) => handleItemChange(idx, 'material', e.target.value)}
+                                                                onKeyDown={handleKeyDown}
                                                                 className="w-20 px-1 py-1.5 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
                                                                 placeholder="Mat"
                                                             />
@@ -1576,6 +1605,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                             title="Supplier Item Quantity"
                                                             value={item.quantity}
                                                             onChange={(e) => handleItemChange(idx, 'quantity', Number(e.target.value))}
+                                                            onKeyDown={handleKeyDown}
                                                             className="w-12 text-center px-1 py-1 rounded border border-indigo-200 outline-none focus:border-indigo-500 font-mono font-bold text-slate-800 text-xs"
                                                         />
                                                     </td>
@@ -1601,6 +1631,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                             title="Supplier Rate"
                                                                             className="w-full text-center px-1 py-1.5 rounded border border-indigo-200 text-sm outline-none focus:border-indigo-500 font-bold text-indigo-600 bg-indigo-50/50"
                                                                             onChange={(e) => handleSupplierRateChange(idx, Number(e.target.value))}
+                                                                            onKeyDown={handleKeyDown}
                                                                         />
                                                                         < span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-indigo-300" >% </span>
                                                                     </div>
@@ -1614,6 +1645,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                         value={supplierPrice}
                                                                         className="w-full text-right bg-transparent outline-none focus:border-b focus:border-indigo-400 font-mono font-extrabold text-indigo-700"
                                                                         onChange={(e) => handleSupplierPriceChange(idx, Number(e.target.value))}
+                                                                        onKeyDown={handleKeyDown}
                                                                     />
                                                                 </td>
                                                                 < td className="px-4 py-3 text-right align-middle font-mono font-extrabold text-slate-900 text-sm" >
@@ -1670,6 +1702,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                             title="Discount Percentage"
                                                                             className="w-full text-center px-1 py-1.5 rounded border border-slate-200 text-sm outline-none focus:border-teal-500 font-bold text-red-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                             onChange={(e) => handleDiscountChange(idx, Number(e.target.value))}
+                                                                            onKeyDown={handleKeyDown}
                                                                         />
                                                                         < span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400" >% </span>
                                                                     </div>
@@ -1684,6 +1717,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                             const val = Number(e.target.value.replace(/[^0-9]/g, ''));
                                                                             handlePriceChange(idx, val);
                                                                         }}
+                                                                        onKeyDown={handleKeyDown}
                                                                         className={`w-28 text-right px-2 py-1.5 rounded border outline-none font-mono text-sm font-extrabold text-slate-900 ${isPriceModified
                                                                             ? 'border-teal-500 bg-teal-50 text-teal-700'
                                                                             : 'border-slate-200 focus:border-teal-500'
