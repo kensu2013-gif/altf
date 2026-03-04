@@ -1,6 +1,6 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, Fragment } from 'react';
 import { useStore } from '../../store/useStore';
-import { FileText, PackageX, Calendar, Search, Filter, MessageSquare, Send, X, Trash2 } from 'lucide-react';
+import { FileText, PackageX, Calendar, Search, Filter, MessageSquare, Send, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { CalmPageShell } from '../../components/ui/CalmPageShell';
 import { PageTransition } from '../../components/ui/PageTransition';
 
@@ -22,6 +22,16 @@ interface PendingItem {
     comments?: { author: string; timestamp: string; content: string; authorId?: string }[];
 }
 
+interface PendingOrderGroup {
+    orderId: string;
+    poNumber: string;
+    poDate: string;
+    deliveryDate: string;
+    customerName: string;
+    targetCustomerName: string;
+    items: PendingItem[];
+}
+
 export default function PendingOrders() {
     const { orders, setOrders, updateOrder } = useStore((state) => state);
     const user = useStore((state) => state.auth.user);
@@ -34,6 +44,18 @@ export default function PendingOrders() {
     // Comment State
     const [activeCommentItemId, setActiveCommentItemId] = useState<string | null>(null);
     const [newComment, setNewComment] = useState('');
+
+    // Expand State
+    const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+
+    const toggleExpand = (orderId: string) => {
+        setExpandedOrders(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(orderId)) newSet.delete(orderId);
+            else newSet.add(orderId);
+            return newSet;
+        });
+    };
 
     // Sync Orders on Mount
     useEffect(() => {
@@ -65,7 +87,7 @@ export default function PendingOrders() {
     }, [setOrders, user]);
 
     // Flatten and Filter Items
-    const pendingItems: PendingItem[] = useMemo(() => {
+    const pendingOrderGroups: PendingOrderGroup[] = useMemo(() => {
         const itemsList: PendingItem[] = [];
 
         orders.forEach(order => {
@@ -122,8 +144,24 @@ export default function PendingOrders() {
             return matchCust && matchPo && matchDate;
         });
 
+        const groupedMap = new Map<string, PendingOrderGroup>();
+        filtered.forEach(item => {
+            if (!groupedMap.has(item.orderId)) {
+                groupedMap.set(item.orderId, {
+                    orderId: item.orderId,
+                    poNumber: item.poNumber,
+                    poDate: item.poDate,
+                    deliveryDate: item.deliveryDate,
+                    customerName: item.customerName,
+                    targetCustomerName: item.targetCustomerName,
+                    items: []
+                });
+            }
+            groupedMap.get(item.orderId)!.items.push(item);
+        });
+
         // Sort by 납기 임박순 (Delivery Date ascending)
-        return filtered.sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
+        return Array.from(groupedMap.values()).sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
     }, [orders, searchCustomer, searchPo, dateFilter]);
 
     // Handlers
@@ -249,7 +287,7 @@ export default function PendingOrders() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {pendingItems.length === 0 ? (
+                                {pendingOrderGroups.length === 0 ? (
                                     <tr>
                                         <td colSpan={5} className="px-6 py-16 text-center text-slate-400">
                                             <div className="flex flex-col items-center gap-3">
@@ -265,127 +303,152 @@ export default function PendingOrders() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    pendingItems.map((item) => {
-                                        const urgent = isUrgent(item.deliveryDate);
-                                        const uniqueId = `${item.orderId}-${item.itemId}`;
-                                        const isCommenting = activeCommentItemId === uniqueId;
+                                    pendingOrderGroups.map((group) => {
+                                        const urgent = isUrgent(group.deliveryDate);
+                                        const isExpanded = expandedOrders.has(group.orderId);
+                                        const displayItems = isExpanded ? group.items : [group.items[0]];
 
                                         return (
-                                            <tr key={uniqueId} className="hover:bg-slate-50 transition-colors group align-top">
-                                                {/* Customer Name */}
-                                                <td className="px-5 py-4">
-                                                    <div className="font-bold text-slate-800">
-                                                        {item.targetCustomerName}
-                                                    </div>
-                                                    {item.customerName !== item.targetCustomerName && (
-                                                        <div className="text-[10px] text-slate-400 mt-1">
-                                                            원주문: {item.customerName}
-                                                        </div>
-                                                    )}
-                                                </td>
+                                            <Fragment key={group.orderId}>
+                                                {displayItems.map((item, index) => {
+                                                    const uniqueId = `${item.orderId}-${item.itemId}`;
+                                                    const isCommenting = activeCommentItemId === uniqueId;
+                                                    const isFirstRow = index === 0;
 
-                                                {/* PO Number & Date */}
-                                                <td className="px-5 py-4">
-                                                    <div className="flex flex-col gap-1.5 align-top">
-                                                        <span className="font-mono font-bold text-indigo-700 text-xs bg-indigo-50 px-2 py-1 rounded w-fit border border-indigo-100 shadow-sm">
-                                                            {item.poNumber.includes('-') ? item.poNumber.split('-')[1] : item.poNumber}
-                                                        </span>
-                                                        <span className={`text-xs flex items-center gap-1 font-medium ${urgent ? 'text-red-500' : 'text-slate-500'}`}>
-                                                            <Calendar className="w-3.5 h-3.5" />
-                                                            {new Date(item.deliveryDate).toLocaleDateString()}
-                                                            {urgent && <span className="ml-1 px-1 bg-red-100 text-red-600 rounded text-[10px] font-bold">임박</span>}
-                                                        </span>
-                                                    </div>
-                                                </td>
+                                                    return (
+                                                        <tr key={uniqueId} className={`hover:bg-slate-50 transition-colors group align-top ${!isFirstRow ? 'bg-slate-50/30' : ''}`}>
+                                                            {/* Customer Name */}
+                                                            {isFirstRow && (
+                                                                <td className={`px-5 py-4 ${displayItems.length > 1 ? 'border-b border-slate-100' : ''}`} rowSpan={displayItems.length}>
+                                                                    <div className="font-bold text-slate-800">
+                                                                        {group.targetCustomerName}
+                                                                    </div>
+                                                                    {group.customerName !== group.targetCustomerName && (
+                                                                        <div className="text-[10px] text-slate-400 mt-1">
+                                                                            원주문: {group.customerName}
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+                                                            )}
 
-                                                {/* Combined Item Spec */}
-                                                <td className="px-5 py-4">
-                                                    <div className="flex flex-col gap-1.5">
-                                                        <div className="font-bold text-slate-900 text-base">{item.itemName}</div>
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            {item.thickness && <span className="text-xs font-mono font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-100 shadow-sm">{item.thickness}</span>}
-                                                            {item.size && <span className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded shadow-sm">{item.size}</span>}
-                                                            {item.material && <span className="text-xs font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 shadow-sm">{item.material}</span>}
-                                                        </div>
-                                                    </div>
-                                                </td>
+                                                            {/* PO Number & Date */}
+                                                            {isFirstRow && (
+                                                                <td className={`px-5 py-4 ${displayItems.length > 1 ? 'border-b border-slate-100' : ''}`} rowSpan={displayItems.length}>
+                                                                    <div className="flex flex-col gap-1.5 align-top">
+                                                                        <span className="font-mono font-bold text-indigo-700 text-xs bg-indigo-50 px-2 py-1 rounded w-fit border border-indigo-100 shadow-sm">
+                                                                            {group.poNumber.includes('-') ? group.poNumber.split('-')[1] : group.poNumber}
+                                                                        </span>
+                                                                        <span className={`text-xs flex items-center gap-1 font-medium ${urgent ? 'text-red-500' : 'text-slate-500'}`}>
+                                                                            <Calendar className="w-3.5 h-3.5" />
+                                                                            {new Date(group.deliveryDate).toLocaleDateString()}
+                                                                            {urgent && <span className="ml-1 px-1 bg-red-100 text-red-600 rounded text-[10px] font-bold">임박</span>}
+                                                                        </span>
+                                                                        {group.items.length > 1 && (
+                                                                            <button
+                                                                                onClick={() => toggleExpand(group.orderId)}
+                                                                                className="mt-2 text-[11px] font-bold text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 py-1.5 px-3 rounded w-fit transition-colors border border-teal-100 flex items-center gap-1 shadow-sm break-keep"
+                                                                            >
+                                                                                {isExpanded ? <><ChevronUp className="w-3.5 h-3.5" /> 닫기</> : <><ChevronDown className="w-3.5 h-3.5" /> 외 {group.items.length - 1}건 보기</>}
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            )}
 
-                                                {/* Quantity */}
-                                                <td className="px-5 py-4 text-right font-bold text-slate-900 font-mono text-lg">
-                                                    {item.quantity.toLocaleString()}
-                                                </td>
+                                                            {/* Combined Item Spec */}
+                                                            <td className={`px-5 py-4 ${!isFirstRow ? 'border-t border-slate-100/50 pl-8 relative' : ''}`}>
+                                                                <div className="flex flex-col gap-1.5">
+                                                                    <div className="font-bold text-slate-900 text-base flex items-center gap-2">
+                                                                        {!isFirstRow && <span className="text-slate-400 font-normal absolute left-3 top-4">└</span>}
+                                                                        {item.itemName}
+                                                                    </div>
+                                                                    <div className="flex flex-wrap items-center gap-2 pl-4">
+                                                                        {item.thickness && <span className="text-xs font-mono font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-100 shadow-sm">{item.thickness}</span>}
+                                                                        {item.size && <span className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded shadow-sm">{item.size}</span>}
+                                                                        {item.material && <span className="text-xs font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 shadow-sm">{item.material}</span>}
+                                                                    </div>
+                                                                </div>
+                                                            </td>
 
-                                                {/* Comments System */}
-                                                <td className="px-5 py-4">
-                                                    <div className="flex flex-col gap-2">
-                                                        {item.comments && item.comments.length > 0 && (
-                                                            <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
-                                                                {item.comments.map((comment, idx) => (
-                                                                    <div key={idx} className="bg-slate-50 rounded-lg p-2 border border-slate-100 text-xs shadow-sm">
-                                                                        <div className="flex justify-between items-center mb-1">
-                                                                            <span className="font-bold text-slate-700">{comment.author}</span>
-                                                                            <div className="flex items-center gap-2">
-                                                                                <span className="text-[9px] text-slate-400">{new Date(comment.timestamp).toLocaleDateString()} {new Date(comment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                                                {user?.role === 'MASTER' && (
-                                                                                    <button
-                                                                                        onClick={() => handleDeleteComment(item.orderId, item.itemId, idx)}
-                                                                                        className="text-slate-300 hover:text-red-500 transition-colors p-0.5 rounded"
-                                                                                        title="코멘트 삭제 (MASTER 권한)"
-                                                                                    >
-                                                                                        <Trash2 className="w-3 h-3" />
-                                                                                    </button>
-                                                                                )}
+                                                            {/* Quantity */}
+                                                            <td className={`px-5 py-4 text-right font-bold text-slate-900 font-mono text-lg ${!isFirstRow ? 'border-t border-slate-100/50' : ''}`}>
+                                                                {item.quantity.toLocaleString()}
+                                                            </td>
+
+                                                            {/* Comments System */}
+                                                            <td className={`px-5 py-4 ${!isFirstRow ? 'border-t border-slate-100/50' : ''}`}>
+                                                                <div className="flex flex-col gap-2">
+                                                                    {item.comments && item.comments.length > 0 && (
+                                                                        <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
+                                                                            {item.comments.map((comment, idx) => (
+                                                                                <div key={idx} className="bg-slate-50 rounded-lg p-2 border border-slate-100 text-xs shadow-sm">
+                                                                                    <div className="flex justify-between items-center mb-1">
+                                                                                        <span className="font-bold text-slate-700">{comment.author}</span>
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <span className="text-[9px] text-slate-400">{new Date(comment.timestamp).toLocaleDateString()} {new Date(comment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                                            {user?.role === 'MASTER' && (
+                                                                                                <button
+                                                                                                    onClick={() => handleDeleteComment(item.orderId, item.itemId, idx)}
+                                                                                                    className="text-slate-300 hover:text-red-500 transition-colors p-0.5 rounded"
+                                                                                                    title="코멘트 삭제 (MASTER 권한)"
+                                                                                                >
+                                                                                                    <Trash2 className="w-3 h-3" />
+                                                                                                </button>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <p className="text-slate-600 leading-snug break-words whitespace-pre-wrap">{comment.content}</p>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+
+                                                                    {!isCommenting ? (
+                                                                        <button
+                                                                            onClick={() => setActiveCommentItemId(uniqueId)}
+                                                                            className="flex items-center justify-center gap-1.5 w-full py-1.5 mt-1 border border-dashed border-slate-300 rounded text-xs font-medium text-slate-500 hover:text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                                                                        >
+                                                                            <MessageSquare className="w-3.5 h-3.5" />
+                                                                            {item.comments && item.comments.length > 0 ? '코멘트 추가' : '첫 코멘트 남기기'}
+                                                                        </button>
+                                                                    ) : (
+                                                                        <div className="flex flex-col gap-2 mt-1 bg-white p-2 rounded border border-teal-200 shadow-md">
+                                                                            <textarea
+                                                                                autoFocus
+                                                                                value={newComment}
+                                                                                onChange={(e) => setNewComment(e.target.value)}
+                                                                                placeholder="담당자 의견, 배차 정보 등..."
+                                                                                className="w-full text-xs p-2 border border-slate-200 rounded outline-none focus:border-teal-400 resize-none h-[60px]"
+                                                                            />
+                                                                            <div className="flex justify-end gap-1">
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        setActiveCommentItemId(null);
+                                                                                        setNewComment('');
+                                                                                    }}
+                                                                                    className="p-1 text-slate-400 hover:bg-slate-100 rounded"
+                                                                                    title="Cancel"
+                                                                                    aria-label="Cancel commenting"
+                                                                                >
+                                                                                    <X className="w-4 h-4" />
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => handleAddComment(item.orderId, item.itemId)}
+                                                                                    disabled={!newComment.trim()}
+                                                                                    className="flex items-center gap-1 px-3 py-1 bg-teal-600 disabled:bg-slate-300 text-white rounded text-xs font-bold hover:bg-teal-700 transition-colors"
+                                                                                >
+                                                                                    <Send className="w-3 h-3" />
+                                                                                    등록
+                                                                                </button>
                                                                             </div>
                                                                         </div>
-                                                                        <p className="text-slate-600 leading-snug break-words whitespace-pre-wrap">{comment.content}</p>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-
-                                                        {!isCommenting ? (
-                                                            <button
-                                                                onClick={() => setActiveCommentItemId(uniqueId)}
-                                                                className="flex items-center justify-center gap-1.5 w-full py-1.5 mt-1 border border-dashed border-slate-300 rounded text-xs font-medium text-slate-500 hover:text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
-                                                            >
-                                                                <MessageSquare className="w-3.5 h-3.5" />
-                                                                {item.comments && item.comments.length > 0 ? '코멘트 추가' : '첫 코멘트 남기기'}
-                                                            </button>
-                                                        ) : (
-                                                            <div className="flex flex-col gap-2 mt-1 bg-white p-2 rounded border border-teal-200 shadow-md">
-                                                                <textarea
-                                                                    autoFocus
-                                                                    value={newComment}
-                                                                    onChange={(e) => setNewComment(e.target.value)}
-                                                                    placeholder="담당자 의견, 배차 정보 등..."
-                                                                    className="w-full text-xs p-2 border border-slate-200 rounded outline-none focus:border-teal-400 resize-none h-[60px]"
-                                                                />
-                                                                <div className="flex justify-end gap-1">
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setActiveCommentItemId(null);
-                                                                            setNewComment('');
-                                                                        }}
-                                                                        className="p-1 text-slate-400 hover:bg-slate-100 rounded"
-                                                                        title="Cancel"
-                                                                        aria-label="Cancel commenting"
-                                                                    >
-                                                                        <X className="w-4 h-4" />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleAddComment(item.orderId, item.itemId)}
-                                                                        disabled={!newComment.trim()}
-                                                                        className="flex items-center gap-1 px-3 py-1 bg-teal-600 disabled:bg-slate-300 text-white rounded text-xs font-bold hover:bg-teal-700 transition-colors"
-                                                                    >
-                                                                        <Send className="w-3 h-3" />
-                                                                        등록
-                                                                    </button>
+                                                                    )}
                                                                 </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </Fragment>
                                         );
                                     })
                                 )}

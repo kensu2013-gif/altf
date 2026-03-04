@@ -66,6 +66,28 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         return order.items ? [...order.items] : [];
     });
 
+    // [MOD] Ensure poItems stays synced with base properties from items (sales price, quantity, etc.)
+    useEffect(() => {
+        setPoItems(prev => prev.map((poItem, idx) => {
+            const cItem = items[idx];
+            if (!cItem) return poItem;
+            // Sync core fields so manual inputs in Customer Mode flow into Supplier Mode
+            if (poItem.unitPrice !== cItem.unitPrice || poItem.quantity !== cItem.quantity || poItem.amount !== cItem.amount || poItem.name !== cItem.name || poItem.thickness !== cItem.thickness || poItem.size !== cItem.size || poItem.material !== cItem.material) {
+                return {
+                    ...poItem,
+                    name: cItem.name,
+                    thickness: cItem.thickness,
+                    size: cItem.size,
+                    material: cItem.material,
+                    quantity: cItem.quantity,
+                    unitPrice: cItem.unitPrice,
+                    amount: cItem.amount,
+                };
+            }
+            return poItem;
+        }));
+    }, [items]);
+
     // Helper: Enrich item with live inventory data (using optimized Index)
     const enrichItem = useCallback((item: LineItem): LineItem => {
         const product = findProduct(item);
@@ -265,9 +287,15 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     // Supplier Totals Calculation
     const { totalSupplierAmount, totalProfit } = selectedItems.reduce((acc, item) => {
         const product = inventory.find(p => p.id === item.productId);
-        const basePrice = product?.base_price ?? product?.unitPrice ?? 0;
+        const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? 0;
         const rate = item.supplierRate ?? 0;
-        const supplierPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+
+        // [FIX] Use supplierPriceOverride if manually entered by the manager
+        let supplierPrice = item.supplierPriceOverride;
+        if (supplierPrice === undefined) {
+            supplierPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+        }
+
         const supplierAmount = supplierPrice * item.quantity;
         const profit = (item.unitPrice - supplierPrice) * item.quantity;
 
@@ -328,9 +356,13 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             },    // Buyer (ALTF)
             items: selectedItems.map((item, idx) => {
                 const product = inventory.find(i => i.id === item.productId);
-                const basePrice = product?.base_price ?? product?.unitPrice ?? 0;
+                const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? 0;
                 const supplierRate = item.supplierRate ?? 0;
-                const supplierPrice = Math.round((basePrice * (100 - supplierRate) / 100) / 10) * 10;
+
+                let supplierPrice = item.supplierPriceOverride;
+                if (supplierPrice === undefined) {
+                    supplierPrice = Math.round((basePrice * (100 - supplierRate) / 100) / 10) * 10;
+                }
 
                 return {
                     no: idx + 1,
@@ -1063,9 +1095,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                         < input
                                                             type="date"
                                                             title="납기지정 (Delivery Date)"
+                                                            value={response.deliveryDate || ''}
                                                             className="w-full px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500"
                                                             onChange={(e) => {
                                                                 const val = e.target.value;
+                                                                setResponse(prev => ({ ...prev, deliveryDate: val }));
                                                                 setSupplierInfo(prev => ({
                                                                     ...prev,
                                                                     note: prev.note.replace(/\n?\[납기지정\]: .*/, '') + (val ? `\n[납기지정]: ${val}` : '')

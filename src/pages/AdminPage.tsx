@@ -148,48 +148,76 @@ export default function AdminPage() {
             return;
         }
 
-        const headers = ['주문번호', '주문일시', '고객사', '주문항목', '담당자', '매출금액', '매입금액(원가)', '이익금', '상태'];
+        const headers = ['발주번호', '주문일시', '고객사', '품목명', '규격', '수량', '판매단가', '판매금액', '매입단가', '매입금액', '이익금', '상태', '담당자'];
         const csvRows = [headers.join(',')];
 
         filteredOrders.forEach(order => {
             const dateStr = new Date(order.createdAt).toLocaleString('ko-KR');
-            const itemName = order.items.length > 0
-                ? (order.items[0].name + (order.items.length > 1 ? ` 외 ${order.items.length - 1}건` : ''))
-                : '항목없음';
             const managerName = order.lastUpdatedBy?.name || '미배정';
+            const statusStr = order.status;
 
-            // Re-calculate Cost (logic matching the table display)
             const targetItems = (order.po_items && order.po_items.length > 0) ? order.po_items : order.items;
-            const cost = targetItems.reduce((acc, item) => {
+
+            if (targetItems.length === 0) {
+                const row = [
+                    `"${order.id}"`,
+                    `"${dateStr}"`,
+                    `"${order.customerName}"`,
+                    `""`,
+                    `""`,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    `"${statusStr}"`,
+                    `"${managerName}"`
+                ];
+                csvRows.push(row.join(','));
+                return;
+            }
+
+            targetItems.forEach(item => {
                 const product = findProduct(item);
                 const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
-                let itemCost = 0;
-                if (item.supplierRate !== undefined) {
-                    itemCost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
+
+                // Buying Cost
+                let unitCost = 0;
+                if (item.supplierPriceOverride !== undefined) {
+                    unitCost = item.supplierPriceOverride;
+                } else if (item.supplierRate !== undefined) {
+                    unitCost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
                 } else {
                     const rate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
-                    itemCost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+                    unitCost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
                 }
-                return acc + (itemCost * item.quantity);
-            }, 0);
+                const totalCost = unitCost * item.quantity;
 
-            const sales = order.totalAmount || 0;
-            const profit = sales - cost;
+                // Sales
+                const unitSalesPrice = item.unitPrice;
+                const totalSalesPrice = item.amount;
 
-            // Escape commas and quotes for CSV cells
-            const row = [
-                `"${order.id}"`,
-                `"${dateStr}"`,
-                `"${order.customerName}"`,
-                `"${itemName}"`,
-                `"${managerName}"`,
-                sales,
-                cost,
-                profit,
-                `"${order.status}"`
-            ];
+                const profit = totalSalesPrice - totalCost;
 
-            csvRows.push(row.join(','));
+                const row = [
+                    `"${order.id}"`,
+                    `"${dateStr}"`,
+                    `"${order.customerName}"`,
+                    `"${item.name || ''}"`,
+                    `"${(item as { options?: string[] }).options?.join(' ') || ''}"`,
+                    item.quantity,
+                    unitSalesPrice,
+                    totalSalesPrice,
+                    unitCost,
+                    totalCost,
+                    profit,
+                    `"${statusStr}"`,
+                    `"${managerName}"`
+                ];
+
+                csvRows.push(row.join(','));
+            });
         });
 
         const csvString = csvRows.join('\n');
@@ -198,7 +226,7 @@ export default function AdminPage() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `주문내역통계_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.setAttribute('download', `주문품목내역_${new Date().toISOString().slice(0, 10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -251,7 +279,7 @@ export default function AdminPage() {
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             </div>
 
-                            {user?.role === 'MASTER' && (
+                            {(user?.role?.toUpperCase() === 'MASTER' || user?.role?.toLowerCase() === 'admin' || user?.role?.toUpperCase() === 'MANAGER') && (
                                 <button
                                     onClick={handleExportCSV}
                                     className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors whitespace-nowrap"
@@ -302,18 +330,17 @@ export default function AdminPage() {
                                                 // But usually `base_price` is reliable if matched.
 
                                                 let cost = 0;
+                                                // [FIX] Include item.base_price for unlinked items
                                                 const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
 
-                                                // If we have logic for supplier rate in PO items:
-                                                if (item.supplierRate !== undefined) {
+                                                // [FIX] Check for manual overrides first
+                                                if (item.supplierPriceOverride !== undefined) {
+                                                    cost = item.supplierPriceOverride;
+                                                } else if (item.supplierRate !== undefined) {
                                                     // Cost = Base - (Base * Rate)
                                                     cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
                                                 } else {
-                                                    // Fallback: Use base price (assuming 0 margin or standard margin?)
-                                                    // Actually, if simply estimating cost, base_price is the cost? 
-                                                    // Wait, in AdminOrderDetail: "Supplier Price" is the buying cost.
-                                                    // supplierPrice = basePrice * (100 - rate) / 100.
-                                                    // If no rate is set, default rate is used.
+                                                    // Fallback: Use base price and default rate
                                                     const rate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
                                                     cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
                                                 }
