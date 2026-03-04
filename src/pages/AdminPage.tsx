@@ -158,11 +158,13 @@ export default function AdminPage() {
 
             const targetItems = (order.po_items && order.po_items.length > 0) ? order.po_items : order.items;
 
+            const displayCustomer = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName;
+
             if (targetItems.length === 0) {
                 const row = [
                     `"${order.id}"`,
                     `"${dateStr}"`,
-                    `"${order.customerName}"`,
+                    `"${displayCustomer}"`,
                     `""`,
                     `""`,
                     0,
@@ -200,12 +202,14 @@ export default function AdminPage() {
 
                 const profit = totalSalesPrice - totalCost;
 
+                const spec = `${item.thickness || ''} ${item.size || ''} ${item.material || ''}`.trim() || `${(item as { options?: string[] }).options?.join(' ') || ''}`;
+
                 const row = [
                     `"${order.id}"`,
                     `"${dateStr}"`,
-                    `"${order.customerName}"`,
+                    `"${displayCustomer}"`,
                     `"${item.name || ''}"`,
-                    `"${(item as { options?: string[] }).options?.join(' ') || ''}"`,
+                    `"${spec}"`,
                     item.quantity,
                     unitSalesPrice,
                     totalSalesPrice,
