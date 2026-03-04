@@ -63,6 +63,32 @@ export const QuoteItemRow = React.memo(({
     const profit = (item.unitPrice - costPrice) * item.quantity;
     const isPriceModified = product ? item.unitPrice !== product.unitPrice : false;
 
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            const currentInput = e.currentTarget;
+            const currentTr = currentInput.closest('tr');
+            if (!currentTr) return;
+
+            const inputs = Array.from(currentTr.querySelectorAll('input:not([type="checkbox"])'));
+            const colIndex = inputs.indexOf(currentInput);
+            if (colIndex === -1) return;
+
+            const targetTr = e.key === 'ArrowUp'
+                ? currentTr.previousElementSibling
+                : currentTr.nextElementSibling;
+
+            if (targetTr) {
+                const targetInputs = Array.from(targetTr.querySelectorAll('input:not([type="checkbox"])'));
+                const targetInput = targetInputs[colIndex] as HTMLInputElement;
+                if (targetInput) {
+                    targetInput.focus();
+                    targetInput.select();
+                }
+            }
+        }
+    };
+
     return (
         <tr className={`${isSelected ? '' : 'opacity-40 grayscale'} ${isUnlinked ? 'bg-red-50/30' : 'bg-white hover:bg-slate-50'} transition-all`}>
             <td className="px-2 py-3 text-center align-middle">
@@ -85,6 +111,7 @@ export const QuoteItemRow = React.memo(({
                         title="Item Name"
                         placeholder="품목명"
                         onChange={(e) => onItemChange(index, 'name', e.target.value)}
+                        onKeyDown={handleKeyDown}
                         className="w-20 px-2 py-1.5 rounded border border-slate-200 focus:border-teal-500 outline-none text-xs font-bold text-slate-800"
                     />
                     <span className="text-slate-300 select-none">-</span>
@@ -93,6 +120,7 @@ export const QuoteItemRow = React.memo(({
                         value={item.thickness}
                         title="Thickness"
                         onChange={(e) => onItemChange(index, 'thickness', e.target.value)}
+                        onKeyDown={handleKeyDown}
                         className="w-20 px-1 py-1.5 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
                         placeholder="T"
                     />
@@ -102,6 +130,7 @@ export const QuoteItemRow = React.memo(({
                         value={item.size}
                         title="Size"
                         onChange={(e) => onItemChange(index, 'size', e.target.value)}
+                        onKeyDown={handleKeyDown}
                         className="w-28 px-1 py-1.5 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
                         placeholder="Size"
                     />
@@ -111,6 +140,7 @@ export const QuoteItemRow = React.memo(({
                         value={item.material}
                         title="Material"
                         onChange={(e) => onItemChange(index, 'material', e.target.value)}
+                        onKeyDown={handleKeyDown}
                         className="w-36 px-1 py-1.5 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
                         placeholder="Mat"
                     />
@@ -136,6 +166,7 @@ export const QuoteItemRow = React.memo(({
                     value={item.quantity}
                     title="Quantity"
                     onChange={(e) => onItemChange(index, 'quantity', Number(e.target.value))}
+                    onKeyDown={handleKeyDown}
                     className="w-16 text-center px-2 py-1.5 rounded border border-slate-200 focus:border-teal-500 outline-none font-mono text-sm"
                 />
             </td>
@@ -153,6 +184,7 @@ export const QuoteItemRow = React.memo(({
                     placeholder="0"
                     className="w-16 text-center px-1 py-1 rounded border border-indigo-100 focus:border-indigo-500 outline-none font-mono text-xs text-indigo-700 bg-indigo-50/10"
                     onChange={(e) => onSupplierRateChange(index, Number(e.target.value))}
+                    onKeyDown={handleKeyDown}
                 />
             </td>
 
@@ -171,6 +203,7 @@ export const QuoteItemRow = React.memo(({
                         title="Rate (Discount Percentage)"
                         className="w-16 text-center px-1 py-1.5 rounded border border-slate-200 text-sm outline-none focus:border-teal-500 font-bold text-red-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         onChange={(e) => onDiscountRateChange(index, Number(e.target.value))}
+                        onKeyDown={handleKeyDown}
                     />
                 </div>
             </td>
@@ -188,6 +221,7 @@ export const QuoteItemRow = React.memo(({
                         const val = Number(e.target.value.replace(/[^0-9]/g, ''));
                         onPriceChange(index, val);
                     }}
+                    onKeyDown={handleKeyDown}
                     className={`w-24 text-right px-2 py-1.5 rounded border outline-none font-mono text-sm font-bold ${isPriceModified
                         ? 'border-teal-500 bg-teal-50 text-teal-700'
                         : 'border-slate-200 focus:border-teal-500'
