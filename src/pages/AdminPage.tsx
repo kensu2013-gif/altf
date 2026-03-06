@@ -58,6 +58,29 @@ export default function AdminPage() {
         return () => window.removeEventListener('focus', fetchOrders);
     }, [setOrders, user]);
 
+    // Auto-complete orders that meet all criteria but are still in processing
+    useEffect(() => {
+        if (!orders || orders.length === 0) return;
+
+        const ordersToComplete = orders.filter(order => {
+            if (order.status === 'COMPLETED' || order.status === 'CANCELLED' || order.status === 'WITHDRAWN') {
+                return false;
+            }
+            if (!order.poSent && !order.supplierPO) return false;
+
+            const targetItems = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
+            if (!targetItems || targetItems.length === 0) return false;
+
+            return targetItems.every(item => item.transactionIssued);
+        });
+
+        if (ordersToComplete.length > 0) {
+            ordersToComplete.forEach(order => {
+                updateOrder(order.id, { status: 'COMPLETED' });
+            });
+        }
+    }, [orders, updateOrder]);
+
     // UI State
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -297,17 +320,17 @@ export default function AdminPage() {
 
                     {/* Orders Table */}
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] custom-scrollbar pb-4 pr-2">
+                            <table className="w-full min-w-[1000px] text-sm text-left">
+                                <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                                     <tr>
-                                        <th scope="col" className="px-6 py-3 font-bold w-[5%] text-center">No.</th>
-                                        <th scope="col" className="px-6 py-3 font-bold w-[20%]">주문 품목 (Items)</th>
-                                        <th scope="col" className="px-6 py-3 font-bold w-[20%]">고객 / 주문일시 (Customer)</th>
-                                        <th scope="col" className="px-6 py-3 font-bold text-right w-[15%] whitespace-nowrap">주문금액 (Sales)</th>
-                                        <th scope="col" className="px-6 py-3 font-bold text-right w-[15%] whitespace-nowrap">매입금액 (Buying)</th>
-                                        <th scope="col" className="px-6 py-3 font-bold text-center w-[12%]">상태 (Status)</th>
-                                        <th scope="col" className="px-6 py-3 font-bold text-center w-[13%]">관리 (Manage)</th>
+                                        <th scope="col" className="px-6 py-3 font-bold w-[5%] text-center min-w-[60px]">No.</th>
+                                        <th scope="col" className="px-6 py-3 font-bold w-[20%] min-w-[150px]">주문 품목 (Items)</th>
+                                        <th scope="col" className="px-6 py-3 font-bold w-[20%] min-w-[180px]">고객 / 주문일시 (Customer)</th>
+                                        <th scope="col" className="px-6 py-3 font-bold text-right w-[15%] min-w-[120px] whitespace-nowrap">주문금액 (Sales)</th>
+                                        <th scope="col" className="px-6 py-3 font-bold text-right w-[15%] min-w-[120px] whitespace-nowrap">매입금액 (Buying)</th>
+                                        <th scope="col" className="px-6 py-3 font-bold text-center w-[12%] min-w-[120px]">상태 (Status)</th>
+                                        <th scope="col" className="px-6 py-3 font-bold text-center w-[13%] min-w-[150px]">관리 (Manage)</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -429,15 +452,19 @@ export default function AdminPage() {
                                                         <div className="flex items-center justify-center gap-2">
                                                             {/* [MOD] REMOVED PO BUTTON */}
 
+                                                            {/* Sales (매출) Button */}
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    setDetailInitialMode('CUSTOMER'); // Set to Customer Mode
+                                                                    setDetailInitialMode('CUSTOMER');
                                                                     setSelectedOrder(order);
                                                                 }}
-                                                                className="text-xs font-bold text-teal-600 border border-teal-200 rounded px-3 py-1.5 hover:bg-teal-50 transition-colors whitespace-nowrap"
+                                                                className={`text-xs font-bold border rounded px-3 py-1.5 transition-colors whitespace-nowrap ${targetItems.length > 0 && targetItems.every(item => item.transactionIssued)
+                                                                    ? 'bg-teal-600 text-white border-teal-600 hover:bg-teal-700'
+                                                                    : 'text-teal-600 border-teal-200 hover:bg-teal-50'
+                                                                    }`}
                                                             >
-                                                                매출{/* [MOD] Added whitespace-nowrap */}
+                                                                매출
                                                             </button>
 
                                                             <button

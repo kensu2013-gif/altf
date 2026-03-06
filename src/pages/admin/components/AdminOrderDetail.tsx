@@ -755,13 +755,17 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             });
 
             if (response.ok || response.type === 'opaque') {
-                alert("매입 발주서 전송이 완료되었습니다. 상태가 [배송중]으로 변경됩니다.");
+                const updatedPoItems = enrichedPoItems.map(item => ({ ...item, poSent: true, vendorName: supplierInfo.company_name }));
+                const allTxIssued = updatedPoItems.length > 0 && updatedPoItems.every(item => item.transactionIssued);
+                const newStatus = allTxIssued ? 'COMPLETED' : 'SHIPPED';
+
+                alert(`매입 발주서 전송이 완료되었습니다. 상태가 [${allTxIssued ? '완료' : '배송중'}]으로 변경됩니다.`);
 
                 await handleSave({
-                    status: 'SHIPPED',
+                    status: newStatus,
                     poSent: true,
                     supplierPO: newSupplierPO,
-                    po_items: enrichedPoItems.map(item => ({ ...item, poSent: true, vendorName: supplierInfo.company_name }))
+                    po_items: updatedPoItems
                 });
 
             } else {
@@ -2108,9 +2112,19 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                     return poItem;
                                 });
 
+                                // Check if this makes both Sales and Purchase complete
+                                const allTxIssued = updatedPoItems.length > 0 && updatedPoItems.every(item => item.transactionIssued);
+                                const isPoOverallSent = order.poSent || !!order.supplierPO || (updatedPoItems.length > 0 && updatedPoItems.every(item => item.poSent));
+
+                                const newStatus = (allTxIssued && isPoOverallSent) ? 'COMPLETED' : order.status;
+                                if (newStatus === 'COMPLETED' && order.status !== 'COMPLETED') {
+                                    alert('모든 매입 및 매출 처리가 완료되어, 주문 상태가 [완료]로 자동 변경됩니다.');
+                                }
+
                                 // Auto-save the order with the updated po_items
                                 await handleSave({
-                                    po_items: updatedPoItems
+                                    po_items: updatedPoItems,
+                                    status: newStatus !== order.status ? newStatus : undefined
                                 });
                             }
                         }}

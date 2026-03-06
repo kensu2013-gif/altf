@@ -1,19 +1,18 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { useInventory } from '../../hooks/useInventory';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-    ShoppingCart,
-    FileText,
-    Package,
-    Settings,
-    LogOut,
     Menu,
-    User
+    User,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react';
 import { useState } from 'react';
 
 export default function AdminLayout() {
     const navigate = useNavigate();
+    const location = useLocation();
     const logout = useStore((state) => state.logout);
     const user = useStore((state) => state.auth.user);
     const { orders, quotes } = useStore((state) => state);
@@ -22,35 +21,69 @@ export default function AdminLayout() {
     // [MOD] Ensure inventory is loaded/validated when accessing Admin Panel
     useInventory();
 
+    const delayedPendingCount = orders.reduce((count, order) => {
+        if (order.isDeleted || order.status === 'CANCELLED') return count;
+        if (!order.po_items) return count;
+
+        const deliveryDateStr = order.adminResponse?.deliveryDate || order.createdAt;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dDate = new Date(deliveryDateStr);
+        const diffDays = Math.ceil((dDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) {
+            const hasPendingItems = order.po_items.some(pi => pi.poSent && !pi.transactionIssued);
+            return count + (hasPendingItems ? 1 : 0);
+        }
+        return count;
+    }, 0);
+
     const handleLogout = () => {
         logout();
         navigate('/login');
     };
 
     const NAV_ITEMS = [
-        // { label: '대시보드', path: '/admin', icon: LayoutDashboard, exact: true }, // Maybe later
-        { label: '회원 관리', path: '/admin/members', icon: User },
-        { label: '담당자 관리', path: '/admin/managers', icon: User },
-        { label: '주문 관리', path: '/admin/orders', icon: ShoppingCart, badge: orders.filter(o => o.status === 'SUBMITTED' && !o.isDeleted).length },
-        { label: '미결 관리', path: '/admin/pending', icon: ShoppingCart }, // Using ShoppingCart or equivalent as ListTodo is not imported
-        { label: '견적 관리', path: '/admin/quotes', icon: FileText, badge: quotes.filter(q => q.status === 'SUBMITTED' && !q.isDeleted).length },
-        { label: '재고 관리', path: '/admin/inventory', icon: Package },
-        { label: '설정', path: '/admin/settings', icon: Settings },
+        // { label: '대시보드', path: '/admin', exact: true, emoji: '📊' }, // Maybe later
+        { label: '회원 관리', path: '/admin/members', emoji: '👥' },
+        { label: '담당자 관리', path: '/admin/managers', emoji: '👨‍💼' },
+        { label: '주문 관리', path: '/admin/orders', emoji: '🛒', badge: orders.filter(o => o.status === 'SUBMITTED' && !o.isDeleted).length },
+        { label: '미결 관리', path: '/admin/pending', emoji: '⏳', badge: delayedPendingCount },
+        { label: '견적 관리', path: '/admin/quotes', emoji: '📝', badge: quotes.filter(q => q.status === 'SUBMITTED' && !q.isDeleted).length },
+        { label: '재고 관리', path: '/admin/inventory', emoji: '📦' },
+        { label: '설정', path: '/admin/settings', emoji: '⚙️' },
     ];
 
     return (
         <div className="flex h-screen bg-slate-50 font-pretendard">
+            {/* Sidebar Overlay for Mobile/Tablet */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-slate-900/50 z-20 md:hidden transition-opacity"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+
             {/* Sidebar */}
             <aside
-                className={`bg-slate-900 text-white transition-all duration-300 flex flex-col ${isSidebarOpen ? 'w-64' : 'w-20'}`}
+                className={`bg-slate-900 text-white transition-all duration-300 flex flex-col fixed md:relative z-30 h-full ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20'} shadow-2xl md:shadow-none`}
             >
                 {/* Logo Area */}
-                <div className="h-16 flex items-center justify-center border-b border-slate-800">
+                <div className="h-16 relative flex items-center justify-center border-b border-slate-800">
                     {isSidebarOpen ? (
                         <span className="text-xl font-bold tracking-wider text-teal-400">ALTF ADMIN</span>
                     ) : (
                         <span className="text-xl font-bold text-teal-400">A</span>
                     )}
+
+                    {/* Desktop Toggle Button */}
+                    <button
+                        onClick={() => setSidebarOpen(!isSidebarOpen)}
+                        className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-slate-800 border border-slate-700 rounded-full hidden md:flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors z-50 shadow-sm"
+                        title={isSidebarOpen ? '메뉴 접기' : '메뉴 펼치기'}
+                    >
+                        {isSidebarOpen ? <ChevronLeft className="w-4 h-4 -ml-0.5" /> : <ChevronRight className="w-4 h-4 ml-0.5" />}
+                    </button>
                 </div>
 
                 {/* Nav */}
@@ -65,19 +98,29 @@ export default function AdminLayout() {
                         <NavLink
                             key={item.path}
                             to={item.path}
+                            title={!isSidebarOpen ? item.label : undefined}
                             className={({ isActive }) => `
-                                flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-colors
+                                flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-colors relative
                                 ${isActive
                                     ? 'bg-teal-600 text-white shadow-lg shadow-teal-900/20'
                                     : 'text-slate-400 hover:text-white hover:bg-slate-800'}
                             `}
                         >
-                            <div className="flex items-center gap-3">
-                                <item.icon className="w-5 h-5 flex-shrink-0" />
-                                {isSidebarOpen && <span>{item.label}</span>}
+                            <div className="flex items-center gap-3 w-full justify-center md:justify-start">
+                                <div className="relative flex-shrink-0">
+                                    <span className={`flex items-center justify-center transition-all ${isSidebarOpen ? 'text-xl w-6 h-6' : 'text-2xl w-8 h-8'}`}>
+                                        {item.emoji}
+                                    </span>
+                                    {!isSidebarOpen && item.badge !== undefined && item.badge > 0 && (
+                                        <span className="absolute -top-1 -right-2 bg-yellow-400 text-slate-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm border border-slate-900 z-10">
+                                            {item.badge}
+                                        </span>
+                                    )}
+                                </div>
+                                {isSidebarOpen && <span className="text-sm">{item.label}</span>}
                             </div>
                             {isSidebarOpen && item.badge !== undefined && item.badge > 0 && (
-                                <span className="bg-yellow-400 text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                                <span className="bg-yellow-400 text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm ml-auto">
                                     {item.badge}
                                 </span>
                             )}
@@ -89,16 +132,18 @@ export default function AdminLayout() {
                 <div className="p-4 border-t border-slate-800">
                     <button
                         onClick={handleLogout}
-                        className="flex items-center gap-3 w-full px-4 py-2 text-rose-400 hover:text-rose-300 hover:bg-slate-800 rounded-lg transition-colors text-sm"
+                        className="flex items-center gap-3 w-full px-4 py-2 text-rose-400 hover:text-rose-300 hover:bg-slate-800 rounded-lg transition-colors"
                     >
-                        <LogOut className="w-5 h-5" />
-                        {isSidebarOpen && <span>로그아웃</span>}
+                        <span className={`flex items-center justify-center flex-shrink-0 transition-all ${isSidebarOpen ? 'text-xl w-6 h-6' : 'text-2xl w-8 h-8 mx-auto'}`}>
+                            🚪
+                        </span>
+                        {isSidebarOpen && <span className="text-sm font-medium">로그아웃</span>}
                     </button>
                 </div>
             </aside>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden w-full relative z-10 bg-slate-50">
                 {/* Header */}
                 <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shadow-sm z-10">
                     <div className="flex items-center gap-4">
@@ -125,8 +170,12 @@ export default function AdminLayout() {
                 </header>
 
                 {/* Page Content */}
-                <main className="flex-1 overflow-auto p-8">
-                    <Outlet />
+                <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8">
+                    <AnimatePresence mode="wait">
+                        <motion.div key={location.pathname} className="h-full w-full">
+                            <Outlet />
+                        </motion.div>
+                    </AnimatePresence>
                 </main>
             </div>
         </div>

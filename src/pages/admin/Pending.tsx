@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, Fragment } from 'react';
 import { useStore } from '../../store/useStore';
-import { FileText, PackageX, Calendar, Search, Filter, MessageSquare, Send, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, PackageX, Calendar, Search, Filter, MessageSquare, Send, X, Trash2, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { CalmPageShell } from '../../components/ui/CalmPageShell';
 import { PageTransition } from '../../components/ui/PageTransition';
 
@@ -39,7 +39,7 @@ export default function PendingOrders() {
     // Filters
     const [searchCustomer, setSearchCustomer] = useState('');
     const [searchPo, setSearchPo] = useState('');
-    const [dateFilter, setDateFilter] = useState<'ALL' | 'URGENT'>('ALL'); // URGENT = <= 7 days
+    const [dateFilter, setDateFilter] = useState<'ALL' | 'URGENT'>('URGENT'); // URGENT = <= 7 days
 
     // Comment State
     const [activeCommentItemId, setActiveCommentItemId] = useState<string | null>(null);
@@ -215,13 +215,64 @@ export default function PendingOrders() {
         updateOrder(orderId, { po_items: updatedPoItems });
     };
 
-    const isUrgent = (dateStr: string) => {
+    const getDeliveryStatus = (dateStr: string) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const dDate = new Date(dateStr);
-        const diffTime = dDate.getTime() - today.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return diffDays <= 7;
+        const diffDays = Math.ceil((dDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) return { type: 'DELAYED', text: `지연 +${Math.abs(diffDays)}일`, color: 'text-red-700', bg: 'bg-red-100 border border-red-200' };
+        if (diffDays <= 5) return { type: 'IMMINENT', text: '임박', color: 'text-orange-700', bg: 'bg-orange-100 border border-orange-200' };
+        return { type: 'NORMAL', text: '', color: 'text-slate-500', bg: '' };
+    };
+
+    const handleExportCSV = () => {
+        if (pendingOrderGroups.length === 0) {
+            alert("다운로드할 데이터가 없습니다.");
+            return;
+        }
+
+        const headers = ['고객명', '발주번호', '발주일자', '납기일자', '납기상태', '품목명', '규격', '수량', '메모(특이사항)', '코멘트'];
+        const csvRows = [headers.join(',')];
+
+        pendingOrderGroups.forEach(group => {
+            group.items.forEach(item => {
+                const spec = `${item.thickness || ''} ${item.size || ''} ${item.material || ''}`.trim();
+                const statusInfo = getDeliveryStatus(item.deliveryDate);
+                const statusText = statusInfo.type === 'DELAYED' ? statusInfo.text : (statusInfo.type === 'IMMINENT' ? '임박' : '정상');
+
+                const commentsString = item.comments && item.comments.length > 0
+                    ? item.comments.map(c => `[${c.author}] ${c.content}`).join(' | ')
+                    : '';
+
+                const row = [
+                    `"${item.targetCustomerName || item.customerName}"`,
+                    `"${item.poNumber}"`,
+                    `"${item.poDate}"`,
+                    `"${item.deliveryDate}"`,
+                    `"${statusText}"`,
+                    `"${item.itemName}"`,
+                    `"${spec}"`,
+                    item.quantity,
+                    `"${item.memo.replace(/"/g, '""')}"`,
+                    `"${commentsString.replace(/"/g, '""')}"`
+                ];
+                csvRows.push(row.join(','));
+            });
+        });
+
+        const csvString = csvRows.join('\n');
+        const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        link.setAttribute('href', url);
+        link.setAttribute('download', `미결관리록_${dateStr}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     return (
@@ -271,19 +322,28 @@ export default function PendingOrders() {
                         <option value="URGENT">🔥 납기 임박 (7일 이내)</option>
                     </select>
                 </div>
+                <div className="ml-auto">
+                    <button
+                        onClick={handleExportCSV}
+                        className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
+                    >
+                        <Download className="w-4 h-4" />
+                        엑셀 다운로드
+                    </button>
+                </div>
             </div>
 
             <PageTransition>
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                            <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 whitespace-nowrap">
+                    <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] custom-scrollbar">
+                        <table className="w-full min-w-[1000px] text-sm text-left">
+                            <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 whitespace-nowrap sticky top-0 z-10">
                                 <tr>
-                                    <th scope="col" className="px-5 py-3 font-bold w-[15%]">고객명 (Customer)</th>
-                                    <th scope="col" className="px-5 py-3 font-bold w-[15%]">발주번호 / 납기일자</th>
-                                    <th scope="col" className="px-5 py-3 font-bold w-[30%]">품목 정보 (Item Spec)</th>
-                                    <th scope="col" className="px-5 py-3 font-bold text-right w-[10%]">수량</th>
-                                    <th scope="col" className="px-5 py-3 font-bold w-[30%] text-center">코멘트 (의견/일정 공유)</th>
+                                    <th scope="col" className="px-5 py-3 font-bold w-[13%] min-w-[120px]">고객명 (Customer)</th>
+                                    <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-[160px]">발주번호 / 납기일자</th>
+                                    <th scope="col" className="px-5 py-3 font-bold w-[40%] text-right pr-12">품목 정보 (Item Spec)</th>
+                                    <th scope="col" className="px-5 py-3 font-bold text-center w-[10%]">수량</th>
+                                    <th scope="col" className="px-5 py-3 font-bold w-[25%] text-center">코멘트 (의견/일정 공유)</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -304,7 +364,7 @@ export default function PendingOrders() {
                                     </tr>
                                 ) : (
                                     pendingOrderGroups.map((group) => {
-                                        const urgent = isUrgent(group.deliveryDate);
+                                        const statusObj = getDeliveryStatus(group.deliveryDate);
                                         const isExpanded = expandedOrders.has(group.orderId);
                                         const displayItems = isExpanded ? group.items : [group.items[0]];
 
@@ -334,44 +394,51 @@ export default function PendingOrders() {
                                                             {/* PO Number & Date */}
                                                             {isFirstRow && (
                                                                 <td className={`px-5 py-4 ${displayItems.length > 1 ? 'border-b border-slate-100' : ''}`} rowSpan={displayItems.length}>
-                                                                    <div className="flex flex-col gap-1.5 align-top">
-                                                                        <span className="font-mono font-bold text-indigo-700 text-xs bg-indigo-50 px-2 py-1 rounded w-fit border border-indigo-100 shadow-sm">
-                                                                            {group.poNumber.includes('-') ? group.poNumber.split('-')[1] : group.poNumber}
+                                                                    <div className="flex flex-row items-center gap-2 whitespace-nowrap min-w-max">
+                                                                        <span className="font-mono font-bold text-indigo-700 text-xs bg-indigo-50 px-2 py-1 rounded border border-indigo-100 shadow-sm inline-flex">
+                                                                            NO.{group.poNumber.includes('-') ? group.poNumber.split('-')[1] : group.poNumber}
                                                                         </span>
-                                                                        <span className={`text-xs flex items-center gap-1 font-medium ${urgent ? 'text-red-500' : 'text-slate-500'}`}>
+                                                                        <span className={`text-xs inline-flex items-center gap-1 font-medium ${statusObj.type !== 'NORMAL' ? 'text-slate-800' : 'text-slate-500'} bg-slate-50 rounded px-1.5 py-1 border border-slate-100`}>
                                                                             <Calendar className="w-3.5 h-3.5" />
                                                                             {new Date(group.deliveryDate).toLocaleDateString()}
-                                                                            {urgent && <span className="ml-1 px-1 bg-red-100 text-red-600 rounded text-[10px] font-bold">임박</span>}
+                                                                            {statusObj.type !== 'NORMAL' && <span className={`ml-1 px-1.5 ${statusObj.bg} ${statusObj.color} rounded text-[10px] font-bold shadow-sm inline-flex`}>{statusObj.text}</span>}
                                                                         </span>
-                                                                        {group.items.length > 1 && (
-                                                                            <button
-                                                                                onClick={() => toggleExpand(group.orderId)}
-                                                                                className="mt-2 text-[11px] font-bold text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 py-1.5 px-3 rounded w-fit transition-colors border border-teal-100 flex items-center gap-1 shadow-sm break-keep"
-                                                                            >
-                                                                                {isExpanded ? <><ChevronUp className="w-3.5 h-3.5" /> 닫기</> : <><ChevronDown className="w-3.5 h-3.5" /> 외 {group.items.length - 1}건 보기</>}
-                                                                            </button>
-                                                                        )}
                                                                     </div>
+                                                                    {group.items.length > 1 && (
+                                                                        <button
+                                                                            onClick={() => toggleExpand(group.orderId)}
+                                                                            className="relative mt-2 text-[11px] font-bold text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 py-1.5 px-3 rounded w-fit transition-colors border border-teal-100 flex items-center gap-1 shadow-sm break-keep pr-4"
+                                                                        >
+                                                                            {isExpanded ? <><ChevronUp className="w-3.5 h-3.5" /> 닫기</> : <><ChevronDown className="w-3.5 h-3.5" /> 외 {group.items.length - 1}건 보기</>}
+                                                                            {/* Comment Indicator for hidden items */}
+                                                                            {!isExpanded && group.items.slice(1).some(hiddenItem => hiddenItem.comments && hiddenItem.comments.length > 0) && (
+                                                                                <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3">
+                                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                                                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 shadow-sm border-2 border-white"></span>
+                                                                                </span>
+                                                                            )}
+                                                                        </button>
+                                                                    )}
                                                                 </td>
                                                             )}
 
                                                             {/* Combined Item Spec */}
-                                                            <td className={`px-5 py-4 ${!isFirstRow ? 'border-t border-slate-100/50 pl-8 relative' : ''}`}>
-                                                                <div className="flex flex-col gap-1.5">
-                                                                    <div className="font-bold text-slate-900 text-base flex items-center gap-2">
-                                                                        {!isFirstRow && <span className="text-slate-400 font-normal absolute left-3 top-4">└</span>}
-                                                                        {item.itemName}
-                                                                    </div>
-                                                                    <div className="flex flex-wrap items-center gap-2 pl-4">
-                                                                        {item.thickness && <span className="text-xs font-mono font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-100 shadow-sm">{item.thickness}</span>}
-                                                                        {item.size && <span className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded shadow-sm">{item.size}</span>}
-                                                                        {item.material && <span className="text-xs font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 shadow-sm">{item.material}</span>}
+                                                            <td className={`px-5 py-4 ${!isFirstRow ? 'border-t border-slate-100/50 relative' : ''}`}>
+                                                                <div className="flex flex-col gap-1 items-end pr-8">
+                                                                    <div className="font-bold text-slate-800 text-sm flex items-center gap-1.5 flex-wrap justify-end w-full">
+                                                                        {!isFirstRow && <span className="text-slate-300 font-normal absolute left-3 top-4">└</span>}
+                                                                        <span className="text-slate-900 bg-teal-50 px-1.5 py-0.5 rounded mr-1 leading-tight">{item.itemName}</span>
+                                                                        {(item.thickness || item.size || item.material) && (
+                                                                            <span className="text-slate-600 font-medium whitespace-nowrap">
+                                                                                - {[item.thickness, item.size, item.material].filter(Boolean).join(' - ')}
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             </td>
 
                                                             {/* Quantity */}
-                                                            <td className={`px-5 py-4 text-right font-bold text-slate-900 font-mono text-lg ${!isFirstRow ? 'border-t border-slate-100/50' : ''}`}>
+                                                            <td className={`px-5 py-4 text-center font-bold text-slate-900 font-mono text-lg ${!isFirstRow ? 'border-t border-slate-100/50' : ''}`}>
                                                                 {item.quantity.toLocaleString()}
                                                             </td>
 
@@ -456,8 +523,8 @@ export default function PendingOrders() {
                         </table>
                     </div>
                 </div>
-            </PageTransition>
-        </CalmPageShell>
+            </PageTransition >
+        </CalmPageShell >
     );
 }
 

@@ -57,7 +57,7 @@ export function TwoFactorModal({ isOpen, onClose, onVerify }: TwoFactorModalProp
                     <form onSubmit={handleSubmit} className="w-full space-y-4 pt-4">
                         <div className="space-y-2">
                             <input
-                                type="text"
+                                type="password"
                                 maxLength={6}
                                 value={code}
                                 onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))}
