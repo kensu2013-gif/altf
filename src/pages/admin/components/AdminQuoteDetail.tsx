@@ -630,7 +630,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                                     if (!isNaN(val)) {
                                                                         const newItems = items.map(item => {
                                                                             const product = getProductInfo(item.productId);
-                                                                            const standardPrice = product?.base_price ?? item.unitPrice ?? 0; // Use Base Price, fallback to UnitPrice, then 0
+                                                                            const standardPrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0; // Use Base Price, fallback to UnitPrice, then 0
                                                                             if (standardPrice === 0) return item;
 
                                                                             // Calculate Sales Price based on Base Price * (1 - Rate/100)

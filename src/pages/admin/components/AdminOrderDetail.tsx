@@ -1415,7 +1415,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                                 const newItems = displayedItems.map(item => {
                                                                                     const product = inventory.find(p => p.id === item.productId);
                                                                                     // Calculate new price based on base price and bulk discount
-                                                                                    const basePrice = product ? product.unitPrice : item.unitPrice;
+                                                                                    const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
                                                                                     if (basePrice > 0) {
                                                                                         const newPrice = Math.round(Math.round(basePrice * (1 - val / 100)) / 10) * 10;
                                                                                         return {
@@ -1437,7 +1437,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                         // Accept All: Reset discount to 0 and match base price
                                                                         const newItems = displayedItems.map(item => {
                                                                             const product = inventory.find(p => p.id === item.productId);
-                                                                            const basePrice = product ? product.unitPrice : item.unitPrice;
+                                                                            const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
                                                                             return {
                                                                                 ...item,
                                                                                 discountRate: 0,
