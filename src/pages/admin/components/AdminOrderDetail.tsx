@@ -56,6 +56,13 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const [previewHtml, setPreviewHtml] = useState<string | null>(null);
     const [previewType, setPreviewType] = useState<'PO' | 'SALES'>('PO');
 
+    const setMobileModalOpen = useStore((state) => state.setMobileModalOpen);
+
+    useEffect(() => {
+        setMobileModalOpen(true);
+        return () => setMobileModalOpen(false);
+    }, [setMobileModalOpen]);
+
     const [items, setItems] = useState<LineItem[]>(order.items || []);
     const [poItems, setPoItems] = useState<LineItem[]>(() => {
         // [FIX] If PO Items specific list exists, use it.

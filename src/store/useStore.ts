@@ -110,6 +110,10 @@ interface AppState {
 
     // --- S3 Generic File Upload ---
     uploadFile: (file: File, type: 'member' | 'quote' | 'order' | 'po', refId: string) => Promise<{ url: string, name: string } | null>;
+
+    // --- Admin Mobile Layout State ---
+    isMobileModalOpen: boolean;
+    setMobileModalOpen: (isOpen: boolean) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -135,6 +139,8 @@ export const useStore = create<AppState>()(
             newOrderCount: 0,
             deliveryPreferences: null,
 
+            isMobileModalOpen: false,
+            setMobileModalOpen: (isOpen) => set({ isMobileModalOpen: isOpen }),
 
             setDeliveryPreferences: (info) => set({ deliveryPreferences: info }),
 

@@ -8,15 +8,24 @@ import {
     ChevronLeft,
     ChevronRight
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function AdminLayout() {
     const navigate = useNavigate();
     const location = useLocation();
     const logout = useStore((state) => state.logout);
     const user = useStore((state) => state.auth.user);
-    const { orders, quotes } = useStore((state) => state);
-    const [isSidebarOpen, setSidebarOpen] = useState(true);
+    const { orders, quotes, isMobileModalOpen } = useStore((state) => state);
+
+    // [MOD] Initialize sidebar state from local storage so it persists across refreshes and menu clicks.
+    const [isSidebarOpen, setSidebarOpen] = useState(() => {
+        const saved = localStorage.getItem('altfAdminSidebar');
+        return saved ? saved === 'true' : true;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('altfAdminSidebar', String(isSidebarOpen));
+    }, [isSidebarOpen]);
 
     // [MOD] Ensure inventory is loaded/validated when accessing Admin Panel
     useInventory();
@@ -79,10 +88,10 @@ export default function AdminLayout() {
                     {/* Desktop Toggle Button */}
                     <button
                         onClick={() => setSidebarOpen(!isSidebarOpen)}
-                        className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-slate-800 border border-slate-700 rounded-full hidden md:flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors z-50 shadow-sm"
+                        className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-teal-500 hover:bg-teal-400 border-2 border-slate-900 rounded-full hidden md:flex items-center justify-center text-white transition-colors z-50 shadow-md ring-2 ring-slate-900/50"
                         title={isSidebarOpen ? '메뉴 접기' : '메뉴 펼치기'}
                     >
-                        {isSidebarOpen ? <ChevronLeft className="w-4 h-4 -ml-0.5" /> : <ChevronRight className="w-4 h-4 ml-0.5" />}
+                        {isSidebarOpen ? <ChevronLeft className="w-5 h-5 -ml-0.5" /> : <ChevronRight className="w-5 h-5 ml-0.5" />}
                     </button>
                 </div>
 
@@ -144,8 +153,8 @@ export default function AdminLayout() {
 
             {/* Main Content */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden w-full relative z-10 bg-slate-50">
-                {/* Header */}
-                <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shadow-sm z-10">
+                {/* Header: Hide on mobile when a modal is open to save screen space */}
+                <header className={`h-16 bg-white border-b border-slate-200 items-center justify-between px-6 shadow-sm z-10 ${isMobileModalOpen ? 'hidden md:flex' : 'flex'}`}>
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => setSidebarOpen(!isSidebarOpen)}

@@ -3,7 +3,7 @@ import type { Quotation, LineItem } from '../../../types';
 import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { formatCurrency } from '../../../lib/utils';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useStore } from '../../../store/useStore';
 import { renderDocumentHTML } from '../../../lib/documentTemplate';
 
@@ -28,7 +28,13 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const user = useStore((state) => state.auth.user); // Get Admin User
     const updateQuotation = useStore((state) => state.updateQuotation);
     const uploadFile = useStore((state) => state.uploadFile);
+    const setMobileModalOpen = useStore((state) => state.setMobileModalOpen);
     const customerUser = useStore((state) => state.users.find(u => u.id === quote.userId));
+
+    useEffect(() => {
+        setMobileModalOpen(true);
+        return () => setMobileModalOpen(false);
+    }, [setMobileModalOpen]);
 
     // Local state for admin attachments
     const [adminAttachmentFiles, setAdminAttachmentFiles] = useState<File[]>([]);
