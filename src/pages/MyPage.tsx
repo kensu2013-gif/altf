@@ -84,6 +84,7 @@ export default function MyPage() {
     const [previewPayload, setPreviewPayload] = useState<{ html: string; type: DocumentType; onOrder?: () => void; hidePrint?: boolean; hideClose?: boolean; } | null>(null);
     const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
     const [isOrderSubmitting, setIsOrderSubmitting] = useState(false);
+    const [isApiSubmitting, setIsApiSubmitting] = useState(false);
     const [orderPayload, setOrderPayload] = useState<DocumentPayload | null>(null);
 
     // --- Custom Confirm Dialog State ---
@@ -312,6 +313,7 @@ export default function MyPage() {
 
     const handleSubmitOrder = async (deliveryInfo: DeliveryInfo) => {
         if (!orderPayload) return;
+        setIsApiSubmitting(true);
 
         const finalPayload = { ...orderPayload };
         if (finalPayload.customer) {
@@ -334,6 +336,7 @@ export default function MyPage() {
         }
 
         const result = await OrderService.submitOrder(finalPayload);
+        setIsApiSubmitting(false);
         if (result.success) {
             setIsOrderSubmitting(false);
             resetNewOrderCount();
@@ -803,6 +806,7 @@ export default function MyPage() {
                 onClose={() => setIsOrderSubmitting(false)}
                 onConfirm={handleSubmitOrder}
                 basePayload={orderPayload}
+                isSubmitting={isApiSubmitting}
             />
         </CalmPageShell >
     );

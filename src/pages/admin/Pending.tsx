@@ -263,7 +263,7 @@ export default function PendingOrders() {
             return;
         }
 
-        const headers = ['고객명', '발주번호', '발주일자', '납기일자', '납기상태', '품목명', '규격', '수량', '메모(특이사항)', '코멘트'];
+        const headers = ['고객명', '발주번호', '발주일자', '납기일자', '납기상태', '상태(태그)', '품목명', '규격', '수량', '메모(특이사항)', '코멘트'];
         const csvRows = [headers.join(',')];
 
         pendingOrderGroups.forEach(group => {
@@ -276,12 +276,17 @@ export default function PendingOrders() {
                     ? item.comments.map(c => `[${c.author}] ${c.content}`).join(' | ')
                     : '';
 
+                const tagsString = item.tags && item.tags.length > 0
+                    ? item.tags.join(', ')
+                    : '';
+
                 const row = [
                     `"${item.targetCustomerName || item.customerName}"`,
                     `"${item.poNumber}"`,
                     `"${item.poDate}"`,
                     `"${item.deliveryDate}"`,
                     `"${statusText}"`,
+                    `"${tagsString}"`,
                     `"${item.itemName}"`,
                     `"${spec}"`,
                     item.quantity,

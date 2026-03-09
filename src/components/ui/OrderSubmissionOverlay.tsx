@@ -13,9 +13,10 @@ interface OrderSubmissionOverlayProps {
     onConfirm: (info: DeliveryInfo) => void;
     basePayload: DocumentPayload | null; // Changed from htmlContent
     buttonRef?: React.RefObject<HTMLButtonElement | null>;
+    isSubmitting?: boolean;
 }
 
-export function OrderSubmissionOverlay({ isOpen, onClose, onConfirm, basePayload, buttonRef }: OrderSubmissionOverlayProps) {
+export function OrderSubmissionOverlay({ isOpen, onClose, onConfirm, basePayload, buttonRef, isSubmitting }: OrderSubmissionOverlayProps) {
     const [phase, setPhase] = useState<'idle' | 'morph' | 'sheet' | 'complete'>('idle');
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [launchRect, setLaunchRect] = useState<{ top: number; left: number } | null>(null);
@@ -331,11 +332,15 @@ export function OrderSubmissionOverlay({ isOpen, onClose, onConfirm, basePayload
                                         </Button>
                                         <Button
                                             onClick={handleConfirm}
-                                            disabled={!isValid}
-                                            className={`gap-2 px-6 shadow-lg font-bold transition-all ${isValid ? 'bg-teal-600 hover:bg-teal-700 text-white shadow-teal-500/20' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}`}
+                                            disabled={!isValid || isSubmitting}
+                                            className={`gap-2 px-6 shadow-lg font-bold transition-all ${isValid ? 'bg-teal-600 hover:bg-teal-700 text-white shadow-teal-500/20' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'} ${isSubmitting ? 'opacity-80' : ''}`}
                                         >
-                                            <CheckCircle2 className="w-4 h-4" />
-                                            최종 주문 제출
+                                            {isSubmitting ? (
+                                                <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                                            ) : (
+                                                <CheckCircle2 className="w-4 h-4" />
+                                            )}
+                                            {isSubmitting ? '제출 중...' : '최종 주문 제출'}
                                         </Button>
                                     </div>
                                 </div>

@@ -20,7 +20,8 @@ const uploadMiddleware = multer({
 let db = {
     users: [],
     quotations: [],
-    orders: []
+    orders: [],
+    loginLogs: []
 };
 
 // Load Data
@@ -31,7 +32,8 @@ async function loadData() {
             db.users = json.users || [];
             db.quotations = json.quotations || [];
             db.orders = json.orders || [];
-            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders`);
+            db.loginLogs = json.loginLogs || [];
+            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.loginLogs.length} logs`);
         } else {
             // Seed Initial Admin if file doesn't exist
             db.users = [
@@ -381,6 +383,22 @@ const server = http.createServer(async (req, res) => {
                         ip: req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'Unknown'
                     });
 
+                    // Add to login logs
+                    const loginLog = {
+                        id: crypto.randomUUID(),
+                        userId: user.id,
+                        email: user.email,
+                        companyName: user.companyName,
+                        role: user.role,
+                        action: 'LOGIN',
+                        timestamp: Date.now(),
+                        ip: req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'Unknown'
+                    };
+                    db.loginLogs.push(loginLog);
+                    // Keep only last 1000 logs
+                    if (db.loginLogs.length > 1000) db.loginLogs.shift();
+                    await saveData();
+
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     // Send token along with user data
                     res.end(JSON.stringify({ user: userWithoutPassword, token: loginToken }));
@@ -432,10 +450,27 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/auth/logout') {
         let body = '';
         req.on('data', chunk => body += chunk.toString());
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const { token } = JSON.parse(body);
                 if (token && activeSessions.has(token)) {
+                    const session = activeSessions.get(token);
+
+                    // Add to login logs
+                    const logoutLog = {
+                        id: crypto.randomUUID(),
+                        userId: session.userId,
+                        email: session.email,
+                        companyName: session.companyName,
+                        role: session.role,
+                        action: 'LOGOUT',
+                        timestamp: Date.now(),
+                        ip: session.ip
+                    };
+                    db.loginLogs.push(logoutLog);
+                    if (db.loginLogs.length > 1000) db.loginLogs.shift();
+                    await saveData();
+
                     activeSessions.delete(token);
                     console.log(`[API] Logged out and cleared session for token: ${token}`);
                 }
@@ -470,6 +505,23 @@ const server = http.createServer(async (req, res) => {
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(activeList));
+        return;
+    }
+
+    // GET /api/admin/login-logs
+    if (req.method === 'GET' && url.pathname === '/api/admin/login-logs') {
+        const requesterRole = req.headers['x-requester-role'];
+        if (requesterRole !== 'MASTER' && requesterRole !== 'admin') {
+            res.writeHead(403);
+            res.end(JSON.stringify({ error: 'Forbidden' }));
+            return;
+        }
+
+        // Return the last 200 logs, sorted by descending timestamp
+        const logs = [...db.loginLogs].sort((a, b) => b.timestamp - a.timestamp).slice(0, 200);
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(logs));
         return;
     }
 

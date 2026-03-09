@@ -82,6 +82,8 @@ export default function QuotationEditor() {
         address: user?.address || ''
     });
 
+    const [isApiSubmitting, setIsApiSubmitting] = useState(false);
+
     const handleClearAll = () => {
         if (items.length === 0) return;
         setConfirmConfig({
@@ -361,6 +363,8 @@ export default function QuotationEditor() {
     const handleSendOrder = async (deliveryInfo: DeliveryInfo): Promise<boolean> => {
         if (!currentPayload) return false;
 
+        setIsApiSubmitting(true);
+
         const finalPayload = { ...currentPayload };
         if (finalPayload.customer) {
             // 1. Update Customer Fields with specific Delivery Info
@@ -400,6 +404,7 @@ export default function QuotationEditor() {
         };
 
         const result = await OrderService.submitOrder(payloadWithFiles as unknown as DocumentPayload);
+        setIsApiSubmitting(false);
         if (result.success) {
             setIsSubmitting(false);
             incrementNewOrderCount();
@@ -457,6 +462,7 @@ export default function QuotationEditor() {
                             onConfirm={handleSendOrder}
                             basePayload={currentPayload}
                             buttonRef={submitButtonRef}
+                            isSubmitting={isApiSubmitting}
                         />
 
                         {/* Header */}
