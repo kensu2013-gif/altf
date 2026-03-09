@@ -30,6 +30,7 @@ export interface DeliveryInfo {
 interface AppState {
     auth: {
         user: User | null;
+        token: string | null;
         isAuthenticated: boolean;
         pendingAdminUser: User | null; // For 2FA
     };
@@ -121,6 +122,7 @@ export const useStore = create<AppState>()(
         (set, get) => ({
             auth: {
                 user: null,
+                token: null,
                 isAuthenticated: false,
                 pendingAdminUser: null,
             },
@@ -316,14 +318,14 @@ export const useStore = create<AppState>()(
                     });
 
                     if (res.ok) {
-                        const { user } = await res.json();
+                        const { user, token } = await res.json();
 
 
                         // MFA Check for MASTER
                         // Ensure we catch 'MASTER', 'admin' and potentially 'MANAGER' if needed later
                         if (user.role === 'MASTER' || user.role === 'admin') {
                             set({
-                                auth: { ...get().auth, pendingAdminUser: user }
+                                auth: { ...get().auth, pendingAdminUser: user, token: token || null }
                             });
 
                             return 'MFA_REQUIRED';
@@ -331,7 +333,7 @@ export const useStore = create<AppState>()(
 
                         // Normal User / Manager
                         set({
-                            auth: { user, isAuthenticated: true, pendingAdminUser: null },
+                            auth: { user, token: token || null, isAuthenticated: true, pendingAdminUser: null },
                             quotation: { ...get().quotation, customerNumber: user.companyName }
                         });
                         return 'SUCCESS';
@@ -348,6 +350,15 @@ export const useStore = create<AppState>()(
                 }
             },
 
+            updateAuthUser: (updates: Partial<User>) => set((state) => {
+                if (state.auth.user) {
+                    return {
+                        auth: { user: { ...state.auth.user, ...updates }, token: state.auth.token, isAuthenticated: true, pendingAdminUser: null }
+                    };
+                }
+                return state;
+            }),
+
             verify2FA: (code: string) => {
                 const { auth } = get();
 
@@ -355,7 +366,7 @@ export const useStore = create<AppState>()(
                 // Demo Code: 123456 or user requested code
                 if (auth.pendingAdminUser && (code === '******' || code === '120528')) {
                     set({
-                        auth: { user: auth.pendingAdminUser, isAuthenticated: true, pendingAdminUser: null },
+                        auth: { user: auth.pendingAdminUser, token: auth.token, isAuthenticated: true, pendingAdminUser: null },
                         quotation: { ...get().quotation, customerNumber: auth.pendingAdminUser.companyName }
                     });
 
@@ -370,7 +381,7 @@ export const useStore = create<AppState>()(
             },
 
             logout: () => set({
-                auth: { user: null, isAuthenticated: false, pendingAdminUser: null }
+                auth: { user: null, token: null, isAuthenticated: false, pendingAdminUser: null }
             }),
 
             // Deprecated: Use updateUser(id, updates) instead

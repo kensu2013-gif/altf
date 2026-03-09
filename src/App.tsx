@@ -5,7 +5,7 @@ import { Layout } from './components/layout/Layout';
 
 import { AnimatePresence } from 'framer-motion';
 import { PageTransition } from './components/ui/PageTransition';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 
 // Lazy Load Pages
 const AccessGate = lazy(() => import('./pages/AccessGate'));
@@ -33,6 +33,7 @@ const PendingOrders = lazy(() => import('./pages/admin/Pending'));
 const AdminInventory = lazy(() => import('./pages/admin/Inventory'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
 const AdminProfile = lazy(() => import('./pages/admin/Profile'));
+const AdminActiveUsers = lazy(() => import('./pages/admin/ActiveUsers'));
 
 // ... (keep existing code)
 
@@ -119,6 +120,7 @@ function AnimatedRoutes() {
               <Route path="inventory" element={<PageTransition><AdminInventory /></PageTransition>} />
               <Route path="settings" element={<PageTransition><AdminSettings /></PageTransition>} />
               <Route path="profile" element={<PageTransition><AdminProfile /></PageTransition>} />
+              <Route path="active-users" element={<PageTransition><AdminActiveUsers /></PageTransition>} />
             </Route>
           </Route>
 
@@ -150,10 +152,65 @@ function AnimatedRoutes() {
 
 import { ErrorBoundary } from './components/ErrorBoundary';
 
+function SessionManager() {
+  const { auth, logout } = useStore();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!auth.isAuthenticated || !auth.token) return;
+
+    let lastActivity = Date.now();
+    const TIMEOUT_MS = 3 * 60 * 60 * 1000; // 3 hours
+
+    const updateActivity = () => {
+      lastActivity = Date.now();
+    };
+
+    window.addEventListener('mousemove', updateActivity);
+    window.addEventListener('keydown', updateActivity);
+    window.addEventListener('click', updateActivity);
+    window.addEventListener('scroll', updateActivity, true);
+
+    const intervalId = setInterval(async () => {
+      if (Date.now() - lastActivity > TIMEOUT_MS) {
+        alert('장시간 활동이 없어 자동 로그아웃 되었습니다.');
+        logout();
+        return;
+      }
+
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: auth.token, activity: `Browsing: ${location.pathname}` })
+        });
+
+        if (res.status === 401) {
+          alert('다른 기기에서 로그인되어 현재 연결이 종료되었습니다.');
+          logout();
+        }
+      } catch (e) {
+        console.error('Heartbeat failed:', e);
+      }
+    }, 30 * 1000); // 30 seconds
+
+    return () => {
+      window.removeEventListener('mousemove', updateActivity);
+      window.removeEventListener('keydown', updateActivity);
+      window.removeEventListener('click', updateActivity);
+      window.removeEventListener('scroll', updateActivity, true);
+      clearInterval(intervalId);
+    };
+  }, [auth.isAuthenticated, auth.token, logout, location.pathname]);
+
+  return null;
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
+        <SessionManager />
         <AnimatedRoutes />
       </BrowserRouter>
     </ErrorBoundary>

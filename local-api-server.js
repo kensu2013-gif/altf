@@ -79,6 +79,20 @@ await loadData();
 
 const sessionStore = new Map(); // session_id -> items[]
 
+// --- Concurrent Login & Active User Tracking ---
+const activeSessions = new Map(); // token -> { userId, email, companyName, role, lastSeen, activity, ip }
+const SESSION_TIMEOUT_MS = 3 * 60 * 60 * 1000; // 3 hours
+
+// Periodically clean up expired sessions
+setInterval(() => {
+    const now = Date.now();
+    for (const [token, session] of activeSessions.entries()) {
+        if (now - session.lastSeen > SESSION_TIMEOUT_MS) {
+            activeSessions.delete(token);
+        }
+    }
+}, 60 * 1000); // Check every minute
+
 // --- Global Memory Cache ---
 let inventoryCache = {
     gzippedData: null,
@@ -344,8 +358,32 @@ const server = http.createServer(async (req, res) => {
                     // Return user without password
                     const { password, ...userWithoutPassword } = user;
                     console.log(`[API] Login success: ${email}`);
+
+                    // Generate a new unique token for this login session
+                    const loginToken = crypto.randomUUID();
+
+                    // Remove any existing active sessions for this userId to enforce single device login
+                    for (const [existingToken, session] of activeSessions.entries()) {
+                        if (session.userId === user.id) {
+                            activeSessions.delete(existingToken);
+                            console.log(`[API] Cleared previous session for user ${email}`);
+                        }
+                    }
+
+                    // Store new session
+                    activeSessions.set(loginToken, {
+                        userId: user.id,
+                        email: user.email,
+                        companyName: user.companyName,
+                        role: user.role,
+                        lastSeen: Date.now(),
+                        activity: 'Logging in...',
+                        ip: req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'Unknown'
+                    });
+
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ user: userWithoutPassword }));
+                    // Send token along with user data
+                    res.end(JSON.stringify({ user: userWithoutPassword, token: loginToken }));
                 } else {
                     console.log(`[API] Login failed: Invalid credentials for ${email}`);
                     res.writeHead(401, { 'Content-Type': 'application/json' });
@@ -357,6 +395,59 @@ const server = http.createServer(async (req, res) => {
                 res.end(JSON.stringify({ error: 'Server Error' }));
             }
         });
+        return;
+    }
+
+    // POST /api/auth/heartbeat
+    if (req.method === 'POST' && url.pathname === '/api/auth/heartbeat') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', () => {
+            try {
+                const { token, activity } = JSON.parse(body);
+                const session = activeSessions.get(token);
+
+                if (!session) {
+                    // Token not found (maybe logged in somewhere else, or expired)
+                    res.writeHead(401, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Session expired or logged in from another device' }));
+                    return;
+                }
+
+                // Update session
+                session.lastSeen = Date.now();
+                if (activity) session.activity = activity;
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+            } catch (e) {
+                res.writeHead(500);
+                res.end(JSON.stringify({ error: 'Server Error' }));
+            }
+        });
+        return;
+    }
+
+    // GET /api/admin/active-users
+    if (req.method === 'GET' && url.pathname === '/api/admin/active-users') {
+        const requesterRole = req.headers['x-requester-role'];
+        if (requesterRole !== 'MASTER' && requesterRole !== 'admin') {
+            res.writeHead(403);
+            res.end(JSON.stringify({ error: 'Forbidden' }));
+            return;
+        }
+
+        const now = Date.now();
+        const activeList = [];
+
+        for (const [token, session] of activeSessions.entries()) {
+            if (now - session.lastSeen <= SESSION_TIMEOUT_MS) {
+                activeList.push(session);
+            }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(activeList));
         return;
     }
 

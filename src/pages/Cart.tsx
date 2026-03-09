@@ -261,6 +261,7 @@ export default function QuotationEditor() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         userId: user.id,
+                        userEmail: user.email,
                         customerName: user.companyName || 'Guest',
                         items: items,
                         totalAmount: totalAmount,

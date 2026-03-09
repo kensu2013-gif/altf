@@ -73,6 +73,7 @@ export const OrderService = {
             // Construct Full Order Payload for API (Matches Order Interface)
             const apiPayload = {
                 userId: user.id,
+                userEmail: user.email,
                 customerName: payload.customer.company_name || 'Guest Customer',
                 customerBizNo: user.bizNo || '',
                 items: mappedItems, // Send standardized LineItems
