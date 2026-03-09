@@ -428,6 +428,28 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // POST /api/auth/logout
+    if (req.method === 'POST' && url.pathname === '/api/auth/logout') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', () => {
+            try {
+                const { token } = JSON.parse(body);
+                if (token && activeSessions.has(token)) {
+                    activeSessions.delete(token);
+                    console.log(`[API] Logged out and cleared session for token: ${token}`);
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+            } catch (e) {
+                console.error('[API] Logout error:', e);
+                res.writeHead(500);
+                res.end(JSON.stringify({ error: 'Server Error' }));
+            }
+        });
+        return;
+    }
+
     // GET /api/admin/active-users
     if (req.method === 'GET' && url.pathname === '/api/admin/active-users') {
         const requesterRole = req.headers['x-requester-role'];

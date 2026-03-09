@@ -380,9 +380,19 @@ export const useStore = create<AppState>()(
                 // Deprecated: Admin is seeded on backend
             },
 
-            logout: () => set({
-                auth: { user: null, token: null, isAuthenticated: false, pendingAdminUser: null }
-            }),
+            logout: () => {
+                const { token } = get().auth;
+                if (token) {
+                    fetch((import.meta.env.VITE_API_URL || '') + '/api/auth/logout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token })
+                    }).catch(e => console.error('[Store] Logout error:', e));
+                }
+                set({
+                    auth: { user: null, token: null, isAuthenticated: false, pendingAdminUser: null }
+                });
+            },
 
             // Deprecated: Use updateUser(id, updates) instead
             // updateUser: (updates) => ... 
