@@ -20,6 +20,7 @@ interface PendingItem {
     createdAt: string;
     deliveryDate: string; // Used for "납기 임박" calculation
     comments?: { author: string; timestamp: string; content: string; authorId?: string }[];
+    tags?: string[]; // [NEW] Sticker tags
 }
 
 interface PendingOrderGroup {
@@ -39,7 +40,7 @@ export default function PendingOrders() {
     // Filters
     const [searchCustomer, setSearchCustomer] = useState('');
     const [searchPo, setSearchPo] = useState('');
-    const [dateFilter, setDateFilter] = useState<'ALL' | 'URGENT'>('URGENT'); // URGENT = <= 7 days
+    const [dateFilter, setDateFilter] = useState<'ALL' | 'URGENT' | 'URGENT_NO_COMMENT'>('URGENT'); // URGENT = <= 7 days
 
     // Comment State
     const [activeCommentItemId, setActiveCommentItemId] = useState<string | null>(null);
@@ -119,7 +120,8 @@ export default function PendingOrders() {
                         memo: order.memo || '',
                         createdAt: order.createdAt,
                         deliveryDate: deliveryDateStr,
-                        comments: poItem.comments || []
+                        comments: poItem.comments || [],
+                        tags: poItem.tags || []
                     });
                 }
             });
@@ -139,6 +141,14 @@ export default function PendingOrders() {
                 const diffTime = dDate.getTime() - today.getTime();
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 matchDate = diffDays <= 7;
+            } else if (dateFilter === 'URGENT_NO_COMMENT') {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const dDate = new Date(item.deliveryDate);
+                const diffTime = dDate.getTime() - today.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                const hasComments = item.comments && item.comments.length > 0;
+                matchDate = diffDays < 0 && !hasComments;
             }
 
             return matchCust && matchPo && matchDate;
@@ -193,6 +203,27 @@ export default function PendingOrders() {
         updateOrder(orderId, { po_items: updatedPoItems });
         setNewComment('');
     };
+
+    const handleToggleTag = (orderId: string, itemId: string, tag: string) => {
+        const targetOrder = orders.find(o => o.id === orderId);
+        if (!targetOrder || !targetOrder.po_items) return;
+
+        const updatedPoItems = targetOrder.po_items.map(pi => {
+            if (pi.id === itemId) {
+                const currentTags = pi.tags || [];
+                const newTags = currentTags.includes(tag)
+                    ? currentTags.filter(t => t !== tag)
+                    : [...currentTags, tag];
+                return { ...pi, tags: newTags };
+            }
+            return pi;
+        });
+
+        // Optimistic UI update and sync with store/backend
+        updateOrder(orderId, { po_items: updatedPoItems });
+    };
+
+    const availableTags = ['재고품', '사급', '출고대기', '생산중'];
 
     const handleDeleteComment = (orderId: string, itemId: string, commentIndex: number) => {
         if (!user || user.role !== 'MASTER') return;
@@ -313,13 +344,14 @@ export default function PendingOrders() {
                     <Filter className="w-4 h-4 text-slate-400" />
                     <select
                         value={dateFilter}
-                        onChange={(e) => setDateFilter(e.target.value as 'ALL' | 'URGENT')}
+                        onChange={(e) => setDateFilter(e.target.value as 'ALL' | 'URGENT' | 'URGENT_NO_COMMENT')}
                         className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
                         title="Filter by delivery date"
                         aria-label="Filter by delivery date"
                     >
                         <option value="ALL">전체 기간</option>
                         <option value="URGENT">🔥 납기 임박 (7일 이내)</option>
+                        <option value="URGENT_NO_COMMENT">⚠️ 지연 및 코멘트 누락</option>
                     </select>
                 </div>
                 <div className="ml-auto">
@@ -374,9 +406,10 @@ export default function PendingOrders() {
                                                     const uniqueId = `${item.orderId}-${item.itemId}`;
                                                     const isCommenting = activeCommentItemId === uniqueId;
                                                     const isFirstRow = index === 0;
+                                                    const isDelayedAndNoComment = statusObj.type === 'DELAYED' && (!item.comments || item.comments.length === 0);
 
                                                     return (
-                                                        <tr key={uniqueId} className={`hover:bg-slate-50 transition-colors group align-top ${!isFirstRow ? 'bg-slate-50/30' : ''}`}>
+                                                        <tr key={uniqueId} className={`hover:bg-slate-50 transition-colors group align-top ${!isFirstRow ? 'bg-slate-50/30' : ''} ${isDelayedAndNoComment ? 'bg-red-50/60 shadow-inner' : ''}`}>
                                                             {/* Customer Name */}
                                                             {isFirstRow && (
                                                                 <td className={`px-5 py-4 ${displayItems.length > 1 ? 'border-b border-slate-100' : ''}`} rowSpan={displayItems.length}>
@@ -427,6 +460,14 @@ export default function PendingOrders() {
                                                                 <div className="flex flex-col gap-1 items-end pr-8">
                                                                     <div className="font-bold text-slate-800 text-sm flex items-center gap-1.5 flex-wrap justify-end w-full">
                                                                         {!isFirstRow && <span className="text-slate-300 font-normal absolute left-3 top-4">└</span>}
+
+                                                                        {/* Tags Display */}
+                                                                        {item.tags && item.tags.length > 0 && item.tags.map(tag => (
+                                                                            <span key={tag} className={`text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border ${tag === '재고품' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : tag === '사급' ? 'bg-amber-50 text-amber-700 border-amber-200' : tag === '생산중' ? 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' : tag === '출고대기' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                                                                {tag}
+                                                                            </span>
+                                                                        ))}
+
                                                                         <span className="text-slate-900 bg-teal-50 px-1.5 py-0.5 rounded mr-1 leading-tight">{item.itemName}</span>
                                                                         {(item.thickness || item.size || item.material) && (
                                                                             <span className="text-slate-600 font-medium whitespace-nowrap">
@@ -434,6 +475,24 @@ export default function PendingOrders() {
                                                                             </span>
                                                                         )}
                                                                     </div>
+
+                                                                    {/* Tag Editor (Master/Manager) */}
+                                                                    {user?.role && ['MASTER', 'MANAGER', 'admin'].includes(user.role) && (
+                                                                        <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                            {availableTags.map(tag => {
+                                                                                const hasTag = item.tags?.includes(tag);
+                                                                                return (
+                                                                                    <button
+                                                                                        key={tag}
+                                                                                        onClick={() => handleToggleTag(group.orderId, item.itemId, tag)}
+                                                                                        className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${hasTag ? 'bg-indigo-50 text-indigo-700 border-indigo-200 font-bold' : 'bg-white text-slate-400 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'}`}
+                                                                                    >
+                                                                                        {hasTag ? `- ${tag}` : `+ ${tag}`}
+                                                                                    </button>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </td>
 

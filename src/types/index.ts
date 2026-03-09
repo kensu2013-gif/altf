@@ -65,6 +65,7 @@ export interface LineItem {
 
     // UI State
     isSelected?: boolean; // True if included in documents
+    tags?: string[]; // [NEW] Status tags/stickers like '재고품', '사급'
 }
 
 export interface Quotation {

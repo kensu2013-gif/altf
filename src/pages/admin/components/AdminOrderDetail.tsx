@@ -762,7 +762,24 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             });
 
             if (response.ok || response.type === 'opaque') {
-                const updatedPoItems = enrichedPoItems.map(item => ({ ...item, poSent: true, vendorName: supplierInfo.company_name }));
+                const updatedPoItems = enrichedPoItems.map(item => {
+                    // Auto-tagging logic
+                    const tags = item.tags ? [...item.tags] : [];
+                    if (!item.tags || item.tags.length === 0) {
+                        if (item.stockStatus === 'AVAILABLE') {
+                            tags.push('재고품');
+                        } else if (item.productId) {
+                            tags.push('사급');
+                        }
+                    }
+
+                    return {
+                        ...item,
+                        poSent: true,
+                        vendorName: supplierInfo.company_name,
+                        tags
+                    };
+                });
                 const allTxIssued = updatedPoItems.length > 0 && updatedPoItems.every(item => item.transactionIssued);
                 const newStatus = allTxIssued ? 'COMPLETED' : 'SHIPPED';
 
