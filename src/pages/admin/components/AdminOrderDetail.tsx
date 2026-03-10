@@ -768,8 +768,6 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     if (!item.tags || item.tags.length === 0) {
                         if (item.stockStatus === 'AVAILABLE') {
                             tags.push('재고품');
-                        } else if (item.productId) {
-                            tags.push('사급');
                         }
                     }
 

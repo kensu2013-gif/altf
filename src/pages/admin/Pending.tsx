@@ -41,6 +41,7 @@ export default function PendingOrders() {
     const [searchCustomer, setSearchCustomer] = useState('');
     const [searchPo, setSearchPo] = useState('');
     const [dateFilter, setDateFilter] = useState<'ALL' | 'URGENT' | 'URGENT_NO_COMMENT'>('URGENT'); // URGENT = <= 7 days
+    const [tagFilter, setTagFilter] = useState<string>('ALL'); // [NEW] Tag FILTER
 
     // Comment State
     const [activeCommentItemId, setActiveCommentItemId] = useState<string | null>(null);
@@ -151,7 +152,12 @@ export default function PendingOrders() {
                 matchDate = diffDays < 0 && !hasComments;
             }
 
-            return matchCust && matchPo && matchDate;
+            let matchTag = true;
+            if (tagFilter !== 'ALL') {
+                matchTag = item.tags ? item.tags.includes(tagFilter) : false;
+            }
+
+            return matchCust && matchPo && matchDate && matchTag;
         });
 
         const groupedMap = new Map<string, PendingOrderGroup>();
@@ -172,7 +178,7 @@ export default function PendingOrders() {
 
         // Sort by 납기 임박순 (Delivery Date ascending)
         return Array.from(groupedMap.values()).sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
-    }, [orders, searchCustomer, searchPo, dateFilter]);
+    }, [orders, searchCustomer, searchPo, dateFilter, tagFilter]);
 
     // Handlers
     const handleAddComment = (orderId: string, itemId: string) => {
@@ -223,7 +229,7 @@ export default function PendingOrders() {
         updateOrder(orderId, { po_items: updatedPoItems });
     };
 
-    const availableTags = ['재고품', '사급', '출고대기', '생산중'];
+    const availableTags = ['관리', '재고품', '사급', '출고대기', '생산중'];
 
     const handleDeleteComment = (orderId: string, itemId: string, commentIndex: number) => {
         if (!user || user.role !== 'MASTER') return;
@@ -359,6 +365,21 @@ export default function PendingOrders() {
                         <option value="URGENT_NO_COMMENT">⚠️ 지연 및 코멘트 누락</option>
                     </select>
                 </div>
+                <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-slate-400" />
+                    <select
+                        value={tagFilter}
+                        onChange={(e) => setTagFilter(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                        title="Filter by tag"
+                        aria-label="Filter by tag"
+                    >
+                        <option value="ALL">모든 아이템 (필터 없음)</option>
+                        {availableTags.map(tag => (
+                            <option key={tag} value={tag}>{tag}</option>
+                        ))}
+                    </select>
+                </div>
                 <div className="ml-auto">
                     <button
                         onClick={handleExportCSV}
@@ -468,7 +489,7 @@ export default function PendingOrders() {
 
                                                                         {/* Tags Display */}
                                                                         {item.tags && item.tags.length > 0 && item.tags.map(tag => (
-                                                                            <span key={tag} className={`text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border ${tag === '재고품' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : tag === '사급' ? 'bg-amber-50 text-amber-700 border-amber-200' : tag === '생산중' ? 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' : tag === '출고대기' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                                                            <span key={tag} className={`text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border ${tag === '관리' ? 'bg-red-50 text-red-700 border-red-200' : tag === '재고품' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : tag === '사급' ? 'bg-amber-50 text-amber-700 border-amber-200' : tag === '생산중' ? 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' : tag === '출고대기' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                                                                                 {tag}
                                                                             </span>
                                                                         ))}
