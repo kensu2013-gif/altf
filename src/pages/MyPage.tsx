@@ -623,6 +623,8 @@ export default function MyPage() {
                                                                     <span className="text-slate-400 text-xs font-mono">{quote.id.slice(0, 8)}</span>
                                                                     <span className="text-slate-300 hidden sm:inline">|</span>
                                                                     <span className="text-slate-600 font-medium text-sm mt-1 sm:mt-0 w-full sm:w-auto">{formatDate(quote.createdAt)}</span>
+                                                                    <span className="text-slate-300 hidden sm:inline">|</span>
+                                                                    <span className="text-slate-700 font-bold text-sm">{quote.customerName || quote.customerInfo?.companyName || '미지정'}</span>
                                                                 </div>
                                                                 <div className="flex flex-wrap items-center gap-3">
                                                                     <span className="font-bold text-slate-800">{formatCurrency(quote.totalAmount)}</span>

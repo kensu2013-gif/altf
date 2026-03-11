@@ -2,7 +2,7 @@ import { useState, memo, useMemo, useCallback, useEffect } from 'react';
 import type { Order, LineItem, Product } from '../../../types';
 // import { generateSku } from '../../../lib/sku'; // REMOVED: Managed in useInventoryIndex
 import { useStore } from '../../../store/useStore';
-import { X, AlertTriangle, Check, Calendar, Package, User, Trash2, Plus, Download, FileText, Minus, Equal, Send } from 'lucide-react';
+import { X, AlertTriangle, Check, Calendar, Package, User, Trash2, Plus, Download, FileText, Minus, Equal, Send, SplitSquareHorizontal } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { useInventoryIndex } from '../../../hooks/useInventoryIndex';
 
@@ -343,6 +343,40 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             const newItems = displayedItems.filter((_, i) => i !== index);
             setDisplayedItems(newItems);
         }
+    };
+
+    const handleSplitItem = (index: number) => {
+        const item = displayedItems[index];
+        const splitQtyStr = prompt(`현재 수량은 ${item.quantity}입니다. 분할하여 빼낼(새로운 줄로 만들) 수량을 입력하세요.`);
+        if (!splitQtyStr) return;
+        const splitQty = Number(splitQtyStr);
+        if (isNaN(splitQty) || splitQty <= 0 || splitQty >= item.quantity) {
+            alert('유효하지 않은 수량입니다. 기존 수량보다 작아야 합니다.');
+            return;
+        }
+
+        const newItems = [...displayedItems];
+        // 1. Reduce original item quantity
+        const newOriginalQty = item.quantity - splitQty;
+        newItems[index] = {
+            ...item,
+            quantity: newOriginalQty,
+            amount: item.unitPrice * newOriginalQty
+        };
+
+        // 2. Create new split item
+        const splitItemId = `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const splitItem: LineItem = {
+            ...item,
+            id: splitItemId,
+            quantity: splitQty,
+            amount: item.unitPrice * splitQty,
+            transactionIssued: false // Reset for the split item
+        };
+
+        // Insert the split item right after the original item
+        newItems.splice(index + 1, 0, splitItem);
+        setDisplayedItems(newItems);
     };
 
     const handleDownloadPO = () => {
@@ -1625,15 +1659,26 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                             />
                                                         </div>
                                                     </td>
-                                                    < td className="px-4 py-3 text-center align-middle" >
-                                                        <input
-                                                            type="number"
-                                                            title="Supplier Item Quantity"
-                                                            value={item.quantity}
-                                                            onChange={(e) => handleItemChange(idx, 'quantity', Number(e.target.value))}
-                                                            onKeyDown={handleKeyDown}
-                                                            className="w-12 text-center px-1 py-1 rounded border border-indigo-200 outline-none focus:border-indigo-500 font-mono font-bold text-slate-800 text-xs"
-                                                        />
+                                                    <td className="px-4 py-3 text-center align-middle">
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <input
+                                                                type="number"
+                                                                title="Supplier Item Quantity"
+                                                                value={item.quantity}
+                                                                onChange={(e) => handleItemChange(idx, 'quantity', Number(e.target.value))}
+                                                                onKeyDown={handleKeyDown}
+                                                                className="w-12 text-center px-1 py-1 rounded border border-indigo-200 outline-none focus:border-indigo-500 font-mono font-bold text-slate-800 text-xs"
+                                                            />
+                                                            {!isSupplierMode && item.quantity > 1 && (
+                                                                <button
+                                                                    onClick={() => handleSplitItem(idx)}
+                                                                    className="p-1 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded transition-colors"
+                                                                    title="품목 분할 (부분 출고)"
+                                                                >
+                                                                    <SplitSquareHorizontal className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </td>
 
                                                     {
