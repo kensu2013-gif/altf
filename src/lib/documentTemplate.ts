@@ -179,6 +179,9 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             .col-mat { width: 12%; text-align: center; }
             
             .col-stock { width: 8%; text-align: center; } 
+            th.col-stock { ${isPurchaseOrder ? 'font-size: 12px; font-weight: normal;' : ''} }
+            td.col-stock { ${isPurchaseOrder ? 'font-size: 13px !important; font-weight: normal !important;' : ''} }
+            
             .col-status { width: 10%; text-align: center; } 
             /* LOC Column hidden by dynamically not rendering or reallocating width */
             

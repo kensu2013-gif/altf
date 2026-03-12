@@ -381,12 +381,12 @@ export const useStore = create<AppState>()(
             },
 
             logout: () => {
-                const { token } = get().auth;
-                if (token) {
+                const { token, user } = get().auth;
+                if (token || user) {
                     fetch((import.meta.env.VITE_API_URL || '') + '/api/auth/logout', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ token })
+                        body: JSON.stringify({ token, user })
                     }).catch(e => console.error('[Store] Logout error:', e));
                 }
                 set({

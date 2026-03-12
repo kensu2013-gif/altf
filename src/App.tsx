@@ -182,7 +182,7 @@ function SessionManager() {
         const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/heartbeat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: auth.token, activity: `Browsing: ${location.pathname}` })
+          body: JSON.stringify({ token: auth.token, activity: `Browsing: ${location.pathname}`, user: auth.user })
         });
 
         if (res.status === 401) {
@@ -201,7 +201,7 @@ function SessionManager() {
       window.removeEventListener('scroll', updateActivity, true);
       clearInterval(intervalId);
     };
-  }, [auth.isAuthenticated, auth.token, logout, location.pathname]);
+  }, [auth.isAuthenticated, auth.token, auth.user, logout, location.pathname]);
 
   return null;
 }

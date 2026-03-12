@@ -103,6 +103,7 @@ export interface User {
     phone: string;
     fax?: string;
     role: 'MASTER' | 'MANAGER' | 'CUSTOMER' | 'admin' | 'user'; // Kept legacy for compatibility during migration
+    lastLoginAt?: number;
     managerIds?: string[]; // [NEW] Support multiple managers
     managerId?: string; // [DEPRECATED] Backwards compatibility
     // For MANAGER

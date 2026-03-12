@@ -357,6 +357,9 @@ const server = http.createServer(async (req, res) => {
                         res.end(JSON.stringify({ error: 'PENDING_APPROVAL' }));
                         return;
                     }
+                    // Update lastLoginAt
+                    user.lastLoginAt = Date.now();
+                    
                     // Return user without password
                     const { password, ...userWithoutPassword } = user;
                     console.log(`[API] Login success: ${email}`);
@@ -397,6 +400,8 @@ const server = http.createServer(async (req, res) => {
                     db.loginLogs.push(loginLog);
                     // Keep only last 1000 logs
                     if (db.loginLogs.length > 1000) db.loginLogs.shift();
+                    
+                    // Save to S3
                     await saveData();
 
                     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -422,14 +427,29 @@ const server = http.createServer(async (req, res) => {
         req.on('data', chunk => body += chunk.toString());
         req.on('end', () => {
             try {
-                const { token, activity } = JSON.parse(body);
-                const session = activeSessions.get(token);
+                const { token, activity, user } = JSON.parse(body);
+                let session = activeSessions.get(token);
 
                 if (!session) {
-                    // Token not found (maybe logged in somewhere else, or expired)
-                    res.writeHead(401, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Session expired or logged in from another device' }));
-                    return;
+                    // Try to restore session if user data is provided
+                    if (user && user.id) {
+                        session = {
+                            userId: user.id,
+                            email: user.email,
+                            companyName: user.companyName,
+                            role: user.role,
+                            lastSeen: Date.now(),
+                            activity: activity || 'Session restored',
+                            ip: req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'Unknown'
+                        };
+                        activeSessions.set(token, session);
+                        console.log(`[API] Session restored for user ${user.email}`);
+                    } else {
+                        // Token not found (maybe logged in somewhere else, or expired)
+                        res.writeHead(401, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'Session expired or logged in from another device' }));
+                        return;
+                    }
                 }
 
                 // Update session
@@ -452,27 +472,41 @@ const server = http.createServer(async (req, res) => {
         req.on('data', chunk => body += chunk.toString());
         req.on('end', async () => {
             try {
-                const { token } = JSON.parse(body);
+                const { token, user } = JSON.parse(body);
+                
+                let logoutUserId, logoutEmail, logoutCompanyName, logoutRole;
+                
                 if (token && activeSessions.has(token)) {
                     const session = activeSessions.get(token);
+                    logoutUserId = session.userId;
+                    logoutEmail = session.email;
+                    logoutCompanyName = session.companyName;
+                    logoutRole = session.role;
+                    activeSessions.delete(token);
+                } else if (user) {
+                    // Fallback to provided user data if session is lost
+                    logoutUserId = user.id;
+                    logoutEmail = user.email;
+                    logoutCompanyName = user.companyName;
+                    logoutRole = user.role;
+                }
 
+                if (logoutUserId) {
                     // Add to login logs
                     const logoutLog = {
                         id: crypto.randomUUID(),
-                        userId: session.userId,
-                        email: session.email,
-                        companyName: session.companyName,
-                        role: session.role,
+                        userId: logoutUserId,
+                        email: logoutEmail,
+                        companyName: logoutCompanyName,
+                        role: logoutRole,
                         action: 'LOGOUT',
                         timestamp: Date.now(),
-                        ip: session.ip
+                        ip: req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'Unknown'
                     };
                     db.loginLogs.push(logoutLog);
                     if (db.loginLogs.length > 1000) db.loginLogs.shift();
                     await saveData();
-
-                    activeSessions.delete(token);
-                    console.log(`[API] Logged out and cleared session for token: ${token}`);
+                    console.log(`[API] Logged out user ${logoutEmail}`);
                 }
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));

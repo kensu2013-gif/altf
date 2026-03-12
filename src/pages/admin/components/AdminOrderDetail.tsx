@@ -526,6 +526,12 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         if (field === 'spec') return;
 
         const updatedItem = { ...newItems[index], [field]: value };
+        
+        // [BUG FIX] Reset productId when manual specs are typed to force a fresh spec match
+        if (['name', 'thickness', 'size', 'material'].includes(field as string)) {
+            updatedItem.productId = null;
+        }
+
         const matchedProduct = findProduct(updatedItem);
 
         if (matchedProduct) {

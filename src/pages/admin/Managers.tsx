@@ -127,13 +127,14 @@ export default function AdminManagers() {
                             <th className="px-6 py-4 font-medium">이름 / 이메일</th>
                             <th className="px-6 py-4 font-medium">소속 (부서)</th>
                             <th className="px-6 py-4 font-medium">연락처</th>
+                            <th className="px-6 py-4 font-medium text-center">최근 접속일</th>
                             <th className="px-6 py-4 font-medium text-right">관리</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {filteredUsers.length === 0 ? (
                             <tr>
-                                <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
+                                <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                                     등록된 영업 담당자가 없습니다.
                                 </td>
                             </tr>
@@ -157,6 +158,16 @@ export default function AdminManagers() {
                                     <div className="text-slate-400 text-xs flex items-center gap-1 mt-1">
                                         <MapPin className="w-3 h-3" /> {user.address}
                                     </div>
+                                </td>
+                                <td className="px-6 py-4 text-center text-xs text-slate-500">
+                                    {user.lastLoginAt ? (
+                                        <div className="flex flex-col items-center gap-1">
+                                            <span>{new Date(user.lastLoginAt).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span>
+                                            <span className="text-[10px] text-slate-400">{new Date(user.lastLoginAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-slate-300">-</span>
+                                    )}
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     <div className="flex justify-end gap-2">

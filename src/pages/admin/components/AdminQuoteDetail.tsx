@@ -234,6 +234,11 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             const newItems = [...prevItems];
             const updatedItem = { ...newItems[index], [field]: value };
 
+            // [BUG FIX] Reset productId when manual specs are typed to force a fresh spec match
+            if (['name', 'thickness', 'size', 'material'].includes(field as string)) {
+                updatedItem.productId = null;
+            }
+
             // Dynamic SKU Lookup
             const matchedProduct = findMatchingProduct(updatedItem, inventory);
 
