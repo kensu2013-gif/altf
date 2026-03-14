@@ -2144,28 +2144,48 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-6 border-t border-slate-200 bg-white flex items-center justify-end gap-3" >
-                    <Button variant="outline" onClick={onClose} >
-                        닫기
-                    </Button>
-                    < Button
-                        onClick={() => isSupplierMode ? handleSupplierSave() : handleSave()}
-                        disabled={isSendingWebhook}
-                        className={`shadow-lg px-6 ${isSupplierMode
-                            ? 'bg-red-600 hover:bg-red-700 shadow-red-500/20'
-                            : 'bg-teal-600 hover:bg-teal-700 shadow-teal-500/20'} text-white`}
-                    >
-                        {isSendingWebhook ? '처리중...' : (isSupplierMode ? '매입 발주서 저장/전송' : '주문 확정 및 답변 전송')}
-                    </Button>
-                    < Button
-                        onClick={handleJustSave}
-                        className="bg-slate-800 text-white hover:bg-slate-900 shadow-lg px-4"
-                    >
-                        저장(Save)
-                    </Button>
+                <div className="p-6 border-t border-slate-200 bg-white flex items-center justify-between gap-3">
+                    <div>
+                        {!isSupplierMode && order.po_items && order.po_items.length > 0 && order.po_items.some(item => !item.transactionIssued) && (
+                            <Button
+                                onClick={async () => {
+                                    if(confirm('이 주문의 모든 품목을 "명세표 발행 완료(미결 종료)" 상태로 강제 변경하시겠습니까?\n\n(참고: 운임비 등 수기 추가 품목으로 인해 미결목록에서 안 빠지는 경우 이 버튼을 누르세요.)')) {
+                                        const updatedPoItems = order.po_items!.map(poItem => ({ ...poItem, transactionIssued: true }));
+                                        const isPoOverallSent = order.poSent || !!order.supplierPO || (updatedPoItems.length > 0 && updatedPoItems.every(item => item.poSent));
+                                        const newStatus = (updatedPoItems.every(item => item.transactionIssued) && isPoOverallSent) ? 'COMPLETED' : order.status;
+                                        await handleSave({ po_items: updatedPoItems, status: newStatus !== order.status ? newStatus : undefined });
+                                        alert('미결 리스트에서 성공적으로 강제 종료되었습니다.');
+                                    }
+                                }}
+                                className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg px-4 text-xs font-bold transition-colors"
+                            >
+                                모든 품목 미결 강제종료
+                            </Button>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <Button variant="outline" onClick={onClose}>
+                            닫기
+                        </Button>
+                        <Button
+                            onClick={() => isSupplierMode ? handleSupplierSave() : handleSave()}
+                            disabled={isSendingWebhook}
+                            className={`shadow-lg px-6 ${isSupplierMode
+                                ? 'bg-red-600 hover:bg-red-700 shadow-red-500/20'
+                                : 'bg-teal-600 hover:bg-teal-700 shadow-teal-500/20'} text-white`}
+                        >
+                            {isSendingWebhook ? '처리중...' : (isSupplierMode ? '매입 발주서 저장/전송' : '주문 확정 및 답변 전송')}
+                        </Button>
+                        <Button
+                            onClick={handleJustSave}
+                            className="bg-slate-800 text-white hover:bg-slate-900 shadow-lg px-4"
+                        >
+                            저장(Save)
+                        </Button>
+                    </div>
                 </div>
 
-            </div >
+            </div>
             {
                 previewHtml && (
                     <PreviewModal

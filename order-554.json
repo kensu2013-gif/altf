@@ -1,0 +1,103 @@
+{
+  "id": "PO-20260312-TAEIL-012",
+  "userId": "c7591d83-191a-4eeb-a2ae-35f20b651ba3",
+  "items": [
+    {
+      "id": "ORD-ITEM-0-1773294137250",
+      "productId": "CAP-S20S-100A-STS304-S",
+      "name": "CAP",
+      "thickness": "S20S",
+      "size": "100A",
+      "material": "STS304-S",
+      "quantity": 18,
+      "unitPrice": 11390,
+      "amount": 205020,
+      "isVerified": true,
+      "currentStock": 136,
+      "location": "양산",
+      "maker": "대경",
+      "stockStatus": "AVAILABLE",
+      "marking_wait_qty": 0,
+      "base_price": 32540,
+      "isSelected": true,
+      "discountRate": 65,
+      "supplierRate": 65
+    }
+  ],
+  "totalAmount": 205020,
+  "customerName": "태일공업사",
+  "customerNumber": "",
+  "status": "COMPLETED",
+  "createdAt": "2026-03-12T05:42:18.234Z",
+  "memo": "배송:화물 - 광양칠성지점\n담당자: 현대배관 (061-761-0643)\n요청사항: 착불화물 / 549번이랑 같이 금일출고 요청\n[재고장 확인의 건]",
+  "attachments": [],
+  "adminResponse": {
+    "confirmedPrice": 205020,
+    "deliveryDate": "2026-03-12",
+    "note": "",
+    "globalDiscountRate": 0,
+    "additionalCharges": []
+  },
+  "supplierInfo": {
+    "company_name": "(주)대경벤드",
+    "contact_name": "정호근 과장",
+    "tel": "055-364-1800",
+    "email": "dksales@daekyungbend.com",
+    "address": "경상남도 양산시 어실로 115",
+    "note": "CUSTOEMR: 현대배관 / 당일출고 요청\n[납기지정]: 2026-03-12"
+  },
+  "buyerInfo": {
+    "company_name": "알트에프",
+    "contact_name": "이사랑 사원",
+    "tel": "010-8615-5868",
+    "email": "srlee@altf.kr",
+    "address": "부산광역시 사상구 낙동대로1310번길 55"
+  },
+  "poNumber": "ES260312-554",
+  "poTitle": "[알트에프] 대경벤드 발주서 첨부건 - 554",
+  "poEndCustomer": "현대배관",
+  "po_items": [
+    {
+      "id": "ORD-ITEM-0-1773294137250",
+      "productId": "CAP-S20S-100A-STS304-S",
+      "name": "CAP",
+      "thickness": "S20S",
+      "size": "100A",
+      "material": "STS304-S",
+      "quantity": 18,
+      "unitPrice": 11390,
+      "amount": 205020,
+      "isVerified": true,
+      "currentStock": 136,
+      "location": "양산",
+      "maker": "대경",
+      "stockStatus": "AVAILABLE",
+      "marking_wait_qty": 0,
+      "base_price": 32540,
+      "isSelected": true,
+      "supplierRate": 67,
+      "poSent": true,
+      "vendorName": "(주)대경벤드",
+      "tags": [
+        "재고품"
+      ],
+      "transactionIssued": true
+    }
+  ],
+  "lastUpdatedBy": {
+    "name": "이사랑 사원",
+    "id": "bae92440-6024-4eb0-a49d-7c1f9fb515d5",
+    "email": "srlee@altf.kr",
+    "at": "2026-03-13T00:23:10.265Z"
+  },
+  "manager": {
+    "name": "이사랑 사원",
+    "id": "bae92440-6024-4eb0-a49d-7c1f9fb515d5",
+    "email": "srlee@altf.kr"
+  },
+  "poSent": true,
+  "supplierPO": {
+    "url": "https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/documents/purchase_orders/PO-20260312-TAEIL-012_po/1773294236611_554260312ALTF.pdf",
+    "name": "554 발주서 대경벤드 260312 (ALTF,현대배관,).pdf"
+  }
+}

@@ -1,0 +1,25 @@
+Order ID: PO-20260310-TAEIL-017, PO: ES260310-546, Customer: 태일공업사
+  Items: 14
+  PO Items: 15
+  >>> Found 546!
+Order ID: PO-20260305-TAEIL-007, PO: ES260305-472, Customer: 태일공업사
+  Items: 6
+  PO Items: 5
+  >>> Found 472!
+    Item 1: 90E(L) 350A - Qty: 4
+    Item 2: 45E(L) 350A - Qty: 1
+    Item 3: 45E(L) 350A - Qty: 3
+    Item 4: R(C) 350A X 200A - Qty: 2
+    Item 5: 90E(L) 150A - Qty: 6
+    Item 6: 90E(L) 65A - Qty: 6
+Order ID: PO-20260304-TAEIL-029, PO: ES260204-274, Customer: 태일공업사
+  Items: 7
+  PO Items: 7
+  >>> Found 274!
+    Item 1: 45E(S) 125A - Qty: 15
+    Item 2: 45E(S) 200A - Qty: 10
+    Item 3: 45E(S) 400A - Qty: 18
+    Item 4: 90E(S) 125A - Qty: 33
+    Item 5: 90E(S) 400A - Qty: 6
+    Item 6: 90E(S) 40A - Qty: 6
+    Item 7: R(C) 125A X 100A - Qty: 3
