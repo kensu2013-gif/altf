@@ -189,13 +189,16 @@ export default function AdminQuotes() {
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className="font-bold text-slate-800 text-lg">{isModified ? displayCompany : quote.customerNumber}</span>
+                                                <span className="font-bold text-slate-800 text-lg">
+                                                    {displayCompany}
+                                                    {displayContact && <span className="text-base text-slate-500 font-medium ml-1">({displayContact})</span>}
+                                                </span>
                                                 <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{quote.id}</span>
                                                 {isModified && <span className="text-[10px] font-normal text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded ml-1 border border-teal-100">수정됨</span>}
                                             </div>
                                             <div className={`text-sm font-bold ${isModified ? 'text-teal-700' : 'text-indigo-700'} mb-1 flex items-center gap-1.5`}>
                                                 <span className={`w-1.5 h-1.5 rounded-full ${isModified ? 'bg-teal-400' : 'bg-indigo-400'} inline-block`}></span>
-                                                {isModified ? `원주문: ${quote.customerNumber}` : displayCompany} <span className="text-slate-400 font-normal text-xs ml-1">{displayContact ? `(${displayContact})` : ''}</span>
+                                                원주문: {quote.customerNumber}
                                             </div>
                                             <div className="text-sm text-slate-500 flex items-center gap-4">
                                                 <span className="flex items-center gap-1">
