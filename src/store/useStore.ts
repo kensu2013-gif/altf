@@ -664,12 +664,22 @@ export const useStore = create<AppState>()(
             syncDraftQuotation: async () => {
                 const { auth, quotation } = get();
                 if (!auth.isAuthenticated || !auth.user) return;
+                
+                // Attach a timestamp to ensure accurate polling from other devices
+                const syncedQuotation = {
+                    ...quotation,
+                    lastUpdated: Date.now()
+                };
+
+                // Update local state to reflect the new timestamp
+                set({ quotation: syncedQuotation });
+
                 try {
                     // Save draft to user profile
                     await fetch(`${import.meta.env.VITE_API_URL || ''}/api/users/${auth.user.id}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ draftQuotation: quotation })
+                        body: JSON.stringify({ draftQuotation: syncedQuotation })
                     });
                 } catch (e) {
                     console.error('Failed to sync draft', e);
@@ -684,10 +694,19 @@ export const useStore = create<AppState>()(
                         const users = await res.json();
                         const user = users.find((u: User) => u.id === auth.user?.id);
                         if (user && user.draftQuotation) {
-                            // Only overwrite if local is empty or we want to force sync
-                            // For simplicity, we just merge or replace if local is empty
-                            if (quotation.items.length === 0 && user.draftQuotation.items.length > 0) {
-                                set({ quotation: user.draftQuotation });
+                            
+                            const serverDraft = user.draftQuotation;
+                            const localTimestamp = (quotation as any).lastUpdated || 0;
+                            const serverTimestamp = serverDraft.lastUpdated || 0;
+
+                            // If server has a newer draft (e.g. edited on Mobile), pull it.
+                            if (serverTimestamp > localTimestamp) {
+                                set({ quotation: serverDraft });
+                                console.log('[Store] Pulled newer draft quotation from server.');
+                            } else if (quotation.items.length === 0 && serverDraft.items.length > 0 && localTimestamp === 0) {
+                                // Fallback: Initial load where local has nothing and no timestamp
+                                set({ quotation: serverDraft });
+                                console.log('[Store] Initial draft quotation load from server.');
                             }
                         }
                     }

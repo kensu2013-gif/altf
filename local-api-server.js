@@ -367,11 +367,24 @@ const server = http.createServer(async (req, res) => {
                     // Generate a new unique token for this login session
                     const loginToken = crypto.randomUUID();
 
-                    // Remove any existing active sessions for this userId to enforce single device login
+                    // Find all existing sessions for this user
+                    const userSessions = [];
                     for (const [existingToken, session] of activeSessions.entries()) {
                         if (session.userId === user.id) {
-                            activeSessions.delete(existingToken);
-                            console.log(`[API] Cleared previous session for user ${email}`);
+                            userSessions.push({ token: existingToken, ...session });
+                        }
+                    }
+
+                    // Enforce 2-device limit: If there are already 2 or more, remove the oldest until we have space for the new one (so 1 remaining)
+                    if (userSessions.length >= 2) {
+                        // Sort by lastSeen (ascending = oldest first)
+                        userSessions.sort((a, b) => a.lastSeen - b.lastSeen);
+                        // Calculate how many we need to remove to leave exactly 1 session (so adding the new one makes it 2)
+                        const overLimitCount = userSessions.length - 1;
+                        for (let i = 0; i < overLimitCount; i++) {
+                            const oldestSession = userSessions[i];
+                            activeSessions.delete(oldestSession.token);
+                            console.log(`[API] Device limit reached. Cleared oldest session for user ${email}`);
                         }
                     }
 
