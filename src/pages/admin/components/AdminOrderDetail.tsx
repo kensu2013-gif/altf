@@ -461,7 +461,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             },
             customer: {
                 // [MOD] Use Signup Info (linkedUser) specifically for Transaction Statement
-                company_name: linkedUser?.companyName || order.customerName,
+                company_name: poEndCustomer || linkedUser?.companyName || order.customerName,
                 contact_name: linkedUser?.contactName || customerInfo.contactName,
                 tel: linkedUser?.phone || customerInfo.tel,
                 email: linkedUser?.email || '',
