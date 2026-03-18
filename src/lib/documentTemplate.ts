@@ -396,7 +396,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             return appendedNote ? `
     <div style="margin-top: 15px; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; background-color: #f8fafc;">
         <div style="font-weight: 700; color: #475569; margin-bottom: 4px; ${document_type === 'PURCHASE_ORDER' ? 'font-size: 14px;' : 'font-size: 11px;'}">배송요청사항 </div>
-        <div style="white-space: pre-wrap; color: #334155; ${document_type === 'PURCHASE_ORDER' ? 'font-size: 14px; font-weight: bold;' : 'font-size: 10px;'}">${appendedNote.replace(/(\[재고장 확인의 건\]|\[무마킹 출고 조건\]|\[주문제작 요청건\])/g, '<span style="color: #ffffff; font-size: 16px; font-weight: 900;">$1</span>')}</div>
+        <div style="white-space: pre-wrap; color: #334155; ${document_type === 'PURCHASE_ORDER' ? 'font-size: 14px; font-weight: bold;' : 'font-size: 10px;'}">${appendedNote.replace(/(\[재고장 확인의 건\]|\[무마킹 출고 조건\]|\[주문제작 요청건\])/g, '<span style="color: #e11d48; font-size: 16px; font-weight: 900;">$1</span>')}</div>
     </div>` : '';
             })()}
                 ` : `

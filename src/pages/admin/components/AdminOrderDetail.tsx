@@ -1130,7 +1130,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 checked={poOptionNoMarking}
                                                                 onChange={(e) => { setPoOptionNoMarking(e.target.checked); if (!printOptionTouched) setPrintOptionTouched(true); }}
                                                             />
-                                                            < label htmlFor="po-opt-nomarking" className="text-xs font-bold text-slate-700 cursor-pointer" >
+                                                            < label htmlFor="po-opt-nomarking" className="text-xs font-bold text-red-600 cursor-pointer" >
                                                                 무마킹 출고 조건
                                                             </label>
                                                         </div>
@@ -1142,7 +1142,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 checked={poOptionStockCheck}
                                                                 onChange={(e) => { setPoOptionStockCheck(e.target.checked); if (!printOptionTouched) setPrintOptionTouched(true); }}
                                                             />
-                                                            < label htmlFor="po-opt-stock" className="text-xs font-bold text-slate-700 cursor-pointer" >
+                                                            < label htmlFor="po-opt-stock" className="text-xs font-bold text-red-600 cursor-pointer" >
                                                                 재고장 확인의 건 </label>
                                                         </div>
                                                         < div className="flex items-center gap-2" >
@@ -1153,7 +1153,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 checked={poOptionCustomOrder}
                                                                 onChange={(e) => { setPoOptionCustomOrder(e.target.checked); if (!printOptionTouched) setPrintOptionTouched(true); }}
                                                             />
-                                                            < label htmlFor="po-opt-custom" className="text-xs font-bold text-slate-700 cursor-pointer" >
+                                                            < label htmlFor="po-opt-custom" className="text-xs font-bold text-red-600 cursor-pointer" >
                                                                 주문제작 요청건
                                                             </label>
                                                         </div>
