@@ -185,11 +185,10 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             .col-mat { width: 12%; text-align: center; }
             
             .col-stock { width: 8%; text-align: center; } 
-            th.col-stock { ${isPurchaseOrder ? 'font-size: 12px; font-weight: normal; color: #ffffff !important;' : ''} }
+            th.col-stock { ${isPurchaseOrder ? 'font-size: 12px; font-weight: normal;' : ''} }
             td.col-stock { ${isPurchaseOrder ? 'font-size: 13px !important; font-weight: normal !important; color: #ffffff !important;' : ''} }
             
-            .col-status { width: 10%; text-align: center; } 
-            th.col-status { ${isPurchaseOrder ? 'color: #ffffff !important;' : ''} } 
+            .col-status { width: 10%; text-align: center; }
             /* LOC Column hidden by dynamically not rendering or reallocating width */
             
             .col-qty { width: 6%; text-align: center; } 
@@ -334,8 +333,8 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                             <th class="col-size">규격<br><span class="sub-text">SIZE</span></th>
                             <th class="col-mat">재질<br><span class="sub-text">MATERIAL</span></th>
                             ${!isTransaction ? `
-                            <th class="col-stock"><span style="color: ${isPurchaseOrder ? '#ffffff' : 'inherit'};">재고</span><br><span class="sub-text" style="color: ${isPurchaseOrder ? '#ffffff' : 'inherit'};">STOCK</span></th>
-                            <th class="col-status"><span style="color: ${isPurchaseOrder ? '#ffffff' : 'inherit'};">상태</span><br><span class="sub-text" style="color: ${isPurchaseOrder ? '#ffffff' : 'inherit'};">STAT</span></th>
+                            <th class="col-stock">재고<br><span class="sub-text">STOCK</span></th>
+                            <th class="col-status">상태<br><span class="sub-text">STAT</span></th>
                             ` : ''}
                             <th class="col-qty">수량<br><span class="sub-text">QTY</span></th>
                             <th class="col-price">단가<br><span class="sub-text">PRICE</span></th>
