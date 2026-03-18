@@ -321,7 +321,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                         <col class="col-mat">
                         <col class="col-stock">
                         <col class="col-status">
-                        ${!isPurchaseOrder && document_type !== 'QUOTATION' ? `<col class="col-loc">` : ''}
+                        ${/* !isPurchaseOrder && document_type !== 'QUOTATION' ? \`<col class="col-loc">\` : '' */ ''}
                         <col class="col-qty">
                         <col class="col-price">
                         <col class="col-amt">
@@ -337,7 +337,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                             ${!isTransaction ? `
                             <th class="col-stock"><span style="color: ${isPurchaseOrder ? '#ffffff' : 'inherit'};">재고</span><br><span class="sub-text" style="color: ${isPurchaseOrder ? '#ffffff' : 'inherit'};">STOCK</span></th>
                             <th class="col-status"><span style="color: ${isPurchaseOrder ? '#ffffff' : 'inherit'};">상태</span><br><span class="sub-text" style="color: ${isPurchaseOrder ? '#ffffff' : 'inherit'};">STAT</span></th>
-                            ${!isPurchaseOrder && document_type !== 'QUOTATION' ? `<th class="col-loc">위치<br><span class="sub-text">LOC</span></th>` : ''}
+                            ${/* !isPurchaseOrder && document_type !== 'QUOTATION' ? \`<th class="col-loc">위치<br><span class="sub-text">LOC</span></th>\` : '' */ ''}
                             ` : ''}
                             <th class="col-qty">수량<br><span class="sub-text">QTY</span></th>
                             <th class="col-price">단가<br><span class="sub-text">PRICE</span></th>
@@ -368,7 +368,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 return `<span style="color: ${c}; font-weight: 800;">${st}</span>`;
             })()}
                             </td>
-                            ${!isPurchaseOrder && document_type !== 'QUOTATION' ? `<td class="col-loc">${item.location_maker || '-'}</td>` : ''}
+                            ${/* !isPurchaseOrder && document_type !== 'QUOTATION' ? \`<td class="col-loc">${item.location_maker || '-'}</td>\` : '' */ ''}
                             ` : ''}
                             <td class="col-qty">${item.qty}</td>
                             <td class="col-price text-right">${formatCurrency(item.unit_price)}</td>
