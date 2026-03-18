@@ -693,8 +693,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                 />
                                             </th>
                                             <th className="px-2 py-3 w-[3%] text-center text-slate-400 font-normal">No.</th>
-                                            <th className="px-4 py-3 w-[25%] text-left">품목명 / 규격 (Item/Spec)</th>
-                                            <th className="px-2 py-3 text-center w-[4%]">현재고</th>
+                                            <th className="px-4 py-3 w-[23%] text-left">품목명 / 규격 (Item/Spec)</th>
+                                            <th className="px-2 py-3 text-center w-[6%] whitespace-nowrap">현재고</th>
                                             <th className="px-2 py-3 text-center w-[4%]">수량</th>
 
                                             {/* Reference / Base Price Column */}

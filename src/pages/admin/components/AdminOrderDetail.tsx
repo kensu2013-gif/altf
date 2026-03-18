@@ -1469,7 +1469,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                             ) : (
                                                 /* Customer Columns */
                                                 <>
-                                                    <th className="px-2 py-3 text-center w-[5%]" > 현재재고 </th>
+                                                    <th className="px-2 py-3 text-center w-[6%] whitespace-nowrap" > 현재재고 </th>
                                                     < th className="px-2 py-3 text-center w-[5%]" > 상태 </th>
                                                     < th className="px-2 py-3 text-right text-slate-500 w-[7%]" > 기준단가(Base) </th>
                                                     < th className="px-4 py-3 text-center w-[8%]" >
@@ -1790,8 +1790,21 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                         ) : (
                                                             /* Customer Mode Row Cells */
                                                             <>
-                                                                <td className="px-4 py-3 text-center align-middle font-mono text-sm font-bold text-slate-900" >
-                                                                    {isUnlinked ? '-' : currentStock.toLocaleString()}
+                                                                <td className="px-2 py-3 text-center align-middle whitespace-nowrap">
+                                                                    {isUnlinked ? (
+                                                                        <span className="font-bold text-slate-400">-</span>
+                                                                    ) : (
+                                                                        <div className="flex flex-col items-center text-xs w-auto min-w-[75px] mx-auto px-1 space-y-0.5">
+                                                                            <div className="flex justify-between w-full gap-2 whitespace-nowrap">
+                                                                                <span className="text-slate-500 font-normal">양산:</span>
+                                                                                <span className="font-bold text-slate-800">{((product?.locationStock?.['양산'] as number) ?? (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (product.shQty ?? 0)) : (item.currentStock || 0))).toLocaleString()}</span>
+                                                                            </div>
+                                                                            <div className="flex justify-between w-full gap-2 whitespace-nowrap">
+                                                                                <span className="text-slate-500 font-normal">시화:</span>
+                                                                                <span className="font-bold text-blue-600">{((product?.locationStock?.['시화'] as number) ?? product?.shQty ?? 0).toLocaleString()}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                 </td>
                                                                 < td className="px-4 py-3 text-center align-middle" >
                                                                     {

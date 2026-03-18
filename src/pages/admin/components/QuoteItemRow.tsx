@@ -146,16 +146,24 @@ export const QuoteItemRow = React.memo(({
                     />
                 </div>
             </td>
-            <td className="px-4 py-3 text-center align-middle font-mono text-sm text-slate-600">
+            <td className="px-2 py-2 text-center align-middle font-mono text-sm text-slate-600">
                 {isUnlinked ? (
                     <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">미연동</span>
                 ) : (
-                    <div className="flex flex-col items-center">
-                        <span>{product?.currentStock?.toLocaleString()}</span>
+                    <div className="flex flex-col items-center text-xs bg-slate-50 rounded border border-slate-100 p-1.5 w-auto min-w-[85px] mx-auto space-y-0.5">
+                        <div className="flex justify-between w-full gap-2 whitespace-nowrap">
+                            <span className="text-slate-500">양산:</span>
+                            <span className="font-bold text-slate-800">{((product?.locationStock?.['양산'] as number) ?? (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (product.shQty ?? 0)) : 0)).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between w-full gap-2 whitespace-nowrap">
+                            <span className="text-slate-500">시화:</span>
+                            <span className="font-bold text-blue-600">{((product?.locationStock?.['시화'] as number) ?? product?.shQty ?? 0).toLocaleString()}</span>
+                        </div>
                         {(item.marking_wait_qty || 0) > 0 && (
-                            <span className="text-xs text-purple-600 font-bold">
-                                (대기: {item.marking_wait_qty?.toLocaleString()})
-                            </span>
+                            <div className="flex justify-between w-full gap-2 whitespace-nowrap">
+                                <span className="text-slate-500">대기:</span>
+                                <span className="font-bold text-purple-600">{item.marking_wait_qty?.toLocaleString()}</span>
+                            </div>
                         )}
                     </div>
                 )}
