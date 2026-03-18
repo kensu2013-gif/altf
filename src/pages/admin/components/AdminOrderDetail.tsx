@@ -1754,13 +1754,16 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 </td>
                                                                 <td className="px-4 py-3 text-center align-middle font-mono font-extrabold text-indigo-700 text-xs">
                                                                     <input
-                                                                        type="number"
+                                                                        type="text"
                                                                         inputMode="numeric"
                                                                         title="Supplier Price Override"
                                                                         placeholder="수기단가"
-                                                                        value={supplierPrice}
-                                                                        className="w-full text-center bg-transparent outline-none focus:border-b focus:border-indigo-400 font-mono font-extrabold text-indigo-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                                        onChange={(e) => handleSupplierPriceChange(idx, Number(e.target.value))}
+                                                                        value={supplierPrice.toLocaleString()}
+                                                                        className="w-full text-center bg-transparent outline-none focus:border-b focus:border-indigo-400 font-mono font-extrabold text-indigo-700"
+                                                                        onChange={(e) => {
+                                                                            const val = Number(e.target.value.replace(/[^0-9]/g, ''));
+                                                                            handleSupplierPriceChange(idx, val);
+                                                                        }}
                                                                         onKeyDown={handleKeyDown}
                                                                     />
                                                                 </td>
