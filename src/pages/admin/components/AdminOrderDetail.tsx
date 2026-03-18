@@ -1445,36 +1445,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 >
                                                                     All
                                                                 </button>
-                                                                < button
-                                                                    onClick={() => {
-                                                                        const newItems = displayedItems.map(item => {
-                                                                            const product = inventory.find(p => p.id === item.productId);
-                                                                            const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? 0;
-                                                                            const rate = item.supplierRate ?? 0;
-                                                                            
-                                                                            const mat = item.material?.toUpperCase() || product?.material?.toUpperCase() || '';
-                                                                            const nm = item.name?.toUpperCase() || product?.name?.toUpperCase() || '';
-                                                                            
-                                                                            const is316W = mat === 'STS316L-W' || mat === 'WP316L-W';
-                                                                            const isCap316S = nm === 'CAP' && (mat === 'STS316L-S' || mat === 'WP316L-S');
-                                                                            
-                                                                            if (is316W || isCap316S) {
-                                                                                const targetPrice = Math.ceil(((basePrice / 2) * ((100 - rate) / 100) * 1.9) / 10) * 10;
-                                                                                return {
-                                                                                    ...item,
-                                                                                    supplierPriceOverride: targetPrice
-                                                                                };
-                                                                            }
-                                                                            return item;
-                                                                        });
-                                                                        setDisplayedItems(newItems);
-                                                                    }}
-                                                                    className="px-1 py-0.5 text-[10px] bg-sky-50 text-sky-700 border border-sky-200 rounded hover:bg-sky-100 whitespace-nowrap ml-0.5 font-bold"
-                                                                    title="316계열 보정단가 적용"
-                                                                >
-                                                                    316
-                                                                </button>
-                                                            </div>
+                                                                </div>
                                                         </div>
                                                     </th>
                                                     < th className="px-1 py-3 text-center w-[8%] text-xs font-bold" >
@@ -1745,29 +1716,43 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                             />
                                                                             < span className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] text-indigo-300 pointer-events-none" >% </span>
                                                                         </div>
-                                                                        <button
-                                                                            onClick={() => {
-                                                                                const newItems = [...displayedItems];
-                                                                                const targetItem = { ...newItems[idx] };
-                                                                                const product = inventory.find(p => p.id === targetItem.productId);
-                                                                                const productBasePrice = product?.base_price ?? targetItem.base_price ?? product?.unitPrice ?? 0;
-                                                                                const rate = targetItem.supplierRate ?? 0;
-                                                                                
-                                                                                if (productBasePrice > 0) {
-                                                                                    const targetPrice = Math.ceil(((productBasePrice / 2) * ((100 - rate) / 100) * 1.9) / 10) * 10;
-                                                                                    targetItem.supplierPriceOverride = targetPrice;
-                                                                                    newItems[idx] = targetItem;
-                                                                                    setDisplayedItems(newItems);
-                                                                                }
-                                                                            }}
-                                                                            className="px-1.5 py-1 text-[10px] bg-sky-50 text-sky-700 border border-sky-200 rounded hover:bg-sky-100 font-bold whitespace-nowrap shadow-sm"
-                                                                            title="해당 품목만 316 보정단가 적용"
-                                                                        >
-                                                                            316
-                                                                        </button>
-                                                                    </div>
+                                                                        </div>
+                                                                        {(() => {
+                                                                            const product = inventory.find(p => p.id === item.productId);
+                                                                            const mat = item.material?.toUpperCase() || product?.material?.toUpperCase() || '';
+                                                                            const nm = item.name?.toUpperCase() || product?.name?.toUpperCase() || '';
+                                                                            
+                                                                            const is316W = mat === 'STS316L-W' || mat === 'WP316L-W';
+                                                                            const isCap316S = nm === 'CAP' && (mat === 'STS316L-S' || mat === 'WP316L-S');
+                                                                            
+                                                                            if (is316W || isCap316S) {
+                                                                                return (
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            const newItems = [...displayedItems];
+                                                                                            const targetItem = { ...newItems[idx] };
+                                                                                            const product = inventory.find(p => p.id === targetItem.productId);
+                                                                                            const productBasePrice = product?.base_price ?? targetItem.base_price ?? product?.unitPrice ?? 0;
+                                                                                            const rate = targetItem.supplierRate ?? 0;
+                                                                                            
+                                                                                            if (productBasePrice > 0) {
+                                                                                                const targetPrice = Math.ceil(((productBasePrice / 2) * ((100 - rate) / 100) * 1.9) / 10) * 10;
+                                                                                                targetItem.supplierPriceOverride = targetPrice;
+                                                                                                newItems[idx] = targetItem;
+                                                                                                setDisplayedItems(newItems);
+                                                                                            }
+                                                                                        }}
+                                                                                        className="px-1.5 py-1 text-[10px] bg-sky-50 text-sky-700 border border-sky-200 rounded hover:bg-sky-100 font-bold whitespace-nowrap shadow-sm mt-1"
+                                                                                        title="해당 품목만 316 보정단가 적용"
+                                                                                    >
+                                                                                        316
+                                                                                    </button>
+                                                                                );
+                                                                            }
+                                                                            return null;
+                                                                        })()}
                                                                 </td>
-                                                                < td className="px-4 py-3 text-center align-middle font-mono font-extrabold text-indigo-700 text-xs" >
+                                                                <td className="px-4 py-3 text-center align-middle font-mono font-extrabold text-indigo-700 text-xs">
                                                                     <input
                                                                         type="number"
                                                                         inputMode="numeric"
