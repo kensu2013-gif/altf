@@ -408,12 +408,14 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     unit_price: supplierPrice,
                     amount: supplierPrice * item.quantity,
                     note: '',
-                    stock_qty: product?.currentStock || 0,
+                    stock_qty: product?.currentStock ?? item.currentStock ?? 0,
                     stock_status: (item.marking_wait_qty || 0) > 0
                         ? `마킹대기:${item.marking_wait_qty}`
-                        : (product?.currentStock !== undefined
-                            ? (product.currentStock === 0 ? '재고없음' : (item.quantity > product.currentStock ? '일부 주문생산' : '출고가능'))
-                            : '-'),
+                        : (product?.stockStatus ?? item.stockStatus ?? (
+                            (product?.currentStock ?? item.currentStock) !== undefined
+                            ? ((product?.currentStock ?? item.currentStock ?? 0) === 0 ? '재고없음' : (item.quantity > (product?.currentStock ?? item.currentStock ?? 0) ? '일부 주문생산' : '출고가능'))
+                            : '-'
+                          )),
                     location_maker: product?.location || '-'
                 };
             }),
@@ -479,9 +481,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     note: '',
                     stock_status: (item.marking_wait_qty || 0) > 0
                         ? `마킹대기:${item.marking_wait_qty}`
-                        : (product?.currentStock !== undefined
-                            ? (product.currentStock === 0 ? '재고없음' : (item.quantity > product.currentStock ? '일부 주문생산' : '출고가능'))
-                            : '-')
+                        : (product?.stockStatus ?? item.stockStatus ?? (
+                            (product?.currentStock ?? item.currentStock) !== undefined
+                            ? ((product?.currentStock ?? item.currentStock ?? 0) === 0 ? '재고없음' : (item.quantity > (product?.currentStock ?? item.currentStock ?? 0) ? '일부 주문생산' : '출고가능'))
+                            : '-'
+                          ))
                 };
             }),
             totals: {
