@@ -1716,7 +1716,6 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                             />
                                                                             < span className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] text-indigo-300 pointer-events-none" >% </span>
                                                                         </div>
-                                                                        </div>
                                                                         {(() => {
                                                                             const product = inventory.find(p => p.id === item.productId);
                                                                             const mat = item.material?.toUpperCase() || product?.material?.toUpperCase() || '';
@@ -1742,7 +1741,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                                                 setDisplayedItems(newItems);
                                                                                             }
                                                                                         }}
-                                                                                        className="px-1.5 py-1 text-[10px] bg-sky-50 text-sky-700 border border-sky-200 rounded hover:bg-sky-100 font-bold whitespace-nowrap shadow-sm mt-1"
+                                                                                        className="px-1.5 py-1 text-[10px] bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 font-bold whitespace-nowrap shadow-sm"
                                                                                         title="해당 품목만 316 보정단가 적용"
                                                                                     >
                                                                                         316
@@ -1751,6 +1750,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                             }
                                                                             return null;
                                                                         })()}
+                                                                    </div>
                                                                 </td>
                                                                 <td className="px-4 py-3 text-center align-middle font-mono font-extrabold text-indigo-700 text-xs">
                                                                     <input
