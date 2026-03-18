@@ -1408,10 +1408,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                         기준단가
                                                         < div className="text-[10px] font-normal opacity-70" > (Base) </div>
                                                     </th>
-                                                    < th className="px-1 py-3 text-right w-[6%]" >
-                                                        <div className="flex flex-col items-end gap-1" >
+                                                    < th className="px-1 py-3 text-center w-[8%] whitespace-nowrap" >
+                                                        <div className="flex flex-col items-center gap-1" >
                                                             <span className="text-xs font-bold text-indigo-700" > 매입율(%) </span>
-                                                            < div className="flex items-center justify-end gap-1 w-full" >
+                                                            < div className="flex items-center justify-center gap-1 w-full" >
                                                                 <input
                                                                     type="number"
                                                                     inputMode="numeric"
@@ -1477,7 +1477,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                             </div>
                                                         </div>
                                                     </th>
-                                                    < th className="px-1 py-3 text-right w-[7%] text-xs font-bold" >
+                                                    < th className="px-1 py-3 text-center w-[8%] text-xs font-bold" >
                                                         매입단가
                                                         < div className="text-[10px] font-normal opacity-70" > (Cost) </div>
                                                     </th>
@@ -1730,29 +1730,51 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     {basePrice > 0 ? formatCurrency(basePrice) : '-'
                                                                     }
                                                                 </td>
-                                                                < td className="px-4 py-3 text-right align-middle" >
-                                                                    <div className="relative w-full" >
-                                                                        <input
-                                                                            type="number"
-                                                                            inputMode="numeric"
-                                                                            value={supplierRate === 0 ? '' : supplierRate}
-                                                                            placeholder="0"
-                                                                            title="Supplier Rate"
-                                                                            className="w-full text-center px-1 py-1.5 rounded border border-indigo-200 text-sm outline-none focus:border-indigo-500 font-bold text-indigo-600 bg-indigo-50/50"
-                                                                            onChange={(e) => handleSupplierRateChange(idx, Number(e.target.value))}
-                                                                            onKeyDown={handleKeyDown}
-                                                                        />
-                                                                        < span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-indigo-300" >% </span>
+                                                                < td className="px-2 py-3 text-center align-middle" >
+                                                                    <div className="flex items-center justify-center gap-1 w-full" >
+                                                                        <div className="relative w-16 focus-within:z-10" >
+                                                                            <input
+                                                                                type="number"
+                                                                                inputMode="numeric"
+                                                                                value={supplierRate === 0 ? '' : supplierRate}
+                                                                                placeholder="0"
+                                                                                title="Supplier Rate"
+                                                                                className="w-full text-center pr-3 pl-1 py-1.5 rounded border border-indigo-200 text-sm outline-none focus:border-indigo-500 font-bold text-indigo-600 bg-indigo-50/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                                onChange={(e) => handleSupplierRateChange(idx, Number(e.target.value))}
+                                                                                onKeyDown={handleKeyDown}
+                                                                            />
+                                                                            < span className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] text-indigo-300 pointer-events-none" >% </span>
+                                                                        </div>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                const newItems = [...displayedItems];
+                                                                                const targetItem = { ...newItems[idx] };
+                                                                                const product = inventory.find(p => p.id === targetItem.productId);
+                                                                                const productBasePrice = product?.base_price ?? targetItem.base_price ?? product?.unitPrice ?? 0;
+                                                                                const rate = targetItem.supplierRate ?? 0;
+                                                                                
+                                                                                if (productBasePrice > 0) {
+                                                                                    const targetPrice = Math.ceil(((productBasePrice / 2) * ((100 - rate) / 100) * 1.9) / 10) * 10;
+                                                                                    targetItem.supplierPriceOverride = targetPrice;
+                                                                                    newItems[idx] = targetItem;
+                                                                                    setDisplayedItems(newItems);
+                                                                                }
+                                                                            }}
+                                                                            className="px-1.5 py-1 text-[10px] bg-sky-50 text-sky-700 border border-sky-200 rounded hover:bg-sky-100 font-bold whitespace-nowrap shadow-sm"
+                                                                            title="해당 품목만 316 보정단가 적용"
+                                                                        >
+                                                                            316
+                                                                        </button>
                                                                     </div>
                                                                 </td>
-                                                                < td className="px-4 py-3 text-right align-middle font-mono font-extrabold text-indigo-700 text-xs text-right" >
+                                                                < td className="px-4 py-3 text-center align-middle font-mono font-extrabold text-indigo-700 text-xs" >
                                                                     <input
                                                                         type="number"
                                                                         inputMode="numeric"
                                                                         title="Supplier Price Override"
                                                                         placeholder="수기단가"
                                                                         value={supplierPrice}
-                                                                        className="w-full text-right bg-transparent outline-none focus:border-b focus:border-indigo-400 font-mono font-extrabold text-indigo-700"
+                                                                        className="w-full text-center bg-transparent outline-none focus:border-b focus:border-indigo-400 font-mono font-extrabold text-indigo-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                         onChange={(e) => handleSupplierPriceChange(idx, Number(e.target.value))}
                                                                         onKeyDown={handleKeyDown}
                                                                     />
