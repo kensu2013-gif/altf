@@ -4,11 +4,12 @@ import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plu
 import { Button } from '../../../components/ui/Button';
 import { formatCurrency } from '../../../lib/utils';
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { useStore } from '../../../store/useStore';
+import { useStore, type DeliveryInfo } from '../../../store/useStore';
 import { renderDocumentHTML } from '../../../lib/documentTemplate';
 
-import type { DocumentPayload } from '../../../types/document';
-
+import type { DocumentPayload, DocumentItem } from '../../../types/document';
+import { OrderSubmissionOverlay } from '../../../components/ui/OrderSubmissionOverlay';
+import { OrderService } from '../../../services/orderService';
 
 interface AdminQuoteDetailProps {
     quote: Quotation;
@@ -38,6 +39,9 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
     // Local state for admin attachments
     const [adminAttachmentFiles, setAdminAttachmentFiles] = useState<File[]>([]);
+    const [isOrderSubmitting, setIsOrderSubmitting] = useState(false);
+    const [orderPayload, setOrderPayload] = useState<DocumentPayload | null>(null);
+    const [isApiSubmitting, setIsApiSubmitting] = useState(false);
 
     // Local state for customer info
 
@@ -482,6 +486,108 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         } catch (error) {
             console.error(error);
             alert('전송에 실패했습니다. (네트워크/서버 오류)');
+        }
+    };
+
+    const handleConvertOrder = () => {
+        // Construct Order Payload from Quote
+        const now = new Date();
+        const docNo = `O-${now.toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
+
+        const docItems: DocumentItem[] = items.map((item, idx) => {
+            const product = getProductInfo(item.productId);
+            return {
+                no: idx + 1,
+                item_id: item.productId || item.id, // Ensure ID is passed
+                item_name: item.name,
+                thickness: item.thickness,
+                size: item.size,
+                material: item.material,
+                stock_qty: item.currentStock || 0,
+                stock_status: (item.marking_wait_qty || 0) > 0
+                    ? `마킹대기:${item.marking_wait_qty}`
+                    : (product?.currentStock !== undefined
+                        ? (product.currentStock === 0 ? '재고없음' : (item.quantity > product.currentStock ? '일부 주문생산' : '출고가능'))
+                        : '-'),
+                location_maker: item.maker ? `${item.location || ''} / ${item.maker}` : (item.location || '-'),
+                qty: item.quantity,
+                unit_price: item.unitPrice,
+                amount: item.amount,
+                rate: item.discountRate // Carry over negotiated rate
+            };
+        });
+
+        const payload: DocumentPayload = {
+            document_type: 'ORDER',
+            meta: {
+                doc_no: docNo,
+                created_at: now.toLocaleString(),
+                channel: 'WEB',
+                delivery_date: response.deliveryDate, // Carry over confirmed date
+                linkedQuoteId: quote.id
+            },
+            supplier: {
+                company_name: '알트에프(ALTF)',
+                contact_name: '관리자',
+                address: '부산광역시 사상구 낙동대로 1330번길 67',
+                tel: '051-303-3751',
+                fax: '0504-376-3751',
+                email: 'altf@altf.kr',
+                business_no: '838-05-01054'
+            },
+            customer: {
+                company_name: customerInfo.companyName,
+                contact_name: customerInfo.contactName,
+                tel: customerInfo.phone,
+                email: customerInfo.email,
+                address: customerInfo.address,
+                memo: response.note // Pass generic note if needed
+            },
+            items: docItems,
+            totals: {
+                total_amount: totalWithCharges, // Use confirmed price
+                currency: 'KRW',
+                additional_charges: charges // Carry over charges
+            }
+        };
+
+        setOrderPayload(payload);
+        setIsOrderSubmitting(true); // Open Order Overlay
+    };
+
+    const handleSubmitOrder = async (deliveryInfo: DeliveryInfo) => {
+        if (!orderPayload) return;
+        setIsApiSubmitting(true);
+
+        const finalPayload = { ...orderPayload };
+        if (finalPayload.customer) {
+            // Update Customer Fields with specific Delivery Info
+            finalPayload.customer.contact_name = deliveryInfo.contactName;
+            finalPayload.customer.tel = deliveryInfo.contactPhone;
+
+            const methodPrefix = deliveryInfo.method === 'FREIGHT' ? '[화물] ' : '[택배] ';
+            const addressDetail = deliveryInfo.method === 'FREIGHT' ? deliveryInfo.branchName : deliveryInfo.address;
+            finalPayload.customer.address = `${methodPrefix}${addressDetail}`;
+
+            const deliveryNote = `[배송: ${deliveryInfo.method === 'FREIGHT' ? '화물' : '택배'}] ` +
+                `${deliveryInfo.method === 'FREIGHT' ? deliveryInfo.branchName : deliveryInfo.address} ` +
+                `| 담당자: ${deliveryInfo.contactName} (${deliveryInfo.contactPhone})` +
+                (deliveryInfo.additionalRequest ? ` | 요청: ${deliveryInfo.additionalRequest}` : '');
+
+            finalPayload.customer.memo = finalPayload.customer.memo
+                ? `${finalPayload.customer.memo}\n${deliveryNote}`
+                : deliveryNote;
+        }
+
+        const result = await OrderService.submitOrder(finalPayload);
+        setIsApiSubmitting(false);
+        if (result.success) {
+            setIsOrderSubmitting(false);
+            alert('발주서로 전환되었습니다.');
+            onSuccess?.();
+            _onClose();
+        } else {
+            alert('발주서 전송에 실패했습니다.');
         }
     };
 
@@ -958,6 +1064,17 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                 </Button>
                             )}
 
+                            {/* Convert to Order */}
+                            {(quote.status === 'PROCESSED' || quote.status === 'COMPLETED') && (
+                                <Button
+                                    variant="outline"
+                                    onClick={handleConvertOrder}
+                                    className="text-green-700 border-green-200 hover:bg-green-50 font-medium"
+                                >
+                                    발주서로 전환
+                                </Button>
+                            )}
+
                             <Button variant="outline" onClick={_onClose}>
                                 닫기
                             </Button>
@@ -1022,6 +1139,15 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 </div >
 
             </div >
+            {isOrderSubmitting && orderPayload && (
+                <OrderSubmissionOverlay
+                    isOpen={isOrderSubmitting}
+                    onClose={() => setIsOrderSubmitting(false)}
+                    basePayload={orderPayload}
+                    onConfirm={handleSubmitOrder}
+                    isSubmitting={isApiSubmitting}
+                />
+            )}
         </div >
 
     );

@@ -21,15 +21,7 @@ interface AdminOrderDetailProps {
 
 // ... (helpers) ...
 
-// Helper: Get Stock Status Text
-const getStockStatusText = (status: string | undefined) => {
-    switch (status) {
-        case 'AVAILABLE': return '출고가능';
-        case 'CHECK_LEAD_TIME': return '일부출고';
-        case 'OUT_OF_STOCK': return '재고없음';
-        default: return '-';
-    }
-};
+
 
 export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose, onUpdate, initialMode = 'CUSTOMER' }: AdminOrderDetailProps) {
     const inventory = useStore((state) => state.inventory);
@@ -417,7 +409,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     amount: supplierPrice * item.quantity,
                     note: '',
                     stock_qty: product?.currentStock || 0,
-                    stock_status: getStockStatusText(product?.stockStatus),
+                    stock_status: (item.marking_wait_qty || 0) > 0
+                        ? `마킹대기:${item.marking_wait_qty}`
+                        : (product?.currentStock !== undefined
+                            ? (product.currentStock === 0 ? '재고없음' : (item.quantity > product.currentStock ? '일부 주문생산' : '출고가능'))
+                            : '-'),
                     location_maker: product?.location || '-'
                 };
             }),
@@ -468,19 +464,26 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 address: linkedUser?.address || '',
                 memo: transactionTrackingNo ? `[제품송장 번호]: ${transactionTrackingNo}\n${shippingMemo}` : shippingMemo
             },
-            items: selectedItems.map((item, idx) => ({
-                no: idx + 1,
-                item_name: item.name || '',
-                spec: `${item.thickness || ''} ${item.size || ''} ${item.material || ''}`.trim(),
-                thickness: item.thickness || '',
-                size: item.size || '',
-                material: item.material || '',
-                qty: item.quantity,
-                unit_price: item.unitPrice,
-                amount: item.amount,
-                note: '',
-                stock_status: item.stockStatus
-            })),
+            items: selectedItems.map((item, idx) => {
+                const product = inventory.find(p => p.id === item.productId);
+                return {
+                    no: idx + 1,
+                    item_name: item.name || '',
+                    spec: `${item.thickness || ''} ${item.size || ''} ${item.material || ''}`.trim(),
+                    thickness: item.thickness || '',
+                    size: item.size || '',
+                    material: item.material || '',
+                    qty: item.quantity,
+                    unit_price: item.unitPrice,
+                    amount: item.amount,
+                    note: '',
+                    stock_status: (item.marking_wait_qty || 0) > 0
+                        ? `마킹대기:${item.marking_wait_qty}`
+                        : (product?.currentStock !== undefined
+                            ? (product.currentStock === 0 ? '재고없음' : (item.quantity > product.currentStock ? '일부 주문생산' : '출고가능'))
+                            : '-')
+                };
+            }),
             totals: {
                 total_amount: calculatedTotal,
                 currency: 'KRW',
@@ -1441,6 +1444,35 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     title="모두 기본 매입율 적용"
                                                                 >
                                                                     All
+                                                                </button>
+                                                                < button
+                                                                    onClick={() => {
+                                                                        const newItems = displayedItems.map(item => {
+                                                                            const product = inventory.find(p => p.id === item.productId);
+                                                                            const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? 0;
+                                                                            const rate = item.supplierRate ?? 0;
+                                                                            
+                                                                            const mat = item.material?.toUpperCase() || product?.material?.toUpperCase() || '';
+                                                                            const nm = item.name?.toUpperCase() || product?.name?.toUpperCase() || '';
+                                                                            
+                                                                            const is316W = mat === 'STS316L-W' || mat === 'WP316L-W';
+                                                                            const isCap316S = nm === 'CAP' && (mat === 'STS316L-S' || mat === 'WP316L-S');
+                                                                            
+                                                                            if (is316W || isCap316S) {
+                                                                                const targetPrice = Math.ceil(((basePrice / 2) * ((100 - rate) / 100) * 1.9) / 10) * 10;
+                                                                                return {
+                                                                                    ...item,
+                                                                                    supplierPriceOverride: targetPrice
+                                                                                };
+                                                                            }
+                                                                            return item;
+                                                                        });
+                                                                        setDisplayedItems(newItems);
+                                                                    }}
+                                                                    className="px-1 py-0.5 text-[10px] bg-sky-50 text-sky-700 border border-sky-200 rounded hover:bg-sky-100 whitespace-nowrap ml-0.5 font-bold"
+                                                                    title="316계열 보정단가 적용"
+                                                                >
+                                                                    316
                                                                 </button>
                                                             </div>
                                                         </div>

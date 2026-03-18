@@ -185,10 +185,11 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             .col-mat { width: 12%; text-align: center; }
             
             .col-stock { width: 8%; text-align: center; } 
-            th.col-stock { ${isPurchaseOrder ? 'font-size: 12px; font-weight: normal;' : ''} }
-            td.col-stock { ${isPurchaseOrder ? 'font-size: 13px !important; font-weight: normal !important;' : ''} }
+            th.col-stock { ${isPurchaseOrder ? 'font-size: 12px; font-weight: normal; color: #ffffff !important;' : ''} }
+            td.col-stock { ${isPurchaseOrder ? 'font-size: 13px !important; font-weight: normal !important; color: #ffffff !important;' : ''} }
             
             .col-status { width: 10%; text-align: center; } 
+            th.col-status { ${isPurchaseOrder ? 'color: #ffffff !important;' : ''} } 
             /* LOC Column hidden by dynamically not rendering or reallocating width */
             
             .col-qty { width: 5%; text-align: center; } 
@@ -334,8 +335,8 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                             <th class="col-size">규격<br><span class="sub-text">SIZE</span></th>
                             <th class="col-mat">재질<br><span class="sub-text">MATERIAL</span></th>
                             ${!isTransaction ? `
-                            <th class="col-stock">재고<br><span class="sub-text">STOCK</span></th>
-                            <th class="col-status">상태<br><span class="sub-text">STAT</span></th>
+                            <th class="col-stock"><span style="color: ${isPurchaseOrder ? '#ffffff' : 'inherit'};">재고</span><br><span class="sub-text" style="color: ${isPurchaseOrder ? '#ffffff' : 'inherit'};">STOCK</span></th>
+                            <th class="col-status"><span style="color: ${isPurchaseOrder ? '#ffffff' : 'inherit'};">상태</span><br><span class="sub-text" style="color: ${isPurchaseOrder ? '#ffffff' : 'inherit'};">STAT</span></th>
                             ${!isPurchaseOrder && document_type !== 'QUOTATION' ? `<th class="col-loc">위치<br><span class="sub-text">LOC</span></th>` : ''}
                             ` : ''}
                             <th class="col-qty">수량<br><span class="sub-text">QTY</span></th>
@@ -352,14 +353,18 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                             <td class="col-size">${item.size || '-'}</td>
                             <td class="col-mat">${item.material || '-'}</td>
                             ${!isTransaction ? `
-                            <td class="col-stock">${item.stock_qty !== undefined ? item.stock_qty.toLocaleString() : '-'}</td>
+                            <td class="col-stock" style="color: ${isPurchaseOrder ? '#ffffff' : 'inherit'};">${item.stock_qty !== undefined ? item.stock_qty.toLocaleString() : '-'}</td>
                             <td class="col-status">
                                 ${(() => {
                 const st = item.stock_status || '-';
                 let c = '#334155';
-                if (st.includes('출고가능')) c = '#0f766e';
-                else if (st.includes('일부 주문생산')) c = '#d97706';
-                else if (st.includes('재고없음') || st.includes('재고 없음')) c = '#e11d48';
+                if (isPurchaseOrder) { 
+                    c = '#ffffff'; 
+                } else {
+                    if (st.includes('출고가능')) c = '#0f766e';
+                    else if (st.includes('일부 주문생산')) c = '#d97706';
+                    else if (st.includes('재고없음') || st.includes('재고 없음')) c = '#e11d48';
+                }
                 return `<span style="color: ${c}; font-weight: 800;">${st}</span>`;
             })()}
                             </td>
@@ -391,10 +396,10 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                     }
                 }
 
-                return appendedNote ? `
+            return appendedNote ? `
     <div style="margin-top: 15px; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; background-color: #f8fafc;">
         <div style="font-weight: 700; color: #475569; margin-bottom: 4px; ${document_type === 'PURCHASE_ORDER' ? 'font-size: 14px;' : 'font-size: 11px;'}">배송요청사항 </div>
-        <div style="white-space: pre-wrap; color: #334155; ${document_type === 'PURCHASE_ORDER' ? 'font-size: 14px; font-weight: bold;' : 'font-size: 10px;'}">${appendedNote.replace(/(\[재고장 확인의 건\]|\[무마킹 출고 조건\]|\[주문제작 요청건\])/g, '<span style="color: #e11d48; font-size: 16px; font-weight: 900;">$1</span>')}</div>
+        <div style="white-space: pre-wrap; color: #334155; ${document_type === 'PURCHASE_ORDER' ? 'font-size: 14px; font-weight: bold;' : 'font-size: 10px;'}">${appendedNote.replace(/(\[재고장 확인의 건\]|\[무마킹 출고 조건\]|\[주문제작 요청건\])/g, '<span style="color: #ffffff; font-size: 16px; font-weight: 900;">$1</span>')}</div>
     </div>` : '';
             })()}
                 ` : `
