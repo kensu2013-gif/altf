@@ -592,8 +592,9 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
-            <div className="w-full xl:max-w-[95%] h-full bg-white shadow-2xl pointer-events-auto flex flex-col animate-in slide-in-from-right duration-300">
+        <>
+            <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
+                <div className="w-full xl:max-w-[95%] h-full bg-white shadow-2xl pointer-events-auto flex flex-col animate-in slide-in-from-right duration-300">
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
                     <div className="space-y-6">
                         {/* Customer Info Edit Section */}
@@ -847,10 +848,10 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                     </tfoot>
                                 </table>
                             </div>
-                        </div >
+                        </div>
 
                         {/* Additional Charges Section */}
-                        < div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm" >
+                        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
                             <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 mb-3 flex items-center gap-2">
                                 <Plus className="w-4 h-4 text-teal-600" />
                                 추가 비용 및 할인 (Additional Charges)
@@ -882,10 +883,10 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                         newCharges[idx].amount = newCharges[idx].amount * -1;
                                                         setCharges(newCharges);
                                                     }}
-                                                    className={`px - 2 py - 2 rounded text - xs font - bold border transition - colors ${isNegative
+                                                    className={`px-2 py-2 rounded text-xs font-bold border transition-colors ${isNegative
                                                         ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
                                                         : 'bg-teal-50 text-teal-600 border-teal-200 hover:bg-teal-100'
-                                                        } `}
+                                                        }`}
                                                 >
                                                     {isNegative ? '(-)' : '(+)'}
                                                 </button>
@@ -901,7 +902,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                         newCharges[idx].amount = isNegative ? -val : val;
                                                         setCharges(newCharges);
                                                     }}
-                                                    className={`w - 32 px - 3 py - 2 border border - slate - 200 rounded text - sm outline - none focus: border - teal - 500 text - right font - mono font - bold ${isNegative ? 'text-red-500' : 'text-slate-700'} `}
+                                                    className={`w-32 px-3 py-2 border border-slate-200 rounded text-sm outline-none focus:border-teal-500 text-right font-mono font-bold ${isNegative ? 'text-red-500' : 'text-slate-700'}`}
                                                 />
                                             </div>
                                             <button
@@ -924,10 +925,10 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                     <Plus className="w-4 h-4" /> 항목 추가
                                 </button>
                             </div>
-                        </div >
+                        </div>
 
                         {/* Admin Response Form */}
-                        < div className="bg-slate-50 rounded-xl p-6 border border-slate-200" >
+                        <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
                             <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
                                 <MessageSquare className="w-4 h-4 text-teal-600" />
                                 답변 정보 입력 (Response)
@@ -1020,12 +1021,13 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                     </div>
                                 </div>
                             </div>
-                        </div >
+                        </div>
 
-                    </div >
+                    </div>
+                </div>
 
                     {/* Footer Actions */}
-                    < div className="p-6 border-t border-slate-200 bg-white flex items-center justify-between gap-3" >
+                    <div className="p-6 border-t border-slate-200 bg-white flex items-center justify-between gap-3">
                         <Button
                             variant="ghost"
                             onClick={handleDownload}
@@ -1135,10 +1137,10 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                 {quote.status === 'PROCESSED' ? '재전송 (Resend)' : '견적서 전송 (답변완료)'}
                             </Button>
                         </div>
-                    </div >
-                </div >
+                    </div>
+                </div>
 
-            </div >
+            </div>
             {isOrderSubmitting && orderPayload && (
                 <OrderSubmissionOverlay
                     isOpen={isOrderSubmitting}
@@ -1148,7 +1150,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                     isSubmitting={isApiSubmitting}
                 />
             )}
-        </div >
+        </>
 
     );
 }
