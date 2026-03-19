@@ -79,6 +79,8 @@ export interface Quotation {
         phone?: string;
         email?: string;
         address?: string;
+        bizNo?: string;
+        fax?: string;
     };
     items: LineItem[];
     status: 'DRAFT' | 'SUBMITTED' | 'IN_REVIEW' | 'PROCESSING' | 'PROCESSED' | 'COMPLETED';

@@ -6,6 +6,8 @@ import { formatCurrency } from '../../lib/utils';
 import { Button } from '../../components/ui/Button';
 
 import type { Quotation } from '../../types';
+import type { DocumentPayload } from '../../types/document';
+import { renderDocumentHTML } from '../../lib/documentTemplate';
 
 export default function AdminQuotes() {
     const { quotes, users, updateQuotation, trashQuotation, restoreQuotation, permanentDeleteQuotation, setQuotes, fetchUsers } = useStore((state) => state);
@@ -95,9 +97,85 @@ export default function AdminQuotes() {
         return true;
     });
 
-    const handlePdfDownload = (e: React.MouseEvent) => {
+    const handlePdfDownload = (e: React.MouseEvent, quote: Quotation) => {
         e.stopPropagation();
-        alert("PDF 다운로드 기능은 준비중입니다.");
+
+        const quoteUser = users.find(u => u.id === quote.userId);
+        
+        const customerInfo = {
+            companyName: quote.customerInfo?.companyName || quoteUser?.companyName || quote.customerName || '',
+            contactName: quote.customerInfo?.contactName || quoteUser?.contactName || '',
+            phone: quote.customerInfo?.phone || quoteUser?.phone || '',
+            email: quote.customerInfo?.email || quoteUser?.email || '',
+            address: quote.customerInfo?.address || quoteUser?.address || '',
+            bizNo: quote.customerInfo?.bizNo || quoteUser?.bizNo || '',
+            fax: quote.customerInfo?.fax || quoteUser?.fax || ''
+        };
+
+        const calculatedTotal = quote.items.reduce((sum, item) => sum + item.amount, 0);
+        const charges = quote.adminResponse?.additionalCharges || [];
+        const totalWithCharges = quote.totalAmount || (calculatedTotal + charges.reduce((sum, c) => sum + c.amount, 0));
+
+        const payload: DocumentPayload = {
+            document_type: 'QUOTATION',
+            meta: {
+                doc_no: quote.id,
+                created_at: new Date(quote.createdAt).toLocaleDateString(),
+                channel: 'WEB',
+                title: '견 적 서 (QUOTATION)',
+                delivery_date: quote.adminResponse?.deliveryDate || ''
+            },
+            supplier: {
+                company_name: '(주)알트에프',
+                contact_name: user?.contactName || '조현진 대표',
+                tel: user?.phone || '051-303-3751',
+                email: user?.email || 'altf@altf.kr',
+                address: user?.address || '부산시 사상구 낙동대로1330번길 67'
+            },
+            customer: {
+                company_name: customerInfo.companyName,
+                contact_name: customerInfo.contactName,
+                tel: customerInfo.phone,
+                email: customerInfo.email,
+                address: customerInfo.address,
+                business_no: customerInfo.bizNo,
+                fax: customerInfo.fax
+            },
+            items: quote.items.map((item, idx) => {
+                return {
+                    no: idx + 1,
+                    item_name: item.name,
+                    spec: `${item.thickness || ''} ${item.size || ''} ${item.material || ''} `.trim(),
+                    thickness: item.thickness,
+                    size: item.size,
+                    material: item.material,
+                    qty: item.quantity,
+                    unit_price: item.unitPrice,
+                    amount: item.amount,
+                    note: '',
+                    stock_qty: item.currentStock || 0,
+                    stock_status: (item.marking_wait_qty || 0) > 0 ? `마킹대기:${item.marking_wait_qty}` : '-',
+                    location_maker: item.maker ? `${item.location || ''} / ${item.maker}` : (item.location || '-')
+                };
+            }),
+            totals: {
+                total_amount: calculatedTotal,
+                currency: 'KRW',
+                vat_rate: 0.1,
+                final_amount: totalWithCharges,
+                additional_charges: charges
+            },
+            footer: {
+                message: quote.adminResponse?.note || quote.memo || ''
+            }
+        };
+
+        const html = renderDocumentHTML(payload);
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(html);
+            printWindow.document.close();
+        }
     };
 
     const handleStatusUpdate = (quoteId: string, newStatus: string) => {
@@ -284,7 +362,7 @@ export default function AdminQuotes() {
                                                 variant="ghost"
                                                 size="sm"
                                                 className="text-slate-400 hover:text-teal-600"
-                                                onClick={handlePdfDownload}
+                                                onClick={(e) => handlePdfDownload(e, quote)}
                                             >
                                                 <Download className="w-4 h-4" /> PDF
                                             </Button>
