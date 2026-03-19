@@ -122,7 +122,7 @@ interface MockImportedItem {
 
 export default function Search() {
     const navigate = useNavigate();
-    const { addItem, quotation, logout, inventory, fetchInventory } = useStore();
+    const { addItem, quotation, logout, inventory, fetchInventory, startUpload } = useStore();
     const { isLoading, error: loadError } = useInventory(); // Using hook to ensure data is fetched
 
     // --- State Management ---
@@ -560,6 +560,9 @@ export default function Search() {
 
         // 1. Generate Session ID
         const sessionId = crypto.randomUUID();
+
+        // Save to global store so Cart can access it
+        startUpload(attachedFile, sessionId);
 
         // 2. Prepare Payload
         const formData = new FormData();

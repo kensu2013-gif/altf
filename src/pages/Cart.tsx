@@ -4,7 +4,7 @@ import { useStore, type DeliveryInfo } from '../store/useStore';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { formatCurrency } from '../lib/utils';
-import { Trash2, Send, Plus, Minus, Search, RotateCcw, Printer, ArrowRight, User } from 'lucide-react';
+import { Trash2, Send, Plus, Minus, Search, RotateCcw, Printer, ArrowRight, User, X } from 'lucide-react';
 import type { LineItem } from '../types';
 import { PreviewModal } from '../components/ui/PreviewModal';
 import type { DocumentPayload, DocumentItem, DocumentType } from '../types/document';
@@ -21,7 +21,7 @@ export default function QuotationEditor() {
     const { items, memo: quotationMemo } = useStore((state) => state.quotation);
     // Use selector for stable reference
     const user = useStore(state => state.auth.user);
-    const { updateItem, removeItem, inventory, clearQuotation, incrementNewOrderCount, setQuotationMemo, uploadFile, pullDraftQuotation } = useStore((state) => state);
+    const { updateItem, removeItem, inventory, clearQuotation, incrementNewOrderCount, setQuotationMemo, uploadFile, pullDraftQuotation, uploadState, resetUpload } = useStore((state) => state);
 
     // Draft Sync Polling
     useEffect(() => {
@@ -40,12 +40,18 @@ export default function QuotationEditor() {
 
     const navigate = useNavigate();
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
-    const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+    const [attachmentFiles, setAttachmentFiles] = useState<File[]>(uploadState.attachedFile ? [uploadState.attachedFile] : []);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
     const [currentPayload, setCurrentPayload] = useState<DocumentPayload | null>(null);
-    // Removed local state: const [quotationMemo, setQuotationMemo] = useState('');
     const submitButtonRef = useRef<HTMLButtonElement>(null);
+
+    // AI Upload Sync
+    useEffect(() => {
+        if (uploadState.attachedFile) {
+            resetUpload(); // Clear memory after it has been grabbed above
+        }
+    }, [uploadState.attachedFile, resetUpload]);
 
     // --- Custom Confirm Dialog State ---
     const [confirmConfig, setConfirmConfig] = useState<{
@@ -775,6 +781,19 @@ export default function QuotationEditor() {
                                 <input
                                     type="file"
                                     multiple
+                                    ref={(input) => {
+                                        if (input && attachmentFiles.length > 0) {
+                                            try {
+                                                const dt = new DataTransfer();
+                                                attachmentFiles.forEach(file => dt.items.add(file));
+                                                if (input.files?.length !== attachmentFiles.length) {
+                                                    input.files = dt.files;
+                                                }
+                                            } catch {
+                                                // DataTransfer not supported
+                                            }
+                                        }
+                                    }}
                                     aria-label="도면 및 요청서 첨부"
                                     title="도면 및 요청서 첨부"
                                     className="text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-5 file:rounded-xl file:border border-slate-200 file:text-sm file:font-bold file:bg-white file:text-slate-700 hover:file:bg-slate-50 transition-all cursor-pointer w-full sm:w-auto"
@@ -783,7 +802,15 @@ export default function QuotationEditor() {
                                 {attachmentFiles.length > 0 && (
                                     <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-600">
                                         {attachmentFiles.map(f => (
-                                            <span key={f.name} className="px-3 py-1 bg-slate-100 rounded-full border border-slate-200 shadow-sm">{f.name}</span>
+                                            <span key={f.name} className="px-3 py-1 bg-slate-100 rounded-full border border-slate-200 shadow-sm flex items-center gap-1">
+                                                {f.name}
+                                                <button onClick={(e) => {
+                                                    e.preventDefault();
+                                                    setAttachmentFiles(prev => prev.filter(file => file.name !== f.name));
+                                                }} className="text-slate-400 hover:text-red-500 ml-1" aria-label="첨부파일 삭제" title="첨부파일 삭제">
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </span>
                                         ))}
                                     </div>
                                 )}
