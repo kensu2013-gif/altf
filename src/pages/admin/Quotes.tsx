@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Calendar, Download, Trash2, ArchiveRestore, Search } from 'lucide-react';
+import { FileText, Calendar, Download, Trash2, ArchiveRestore, Search, Image } from 'lucide-react';
 import { AdminQuoteDetail } from './components/AdminQuoteDetail';
 import { useStore } from '../../store/useStore';
 import { formatCurrency } from '../../lib/utils';
@@ -291,11 +291,29 @@ export default function AdminQuotes() {
                                     </div>
 
                                     <div className="flex items-center gap-6 pl-14 md:pl-0">
-                                        <div>
+                                        <div className="flex items-center gap-3">
                                             <StatusSelect
                                                 status={quote.status}
                                                 onChange={(val) => handleStatusUpdate(quote.id, val)}
                                             />
+                                            {(quote.attachments && quote.attachments.length > 0) && (
+                                                <div className="flex gap-2">
+                                                    {quote.attachments.map((file, i) => (
+                                                        <a 
+                                                            key={i} 
+                                                            href={file.url} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer" 
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 rounded-full text-xs font-bold transition-colors shadow-sm"
+                                                            title={file.name}
+                                                        >
+                                                            <Image className="w-3.5 h-3.5" />
+                                                            사진 보기 {quote.attachments!.length > 1 ? `(${i+1})` : ''}
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="text-right">
