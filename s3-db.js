@@ -48,8 +48,11 @@ export async function getInventoryFromS3() {
         });
         const response = await s3Client.send(command);
         const bodyContent = await streamToString(response.Body);
-        console.log(`[S3] Fetched ${INVENTORY_KEY} from S3`);
-        return JSON.parse(bodyContent);
+        console.log(`[S3] Fetched ${INVENTORY_KEY} from S3. Last Modified: ${response.LastModified}`);
+        return {
+            items: JSON.parse(bodyContent),
+            lastModified: response.LastModified
+        };
     } catch (error) {
         console.error('[S3] Failed to fetch inventory from S3:', error);
         throw error;

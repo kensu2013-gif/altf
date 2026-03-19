@@ -4,7 +4,7 @@ import { Button } from '../../components/ui/Button';
 
 export default function AdminInventory() {
     // Use the hook which handles SWR fetching and data mapping automatically
-    const { inventory, isLoading, isValidating } = useInventory();
+    const { inventory, lastModified, isLoading, isValidating } = useInventory();
 
     // For refresh, we can just reload the page or rely on SWR's focus revalidation, 
     // but the button suggests manual action. Since useInventory uses SWR, 
@@ -121,7 +121,10 @@ export default function AdminInventory() {
                 </div>
                 <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 text-xs text-slate-500 flex justify-between">
                     <span>총 {inventory.length}개 품목 중 100개 표시</span>
-                    <span>마지막 업데이트: {new Date().toLocaleTimeString()}</span>
+                    <span>
+                        데이터 출처(S3) 기준 일시: {lastModified ? new Date(lastModified).toLocaleString('ko-KR') : '확인 중...'} 
+                        {' '}(웹 새로고침: {new Date().toLocaleTimeString()})
+                    </span>
                 </div>
             </div>
         </div>

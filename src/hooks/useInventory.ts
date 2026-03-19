@@ -150,6 +150,7 @@ export function useInventory() {
 
     return {
         inventory: data ? useStore.getState().inventory : existingInventory, // Prefer processed store data
+        lastModified: data?.lastModified || null,
         isLoading,
         isValidating,
         error: error ? String(error) : null
