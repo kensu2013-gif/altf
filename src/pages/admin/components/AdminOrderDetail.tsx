@@ -2,7 +2,7 @@ import { useState, memo, useMemo, useCallback, useEffect } from 'react';
 import type { Order, LineItem, Product } from '../../../types';
 // import { generateSku } from '../../../lib/sku'; // REMOVED: Managed in useInventoryIndex
 import { useStore } from '../../../store/useStore';
-import { X, AlertTriangle, Check, Calendar, Package, User, Trash2, Plus, Download, FileText, Minus, Equal, Send, SplitSquareHorizontal } from 'lucide-react';
+import { X, AlertTriangle, Check, Calendar, Package, User, Trash2, Plus, Download, FileText, Minus, Equal, Send, SplitSquareHorizontal, Image } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { useInventoryIndex } from '../../../hooks/useInventoryIndex';
 
@@ -1033,10 +1033,33 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                     {/* Buyer Info */}
                                     <div className="space-y-3" >
                                         {
-                                            order.memo && (
+                                            (order.memo || (order.attachments && order.attachments.length > 0)) && (
                                                 <div className="bg-yellow-50 p-2 rounded border border-yellow-200 text-xs mb-2">
-                                                    <span className="font-bold text-yellow-800 block mb-1"> 고객 요청/ 배송 메모(Customer Memo): </span>
-                                                    < div className="whitespace-pre-wrap text-slate-700" > {order.memo} </div>
+                                                    {order.memo && (
+                                                        <>
+                                                            <span className="font-bold text-yellow-800 block mb-1"> 고객 요청/ 배송 메모(Customer Memo): </span>
+                                                            < div className="whitespace-pre-wrap text-slate-700 mb-2" > {order.memo} </div>
+                                                        </>
+                                                    )}
+                                                    {order.attachments && order.attachments.length > 0 && (
+                                                        <div className="mt-2 pt-2 border-t border-yellow-200/50">
+                                                            <span className="font-bold text-yellow-800 block mb-2"> 첨부된 사진/파일: </span>
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {order.attachments.map((file, i) => (
+                                                                    <a 
+                                                                        key={i} 
+                                                                        href={file.url} 
+                                                                        target="_blank" 
+                                                                        rel="noopener noreferrer" 
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-yellow-300 text-yellow-700 hover:bg-yellow-100 rounded text-[10px] font-bold transition-colors shadow-sm"
+                                                                    >
+                                                                        <Image className="w-3 h-3" />
+                                                                        보기 {order.attachments!.length > 1 ? `(${i+1})` : ''}
+                                                                    </a>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     < button
                                                         onClick={() => {
                                                             // Quick Action: Copy Memo to Note or Address?
@@ -1357,6 +1380,26 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                     className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:border-teal-500 outline-none resize-none h-16 bg-yellow-50/50"
                                                     placeholder="배송 요청사항을 입력하세요."
                                                 />
+                                                {/* NEW: Attached Photos */}
+                                                {order.attachments && order.attachments.length > 0 && (
+                                                    <div className="mt-3 pt-3 border-t border-slate-100">
+                                                        <h4 className="text-xs font-bold text-slate-500 mb-2">첨부된 사진/파일 (Customer Attachments)</h4>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {order.attachments.map((file, i) => (
+                                                                <a 
+                                                                    key={i} 
+                                                                    href={file.url} 
+                                                                    target="_blank" 
+                                                                    rel="noopener noreferrer" 
+                                                                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded text-xs font-bold transition-colors"
+                                                                >
+                                                                    <Image className="w-3 h-3" />
+                                                                    첨부사진 보기 {order.attachments!.length > 1 ? `(${i+1})` : ''}
+                                                                </a>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                             {
                                                 order.status === 'COMPLETED' && (

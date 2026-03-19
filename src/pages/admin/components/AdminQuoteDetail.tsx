@@ -1,6 +1,6 @@
 
 import type { Quotation, LineItem } from '../../../types';
-import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User } from 'lucide-react';
+import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User, Image } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { formatCurrency } from '../../../lib/utils';
 import { useState, useCallback, useMemo, useEffect } from 'react';
@@ -671,6 +671,27 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                             <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
                                 {quote.memo || <span className="text-slate-400 italic">고객이 작성한 메모가 없습니다. (No customer memo)</span>}
                             </div>
+                            
+                            {/* NEW: Attached Photos */}
+                            {quote.attachments && quote.attachments.length > 0 && (
+                                <div className="mt-4 pt-4 border-t border-yellow-200/50">
+                                    <h4 className="text-xs font-bold text-yellow-800 mb-2">첨부된 사진/파일</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {quote.attachments.map((file, i) => (
+                                            <a 
+                                                key={i} 
+                                                href={file.url} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer" 
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-yellow-300 text-yellow-700 hover:bg-yellow-100 rounded-md text-sm font-bold transition-colors shadow-sm"
+                                            >
+                                                <Image className="w-4 h-4" />
+                                                첨부사진 보기 {quote.attachments!.length > 1 ? `(${i+1})` : ''}
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Quote Items Table (Negotiation) */}
@@ -1081,8 +1102,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                 닫기
                             </Button>
 
-                            {/* Save Changes (Only if PROCESSED) - New Feature */}
-                            {quote.status === 'PROCESSED' && (
+                            {/* Save Changes (New Feature) - Allow saving changes anytime except COMPLETED */}
+                            {quote.status !== 'COMPLETED' && (
                                 <Button
                                     onClick={async () => {
                                         // 1. Upload Admin Attachments to S3
@@ -1093,7 +1114,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             if (res) uploadedAttachments.push(res);
                                         }
 
-                                        // Same logic as send but keep status as PROCESSED and just update details
+                                        // Same logic as send but keep status unchanged to just update details
                                         const updatePayload = {
                                             items: items,
                                             adminAttachments: uploadedAttachments,
@@ -1125,7 +1146,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                     className="bg-slate-800 hover:bg-slate-900 text-white gap-2"
                                 >
                                     <FileText className="w-4 h-4" />
-                                    수정 저장 (Save)
+                                    저장 (Save)
                                 </Button>
                             )}
 

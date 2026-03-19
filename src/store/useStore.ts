@@ -715,7 +715,7 @@ export const useStore = create<AppState>()(
                         if (user && user.draftQuotation) {
                             
                             const serverDraft = user.draftQuotation;
-                            const localTimestamp = (quotation as any).lastUpdated || 0;
+                            const localTimestamp = (quotation as { lastUpdated?: number }).lastUpdated || 0;
                             const serverTimestamp = serverDraft.lastUpdated || 0;
 
                             // If server has a newer draft (e.g. edited on Mobile), pull it.
