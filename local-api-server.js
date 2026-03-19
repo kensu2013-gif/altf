@@ -762,7 +762,11 @@ const server = http.createServer(async (req, res) => {
                 (u.managerIds && u.managerIds.includes(requesterId)) ||
                 (u.managerId === requesterId) // Backwards compatibility
             ).map(u => u.id);
-            const managedQuotes = db.quotations.filter(q => managedUserIds.includes(q.userId));
+            const managedQuotes = db.quotations.filter(q => 
+                managedUserIds.includes(q.userId) || 
+                (q.manager && q.manager.id === requesterId) ||
+                q.managerId === requesterId
+            );
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(managedQuotes));
         } else {
@@ -865,7 +869,11 @@ const server = http.createServer(async (req, res) => {
                 (u.managerIds && u.managerIds.includes(requesterId)) ||
                 (u.managerId === requesterId)
             ).map(u => u.id);
-            const managedOrders = db.orders.filter(o => managedUserIds.includes(o.userId));
+            const managedOrders = db.orders.filter(o => 
+                managedUserIds.includes(o.userId) || 
+                (o.manager && o.manager.id === requesterId) ||
+                o.managerId === requesterId
+            );
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(managedOrders));
         } else {
@@ -904,6 +912,51 @@ const server = http.createServer(async (req, res) => {
                 res.end(JSON.stringify({ error: 'Server Error' }));
             }
         });
+        return;
+    }
+
+    // POST /api/admin/orders/:id/retract (Retract Order to Quote)
+    if (req.method === 'POST' && url.pathname.startsWith('/api/admin/orders/') && url.pathname.endsWith('/retract')) {
+        const id = url.pathname.split('/')[4];
+        const orderIndex = db.orders.findIndex(o => o.id === id);
+
+        if (orderIndex !== -1) {
+            const order = db.orders[orderIndex];
+            
+            // Construct a Quote object from the Order back to SUBMITTED status
+            const newQuote = {
+                ...order,
+                id: (order.meta && order.meta.linkedQuoteId) ? order.meta.linkedQuoteId : (order.poNumber || order.id), // Re-use Original Quote ID if possible
+                status: 'SUBMITTED', // '견적접수' state
+                document_type: 'QUOTATION'
+            };
+
+            // Remove order from db.orders
+            db.orders.splice(orderIndex, 1);
+
+            // Add or update in db.quotations
+            const quoteIndex = db.quotations.findIndex(q => q.id === newQuote.id);
+            if (quoteIndex !== -1) {
+                // If the quote already existed, overwrite it to bring it back to SUBMITTED with the latest order details
+                db.quotations[quoteIndex] = { ...db.quotations[quoteIndex], ...newQuote };
+            } else {
+                db.quotations.unshift(newQuote);
+            }
+
+            try {
+                await saveData();
+                console.log(`[API] Retracted order ${id} to quote ${newQuote.id}`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, quote: newQuote }));
+            } catch (e) {
+                console.error(e);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Server Error saving data' }));
+            }
+        } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Order not found' }));
+        }
         return;
     }
 

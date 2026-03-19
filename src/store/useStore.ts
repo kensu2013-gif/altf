@@ -83,6 +83,7 @@ interface AppState {
     trashOrder: (orderId: string) => Promise<void>;
     restoreOrder: (orderId: string) => Promise<void>;
     permanentDeleteOrder: (orderId: string) => Promise<boolean>;
+    retractOrder: (orderId: string) => Promise<boolean>;
 
     addQuotation: (quotation: Omit<Quotation, 'id' | 'createdAt'>) => void;
     updateQuotation: (quoteId: string, updates: Partial<Quotation>) => void;
@@ -467,6 +468,24 @@ export const useStore = create<AppState>()(
                     return false;
                 } catch (e) {
                     console.error(e);
+                    return false;
+                }
+            },
+
+            retractOrder: async (orderId) => {
+                try {
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/orders/${orderId}/retract`, { method: 'POST' });
+                    if (res.ok) {
+                        const { quote } = await res.json();
+                        set((state) => ({
+                            orders: state.orders.filter(o => o.id !== orderId),
+                            quotes: [quote, ...state.quotes.filter(q => q.id !== quote.id)]
+                        }));
+                        return true;
+                    }
+                    return false;
+                } catch (e) {
+                    console.error('Failed to retract order:', e);
                     return false;
                 }
             },

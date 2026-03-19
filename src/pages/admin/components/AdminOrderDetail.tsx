@@ -848,6 +848,19 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         }
     };
 
+    const handleRetractOrder = async () => {
+        if (confirm('이 주문을 견적서 접수 상태로 회수하시겠습니까?\n\n(회수된 주문은 주문 관리 대시보드에서 삭제되고 견적 관리로 이동합니다.)')) {
+            try {
+                await useStore.getState().retractOrder(order.id);
+                alert('견적서로 회수 완료되었습니다.');
+                onClose();
+            } catch (e) {
+                console.error('Failed to retract order:', e);
+                alert('회수 처리 중 오류가 발생했습니다.');
+            }
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex justify-end pointer-events-none" >
             {/* Backdrop */}
@@ -2223,6 +2236,16 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         )}
                     </div>
                     <div className="flex items-center gap-3">
+                        {!isSupplierMode && (
+                            <Button
+                                variant="outline"
+                                onClick={handleRetractOrder}
+                                className="border-slate-300 text-slate-600 hover:bg-slate-50"
+                                title="이 발주를 취소하고 견적 단계로 다시 돌려보냅니다."
+                            >
+                                회수(견적으로 전환)
+                            </Button>
+                        )}
                         <Button variant="outline" onClick={onClose}>
                             닫기
                         </Button>
