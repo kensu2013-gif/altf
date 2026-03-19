@@ -438,7 +438,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/auth/heartbeat') {
         let body = '';
         req.on('data', chunk => body += chunk.toString());
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const { token, activity, user } = JSON.parse(body);
                 let session = activeSessions.get(token);
@@ -466,12 +466,25 @@ const server = http.createServer(async (req, res) => {
                 }
 
                 // Update session
-                session.lastSeen = Date.now();
+                const now = Date.now();
+                session.lastSeen = now;
                 if (activity) session.activity = activity;
+
+                // Update persistent user lastLoginAt
+                const dbUser = db.users.find(u => u.id === session.userId);
+                if (dbUser) {
+                    // To avoid spamming S3 on every heartbeat, only save if it's been more than 5 minutes
+                    const lastLogin = dbUser.lastLoginAt || 0;
+                    if (now - lastLogin > 5 * 60 * 1000) {
+                        dbUser.lastLoginAt = now;
+                        await saveData();
+                    }
+                }
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));
             } catch (e) {
+                console.error('[API] Heartbeat error:', e);
                 res.writeHead(500);
                 res.end(JSON.stringify({ error: 'Server Error' }));
             }
