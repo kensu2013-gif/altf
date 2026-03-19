@@ -763,6 +763,7 @@ const server = http.createServer(async (req, res) => {
                 (u.managerId === requesterId) // Backwards compatibility
             ).map(u => u.id);
             const managedQuotes = db.quotations.filter(q => 
+                q.userId === requesterId ||
                 managedUserIds.includes(q.userId) || 
                 (q.manager && q.manager.id === requesterId) ||
                 q.managerId === requesterId
@@ -870,6 +871,7 @@ const server = http.createServer(async (req, res) => {
                 (u.managerId === requesterId)
             ).map(u => u.id);
             const managedOrders = db.orders.filter(o => 
+                o.userId === requesterId ||
                 managedUserIds.includes(o.userId) || 
                 (o.manager && o.manager.id === requesterId) ||
                 o.managerId === requesterId
