@@ -413,8 +413,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         ? `마킹대기:${item.marking_wait_qty}`
                         : (
                             (product?.currentStock ?? item.currentStock) !== undefined
-                            ? ((product?.currentStock ?? item.currentStock ?? 0) === 0 ? '재고없음' : (item.quantity > (product?.currentStock ?? item.currentStock ?? 0) ? '일부 주문생산' : '출고가능'))
-                            : '-'
+                                ? ((product?.currentStock ?? item.currentStock ?? 0) === 0 ? '재고없음' : (item.quantity > (product?.currentStock ?? item.currentStock ?? 0) ? '일부 주문생산' : '출고가능'))
+                                : '-'
                         ),
                     location_maker: product?.location || '-'
                 };
@@ -483,8 +483,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         ? `마킹대기:${item.marking_wait_qty}`
                         : (
                             (product?.currentStock ?? item.currentStock) !== undefined
-                            ? ((product?.currentStock ?? item.currentStock ?? 0) === 0 ? '재고없음' : (item.quantity > (product?.currentStock ?? item.currentStock ?? 0) ? '일부 주문생산' : '출고가능'))
-                            : '-'
+                                ? ((product?.currentStock ?? item.currentStock ?? 0) === 0 ? '재고없음' : (item.quantity > (product?.currentStock ?? item.currentStock ?? 0) ? '일부 주문생산' : '출고가능'))
+                                : '-'
                         )
                 };
             }),
@@ -533,7 +533,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         if (field === 'spec') return;
 
         const updatedItem = { ...newItems[index], [field]: value };
-        
+
         // [BUG FIX] Reset productId when manual specs are typed to force a fresh spec match
         if (['name', 'thickness', 'size', 'material'].includes(field as string)) {
             updatedItem.productId = null;
@@ -1046,15 +1046,15 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                             <span className="font-bold text-yellow-800 block mb-2"> 첨부된 사진/파일: </span>
                                                             <div className="flex flex-wrap gap-1.5">
                                                                 {order.attachments.map((file, i) => (
-                                                                    <a 
-                                                                        key={i} 
-                                                                        href={file.url} 
-                                                                        target="_blank" 
-                                                                        rel="noopener noreferrer" 
+                                                                    <a
+                                                                        key={i}
+                                                                        href={file.url}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
                                                                         className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-yellow-300 text-yellow-700 hover:bg-yellow-100 rounded text-[10px] font-bold transition-colors shadow-sm"
                                                                     >
                                                                         <Image className="w-3 h-3" />
-                                                                        보기 {order.attachments!.length > 1 ? `(${i+1})` : ''}
+                                                                        보기 {order.attachments!.length > 1 ? `(${i + 1})` : ''}
                                                                     </a>
                                                                 ))}
                                                             </div>
@@ -1386,15 +1386,15 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                         <h4 className="text-xs font-bold text-slate-500 mb-2">첨부된 사진/파일 (Customer Attachments)</h4>
                                                         <div className="flex flex-wrap gap-2">
                                                             {order.attachments.map((file, i) => (
-                                                                <a 
-                                                                    key={i} 
-                                                                    href={file.url} 
-                                                                    target="_blank" 
-                                                                    rel="noopener noreferrer" 
+                                                                <a
+                                                                    key={i}
+                                                                    href={file.url}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
                                                                     className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded text-xs font-bold transition-colors"
                                                                 >
                                                                     <Image className="w-3 h-3" />
-                                                                    첨부사진 보기 {order.attachments!.length > 1 ? `(${i+1})` : ''}
+                                                                    첨부사진 보기 {order.attachments!.length > 1 ? `(${i + 1})` : ''}
                                                                 </a>
                                                             ))}
                                                         </div>
@@ -1505,7 +1505,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 >
                                                                     All
                                                                 </button>
-                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </th>
                                                     < th className="px-1 py-3 text-center w-[8%] text-xs font-bold" >
@@ -1780,10 +1780,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                             const product = inventory.find(p => p.id === item.productId);
                                                                             const mat = item.material?.toUpperCase() || product?.material?.toUpperCase() || '';
                                                                             const nm = item.name?.toUpperCase() || product?.name?.toUpperCase() || '';
-                                                                            
+
                                                                             const is316W = mat === 'STS316L-W' || mat === 'WP316L-W';
                                                                             const isCap316S = nm === 'CAP' && (mat === 'STS316L-S' || mat === 'WP316L-S');
-                                                                            
+
                                                                             if (is316W || isCap316S) {
                                                                                 return (
                                                                                     <button
@@ -1793,7 +1793,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                                             const product = inventory.find(p => p.id === targetItem.productId);
                                                                                             const productBasePrice = product?.base_price ?? targetItem.base_price ?? product?.unitPrice ?? 0;
                                                                                             const rate = targetItem.supplierRate ?? 0;
-                                                                                            
+
                                                                                             if (productBasePrice > 0) {
                                                                                                 const targetPrice = Math.ceil(((productBasePrice / 2) * ((100 - rate) / 100) * 1.9) / 10) * 10;
                                                                                                 targetItem.supplierPriceOverride = targetPrice;
@@ -2260,11 +2260,21 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
                 {/* Footer Actions */}
                 <div className="p-6 border-t border-slate-200 bg-white flex items-center justify-between gap-3">
-                    <div>
+                    <div className="flex items-center gap-3">
+                        {!isSupplierMode && (
+                            <Button
+                                variant="outline"
+                                onClick={handleRetractOrder}
+                                className="border-yellow-400 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 shadow-sm transition-colors text-xs font-bold px-4"
+                                title="이 발주를 취소하고 견적 단계로 다시 돌려보냅니다."
+                            >
+                                회수(견적으로 전환)
+                            </Button>
+                        )}
                         {!isSupplierMode && order.po_items && order.po_items.length > 0 && order.po_items.some(item => !item.transactionIssued) && (
                             <Button
                                 onClick={async () => {
-                                    if(confirm('이 주문의 모든 품목을 "명세표 발행 완료(미결 종료)" 상태로 강제 변경하시겠습니까?\n\n(참고: 운임비 등 수기 추가 품목으로 인해 미결목록에서 안 빠지는 경우 이 버튼을 누르세요.)')) {
+                                    if (confirm('이 주문의 모든 품목을 "명세표 발행 완료(미결 종료)" 상태로 강제 변경하시겠습니까?\n\n(참고: 운임비 등 수기 추가 품목으로 인해 미결목록에서 안 빠지는 경우 이 버튼을 누르세요.)')) {
                                         const updatedPoItems = order.po_items!.map(poItem => ({ ...poItem, transactionIssued: true }));
                                         const isPoOverallSent = order.poSent || !!order.supplierPO || (updatedPoItems.length > 0 && updatedPoItems.every(item => item.poSent));
                                         const newStatus = (updatedPoItems.every(item => item.transactionIssued) && isPoOverallSent) ? 'COMPLETED' : order.status;
@@ -2274,21 +2284,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                 }}
                                 className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg px-4 text-xs font-bold transition-colors"
                             >
-                                모든 품목 미결 강제종료
+                                모든 미결품목 강제종료
                             </Button>
                         )}
                     </div>
                     <div className="flex items-center gap-3">
-                        {!isSupplierMode && (
-                            <Button
-                                variant="outline"
-                                onClick={handleRetractOrder}
-                                className="border-slate-300 text-slate-600 hover:bg-slate-50"
-                                title="이 발주를 취소하고 견적 단계로 다시 돌려보냅니다."
-                            >
-                                회수(견적으로 전환)
-                            </Button>
-                        )}
                         <Button variant="outline" onClick={onClose}>
                             닫기
                         </Button>
