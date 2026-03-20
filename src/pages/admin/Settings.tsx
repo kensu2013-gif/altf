@@ -20,14 +20,16 @@ export default function AdminSettings() {
                 'Content-Type': 'application/json'
             };
 
-            // Fetch Quotes
-            const quotesRes = await fetch(`${apiUrl}/api/my/quotations?limit=5000`, { headers });
-            const quotesData = quotesRes.ok ? await quotesRes.json() : [];
+            // Fetch Quotes (서버 부하/타임아웃 방지를 위해 limit을 800으로 하향 조정)
+            const quotesRes = await fetch(`${apiUrl}/api/my/quotations?limit=800`, { headers });
+            const quotesText = await quotesRes.text();
+            const quotesData = quotesRes.ok && quotesText ? JSON.parse(quotesText) : [];
 
             // Fetch Orders
             const ordersEndpoint = user?.role === 'MASTER' ? '/api/admin/orders' : '/api/my/orders';
-            const ordersRes = await fetch(`${apiUrl}${ordersEndpoint}?limit=5000`, { headers });
-            const ordersData = ordersRes.ok ? await ordersRes.json() : [];
+            const ordersRes = await fetch(`${apiUrl}${ordersEndpoint}?limit=800`, { headers });
+            const ordersText = await ordersRes.text();
+            const ordersData = ordersRes.ok && ordersText ? JSON.parse(ordersText) : [];
 
             let foundCount = 0;
             const records: CustomPriceRecord[] = [];
