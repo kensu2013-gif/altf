@@ -15,7 +15,17 @@ export default function AdminLayout() {
     const location = useLocation();
     const logout = useStore((state) => state.logout);
     const user = useStore((state) => state.auth.user);
-    const { orders, quotes, isMobileModalOpen } = useStore((state) => state);
+    const { orders, quotes, isMobileModalOpen, lastCustomPriceSync, syncHistoricalCustomPrices } = useStore((state) => state);
+
+    // Auto-sync custom prices once every 24 hours
+    useEffect(() => {
+        if (!user) return;
+        const now = Date.now();
+        if (now - lastCustomPriceSync > 86400000) { // 24 hours
+            console.log('[AdminLayout] Auto-syncing custom prices in background...');
+            syncHistoricalCustomPrices().catch(console.error);
+        }
+    }, [user, lastCustomPriceSync, syncHistoricalCustomPrices]);
 
     // [MOD] Initialize sidebar state from local storage so it persists across refreshes and menu clicks.
     const [isSidebarOpen, setSidebarOpen] = useState(() => {

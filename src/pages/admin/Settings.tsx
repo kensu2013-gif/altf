@@ -1,93 +1,22 @@
 import { useState } from 'react';
-import { useStore, type CustomPriceRecord } from '../../store/useStore';
-import type { LineItem, Quotation, Order } from '../../types';
+import { useStore } from '../../store/useStore';
 import { Database, Loader2, CheckCircle2 } from 'lucide-react';
 
 export default function AdminSettings() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncResult, setSyncResult] = useState<string | null>(null);
-    const saveCustomPrices = useStore(state => state.saveCustomPrices);
-    const user = useStore(state => state.auth.user);
 
     const handleSyncHistoricalPrices = async () => {
         if (!confirm('시스템 전체 데이터(견적/발주서)를 스캔하여 미연동 품목 가격 정보를 불러옵니다. 진행하시겠습니까?')) return;
         setIsSyncing(true);
         setSyncResult(null);
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || '';
-            const headers = {
-                'Authorization': `Bearer ${useStore.getState().auth.token}`,
-                'Content-Type': 'application/json'
-            };
-
-            // Fetch Quotes (서버 부하/타임아웃 방지를 위해 limit을 800으로 하향 조정)
-            const quotesRes = await fetch(`${apiUrl}/api/my/quotations?limit=800`, { headers });
-            const quotesText = await quotesRes.text();
-            const quotesData = quotesRes.ok && quotesText ? JSON.parse(quotesText) : [];
-
-            // Fetch Orders
-            const ordersEndpoint = user?.role === 'MASTER' ? '/api/admin/orders' : '/api/my/orders';
-            const ordersRes = await fetch(`${apiUrl}${ordersEndpoint}?limit=800`, { headers });
-            const ordersText = await ordersRes.text();
-            const ordersData = ordersRes.ok && ordersText ? JSON.parse(ordersText) : [];
-
-            let foundCount = 0;
-            const records: CustomPriceRecord[] = [];
-
-            const processItems = (items: LineItem[]) => {
-                if (!items) return;
-                items.forEach(item => {
-                    if (!item.productId && item.name) {
-                        const specKey = [item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim();
-                        
-                        // 이미 현재 customPrices에 저장된 단가가 있다면 덮어쓰지 않음 보호 (유지)
-                        const currentPrices = useStore.getState().customPrices || {};
-                        if (currentPrices[specKey]) return;
-                        
-                        // 이번 스캔 중 중복으로 들어온 최신 기록이 이미 배열에 있으면 무시 ( API가 최신순으로 반환하므로 첫 번째가 가장 최신 )
-                        if (records.some(r => r.id === specKey)) return;
-
-                        const spOverride = item.supplierPriceOverride || 0;
-                        const bp = item.base_price || 0;
-                        const sRate = item.supplierRate ?? 0;
-
-                        if (specKey && (item.unitPrice > 0 || spOverride > 0 || bp > 0)) { 
-                            const salesPrice = item.unitPrice || 0;
-                            let purchasePrice = spOverride;
-                            
-                            // If SupplierPriceOverride not found, try to calculate from basePrice and supplierRate
-                            if (purchasePrice === 0 && bp > 0 && item.supplierRate !== undefined) {
-                                purchasePrice = Math.round((bp * (100 - sRate) / 100) / 10) * 10;
-                            }
-
-                            if (salesPrice > 0 || purchasePrice > 0) {
-                                records.push({
-                                    id: specKey,
-                                    name: item.name,
-                                    thickness: item.thickness || '',
-                                    size: item.size || '',
-                                    material: item.material || '',
-                                    salesPrice,
-                                    purchasePrice,
-                                    updatedAt: new Date().toISOString(),
-                                    updatedBy: user?.email || 'admin_sync'
-                                });
-                                foundCount++;
-                            }
-                        }
-                    }
-                });
-            };
-
-            if (Array.isArray(quotesData)) quotesData.forEach((q: Quotation) => processItems(q.items));
-            if (Array.isArray(ordersData)) ordersData.forEach((o: Order) => processItems(o.items || []));
-
-            if (records.length > 0) {
-                saveCustomPrices(records);
+            const result = await useStore.getState().syncHistoricalCustomPrices();
+            if (result.error) {
+                setSyncResult(`오류가 발생했습니다: ${result.error}`);
+            } else {
+                setSyncResult(`총 ${result.foundCount}건의 미연동 품목 기록을 스캔하여 추천단가 사전에 반영했습니다.`);
             }
-            
-            setSyncResult(`총 ${foundCount}건의 미연동 품목 기록을 스캔하여 추천단가 사전에 반영했습니다.`);
-            
         } catch (e) {
             console.error('Settings Sync Error:', e);
             const errorMessage = e instanceof Error ? e.message : String(e);

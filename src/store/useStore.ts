@@ -133,6 +133,8 @@ interface AppState {
     // --- Custom Item Pricing ---
     customPrices: Record<string, CustomPriceRecord>;
     saveCustomPrices: (records: CustomPriceRecord[]) => void;
+    lastCustomPriceSync: number;
+    syncHistoricalCustomPrices: () => Promise<{foundCount: number, error: string | null}>;
 }
 
 export const useStore = create<AppState>()(
@@ -163,6 +165,7 @@ export const useStore = create<AppState>()(
             setMobileModalOpen: (isOpen) => set({ isMobileModalOpen: isOpen }),
 
             customPrices: {},
+            lastCustomPriceSync: 0,
             saveCustomPrices: (records) => {
                 set((state) => {
                     const newPrices = { ...state.customPrices };
@@ -175,6 +178,85 @@ export const useStore = create<AppState>()(
                     });
                     return hasChanges ? { customPrices: newPrices } : state;
                 });
+            },
+            syncHistoricalCustomPrices: async () => {
+                try {
+                    const { auth, customPrices } = get();
+                    if (!auth.isAuthenticated || !auth.user || !auth.token) return { foundCount: 0, error: 'Unauthorized' };
+
+                    const apiUrl = import.meta.env.VITE_API_URL || '';
+                    const headers = {
+                        'Authorization': `Bearer ${auth.token}`,
+                        'Content-Type': 'application/json'
+                    };
+
+                    const quotesRes = await fetch(`${apiUrl}/api/my/quotations?limit=800`, { headers });
+                    const quotesText = await quotesRes.text();
+                    const quotesData = quotesRes.ok && quotesText ? JSON.parse(quotesText) : [];
+
+                    const ordersEndpoint = auth.user.role === 'MASTER' ? '/api/admin/orders' : '/api/my/orders';
+                    const ordersRes = await fetch(`${apiUrl}${ordersEndpoint}?limit=800`, { headers });
+                    const ordersText = await ordersRes.text();
+                    const ordersData = ordersRes.ok && ordersText ? JSON.parse(ordersText) : [];
+
+                    let foundCount = 0;
+                    const records: CustomPriceRecord[] = [];
+
+                    const processItems = (items: LineItem[]) => {
+                        if (!items) return;
+                        items.forEach(item => {
+                            if (!item.productId && item.name) {
+                                const specKey = [item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim();
+                                
+                                // 이미 현재 customPrices에 저장된 단가가 있다면 덮어쓰지 않음 보호 (유지)
+                                if (customPrices[specKey]) return;
+                                
+                                if (records.some(r => r.id === specKey)) return;
+
+                                const spOverride = item.supplierPriceOverride || 0;
+                                const bp = item.base_price || 0;
+                                const sRate = item.supplierRate ?? 0;
+
+                                if (specKey && (item.unitPrice > 0 || spOverride > 0 || bp > 0)) { 
+                                    const salesPrice = item.unitPrice || 0;
+                                    let purchasePrice = spOverride;
+                                    
+                                    if (purchasePrice === 0 && bp > 0 && item.supplierRate !== undefined) {
+                                        purchasePrice = Math.round((bp * (100 - sRate) / 100) / 10) * 10;
+                                    }
+
+                                    if (salesPrice > 0 || purchasePrice > 0) {
+                                        records.push({
+                                            id: specKey,
+                                            name: item.name,
+                                            thickness: item.thickness || '',
+                                            size: item.size || '',
+                                            material: item.material || '',
+                                            salesPrice,
+                                            purchasePrice,
+                                            updatedAt: new Date().toISOString(),
+                                            updatedBy: auth.user!.email || 'admin_sync'
+                                        });
+                                        foundCount++;
+                                    }
+                                }
+                            }
+                        });
+                    };
+
+                    if (Array.isArray(quotesData)) quotesData.forEach((q: Quotation) => processItems(q.items));
+                    if (Array.isArray(ordersData)) ordersData.forEach((o: Order) => processItems(o.items || []));
+
+                    if (records.length > 0) {
+                        get().saveCustomPrices(records);
+                    }
+
+                    set({ lastCustomPriceSync: Date.now() });
+                    return { foundCount, error: null };
+                } catch (e) {
+                    console.error('Auto Sync Custom Prices Error:', e);
+                    return { foundCount: 0, error: e instanceof Error ? e.message : String(e) };
+                }
             },
 
             setDeliveryPreferences: (info) => set({ deliveryPreferences: info }),
@@ -773,7 +855,8 @@ export const useStore = create<AppState>()(
                 quotation: state.quotation,
                 deliveryPreferences: state.deliveryPreferences,
                 newOrderCount: state.newOrderCount,
-                customPrices: state.customPrices
+                customPrices: state.customPrices,
+                lastCustomPriceSync: state.lastCustomPriceSync
             }),
         }
     )
