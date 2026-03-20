@@ -781,26 +781,9 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
-        // 2. Admin Mode: List All (Scoped)
-        if (requesterRole === 'MANAGER' && requesterId) {
-            // Filter: Only customers assigned to this manager (Check if requesterId is in user.managerIds)
-            const managedUserIds = db.users.filter(u =>
-                (u.managerIds && u.managerIds.includes(requesterId)) ||
-                (u.managerId === requesterId) // Backwards compatibility
-            ).map(u => u.id);
-            const managedQuotes = db.quotations.filter(q => 
-                q.userId === requesterId ||
-                managedUserIds.includes(q.userId) || 
-                (q.manager && q.manager.id === requesterId) ||
-                q.managerId === requesterId
-            );
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(managedQuotes));
-        } else {
-            // MASTER or unknown: Return All
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(db.quotations));
-        }
+        // 2. Admin Mode: Return All
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(db.quotations));
 
         return;
     }
@@ -890,24 +873,9 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
-        // Admin Mode: List All (Scoped)
-        if (requesterRole === 'MANAGER' && requesterId) {
-            const managedUserIds = db.users.filter(u =>
-                (u.managerIds && u.managerIds.includes(requesterId)) ||
-                (u.managerId === requesterId)
-            ).map(u => u.id);
-            const managedOrders = db.orders.filter(o => 
-                o.userId === requesterId ||
-                managedUserIds.includes(o.userId) || 
-                (o.manager && o.manager.id === requesterId) ||
-                o.managerId === requesterId
-            );
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(managedOrders));
-        } else {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(db.orders));
-        }
+        // Admin Mode: Return All
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(db.orders));
 
         return;
     }
