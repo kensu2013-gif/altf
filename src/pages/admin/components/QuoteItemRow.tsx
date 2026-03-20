@@ -156,12 +156,12 @@ export const QuoteItemRow = React.memo(({
                     <div className="flex flex-col items-center gap-1">
                         <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">미연동</span>
                         {customPriceRecord && (
-                            <div className="flex flex-col items-center mt-1 border border-teal-200 bg-teal-50 rounded p-1 text-[10px] w-full max-w-[90px] mx-auto shadow-sm">
-                                <span className="text-teal-700 font-bold mb-0.5 whitespace-nowrap">💡 추천단가</span>
-                                <span className="text-slate-600 truncate w-full flex justify-between" title={`판매: ${formatCurrency(customPriceRecord.salesPrice)}`}>
+                            <div className="flex flex-col items-center mt-1 border border-slate-200 bg-slate-50 rounded p-1.5 text-[10px] w-full max-w-[100px] shadow-sm">
+                        <span className="text-slate-700 font-bold mb-1 whitespace-nowrap border-b border-slate-200 w-full text-center pb-0.5">📋 과거 실적확인</span>
+                        <div className="flex justify-between w-full mb-0.5" title={`판매: ${formatCurrency(customPriceRecord.salesPrice)}`}>
                                     <span className="text-[9px]">판매:</span> 
                                     <span className="font-bold">{formatCurrency(customPriceRecord.salesPrice)}</span>
-                                </span>
+                                </div>
                                 {(customPriceRecord.purchasePrice > 0) && (
                                     <span className="text-slate-600 truncate w-full flex justify-between" title={`매입: ${formatCurrency(customPriceRecord.purchasePrice)}`}>
                                         <span className="text-[9px]">매입:</span> 

@@ -1861,11 +1861,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                         if (record && record.purchasePrice > 0) {
                                                                             return (
                                                                                 <button
-                                                                                    className="mt-1 px-1.5 py-0.5 text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-100 font-bold whitespace-nowrap shadow-sm block w-full truncate"
-                                                                                    title={`추천 매입가: ${formatCurrency(record.purchasePrice)} (클릭하여 적용)`}
+                                                                                    className="mt-1 px-1.5 py-0.5 text-[10px] bg-slate-100 text-slate-700 border border-slate-300 rounded hover:bg-slate-200 font-bold whitespace-nowrap shadow-sm block w-full truncate"
+                                                                                    title={`과거 매입실적: ${formatCurrency(record.purchasePrice)} (클릭하여 적용)`}
                                                                                     onClick={() => handleSupplierPriceChange(idx, record.purchasePrice)}
                                                                                 >
-                                                                                    💡 {formatCurrency(record.purchasePrice)}
+                                                                                    📋 {formatCurrency(record.purchasePrice)}
                                                                                 </button>
                                                                             );
                                                                         }
@@ -1917,8 +1917,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                                     const record = customPrices[specKey];
                                                                                     if (record) {
                                                                                         return (
-                                                                                            <div className="flex flex-col items-center mt-1 border border-teal-200 bg-teal-50 rounded p-1 text-[10px] w-full max-w-[90px] mx-auto shadow-sm">
-                                                                                                <span className="text-teal-700 font-bold mb-0.5 whitespace-nowrap">💡 추천단가</span>
+                                                                                            <div className="flex flex-col items-center mt-1 border border-slate-200 bg-slate-50 rounded p-1 text-[10px] w-full max-w-[90px] mx-auto shadow-sm">
+                                                                                                <span className="text-slate-700 font-bold mb-0.5 whitespace-nowrap">📋 과거 실적확인</span>
                                                                                                 <span className="text-slate-600 truncate w-full flex justify-between" title={`판매: ${formatCurrency(record.salesPrice)}`}>
                                                                                                     <span className="text-[9px]">판매:</span> 
                                                                                                     <span className="font-bold">{formatCurrency(record.salesPrice)}</span>
