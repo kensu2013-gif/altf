@@ -245,7 +245,7 @@ const server = http.createServer(async (req, res) => {
             }
             // Parse Key from URL (e.g. https://bucket.s3.region.amazonaws.com/documents/quotes/...)
             const parsed = new URL(S3Url);
-            const key = parsed.pathname.slice(1); // remove leading slash
+            const key = decodeURIComponent(parsed.pathname.slice(1)); // remove leading slash & decode Unicode
 
             // Generate temporary exact presigned URL
             const presignedUrl = await getPresignedUrlToS3(key);

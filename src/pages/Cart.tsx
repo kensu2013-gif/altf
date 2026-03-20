@@ -426,6 +426,7 @@ export default function QuotationEditor() {
     const handleAnimationComplete = () => {
         setShowSuccessAnimation(false);
         clearQuotation();
+        navigate('/my');
     };
 
     return (
@@ -942,7 +943,10 @@ export default function QuotationEditor() {
                 ))}
                 confirmText="확인"
                 confirmVariant="primary"
-                onConfirm={() => setSuccessConfig(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={() => {
+                    setSuccessConfig(prev => ({ ...prev, isOpen: false }));
+                    navigate('/my');
+                }}
             // No onCancel provided -> Renders single OK button
             />
 
