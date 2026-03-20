@@ -680,7 +680,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         {quote.attachments.map((file, i) => (
                                             <a 
                                                 key={i} 
-                                                href={file.url} 
+                                                href={`${import.meta.env.VITE_API_URL || ''}/api/download?url=${encodeURIComponent(file.url)}`}
                                                 target="_blank" 
                                                 rel="noopener noreferrer" 
                                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-yellow-300 text-yellow-700 hover:bg-yellow-100 rounded-md text-sm font-bold transition-colors shadow-sm"

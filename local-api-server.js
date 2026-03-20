@@ -6,7 +6,7 @@ import zlib from 'zlib';
 const PORT = process.env.PORT || 3001;
 
 // --- Persistence Setup ---
-import { loadDbFromS3, saveDbToS3, uploadFileToS3, getInventoryFromS3 } from './s3-db.js';
+import { loadDbFromS3, saveDbToS3, uploadFileToS3, getInventoryFromS3, getPresignedUrlToS3 } from './s3-db.js';
 
 import multer from 'multer';
 
@@ -232,6 +232,32 @@ const server = http.createServer(async (req, res) => {
                 res.end(JSON.stringify({ error: 'S3 Upload Failed' }));
             }
         });
+        return;
+    }
+
+    // GET /api/download
+    if (req.method === 'GET' && url.pathname === '/api/download') {
+        try {
+            const S3Url = url.searchParams.get('url');
+            if (!S3Url) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ error: 'Missing url parameter' }));
+            }
+            // Parse Key from URL (e.g. https://bucket.s3.region.amazonaws.com/documents/quotes/...)
+            const parsed = new URL(S3Url);
+            const key = parsed.pathname.slice(1); // remove leading slash
+
+            // Generate temporary exact presigned URL
+            const presignedUrl = await getPresignedUrlToS3(key);
+
+            // Redirect the user to the presigned URL
+            res.writeHead(302, { Location: presignedUrl });
+            res.end();
+        } catch (error) {
+            console.error('[API] Presigned URL generation error:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing or invalid S3 Object' }));
+        }
         return;
     }
 

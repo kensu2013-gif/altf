@@ -1,4 +1,5 @@
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -94,6 +95,20 @@ export async function uploadFileToS3(folderPath, fileName, fileBuffer, contentTy
         return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'ap-northeast-2'}.amazonaws.com/${fullKey}`;
     } catch (error) {
         console.error('[S3] Failed to upload file:', error);
+        throw error;
+    }
+}
+
+export async function getPresignedUrlToS3(key) {
+    try {
+        const command = new GetObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: key
+        });
+        const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+        return url;
+    } catch (error) {
+        console.error('[S3] Failed to generate presigned URL:', error);
         throw error;
     }
 }

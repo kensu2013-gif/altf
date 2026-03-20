@@ -292,16 +292,12 @@ export default function AdminQuotes() {
 
                                     <div className="flex items-center gap-6 pl-14 md:pl-0">
                                         <div className="flex items-center gap-3">
-                                            <StatusSelect
-                                                status={quote.status}
-                                                onChange={(val) => handleStatusUpdate(quote.id, val)}
-                                            />
                                             {(quote.attachments && quote.attachments.length > 0) && (
                                                 <div className="flex gap-2">
                                                     {quote.attachments.map((file, i) => (
                                                         <a 
                                                             key={i} 
-                                                            href={file.url} 
+                                                            href={`${import.meta.env.VITE_API_URL || ''}/api/download?url=${encodeURIComponent(file.url)}`}
                                                             target="_blank" 
                                                             rel="noopener noreferrer" 
                                                             onClick={(e) => e.stopPropagation()}
@@ -314,6 +310,10 @@ export default function AdminQuotes() {
                                                     ))}
                                                 </div>
                                             )}
+                                            <StatusSelect
+                                                status={quote.status}
+                                                onChange={(val) => handleStatusUpdate(quote.id, val)}
+                                            />
                                         </div>
 
                                         <div className="text-right">
