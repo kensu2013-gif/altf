@@ -39,7 +39,8 @@ export default function AdminSettings() {
                         const specKey = [item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim();
                         
                         // 이미 현재 customPrices에 저장된 단가가 있다면 덮어쓰지 않음 보호 (유지)
-                        if (useStore.getState().customPrices[specKey]) return;
+                        const currentPrices = useStore.getState().customPrices || {};
+                        if (currentPrices[specKey]) return;
                         
                         // 이번 스캔 중 중복으로 들어온 최신 기록이 이미 배열에 있으면 무시 ( API가 최신순으로 반환하므로 첫 번째가 가장 최신 )
                         if (records.some(r => r.id === specKey)) return;
@@ -86,8 +87,9 @@ export default function AdminSettings() {
             setSyncResult(`총 ${foundCount}건의 미연동 품목 기록을 스캔하여 추천단가 사전에 반영했습니다.`);
             
         } catch (e) {
-            console.error(e);
-            setSyncResult('오류가 발생했습니다. 개발자 도구를 확인하세요.');
+            console.error('Settings Sync Error:', e);
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            setSyncResult(`오류가 발생했습니다: ${errorMessage}`);
         } finally {
             setIsSyncing(false);
         }
