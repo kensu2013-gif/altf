@@ -18,6 +18,19 @@ export interface QuoteImportItem {
     [key: string]: unknown;
 }
 
+export interface CustomPriceRecord {
+    id: string; // e.g. "Name-Thickness-Size-Material"
+    name: string;
+    thickness: string;
+    size: string;
+    material: string;
+    salesPrice: number;
+    purchasePrice: number;
+    updatedAt: string;
+    updatedBy: string;
+}
+
+
 export interface DeliveryInfo {
     method: 'FREIGHT' | 'COURIER';
     branchName: string;
@@ -116,6 +129,10 @@ interface AppState {
     // --- Admin Mobile Layout State ---
     isMobileModalOpen: boolean;
     setMobileModalOpen: (isOpen: boolean) => void;
+
+    // --- Custom Item Pricing ---
+    customPrices: Record<string, CustomPriceRecord>;
+    saveCustomPrices: (records: CustomPriceRecord[]) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -144,6 +161,21 @@ export const useStore = create<AppState>()(
 
             isMobileModalOpen: false,
             setMobileModalOpen: (isOpen) => set({ isMobileModalOpen: isOpen }),
+
+            customPrices: {},
+            saveCustomPrices: (records) => {
+                set((state) => {
+                    const newPrices = { ...state.customPrices };
+                    let hasChanges = false;
+                    records.forEach(record => {
+                        if (record.salesPrice > 0 || record.purchasePrice > 0) {
+                            newPrices[record.id] = record;
+                            hasChanges = true;
+                        }
+                    });
+                    return hasChanges ? { customPrices: newPrices } : state;
+                });
+            },
 
             setDeliveryPreferences: (info) => set({ deliveryPreferences: info }),
 
@@ -740,7 +772,8 @@ export const useStore = create<AppState>()(
                 auth: state.auth,
                 quotation: state.quotation,
                 deliveryPreferences: state.deliveryPreferences,
-                newOrderCount: state.newOrderCount
+                newOrderCount: state.newOrderCount,
+                customPrices: state.customPrices
             }),
         }
     )

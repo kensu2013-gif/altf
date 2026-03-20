@@ -27,6 +27,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const inventory = useStore((state) => state.inventory);
     const user = useStore((state) => state.auth.user);
     const users = useStore((state) => state.users);
+    const customPrices = useStore((state) => state.customPrices);
+    const saveCustomPrices = useStore((state) => state.saveCustomPrices);
 
     const { findProduct } = useInventoryIndex(inventory);
 
@@ -635,7 +637,31 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         setDisplayedItems(newItems);
     };
 
+    const persistCustomPrices = () => {
+        const records = displayedItems
+            .filter(item => {
+                const liveProduct = getProductStock(item);
+                return !liveProduct && item.name;
+            })
+            .map(item => {
+                const specKey = [item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim();
+                return {
+                    id: specKey,
+                    name: item.name,
+                    thickness: item.thickness || '',
+                    size: item.size || '',
+                    material: item.material || '',
+                    salesPrice: item.unitPrice,
+                    purchasePrice: item.supplierPriceOverride ?? 0,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: user?.email || 'admin'
+                };
+            }).filter(r => r.salesPrice > 0 || r.purchasePrice > 0);
+        if (records.length > 0) saveCustomPrices(records);
+    };
+
     const handleJustSave = async () => {
+        persistCustomPrices();
         const updateData: Partial<Order> = {
             totalAmount: totalWithCharges,
             adminResponse: {
@@ -681,6 +707,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     };
 
     const handleSave = async (extraUpdate: Partial<Order> = {}) => {
+        persistCustomPrices();
         const updateData: Partial<Order> = {
             totalAmount: totalWithCharges,
             adminResponse: {
@@ -727,6 +754,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     };
 
     const handleSupplierSave = async () => {
+        persistCustomPrices();
         if (user?.role !== 'MASTER' && user?.role !== 'MANAGER') {
             alert('권한이 없습니다 (Only Master/Manager allowed).');
             return;
@@ -1584,8 +1612,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                             </div>
                                                         </div>
                                                     </th>
-                                                    < th className="px-2 py-3 text-right w-[7%]" > 단가(실구매가) </th>
-                                                    < th className="px-2 py-3 text-right w-[9%]" > 금액(VAT별도) </th>
+                                                    < th className="px-2 py-3 text-right w-[7%]" > 판매단가 </th>
+                                                    < th className="px-2 py-3 text-right w-[9%]" > 합계금액 </th>
                                                 </>
                                             )}
                                         {!isSupplierMode && <th className="px-1 py-3 w-[2%]" > </th>}
@@ -1826,6 +1854,23 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                         }}
                                                                         onKeyDown={handleKeyDown}
                                                                     />
+                                                                    {(() => {
+                                                                        if (!isUnlinked) return null;
+                                                                        const specKey = [item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim();
+                                                                        const record = customPrices[specKey];
+                                                                        if (record && record.purchasePrice > 0) {
+                                                                            return (
+                                                                                <button
+                                                                                    className="mt-1 px-1.5 py-0.5 text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-100 font-bold whitespace-nowrap shadow-sm block w-full truncate"
+                                                                                    title={`추천 매입가: ${formatCurrency(record.purchasePrice)} (클릭하여 적용)`}
+                                                                                    onClick={() => handleSupplierPriceChange(idx, record.purchasePrice)}
+                                                                                >
+                                                                                    💡 {formatCurrency(record.purchasePrice)}
+                                                                                </button>
+                                                                            );
+                                                                        }
+                                                                        return null;
+                                                                    })()}
                                                                 </td>
                                                                 < td className="px-4 py-3 text-right align-middle font-mono font-extrabold text-slate-900 text-sm" >
                                                                     {formatCurrency(supplierAmount)}
@@ -1865,7 +1910,41 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 < td className="px-4 py-3 text-center align-middle" >
                                                                     {
                                                                         isUnlinked ? (
-                                                                            <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded" > 미연동 </span>
+                                                                            <div className="flex flex-col items-center gap-1">
+                                                                                <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">미연동</span>
+                                                                                {(() => {
+                                                                                    const specKey = [item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim();
+                                                                                    const record = customPrices[specKey];
+                                                                                    if (record) {
+                                                                                        return (
+                                                                                            <div className="flex flex-col items-center mt-1 border border-teal-200 bg-teal-50 rounded p-1 text-[10px] w-full max-w-[90px] mx-auto shadow-sm">
+                                                                                                <span className="text-teal-700 font-bold mb-0.5 whitespace-nowrap">💡 추천단가</span>
+                                                                                                <span className="text-slate-600 truncate w-full flex justify-between" title={`판매: ${formatCurrency(record.salesPrice)}`}>
+                                                                                                    <span className="text-[9px]">판매:</span> 
+                                                                                                    <span className="font-bold">{formatCurrency(record.salesPrice)}</span>
+                                                                                                </span>
+                                                                                                {(record.purchasePrice > 0) && (
+                                                                                                    <span className="text-slate-600 truncate w-full flex justify-between" title={`매입: ${formatCurrency(record.purchasePrice)}`}>
+                                                                                                        <span className="text-[9px]">매입:</span> 
+                                                                                                        <span className="font-bold">{formatCurrency(record.purchasePrice)}</span>
+                                                                                                </span>
+                                                                                                )}
+                                                                                                <button type="button" onClick={() => {
+                                                                                                    const newItems = [...displayedItems];
+                                                                                                    newItems[idx] = {
+                                                                                                        ...newItems[idx],
+                                                                                                        unitPrice: record.salesPrice,
+                                                                                                        amount: record.salesPrice * newItems[idx].quantity,
+                                                                                                        supplierPriceOverride: record.purchasePrice > 0 ? record.purchasePrice : newItems[idx].supplierPriceOverride
+                                                                                                    };
+                                                                                                    setDisplayedItems(newItems);
+                                                                                                }} className="mt-1 bg-teal-600 text-white rounded hover:bg-teal-700 w-full py-0.5 font-bold transition-colors">적용하기</button>
+                                                                                            </div>
+                                                                                        );
+                                                                                    }
+                                                                                    return null;
+                                                                                })()}
+                                                                            </div>
                                                                         ) : item.poSent ? (
                                                                             <div className="flex flex-col items-center justify-center gap-0.5" >
                                                                                 <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded font-bold border border-indigo-100 whitespace-nowrap" > 발주완료 </span>

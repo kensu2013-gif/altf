@@ -1,6 +1,7 @@
 
 import React from 'react';
 import type { LineItem, Product } from '../../../types';
+import type { CustomPriceRecord } from '../../../store/useStore';
 import { findMatchingProduct } from '../../../lib/productUtils';
 import { formatCurrency } from '../../../lib/utils'; // Adjust path if needed
 
@@ -18,6 +19,8 @@ interface QuoteItemRowProps {
     onDiscountRateChange: (index: number, value: number) => void;
     isSelected?: boolean;
     onItemSelect?: (index: number, isSelected: boolean) => void;
+    customPriceRecord?: CustomPriceRecord;
+    onApplyCustomPrice?: (record: CustomPriceRecord) => void;
 }
 
 export const QuoteItemRow = React.memo(({
@@ -29,7 +32,9 @@ export const QuoteItemRow = React.memo(({
     onSupplierRateChange,
     onDiscountRateChange,
     isSelected = true,
-    onItemSelect
+    onItemSelect,
+    customPriceRecord,
+    onApplyCustomPrice
 }: QuoteItemRowProps) => {
 
     // Memoize product lookup to prevent unnecessary recalcs if inventory/item identity changes but data is same
@@ -148,7 +153,25 @@ export const QuoteItemRow = React.memo(({
             </td>
             <td className="px-2 py-2 text-center align-middle font-mono text-sm text-slate-600">
                 {isUnlinked ? (
-                    <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">미연동</span>
+                    <div className="flex flex-col items-center gap-1">
+                        <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">미연동</span>
+                        {customPriceRecord && (
+                            <div className="flex flex-col items-center mt-1 border border-teal-200 bg-teal-50 rounded p-1 text-[10px] w-full max-w-[90px] mx-auto shadow-sm">
+                                <span className="text-teal-700 font-bold mb-0.5 whitespace-nowrap">💡 추천단가</span>
+                                <span className="text-slate-600 truncate w-full flex justify-between" title={`판매: ${formatCurrency(customPriceRecord.salesPrice)}`}>
+                                    <span className="text-[9px]">판매:</span> 
+                                    <span className="font-bold">{formatCurrency(customPriceRecord.salesPrice)}</span>
+                                </span>
+                                {(customPriceRecord.purchasePrice > 0) && (
+                                    <span className="text-slate-600 truncate w-full flex justify-between" title={`매입: ${formatCurrency(customPriceRecord.purchasePrice)}`}>
+                                        <span className="text-[9px]">매입:</span> 
+                                        <span className="font-bold">{formatCurrency(customPriceRecord.purchasePrice)}</span>
+                                    </span>
+                                )}
+                                <button type="button" onClick={() => onApplyCustomPrice?.(customPriceRecord)} className="mt-1 bg-teal-600 text-white rounded hover:bg-teal-700 w-full py-0.5 font-bold transition-colors">적용하기</button>
+                            </div>
+                        )}
+                    </div>
                 ) : (
                     <div className="flex flex-col items-center text-xs bg-slate-50 rounded border border-slate-100 p-1.5 w-auto min-w-[85px] mx-auto space-y-0.5">
                         <div className="flex justify-between w-full gap-2 whitespace-nowrap">

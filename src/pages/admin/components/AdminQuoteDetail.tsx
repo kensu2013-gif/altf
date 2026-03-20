@@ -4,7 +4,7 @@ import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plu
 import { Button } from '../../../components/ui/Button';
 import { formatCurrency } from '../../../lib/utils';
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { useStore, type DeliveryInfo } from '../../../store/useStore';
+import { useStore, type DeliveryInfo, type CustomPriceRecord } from '../../../store/useStore';
 import { renderDocumentHTML } from '../../../lib/documentTemplate';
 
 import type { DocumentPayload, DocumentItem } from '../../../types/document';
@@ -28,6 +28,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const inventory = useStore((state) => state.inventory);
     const user = useStore((state) => state.auth.user); // Get Admin User
     const updateQuotation = useStore((state) => state.updateQuotation);
+    const customPrices = useStore((state) => state.customPrices);
+    const saveCustomPrices = useStore((state) => state.saveCustomPrices);
     const uploadFile = useStore((state) => state.uploadFile);
     const setMobileModalOpen = useStore((state) => state.setMobileModalOpen);
     const customerUser = useStore((state) => state.users.find(u => u.id === quote.userId));
@@ -404,8 +406,43 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const calculatedTotal = selectedItems.reduce((sum, item) => sum + item.amount, 0);
     const totalWithCharges = calculatedTotal + charges.reduce((sum, c) => sum + c.amount, 0);
 
+    const persistCustomPrices = () => {
+        const records = items
+            .filter(item => !item.productId && item.name)
+            .map(item => {
+                const specKey = [item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim();
+                return {
+                    id: specKey,
+                    name: item.name,
+                    thickness: item.thickness || '',
+                    size: item.size || '',
+                    material: item.material || '',
+                    salesPrice: item.unitPrice,
+                    purchasePrice: 0,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: user?.email || 'admin'
+                };
+            }).filter(r => r.salesPrice > 0);
+        if (records.length > 0) saveCustomPrices(records);
+    };
+
+    const handleApplyCustomPrice = useCallback((index: number, record: CustomPriceRecord) => {
+        setItems(prev => {
+            const newItems = [...prev];
+            const item = newItems[index];
+            newItems[index] = {
+                ...item,
+                unitPrice: record.salesPrice,
+                amount: record.salesPrice * item.quantity
+            };
+            return newItems;
+        });
+    }, []);
+
     const handleProcessing = async () => {
         if (!confirm('견적서를 회수(수정모드)하시겠습니까? 고객은 더 이상 답변서를 볼 수 없습니다.\n(상태가 답변작성중으로 변경됩니다)')) return;
+
+        persistCustomPrices();
 
         // 1. Prepare Payload (Revert to PROCESSING)
         const updatePayload = {
@@ -434,6 +471,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
     const handleSend = async () => {
         if (!confirm('견적서를 전송하시겠습니까? (상태가 답변완료로 변경됩니다)')) return;
+
+        persistCustomPrices();
 
         // 1. Update User Info
         // Removed `updateUser` call to prevent overwriting the customer's base profile.
@@ -814,6 +853,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                 onDiscountRateChange={handleDiscountRateChange}
                                                 isSelected={item.isSelected}
                                                 onItemSelect={handleItemSelect}
+                                                customPriceRecord={customPrices[[item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim()]}
+                                                onApplyCustomPrice={(record) => handleApplyCustomPrice(idx, record)}
                                             />
                                         ))}
                                     </tbody>
@@ -1106,6 +1147,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                             {quote.status !== 'COMPLETED' && (
                                 <Button
                                     onClick={async () => {
+                                        persistCustomPrices();
+
                                         // 1. Upload Admin Attachments to S3
                                         const uploadedAttachments: { name: string, url: string }[] = quote.adminAttachments || [];
                                         for (const file of adminAttachmentFiles) {
