@@ -346,7 +346,18 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                         <tr>
                             <td class="text-center">${item.no}</td>
                             <td class="col-item">${item.item_name}</td>
-                            <td class="col-spec">${item.thickness || '-'}</td>
+                            <td class="col-spec">
+                                ${(() => {
+                                    if (!item.thickness) return '-';
+                                    const thk = String(item.thickness).trim();
+                                    const parts = thk.split(/\s+[xX]\s+|\s*\/\s*/);
+                                    if (parts.length > 1 && parts.every(p => p.trim() !== '')) {
+                                        const fontSize = (isPurchaseOrder || isTransaction) ? '12.5px' : '8.5px';
+                                        return `<div style="font-size: ${fontSize}; line-height: 1.2; letter-spacing: 0px;">${parts[0]}<br>X ${parts.slice(1).join('<br>X ')}</div>`;
+                                    }
+                                    return thk;
+                                })()}
+                            </td>
                             <td class="col-size">${item.size || '-'}</td>
                             <td class="col-mat">${item.material || '-'}</td>
                             ${!isTransaction ? `
