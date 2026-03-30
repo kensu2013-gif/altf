@@ -76,9 +76,12 @@ export function PreviewModal({ htmlContent, onClose, onSend, onPrint, onOrder, d
         }
 
         if (printWindow) {
+            // Retrieve current DOM state from iframe to include user edits (contenteditable)
+            const currentContent = iframeRef.current?.contentDocument?.documentElement.outerHTML || htmlContent;
+
             // Rewrite with the actual HTML content
             printWindow.document.open();
-            printWindow.document.write(htmlContent);
+            printWindow.document.write(currentContent);
             printWindow.document.close();
 
             // Use a short timeout to let the DOM and external CSS (Tailwind) parse
@@ -124,7 +127,7 @@ export function PreviewModal({ htmlContent, onClose, onSend, onPrint, onOrder, d
                             <Check className="w-5 h-5 text-teal-600" />
                         </div>
                         <h2 className="text-lg font-bold text-slate-800">
-                            {docType === 'ORDER' ? '발주서 미리보기 (Order Preview)' : docType === 'TRANSACTION' ? '거래명세서 뷰어 (Transaction Statement)' : '견적서 답변 확인 (Quotation check)'}
+                            {docType === 'ORDER' ? '발주서 미리보기 (Order Preview)' : docType === 'TRANSACTION' ? '거래명세서 뷰어 (Transaction Statement)' : docType === 'PACKING_LIST' ? '포장내역 뷰어 (Packing List Viewer)' : '견적서 답변 확인 (Quotation check)'}
                         </h2>
                     </div>
                     <button
@@ -191,7 +194,7 @@ export function PreviewModal({ htmlContent, onClose, onSend, onPrint, onOrder, d
                                 className="gap-2 font-bold shadow-sm min-w-[140px] justify-center text-slate-700 border-slate-300 hover:bg-slate-50"
                             >
                                 <Printer className="w-4 h-4" />
-                                {docType === 'ORDER' ? '발주서 출력 (Print Order Sheet)' : docType === 'TRANSACTION' ? '거래명세서 인쇄 (Print)' : '견적서 발급 (PDF 저장)'}
+                                {docType === 'ORDER' ? '발주서 출력 (Print Order Sheet)' : docType === 'TRANSACTION' ? '거래명세서 인쇄 (Print)' : docType === 'PACKING_LIST' ? '포장 내역서 인쇄 (Print)' : '견적서 발급 (PDF 저장)'}
                             </Button>
                         )}
 

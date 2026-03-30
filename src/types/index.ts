@@ -37,6 +37,7 @@ export interface LineItem {
     // Computed/Fetched
     unitPrice: number;
     amount: number;
+    note?: string; // Appended for packing lists and transaction items
     base_price?: number; // Added for verification display
     isVerified: boolean; // True if matched to product
     stockStatus?: StockStatus;
@@ -147,6 +148,9 @@ export interface Order {
     userId: string;
     customerName: string; // Snapshot
     customerBizNo: string; // Snapshot
+    customerBizType?: string; // Editable
+    customerContactName?: string; // Editable
+    customerTel?: string; // Editable
     items: LineItem[];
     po_items?: LineItem[]; // [NEW] Supplier PO Items (Separated from Customer Items)
     totalAmount: number;

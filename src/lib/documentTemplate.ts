@@ -12,16 +12,18 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
     // Unified Template Logic
     const isPurchaseOrder = document_type === 'PURCHASE_ORDER';
     const isTransaction = document_type === 'TRANSACTION';
-    const isOrder = document_type === 'ORDER' || isPurchaseOrder || document_type === 'ORDER_RECEIPT' || isTransaction;
+    const isPackingList = document_type === 'PACKING_LIST';
+    const isOrder = document_type === 'ORDER' || isPurchaseOrder || document_type === 'ORDER_RECEIPT' || isTransaction || isPackingList;
 
     let title = '견적서 (QUOTATION)';
     if (document_type === 'ORDER') title = '주문서 (ORDER SHEET)';
     if (document_type === 'PURCHASE_ORDER') title = '발주서 (PURCHASE ORDER)';
     if (document_type === 'ORDER_RECEIPT') title = '발주 접수증 (ORDER RECEIPT)';
     if (document_type === 'TRANSACTION') title = '거래명세서(공급받는자 보관용)';
+    if (document_type === 'PACKING_LIST') title = '포장명세서 (PACKING LIST)';
 
     // Theme Color (Indigo for PO, Slate for others)
-    const colorTheme = isPurchaseOrder ? '#312e81' : (isTransaction ? '#0f766e' : '#1e293b');
+    const colorTheme = isPurchaseOrder ? '#312e81' : (isTransaction ? '#0f766e' : (isPackingList ? '#ea580c' : '#1e293b'));
 
 
     return `
@@ -201,6 +203,11 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             th.col-amt { text-align: right !important; padding-right: 12px !important; }
             td.col-amt { text-align: right !important; padding-right: 12px !important; }
 
+            .col-remark { width: 26%; }
+            td.col-remark { border: 1.5px dashed #cbd5e1; background: #fff; cursor: text; padding: 4px 8px; font-size: 12px; font-weight: 500; }
+            td.col-remark:focus { outline: 2px solid ${colorTheme}; border-style: solid; }
+            td.col-remark:empty:before { content: attr(placeholder); color: #94a3b8; }
+
             /* Footer Layout */
             .footer-wrapper {
                 display: flex; 
@@ -247,8 +254,19 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 margin-bottom: 0px;
                 line-height: 1.2;
             }
+
+            [contenteditable]:empty:before {
+                content: attr(placeholder);
+                color: #94a3b8;
+                pointer-events: none;
+                display: block;
+            }
             
             @media print {
+                [contenteditable]:empty:before {
+                    content: "";
+                    display: none;
+                }
                 body { 
                     -webkit-print-color-adjust: exact; 
                     padding: 0;
@@ -287,15 +305,16 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                     <h3>공급자 (Supplier)</h3>
                     <div class="row"><span class="label">상호</span><span class="value">${supplier.company_name}</span></div>
                     <div class="row"><span class="label">주소</span><span class="value">${supplier.address}</span></div>
-                    <div class="row"><span class="label">담당자</span><span class="value">${supplier.contact_name || '-'}</span></div>
-                    <div class="row"><span class="label">연락처</span><span class="value">${supplier.tel} / ${supplier.email}</span></div>
+                    <div class="row"><span class="label">담당자</span><span class="value" ${isPackingList ? 'contenteditable="true" style="outline:2px solid transparent;"' : ''}>${supplier.contact_name || '-'}</span></div>
+                    <div class="row"><span class="label">연락처</span><span class="value" ${isPackingList ? 'contenteditable="true" style="outline:2px solid transparent;"' : ''}>${supplier.tel} / ${supplier.email}</span></div>
                 </div>
                 <div class="box">
                     <h3>공급받는자 (Customer)</h3>
                     <div class="row"><span class="label">상호</span><span class="value">${customer.company_name || '-'}</span></div>
                     <div class="row"><span class="label">담당자</span><span class="value">${customer.contact_name || '-'}</span></div>
-                    <div class="row"><span class="label">연락처</span><span class="value">${customer.tel || '-'}</span></div>
+                    ${customer.tel ? `<div class="row"><span class="label">연락처</span><span class="value">${customer.tel}</span></div>` : ''}
                     ${customer.email ? `<div class="row"><span class="label">이메일</span><span class="value">${customer.email}</span></div>` : ''}
+                    ${customer.address ? `<div class="row"><span class="label">주소</span><span class="value">${customer.address}</span></div>` : ''}
                     ${meta.end_customer ? `<div class="row"><span class="label" style="color: #6366f1; font-weight: 800;">요청고객사</span><span class="value" style="color: #6366f1; font-weight: 800;">${meta.end_customer}</span></div>` : ''}
                 </div>
             </div>
@@ -312,6 +331,14 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                         <col style="width: 8%">
                         <col style="width: 15%">
                         <col style="width: 15%">
+                        ` : isPackingList ? `
+                        <col class="col-no">
+                        <col class="col-item">
+                        <col class="col-spec">
+                        <col class="col-size">
+                        <col class="col-mat">
+                        <col class="col-qty">
+                        <col class="col-remark">
                         ` : `
                         <col class="col-no">
                         <col class="col-item">
@@ -332,13 +359,17 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                             <th class="col-spec">두께<br><span class="sub-text">THK</span></th>
                             <th class="col-size">규격<br><span class="sub-text">SIZE</span></th>
                             <th class="col-mat">재질<br><span class="sub-text">MATERIAL</span></th>
-                            ${!isTransaction ? `
+                            ${!isTransaction && !isPackingList ? `
                             <th class="col-stock">재고<br><span class="sub-text">STOCK</span></th>
                             <th class="col-status">상태<br><span class="sub-text">STAT</span></th>
                             ` : ''}
                             <th class="col-qty">수량<br><span class="sub-text">QTY</span></th>
+                            ${isPackingList ? `
+                            <th class="col-remark text-center">비고<br><span class="sub-text">REMARK</span></th>
+                            ` : `
                             <th class="col-price">단가<br><span class="sub-text">PRICE</span></th>
                             <th class="col-amt">합계<br><span class="sub-text">AMT</span></th>
+                            `}
                         </tr>
                     </thead>
                     <tbody>
@@ -360,7 +391,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                             </td>
                             <td class="col-size">${item.size || '-'}</td>
                             <td class="col-mat">${item.material || '-'}</td>
-                            ${!isTransaction ? `
+                            ${!isTransaction && !isPackingList ? `
                             <td class="col-stock" style="color: ${isPurchaseOrder ? '#ffffff' : 'inherit'};">${item.stock_qty !== undefined ? item.stock_qty.toLocaleString() : '-'}</td>
                             <td class="col-status">
                                 ${(() => {
@@ -378,8 +409,12 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                             </td>
                             ` : ''}
                             <td class="col-qty">${item.qty}</td>
+                            ${isPackingList ? `
+                            <td contenteditable="true" class="col-remark text-center" placeholder="비고를 입력하세요" spellcheck="false" style="color: #475569; outline: none;">${item.note || ''}</td>
+                            ` : `
                             <td class="col-price text-right">${formatCurrency(item.unit_price)}</td>
                             <td class="col-amt text-right">${formatCurrency(item.amount)}</td>
+                            `}
                         </tr>
                         `).join('')}
                     </tbody>
@@ -412,8 +447,8 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 ` : `
                     ${(() => {
             // Estimated Delivery Logic
-            // [MOD] Hide Estimated Delivery if Confirmed Delivery exists or if it's a Transaction Statement
-            if (isTransaction || meta.delivery_date) return '';
+            // [MOD] Hide Estimated Delivery if Confirmed Delivery exists or if it's a Transaction Statement or Packing List
+            if (isTransaction || isPackingList || meta.delivery_date) return '';
 
             let deliveryText = '당일~1일내 출고 가능'; // Default (Available/Marking Wait)
             const hasOutOfStock = items.some(i => i.stock_status?.includes('재고없음'));
@@ -448,13 +483,14 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                         </div>
                     ` : ''}
 
-                    ${customer.memo ? `
+                    ${customer.memo && !isPackingList ? `
                         <span class="delivery-title">${isOrder ? '물건 받으실 방법 (Delivery Request)' : '문의 및 요청사항 (Inquiries & Requests)'}</span>
                         <div class="delivery-content" ${isTransaction ? 'style="font-size: 14px; font-weight: bold; line-height: 1.5; color: #1e293b; white-space: pre-wrap;"' : ''}>${customer.memo}</div>
                     ` : ''}
                 `}
                 </div>
 
+                ${!isPackingList ? `
                 <div class="totals-section">
                     ${totals.additional_charges ? totals.additional_charges.map(charge => `
                     <div class="total-row" style="font-size: 11px; color: #555;">
@@ -490,16 +526,17 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                         `}
                     </div>
                 </div>
+                ` : ''}
             </div>
 
             <div class="disclaimer">
                 ${isPurchaseOrder
             ? ''
             : isTransaction
-                ? '' // [MOD] No disclaimer for Transaction Statement
-                : isOrder
-                    ? '본 주문서는 정식 주문 확정 문서입니다.<br><span style="color:#e11d48; font-weight:bold;">재고 부족 품목이 있는 경우, 담당자가 확인 후 연락드리겠습니다.</span>'
-                    : '본 견적서는 현재 시점의 재고 및 단가 기준이며, 실제 주문 시점에 변동될 수 있습니다.<br>유효기간: 견적일로부터 3일<br><span style="color:#e11d48; font-weight:bold;">요청사항에 문의 남겨주시면, 담당자가 10분이내에 연락 드릴 수 있도록 하겠습니다.</span>'}
+                ? ''
+                : isPackingList
+                    ? ''
+                    : ''}
             </div>
 
             ${footer ? `
@@ -513,7 +550,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             </div>
             ` : ''}
 
-            ${isOrder && !isPurchaseOrder && !isTransaction ? `
+            ${isOrder && !isPurchaseOrder && !isTransaction && !isPackingList ? `
             <div class="signature-block">
                 <div class="sig-box">
                     <p class="signature-text">${customer.contact_name || ''}</p>
@@ -534,7 +571,37 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
 
         </div>
         
-
+        ${isPackingList ? `
+        <div style="margin-top: 30px; border: 2px solid #ccc; border-radius: 4px; overflow: hidden; page-break-inside: avoid;">
+            <table style="margin-bottom: 0; font-size: 13px; border: none;">
+                <colgroup>
+                    <col style="width: 20%">
+                    <col style="width: 30%">
+                    <col style="width: 20%">
+                    <col style="width: 30%">
+                </colgroup>
+                <tbody>
+                    <tr>
+                        <td style="background-color: #f8fafc; font-weight: bold; text-align: center; border-right: 1px solid #ccc; border-bottom: 1px solid #ccc;">인수방법</td>
+                        <td contenteditable="true" style="border-right: 1px solid #ccc; border-bottom: 1px solid #ccc; outline: none; padding: 12px;"></td>
+                        <td style="background-color: #f8fafc; font-weight: bold; text-align: center; border-right: 1px solid #ccc; border-bottom: 1px solid #ccc;">도착지</td>
+                        <td contenteditable="true" style="border-bottom: 1px solid #ccc; outline: none; padding: 12px;"></td>
+                    </tr>
+                    <tr>
+                        <td style="background-color: #f8fafc; font-weight: bold; text-align: center; border-right: 1px solid #ccc;">인수자 정보</td>
+                        <td contenteditable="true" style="border-right: 1px solid #ccc; outline: none; padding: 12px;"></td>
+                        <td style="background-color: #f8fafc; font-weight: bold; text-align: center; border-right: 1px solid #ccc;">비고</td>
+                        <td contenteditable="true" style="outline: none; padding: 12px;"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top: 15px; text-align: right; font-size: 14px; font-weight: bold; color: #475569; padding-right: 5px;">
+            인수일자: <span contenteditable="true" style="display:inline-block; min-width: 150px; text-align:center; border-bottom: 1px solid #475569; outline: none; padding-bottom: 2px;">
+                ${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월 ${new Date().getDate()}일
+            </span>
+        </div>
+        ` : ''}
 
     </body>
     </html>

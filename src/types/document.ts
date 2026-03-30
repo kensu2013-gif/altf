@@ -1,4 +1,4 @@
-export type DocumentType = 'QUOTATION' | 'ORDER' | 'INVOICE' | 'TRANSACTION' | 'SHIPPING' | 'PURCHASE_ORDER' | 'ORDER_RECEIPT';
+export type DocumentType = 'QUOTATION' | 'ORDER' | 'INVOICE' | 'TRANSACTION' | 'SHIPPING' | 'PURCHASE_ORDER' | 'ORDER_RECEIPT' | 'PACKING_LIST';
 
 export interface DocumentItem {
     no: number;

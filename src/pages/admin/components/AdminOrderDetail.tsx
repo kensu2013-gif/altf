@@ -33,12 +33,30 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const { findProduct } = useInventoryIndex(inventory);
 
     const linkedUser = useMemo(() => users.find(u => u.id === order.userId), [users, order.userId]);
-    const customerInfo = useMemo(() => ({
-        contactName: order.payload?.customer?.contact_name || linkedUser?.contactName || order.customerName,
-        tel: order.payload?.customer?.tel || linkedUser?.phone || '-',
-        bizNo: order.customerBizNo || linkedUser?.bizNo || '-'
-    }), [order, linkedUser]);
-    // ...
+    const customerInfo = useMemo(() => {
+        const payloadCustomer = order.payload?.customer as Record<string, string> | undefined;
+        return {
+            name: payloadCustomer?.company_name || user?.companyName || 'Unknown',
+            contactName: payloadCustomer?.contact_name || user?.contactName || '',
+            tel: payloadCustomer?.tel || user?.phone || '',
+            bizNo: payloadCustomer?.biz_no || user?.bizNo || '-'
+        };
+    }, [order.payload, user]);
+
+    const cleanDefault = (val: string) => {
+        if (!val) return '';
+        if (val === '000-00-00000' || val === '-' || val === 'Admin' || val === '010-0000-0000' || val === 'Unknown') return '';
+        return val;
+    };
+
+    const [editableCustomerInfo, setEditableCustomerInfo] = useState({
+        bizNo: cleanDefault(order.customerBizNo || customerInfo.bizNo),
+        bizType: order.customerBizType || '',
+        contactName: cleanDefault(order.customerContactName || customerInfo.contactName),
+        tel: cleanDefault(order.customerTel || customerInfo.tel)
+    });
+
+    const [poEndCustomer, setPoEndCustomer] = useState(order.poEndCustomer || order.customerName || '');
 
     const uploadFile = useStore(state => state.uploadFile);
 
@@ -48,7 +66,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const [isSupplierMode, setIsSupplierMode] = useState(initialMode === 'SUPPLIER');
 
     const [previewHtml, setPreviewHtml] = useState<string | null>(null);
-    const [previewType, setPreviewType] = useState<'PO' | 'SALES'>('PO');
+    const [previewType, setPreviewType] = useState<'PO' | 'SALES' | 'PACKING'>('PO');
 
     const setMobileModalOpen = useStore((state) => state.setMobileModalOpen);
 
@@ -208,10 +226,100 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     // Shipping Memo State (Editable)
     const [shippingMemo, setShippingMemo] = useState(() => {
-        if (order.memo) return order.memo;
-        const payload = order.payload;
-        return payload?.customer?.memo || '';
+        const memo = order.memo || order.payload?.customer?.memo || '';
+        return memo.replace(/[\uFFFC\uFFFD]/g, '');
     });
+
+    // --- Delivery Preset Logic ---
+    const getPresetKey = useCallback(() => `delivery_preset_${(isSupplierMode ? supplierInfo.company_name : (poEndCustomer || '')).replace('(주)', '').trim()}`, [isSupplierMode, supplierInfo.company_name, poEndCustomer]);
+
+    const [showPresetDropdown, setShowPresetDropdown] = useState(false);
+
+    // Get all historical memos for this customer from the entire database
+    const availablePresets = useMemo(() => {
+        if (!showPresetDropdown) return [];
+        
+        const key = getPresetKey();
+        let saved: string[] = [];
+        try {
+            const raw = localStorage.getItem(key);
+            if (raw) saved = raw.startsWith('[') ? JSON.parse(raw) : [raw];
+        } catch { 
+            // no-op
+        }
+
+        // Fetch past orders from Zustand store to auto-suggest
+        const allOrders = useStore.getState().orders || [];
+        const currentTarget = isSupplierMode ? supplierInfo.company_name : (order.poEndCustomer || order.customerName || '');
+        const targetClean = currentTarget.replace('(주)', '').trim();
+
+        // Find all memos from past orders that match this customer
+        const historicalMemos = allOrders
+            .filter(o => {
+                const poCustomer = (o.poEndCustomer || o.customerName || '').replace('(주)', '').trim();
+                const supCustomer = (o.supplierInfo?.company_name || '').replace('(주)', '').trim();
+                return isSupplierMode ? supCustomer === targetClean : poCustomer === targetClean;
+            })
+            .map(o => isSupplierMode ? o.supplierInfo?.note : o.memo)
+            .filter(Boolean) as string[];
+
+        // Merge and deduplicate
+        const uniqueKeys = new Set<string>();
+        const finalMerged: string[] = [];
+
+        for (const m of [...saved, ...historicalMemos]) {
+            const cleanM = m.trim().replace(/[\uFFFC\uFFFD]/g, '');
+            if (!cleanM) continue;
+            
+            // Generate a deduplication key by removing auto tags and spaces
+            const dedupKey = cleanM
+                .replace(/\[.*?\]/g, '') // remove all [tags]
+                .replace(/\s+/g, '') // remove all whitespace
+                .toLowerCase();
+
+            if (!uniqueKeys.has(dedupKey)) {
+                uniqueKeys.add(dedupKey);
+                finalMerged.push(cleanM);
+            }
+        }
+            
+        return finalMerged;
+    }, [showPresetDropdown, isSupplierMode, supplierInfo.company_name, getPresetKey, order.customerName, order.poEndCustomer]);
+
+    const handleSaveDeliveryPreset = () => {
+        const key = getPresetKey();
+        if (!key || !shippingMemo.trim()) {
+            alert('업체명(거래처명/고객명)과 배송 요청사항이 모두 있어야 저장할 수 있습니다.');
+            return;
+        }
+
+        let existingSaved: string[] = [];
+        try {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+                if (raw.startsWith('[')) {
+                    existingSaved = JSON.parse(raw);
+                } else {
+                    existingSaved = [raw]; // legacy support
+                }
+            }
+        } catch {
+            // Ignore parse errors
+        }
+
+        const newMemo = shippingMemo.trim();
+        existingSaved = existingSaved.filter(s => s !== newMemo);
+        existingSaved.unshift(newMemo);
+        
+        localStorage.setItem(key, JSON.stringify(existingSaved.slice(0, 10)));
+        alert(`[${key.replace('delivery_preset_', '')}] 배송 요청사항이 저장되었습니다.`);
+        setShowPresetDropdown(false);
+    };
+
+    const handleLoadPresetItem = (preset: string) => {
+        setShippingMemo(preset);
+        setShowPresetDropdown(false);
+    };
 
     // PO Options State
     const initialMemo = order.memo || '';
@@ -231,7 +339,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     useEffect(() => {
         if (!order || !isSupplierMode) return;
 
-        let baseMemo = order.memo || '';
+        let baseMemo = (order.memo || '').replace(/[\uFFFC\uFFFD]/g, '');
         if (baseMemo.includes('[배송:')) {
             baseMemo = baseMemo
                 .replace(/\[배송:\s*([^\]]+)\]/g, '배송:$1 -')
@@ -251,7 +359,6 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     }, [poOptionNoMarking, poOptionStockCheck, poOptionCustomOrder, isSupplierMode, order]);
 
     // PO Info State
-    const [poEndCustomer, setPoEndCustomer] = useState(order.poEndCustomer || order.customerName || '');
     const [poNumber, setPoNumber] = useState(order.poNumber || autoPoNumber);
     const [poTitle, setPoTitle] = useState(order.poTitle || defaultSubject);
 
@@ -530,6 +637,65 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         }
     };
 
+    const handleDownloadPackingList = () => {
+        if (selectedItems.length === 0) {
+            alert('출력할 품목을 선택해주세요.');
+            return;
+        }
+
+        const includeDetails = window.confirm('배송 요청사항과 거래처 상세정보(연락처/이메일/주소)를 포함하여 출력하시겠습니까?\\n\\n[확인]을 누르면 모두 표시되고, [취소]를 누르면 상호명과 담당자만 표시됩니다.');
+
+        const payload: DocumentPayload = {
+            document_type: 'PACKING_LIST',
+            meta: {
+                doc_no: `PK${order.id.slice(2, 8)}-${order.id.split('-')[1] || '000'}`,
+                created_at: new Date().toLocaleDateString(),
+                channel: 'WEB',
+            },
+            supplier: {
+                company_name: '알트에프',
+                contact_name: buyerInfo.contact_name || user?.contactName || '조현진 대표',
+                tel: '051-303-3751',
+                email: 'altf@altf.kr',
+                address: '부산광역시 사상구 낙동대로1330번길, 67'
+            },
+            customer: {
+                company_name: poEndCustomer || linkedUser?.companyName || order.customerName || '',
+                contact_name: "담당자님",
+                ...(includeDetails ? {
+                    tel: linkedUser?.phone || customerInfo.tel,
+                    email: linkedUser?.email || '',
+                    address: linkedUser?.address || '',
+                    memo: transactionTrackingNo ? `[제품송장 번호]: ${transactionTrackingNo}\\n${shippingMemo}` : shippingMemo
+                } : {})
+            },
+            items: selectedItems.map((item, index) => ({
+                no: index + 1,
+                item_name: item.name,
+                thickness: item.thickness,
+                size: item.size,
+                material: item.material,
+                qty: item.quantity,
+                unit_price: 0,
+                amount: 0,
+                note: item.note || ''
+            })),
+            totals: {
+                total_amount: 0,
+                currency: 'KRW'
+            }
+        };
+
+        try {
+            const html = renderDocumentHTML(payload);
+            setPreviewHtml(html);
+            setPreviewType('PACKING');
+        } catch (e) {
+            console.error('Error generating Packing List:', e);
+            alert('문서 생성 중 오류가 발생했습니다.');
+        }
+    };
+
     const handleItemChange = (index: number, field: keyof LineItem | 'spec', value: string | number) => {
         const newItems = [...displayedItems];
         if (field === 'spec') return;
@@ -708,6 +874,26 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     const handleSave = async (extraUpdate: Partial<Order> = {}) => {
         persistCustomPrices();
+        const finalStatus = extraUpdate.status || (order.status === 'SUBMITTED' ? 'PROCESSING' : order.status);
+        
+        // Auto Save Preset if COMPLETED
+        if (finalStatus === 'COMPLETED') {
+            const key = getPresetKey();
+            const newMemo = shippingMemo.trim();
+            if (key && newMemo) {
+                let existingSaved: string[] = [];
+                try {
+                    const raw = localStorage.getItem(key);
+                    if (raw) existingSaved = raw.startsWith('[') ? JSON.parse(raw) : [raw];
+                } catch {
+                    // Ignore parse errors
+                }
+                existingSaved = existingSaved.filter(s => s !== newMemo);
+                existingSaved.unshift(newMemo);
+                localStorage.setItem(key, JSON.stringify(existingSaved.slice(0, 10)));
+            }
+        }
+
         const updateData: Partial<Order> = {
             totalAmount: totalWithCharges,
             adminResponse: {
@@ -715,12 +901,17 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 confirmedPrice: totalWithCharges,
                 additionalCharges: charges
             },
-            status: order.status === 'SUBMITTED' ? 'PROCESSING' : order.status,
+            status: finalStatus,
             supplierInfo: supplierInfo,
             buyerInfo: buyerInfo,
             poNumber: poNumber,
             poTitle: poTitle,
             poEndCustomer: poEndCustomer,
+            customerName: poEndCustomer, // Synchronize core user name
+            customerBizNo: editableCustomerInfo.bizNo,
+            customerBizType: editableCustomerInfo.bizType,
+            customerContactName: editableCustomerInfo.contactName,
+            customerTel: editableCustomerInfo.tel,
             memo: shippingMemo,
             items: enrichedItems,
             po_items: enrichedPoItems,
@@ -926,14 +1117,24 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         )}
                         {
                             !isSupplierMode && (
-                                <Button
-                                    variant="outline"
-                                    onClick={handleDownloadSalesOrder}
-                                    className="gap-2 font-bold bg-white text-teal-600 border-teal-200 hover:bg-teal-50"
-                                >
-                                    <Download className="w-4 h-4" />
-                                    거래명세서 출력
-                                </Button>
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleDownloadSalesOrder}
+                                        className="gap-2 font-bold bg-white text-teal-600 border-teal-200 hover:bg-teal-50"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                        거래명세서 출력
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleDownloadPackingList}
+                                        className="gap-2 font-bold bg-white text-orange-600 border-orange-200 hover:bg-orange-50"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                        포장내역 출력
+                                    </Button>
+                                </>
                             )
                         }
                         {
@@ -1315,27 +1516,61 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                     주문 및 배송 정보(Order & Shipping Info)
                                 </h3>
                                 < div className="grid grid-cols-2 gap-4 text-sm" >
-                                    {/* Basic Customer Details (Read-only/Link references) */}
+                                    <div className="col-span-2 text-[10px] text-teal-600 bg-teal-50 px-2 py-1.5 rounded -mb-1 shadow-inner border border-teal-100 flex items-center justify-center font-bold">
+                                        💡 기본 고객 정보(CUSTOMER)를 변경하시면, 시스템 전체의 업체명 및 사업자번호 등이 업데이트됩니다.
+                                    </div>
                                     < div >
                                         <span className="block text-slate-400 text-xs mb-1" > 업체명(Customer) </span>
-                                        < span className="font-bold text-slate-800" > {order.customerName} </span>
+                                        < input
+                                            type="text"
+                                            value={poEndCustomer}
+                                            onChange={(e) => {
+                                                setPoEndCustomer(e.target.value);
+                                                if (!customerTouched) setCustomerTouched(true);
+                                            }}
+                                            className={`w-full font-bold text-slate-800 bg-transparent border-b hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1 ${!customerTouched ? 'border-transparent' : 'border-teal-400 border-dotted'}`}
+                                            placeholder="고객사명 수정"
+                                        />
                                     </div>
                                     < div >
                                         <span className="block text-slate-400 text-xs mb-1" > 사업자번호(Biz No) </span>
-                                        < span className="font-mono text-slate-600" > {order.customerBizNo || customerInfo.bizNo || linkedUser?.bizNo || '-'} </span>
+                                        < input
+                                            type="text"
+                                            value={editableCustomerInfo.bizNo}
+                                            onChange={(e) => setEditableCustomerInfo({...editableCustomerInfo, bizNo: e.target.value})}
+                                            className="w-full font-mono text-slate-600 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1"
+                                            placeholder="***-**-*****"
+                                        />
                                     </div>
                                     < div >
                                         <span className="block text-slate-400 text-xs mb-1" > 업태 / 종목(Biz Type) </span>
-                                        {/* Mock or Fetch if available, otherwise just placeholder or hidden */}
-                                        <span className="text-slate-600" > -</span>
+                                        < input
+                                            type="text"
+                                            value={editableCustomerInfo.bizType}
+                                            onChange={(e) => setEditableCustomerInfo({...editableCustomerInfo, bizType: e.target.value})}
+                                            className="w-full text-slate-600 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1"
+                                            placeholder="업태/종목 입력"
+                                        />
                                     </div>
                                     < div >
                                         <span className="block text-slate-400 text-xs mb-1" > 담당자명(Contact) </span>
-                                        < span className="font-bold text-slate-800" > {customerInfo.contactName} </span>
+                                        < input
+                                            type="text"
+                                            value={editableCustomerInfo.contactName}
+                                            onChange={(e) => setEditableCustomerInfo({...editableCustomerInfo, contactName: e.target.value})}
+                                            className="w-full font-bold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1"
+                                            placeholder="담당자명(선택)"
+                                        />
                                     </div>
                                     < div >
                                         <span className="block text-slate-400 text-xs mb-1" > 연락처(Phone) </span>
-                                        < span className="font-mono text-slate-600" > {customerInfo.tel} </span>
+                                        < input
+                                            type="text"
+                                            value={editableCustomerInfo.tel}
+                                            onChange={(e) => setEditableCustomerInfo({...editableCustomerInfo, tel: e.target.value})}
+                                            className="w-full font-mono text-slate-600 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1"
+                                            placeholder="연락처(선택)"
+                                        />
                                     </div>
 
                                     {/* Status & Date */}
@@ -1400,12 +1635,47 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                     placeholder="배송지 주소 입력"
                                                 />
                                             </div>
-                                            < div >
-                                                <label className="block text-xs text-slate-400 mb-1" > 배송 요청사항(Shipping Memo) </label>
-                                                < textarea
+                                            <div className="flex flex-col gap-1 mt-4">
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <label className="block text-xs font-bold text-slate-600">배송 요청사항(Shipping Memo)</label>
+                                                    <div className="flex gap-2 relative">
+                                                        <button
+                                                            onClick={handleSaveDeliveryPreset}
+                                                            className="text-[10px] px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded border border-slate-200 font-bold transition-colors"
+                                                            title="현재 입력된 배송 요청사항을 이 업체명으로 기억합니다."
+                                                        >
+                                                            저장하기
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setShowPresetDropdown(!showPresetDropdown)}
+                                                            className="text-[10px] flex items-center gap-1 px-2 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded border border-teal-200 font-bold transition-colors"
+                                                            title="이전에 저장한 이 업체의 다양한 배송 요청사항을 불러옵니다."
+                                                        >
+                                                            불러오기 <span className="text-[8px]">▼</span>
+                                                        </button>
+                                                        {showPresetDropdown && (
+                                                            <div className="absolute right-0 top-full mt-1 w-[320px] bg-white border border-slate-200 rounded-md shadow-xl z-50 max-h-[300px] overflow-y-auto">
+                                                                {availablePresets.length === 0 ? (
+                                                                    <div className="p-3 text-sm text-slate-500 text-center">저장된 내역이 없습니다.</div>
+                                                                ) : (
+                                                                    availablePresets.map((s, idx) => (
+                                                                        <div 
+                                                                            key={idx} 
+                                                                            onClick={() => handleLoadPresetItem(s)}
+                                                                            className="p-3 border-b border-slate-100 hover:bg-slate-50 cursor-pointer text-xs text-slate-700 whitespace-pre-wrap select-none"
+                                                                        >
+                                                                            {s}
+                                                                        </div>
+                                                                    ))
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <textarea
                                                     value={shippingMemo}
                                                     onChange={(e) => setShippingMemo(e.target.value)}
-                                                    className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:border-teal-500 outline-none resize-none h-16 bg-yellow-50/50"
+                                                    className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:border-teal-500 outline-none resize-none h-20 bg-yellow-50/50"
                                                     placeholder="배송 요청사항을 입력하세요."
                                                 />
                                                 {/* NEW: Attached Photos */}
@@ -2394,7 +2664,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 previewHtml && (
                     <PreviewModal
                         htmlContent={previewHtml}
-                        docType={previewType === 'PO' ? 'ORDER' : 'TRANSACTION'}
+                        docType={previewType === 'PO' ? 'ORDER' : previewType === 'PACKING' ? 'PACKING_LIST' : 'TRANSACTION'}
                         onClose={() => setPreviewHtml(null)}
                         onPrint={async () => {
                             if (previewType === 'SALES') {
