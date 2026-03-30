@@ -82,7 +82,7 @@ const ITEM_CATEGORIES = [
         keywords: ["TEE"],
         subs: [
             { label: "동일(STRAIGHT)", value: "T(S)" },
-            { label: "이종(REDUCING)", value: "R" },
+            { label: "이종(REDUCING)", value: "T(R)" },
         ]
     },
     {
