@@ -112,14 +112,14 @@ export default function MyPage() {
         setIsLoading(true);
         try {
             // Fetch Quotations
-            const quotesRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations?userId=${user?.id}`, { cache: 'no-store' });
+            const quotesRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations?userId=${user?.id}&limit=2000`, { cache: 'no-store' });
             if (quotesRes.ok) {
                 const quotes = await quotesRes.json();
                 setQuotations(quotes.filter((q: QuotationRecord) => !('isDeleted' in q && q.isDeleted)));
             }
 
             // Fetch Orders
-            const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders?userId=${user?.id}`, { cache: 'no-store' });
+            const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders?userId=${user?.id}&limit=2000`, { cache: 'no-store' });
             if (ordersRes.ok) {
                 const orders = await ordersRes.json();
                 setOrders(orders.filter((o: OrderRecord) => !('isDeleted' in o && o.isDeleted)));
