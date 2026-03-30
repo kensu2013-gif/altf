@@ -142,13 +142,14 @@ export const OrderService = {
                     if (result.orderId) apiId = result.orderId;
                 } else {
                     console.error('Failed to submit order to API');
+                    return { success: false, order_id: '', message: `서버 저장 실패: (${apiRes.status})` };
                 }
             } catch (err) {
                 console.error('API Error submitting order:', err);
+                return { success: false, order_id: '', message: '서버 통신 중 네트워크 오류' };
             }
 
-            // Still persist to local store (Zustand) so Admin/MyPage can see it immediately
-            // regardless of backend success for now until full DB is ready
+            // Persist to local store only after successful DB save
             store.getState().submitOrder({
                 ...apiPayload,
                 id: apiId

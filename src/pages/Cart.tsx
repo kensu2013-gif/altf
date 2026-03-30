@@ -312,12 +312,16 @@ export default function QuotationEditor() {
                 });
                 if (!apiRes.ok) {
                     console.error('Failed to save quotation to backend API');
+                    alert(`서버 저장에 실패했습니다. (${apiRes.status}) 잠시 후 다시 시도해주세요.`);
+                    return;
                 }
             } catch (err) {
                 console.error('API Error saving quotation:', err);
+                alert('서버 통신 네트워크 오류가 발생했습니다.');
+                return;
             }
 
-            // Persist to Local Store for Admin Visibility (fallback)
+            // Persist to Local Store only on success
             useStore.getState().addQuotation(payloadData);
 
             setSuccessConfig({

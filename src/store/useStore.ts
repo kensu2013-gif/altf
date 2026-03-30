@@ -549,16 +549,21 @@ export const useStore = create<AppState>()(
                     orders: state.orders.map(o => o.id === orderId ? { ...o, ...enrichedUpdates } : o)
                 }));
 
-                // 2. Persist to API
                 try {
                     const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders/${orderId}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(enrichedUpdates)
                     });
-                    if (!res.ok) throw new Error('Failed to update order');
+                    if (!res.ok) {
+                        // Revert optimistic update logging
+                        const text = await res.text();
+                        console.error("Failed to persist order update:", text);
+                        alert(`서버 저장에 실패했습니다. (Error: ${res.status}) 새로고침 후 다시 시도해주세요.`);
+                    }
                 } catch (e) {
-                    console.error("Failed to persist order update:", e);
+                    console.error("Network error during order update:", e);
+                    alert("서버 통신 중 네트워크 오류가 발생했습니다. 변경사항이 유실되었을 수 있습니다!");
                 }
             },
 
