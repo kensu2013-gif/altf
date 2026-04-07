@@ -1,5 +1,6 @@
-import { useMemo, useState, useEffect, Fragment } from 'react';
+import { useMemo, useState, useEffect, Fragment, useDeferredValue } from 'react';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { User } from '../../types';
 import { FileText, PackageX, Calendar, Search, Filter, MessageSquare, Send, X, Trash2, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { CalmPageShell } from '../../components/ui/CalmPageShell';
@@ -37,12 +38,20 @@ interface PendingOrderGroup {
 }
 
 export default function PendingOrders() {
-    const { orders, setOrders, updateOrder, users, fetchUsers } = useStore((state) => state);
+    const { orders, setOrders, updateOrder, users, fetchUsers } = useStore(useShallow((state) => ({
+        orders: state.orders,
+        setOrders: state.setOrders,
+        updateOrder: state.updateOrder,
+        users: state.users,
+        fetchUsers: state.fetchUsers
+    })));
     const user = useStore((state) => state.auth.user);
 
     // Filters
     const [searchCustomer, setSearchCustomer] = useState('');
+    const deferredSearchCustomer = useDeferredValue(searchCustomer);
     const [searchPo, setSearchPo] = useState('');
+    const deferredSearchPo = useDeferredValue(searchPo);
     const [dateFilter, setDateFilter] = useState<'ALL' | 'URGENT' | 'URGENT_NO_COMMENT'>('URGENT'); // URGENT = <= 7 days
     const [tagFilter, setTagFilter] = useState<string>('ALL'); // [NEW] Tag FILTER
     const [searchManager, setSearchManager] = useState<string>('all');
@@ -75,7 +84,11 @@ export default function PendingOrders() {
 
         const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`;
 
+        let lastFetchTime = 0;
         const fetchOrders = () => {
+            const now = Date.now();
+            if (now - lastFetchTime < 20000) return; // 20초 간격 쓰로틀링
+            lastFetchTime = now;
             fetch(endpoint, { headers, cache: 'no-store' })
                 .then(res => {
                     if (res.ok) return res.json();
@@ -135,9 +148,9 @@ export default function PendingOrders() {
 
         // Apply Filters
         const filtered = itemsList.filter(item => {
-            const matchCust = item.targetCustomerName.toLowerCase().includes(searchCustomer.toLowerCase()) ||
-                item.customerName.toLowerCase().includes(searchCustomer.toLowerCase());
-            const matchPo = item.poNumber.toLowerCase().includes(searchPo.toLowerCase());
+            const matchCust = item.targetCustomerName.toLowerCase().includes(deferredSearchCustomer.toLowerCase()) ||
+                item.customerName.toLowerCase().includes(deferredSearchCustomer.toLowerCase());
+            const matchPo = item.poNumber.toLowerCase().includes(deferredSearchPo.toLowerCase());
 
             let matchDate = true;
             if (dateFilter === 'URGENT') {
@@ -190,7 +203,7 @@ export default function PendingOrders() {
 
         // Sort by 납기 임박순 (Delivery Date ascending)
         return groups.sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
-    }, [orders, searchCustomer, searchPo, dateFilter, tagFilter, searchManager]);
+    }, [orders, deferredSearchCustomer, deferredSearchPo, dateFilter, tagFilter, searchManager]);
 
     // Handlers
     const handleUpdateManagersForCustomer = async (targetCustomerName: string, managers: { id: string; name: string }[]) => {

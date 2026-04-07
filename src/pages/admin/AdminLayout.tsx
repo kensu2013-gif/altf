@@ -1,5 +1,6 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useInventory } from '../../hooks/useInventory';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -15,7 +16,13 @@ export default function AdminLayout() {
     const location = useLocation();
     const logout = useStore((state) => state.logout);
     const user = useStore((state) => state.auth.user);
-    const { orders, quotes, isMobileModalOpen, lastCustomPriceSync, syncHistoricalCustomPrices } = useStore((state) => state);
+    const { orders, quotes, isMobileModalOpen, lastCustomPriceSync, syncHistoricalCustomPrices } = useStore(useShallow((state) => ({
+        orders: state.orders,
+        quotes: state.quotes,
+        isMobileModalOpen: state.isMobileModalOpen,
+        lastCustomPriceSync: state.lastCustomPriceSync,
+        syncHistoricalCustomPrices: state.syncHistoricalCustomPrices
+    })));
 
     // Auto-sync custom prices once every 24 hours
     useEffect(() => {

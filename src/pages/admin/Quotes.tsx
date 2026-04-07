@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useDeferredValue } from 'react';
 import { FileText, Calendar, Download, Trash2, ArchiveRestore, Search, Image } from 'lucide-react';
 import { AdminQuoteDetail } from './components/AdminQuoteDetail';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { formatCurrency } from '../../lib/utils';
 import { Button } from '../../components/ui/Button';
 
@@ -11,10 +12,20 @@ import { renderDocumentHTML } from '../../lib/documentTemplate';
 import { PreviewModal } from '../../components/ui/PreviewModal';
 
 export default function AdminQuotes() {
-    const { quotes, users, updateQuotation, trashQuotation, restoreQuotation, permanentDeleteQuotation, setQuotes, fetchUsers } = useStore((state) => state);
+    const { quotes, users, updateQuotation, trashQuotation, restoreQuotation, permanentDeleteQuotation, setQuotes, fetchUsers } = useStore(useShallow((state) => ({
+        quotes: state.quotes,
+        users: state.users,
+        updateQuotation: state.updateQuotation,
+        trashQuotation: state.trashQuotation,
+        restoreQuotation: state.restoreQuotation,
+        permanentDeleteQuotation: state.permanentDeleteQuotation,
+        setQuotes: state.setQuotes,
+        fetchUsers: state.fetchUsers
+    })));
     const [selectedQuote, setSelectedQuote] = useState<typeof quotes[0] | null>(null);
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const deferredSearchQuery = useDeferredValue(searchQuery);
     const [previewHtml, setPreviewHtml] = useState<string | null>(null);
 
     const user = useStore((state) => state.auth.user);
@@ -23,7 +34,11 @@ export default function AdminQuotes() {
     useEffect(() => {
         if (!user) return;
 
+        let lastFetchTime = 0;
         const fetchQuotes = () => {
+            const now = Date.now();
+            if (now - lastFetchTime < 20000) return;
+            lastFetchTime = now;
             fetchUsers();
 
             const headers: Record<string, string> = {
@@ -77,8 +92,8 @@ export default function AdminQuotes() {
         if (!statusMatch) return false;
 
         // Search Match
-        if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase();
+        if (deferredSearchQuery.trim()) {
+            const query = deferredSearchQuery.toLowerCase();
             const customerName = q.customerName?.toLowerCase() || '';
             const companyName = q.customerInfo?.companyName?.toLowerCase() || '';
             const contactName = q.customerInfo?.contactName?.toLowerCase() || '';

@@ -1,12 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useDeferredValue } from 'react';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Check, X, Search, ShieldCheck, Clock, Trash2, RefreshCcw } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 
 export default function AdminMembers() {
-    const { users, fetchUsers, deleteUser, updateUser, auth } = useStore((state) => state);
+    const { users, fetchUsers, deleteUser, updateUser, auth } = useStore(useShallow((state) => ({
+        users: state.users,
+        fetchUsers: state.fetchUsers,
+        deleteUser: state.deleteUser,
+        updateUser: state.updateUser,
+        auth: state.auth
+    })));
     const [searchTerm, setSearchTerm] = useState('');
+    const deferredSearchTerm = useDeferredValue(searchTerm);
     const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'APPROVED'>('ALL');
     const [openManagerDropdown, setOpenManagerDropdown] = useState<string | null>(null); // userId of open dropdown
     const navigate = useNavigate();
@@ -39,9 +47,9 @@ export default function AdminMembers() {
         if (user.role === 'MANAGER' || user.role === 'MASTER' || user.email === 'admin@altf.kr') return false;
 
         const matchesSearch =
-            user.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user.contactName.toLowerCase().includes(searchTerm.toLowerCase());
+            user.companyName.toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
+            user.email.toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
+            user.contactName.toLowerCase().includes(deferredSearchTerm.toLowerCase());
 
         const userStatus = user.status || 'PENDING';
 

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useDeferredValue } from 'react';
 import { useStore } from '../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { CalmPageShell } from '../components/ui/CalmPageShell';
 import { PageTransition } from '../components/ui/PageTransition';
 import {
@@ -12,7 +13,17 @@ import { useInventoryIndex } from '../hooks/useInventoryIndex';
 
 
 export default function AdminPage() {
-    const { orders, updateOrder, trashOrder, restoreOrder, permanentDeleteOrder, setOrders, inventory, users, fetchUsers } = useStore((state) => state);
+    const { orders, updateOrder, trashOrder, restoreOrder, permanentDeleteOrder, setOrders, inventory, users, fetchUsers } = useStore(useShallow((state) => ({
+        orders: state.orders,
+        updateOrder: state.updateOrder,
+        trashOrder: state.trashOrder,
+        restoreOrder: state.restoreOrder,
+        permanentDeleteOrder: state.permanentDeleteOrder,
+        setOrders: state.setOrders,
+        inventory: state.inventory,
+        users: state.users,
+        fetchUsers: state.fetchUsers
+    })));
     const user = useStore((state) => state.auth.user);
     const { findProduct } = useInventoryIndex(inventory);
 
@@ -40,7 +51,11 @@ export default function AdminPage() {
         // [MOD] Ensure we use VITE_API_URL and the correct endpoint (/api/my/orders handles admin scope)
         const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`;
 
+        let lastFetchTime = 0;
         const fetchOrders = () => {
+            const now = Date.now();
+            if (now - lastFetchTime < 20000) return; // 20s throttle
+            lastFetchTime = now;
             fetch(endpoint, { headers, cache: 'no-store' })
                 .then(res => {
                     if (res.ok) return res.json();
@@ -83,11 +98,19 @@ export default function AdminPage() {
     }, [orders, updateOrder]);
 
     // UI State
-    const [filterStatus, setFilterStatus] = useState<string>('all');
+    const [filterStatus, setFilterStatus] = useState<string>('SUBMITTED');
     const [filterManager, setFilterManager] = useState<string>('all');
+    const [showAllExpanded, setShowAllExpanded] = useState(false);
+
+    const handleFilterChange = (status: string) => {
+        setFilterStatus(status);
+        setShowAllExpanded(false);
+    };
+
     const [searchQuery, setSearchQuery] = useState('');
+    const deferredSearchQuery = useDeferredValue(searchQuery); // Defers heavy filtering
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-    const [detailInitialMode, setDetailInitialMode] = useState<'CUSTOMER' | 'SUPPLIER'>('CUSTOMER'); // [MOD] Added Initial Mode State
+    const [detailInitialMode, setDetailInitialMode] = useState<'CUSTOMER' | 'SUPPLIER'>('CUSTOMER');
 
     // Derived Data
     const orderCounts = orders.reduce((acc, order) => {
@@ -115,8 +138,8 @@ export default function AdminPage() {
         if (!statusMatch) return false;
 
         // Search Match
-        if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase();
+        if (deferredSearchQuery.trim()) {
+            const query = deferredSearchQuery.toLowerCase();
             const customerName = order.customerName?.toLowerCase() || '';
             const poEndCustomer = order.poEndCustomer?.toLowerCase() || '';
             const poCompany = order.payload?.customer?.company_name?.toLowerCase() || '';
@@ -268,6 +291,19 @@ export default function AdminPage() {
         document.body.removeChild(link);
     };
 
+    let displayedOrders = filteredOrders;
+    let hasHiddenOrders = false;
+
+    if (!showAllExpanded && (filterStatus === 'all' || filterStatus === 'COMPLETED')) {
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+        displayedOrders = filteredOrders.filter(o => new Date(o.createdAt) >= threeDaysAgo);
+        if (displayedOrders.length < filteredOrders.length) {
+            hasHiddenOrders = true;
+        }
+    }
+
     return (
         <CalmPageShell>
             <div className="mb-6 flex flex-col gap-1">
@@ -284,17 +320,17 @@ export default function AdminPage() {
                     {/* Status Filters & Utilities */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex bg-white p-1 rounded-lg border border-slate-200 shadow-sm w-fit overflow-x-auto">
-                            <FilterButton active={filterStatus === 'all'} onClick={() => setFilterStatus('all')} label="전체" count={orderCounts.all} />
-                            <FilterButton active={filterStatus === 'SUBMITTED'} onClick={() => setFilterStatus('SUBMITTED')} label="주문접수" count={orderCounts.SUBMITTED} variant="highlight" />
-                            <FilterButton active={filterStatus === 'PROCESSING'} onClick={() => setFilterStatus('PROCESSING')} label="처리중" count={orderCounts.PROCESSING} />
-                            <FilterButton active={filterStatus === 'ON_HOLD'} onClick={() => setFilterStatus('ON_HOLD')} label="보류" count={orderCounts.ON_HOLD} />
-                            <FilterButton active={filterStatus === 'WITHDRAWN'} onClick={() => setFilterStatus('WITHDRAWN')} label="회수" count={orderCounts.WITHDRAWN} />
-                            <FilterButton active={filterStatus === 'SHIPPED'} onClick={() => setFilterStatus('SHIPPED')} label="배송중" count={orderCounts.SHIPPED} />
-                            <FilterButton active={filterStatus === 'COMPLETED'} onClick={() => setFilterStatus('COMPLETED')} label="완료" count={orderCounts.COMPLETED} />
-                            <FilterButton active={filterStatus === 'CANCELLED'} onClick={() => setFilterStatus('CANCELLED')} label="취소" count={orderCounts.CANCELLED} />
+                            <FilterButton active={filterStatus === 'all'} onClick={() => handleFilterChange('all')} label="전체" count={orderCounts.all} />
+                            <FilterButton active={filterStatus === 'SUBMITTED'} onClick={() => handleFilterChange('SUBMITTED')} label="주문접수" count={orderCounts.SUBMITTED} variant="highlight" />
+                            <FilterButton active={filterStatus === 'PROCESSING'} onClick={() => handleFilterChange('PROCESSING')} label="처리중" count={orderCounts.PROCESSING} />
+                            <FilterButton active={filterStatus === 'ON_HOLD'} onClick={() => handleFilterChange('ON_HOLD')} label="보류" count={orderCounts.ON_HOLD} />
+                            <FilterButton active={filterStatus === 'WITHDRAWN'} onClick={() => handleFilterChange('WITHDRAWN')} label="회수" count={orderCounts.WITHDRAWN} />
+                            <FilterButton active={filterStatus === 'SHIPPED'} onClick={() => handleFilterChange('SHIPPED')} label="배송중" count={orderCounts.SHIPPED} />
+                            <FilterButton active={filterStatus === 'COMPLETED'} onClick={() => handleFilterChange('COMPLETED')} label="완료" count={orderCounts.COMPLETED} />
+                            <FilterButton active={filterStatus === 'CANCELLED'} onClick={() => handleFilterChange('CANCELLED')} label="취소" count={orderCounts.CANCELLED} />
                             <div className="w-[1px] h-4 bg-slate-200 mx-1" />
                             <button
-                                onClick={() => setFilterStatus('TRASH')}
+                                onClick={() => handleFilterChange('TRASH')}
                                 className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${filterStatus === 'TRASH' ? 'bg-red-50 text-red-600 shadow-sm ring-1 ring-red-200' : 'text-slate-400 hover:text-red-500'}`}
                             >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -357,17 +393,20 @@ export default function AdminPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {filteredOrders.length === 0 ? (
+                                    {displayedOrders.length === 0 ? (
                                         <tr>
                                             <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                                                 <div className="flex flex-col items-center gap-2">
                                                     <LayoutDashboard className="w-8 h-8 opacity-20" />
-                                                    <span className="font-medium">주문 내역이 없습니다.</span>
+                                                    <span className="font-medium">해당 기간에 주문 내역이 없습니다.</span>
+                                                    {hasHiddenOrders && (
+                                                        <button onClick={() => setShowAllExpanded(true)} className="mt-2 text-sm text-teal-600 font-bold hover:underline">과거 내역 펼치기</button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredOrders.map((order, index) => {
+                                        displayedOrders.map((order, index) => {
                                             // Calculate Total Buying Cost
                                             // Use PO Items if available (meaning supplier selection happened), else fallback to inventory cost estimation
                                             const targetItems = (order.po_items && order.po_items.length > 0) ? order.po_items : order.items;
@@ -560,6 +599,18 @@ export default function AdminPage() {
                                                 </tr >
                                             );
                                         })
+                                    )}
+                                    {hasHiddenOrders && displayedOrders.length > 0 && (
+                                        <tr>
+                                            <td colSpan={7} className="px-6 py-6 text-center">
+                                                <button
+                                                    onClick={() => setShowAllExpanded(true)}
+                                                    className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-full transition-colors shadow-sm text-sm"
+                                                >
+                                                    과거 내역 펼치기 ({filteredOrders.length - displayedOrders.length}건 더보기)
+                                                </button>
+                                            </td>
+                                        </tr>
                                     )}
                                 </tbody >
                             </table >

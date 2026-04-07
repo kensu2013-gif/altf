@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore, type DeliveryInfo } from '../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { formatCurrency } from '../lib/utils';
@@ -18,10 +19,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 
 export default function QuotationEditor() {
-    const { items, memo: quotationMemo } = useStore((state) => state.quotation);
+    const { items, memo: quotationMemo } = useStore(useShallow((state) => state.quotation));
     // Use selector for stable reference
     const user = useStore(state => state.auth.user);
-    const { updateItem, removeItem, inventory, clearQuotation, incrementNewOrderCount, setQuotationMemo, uploadFile, pullDraftQuotation, uploadState, resetUpload } = useStore((state) => state);
+    const { updateItem, removeItem, inventory, clearQuotation, incrementNewOrderCount, setQuotationMemo, uploadFile, pullDraftQuotation, uploadState, resetUpload } = useStore(useShallow((state) => ({
+        updateItem: state.updateItem,
+        removeItem: state.removeItem,
+        inventory: state.inventory,
+        clearQuotation: state.clearQuotation,
+        incrementNewOrderCount: state.incrementNewOrderCount,
+        setQuotationMemo: state.setQuotationMemo,
+        uploadFile: state.uploadFile,
+        pullDraftQuotation: state.pullDraftQuotation,
+        uploadState: state.uploadState,
+        resetUpload: state.resetUpload
+    })));
 
     // Draft Sync Polling
     useEffect(() => {

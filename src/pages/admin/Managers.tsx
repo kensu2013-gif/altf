@@ -1,12 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useDeferredValue } from 'react';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { UserPlus, Trash2, Mail, Phone, MapPin, X, Briefcase, Search, Pencil } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import type { User } from '../../types';
 
 export default function AdminManagers() {
-    const { users, fetchUsers, createUser, deleteUser, updateUser } = useStore((state) => state);
+    const { users, fetchUsers, createUser, deleteUser, updateUser } = useStore(useShallow((state) => ({
+        users: state.users,
+        fetchUsers: state.fetchUsers,
+        createUser: state.createUser,
+        deleteUser: state.deleteUser,
+        updateUser: state.updateUser
+    })));
     const [searchTerm, setSearchTerm] = useState('');
+    const deferredSearchTerm = useDeferredValue(searchTerm);
 
     // Modal State
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -28,9 +36,9 @@ export default function AdminManagers() {
         if (user.role !== 'MANAGER') return false;
 
         const matchesSearch =
-            (user.contactName?.toLowerCase().includes(searchTerm.toLowerCase()) || '') ||
-            (user.email?.toLowerCase().includes(searchTerm.toLowerCase()) || '') ||
-            (user.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) || ''); // companyName used for Department
+            (user.contactName?.toLowerCase().includes(deferredSearchTerm.toLowerCase()) || '') ||
+            (user.email?.toLowerCase().includes(deferredSearchTerm.toLowerCase()) || '') ||
+            (user.companyName?.toLowerCase().includes(deferredSearchTerm.toLowerCase()) || ''); // companyName used for Department
 
         return matchesSearch;
     });
