@@ -8,12 +8,14 @@ import { Button } from '../../components/ui/Button';
 import type { Quotation } from '../../types';
 import type { DocumentPayload } from '../../types/document';
 import { renderDocumentHTML } from '../../lib/documentTemplate';
+import { PreviewModal } from '../../components/ui/PreviewModal';
 
 export default function AdminQuotes() {
     const { quotes, users, updateQuotation, trashQuotation, restoreQuotation, permanentDeleteQuotation, setQuotes, fetchUsers } = useStore((state) => state);
     const [selectedQuote, setSelectedQuote] = useState<typeof quotes[0] | null>(null);
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [previewHtml, setPreviewHtml] = useState<string | null>(null);
 
     const user = useStore((state) => state.auth.user);
 
@@ -171,11 +173,7 @@ export default function AdminQuotes() {
         };
 
         const html = renderDocumentHTML(payload);
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            printWindow.document.write(html);
-            printWindow.document.close();
-        }
+        setPreviewHtml(html);
     };
 
     const handleStatusUpdate = (quoteId: string, newStatus: string) => {
@@ -401,6 +399,14 @@ export default function AdminQuotes() {
                         // Switch to 'PROCESSED' view so the user sees the result
                         setFilterStatus('PROCESSED');
                     }}
+                />
+            )}
+
+            {previewHtml && (
+                <PreviewModal
+                    htmlContent={previewHtml}
+                    onClose={() => setPreviewHtml(null)}
+                    docType="QUOTATION"
                 />
             )}
         </div>

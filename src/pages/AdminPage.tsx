@@ -12,7 +12,7 @@ import { useInventoryIndex } from '../hooks/useInventoryIndex';
 
 
 export default function AdminPage() {
-    const { orders, updateOrder, trashOrder, restoreOrder, permanentDeleteOrder, setOrders, inventory } = useStore((state) => state);
+    const { orders, updateOrder, trashOrder, restoreOrder, permanentDeleteOrder, setOrders, inventory, users, fetchUsers } = useStore((state) => state);
     const user = useStore((state) => state.auth.user);
     const { findProduct } = useInventoryIndex(inventory);
 
@@ -53,10 +53,11 @@ export default function AdminPage() {
         };
 
         fetchOrders();
+        fetchUsers();
 
         window.addEventListener('focus', fetchOrders);
         return () => window.removeEventListener('focus', fetchOrders);
-    }, [setOrders, user]);
+    }, [setOrders, fetchUsers, user]);
 
     // Auto-complete orders that meet all criteria but are still in processing
     useEffect(() => {
@@ -83,6 +84,7 @@ export default function AdminPage() {
 
     // UI State
     const [filterStatus, setFilterStatus] = useState<string>('all');
+    const [filterManager, setFilterManager] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [detailInitialMode, setDetailInitialMode] = useState<'CUSTOMER' | 'SUPPLIER'>('CUSTOMER'); // [MOD] Added Initial Mode State
@@ -128,6 +130,13 @@ export default function AdminPage() {
                 !poNumber.includes(query)) {
                 return false;
             }
+        }
+
+        if (filterManager !== 'all') {
+            const hasManager = order.managers && order.managers.some(m => m.id === filterManager);
+            // fallback for legacy manager if needed
+            const matchesLegacy = (!order.managers || order.managers.length === 0) && order.manager?.id === filterManager;
+            if (!hasManager && !matchesLegacy) return false;
         }
 
         return true;
@@ -307,13 +316,27 @@ export default function AdminPage() {
                             </div>
 
                             {(user?.role?.toUpperCase() === 'MASTER' || user?.role?.toLowerCase() === 'admin' || user?.role?.toUpperCase() === 'MANAGER') && (
-                                <button
-                                    onClick={handleExportCSV}
-                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors whitespace-nowrap"
-                                >
-                                    <Download className="w-4 h-4" />
-                                    엑셀 다운로드
-                                </button>
+                                <>
+                                    <select
+                                        value={filterManager}
+                                        onChange={(e) => setFilterManager(e.target.value)}
+                                        className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 min-w-[120px]"
+                                        title="담당자 필터"
+                                        aria-label="담당자 필터"
+                                    >
+                                        <option value="all">모든 담당자</option>
+                                        {users.filter((u: any) => ['MASTER', 'MANAGER', 'admin'].includes(u.role)).map((u: any) => (
+                                            <option key={u.id} value={u.id}>{u.contactName || u.name || u.email}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={handleExportCSV}
+                                        className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors whitespace-nowrap"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                        엑셀 다운로드
+                                    </button>
+                                </>
                             )}
                         </div>
                     </div>
@@ -407,16 +430,27 @@ export default function AdminPage() {
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex flex-col">
-                                                            <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                                                            <div className="flex items-center gap-1.5 font-bold text-slate-700 flex-wrap">
                                                                 <Building2 className="w-3.5 h-3.5 text-slate-400" />
                                                                 {order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName}
                                                                 {(order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name) && ((order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name) !== order.customerName) && (
-                                                                    <span className="text-[10px] font-normal text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded ml-1 border border-teal-100">수정됨</span>
+                                                                    <span className="text-[10px] font-normal text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-100">수정됨</span>
                                                                 )}
                                                             </div>
-                                                            <span className="text-xs text-slate-400 mt-0.5 pl-5">
-                                                                {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                            </span>
+                                                            <div className="flex items-center gap-2 mt-0.5 pl-5">
+                                                                <span className="text-xs text-slate-400">
+                                                                    {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                </span>
+                                                                {order.managers && order.managers.length > 0 ? (
+                                                                    <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 font-bold ml-auto">
+                                                                        담당: {order.managers.map(m => m.name).join(', ')}
+                                                                    </span>
+                                                                ) : order.manager && (
+                                                                    <span className="text-[10px] text-slate-500 ml-auto">
+                                                                        담당: {order.manager.name}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-right whitespace-nowrap">

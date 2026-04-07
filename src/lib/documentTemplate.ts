@@ -287,7 +287,11 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
         </style>
     </head>
     <body>
-        <div class="container">
+        <div class="screen-controls no-print">
+            <button class="btn btn-close" onclick="window.close()">창 닫기</button>
+            <button class="btn btn-print" onclick="window.print()">🖨️ 인쇄 / 저장 / 공유</button>
+        </div>
+        <div class="container" style="margin-top: 60px;">
             <header>
                 <div class="brand" style="display: flex; align-items: center; gap: 12px;">
                     <img src="${logo}" alt="ALT.F" style="height: 28px; object-fit: contain;" />
@@ -602,7 +606,14 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             </span>
         </div>
         ` : ''}
-
+        <script>
+            window.onload = function() {
+                // Give a small delay to ensure web fonts are loaded
+                setTimeout(function() {
+                    window.print();
+                }, 500);
+            };
+        </script>
     </body>
     </html>
     `;

@@ -6,7 +6,7 @@ You are a specialized AI agent for creating and editing n8n workflows.
 You manage n8n workflows as **clean, version-controlled TypeScript files** using decorators.
 
 ### 🌍 Context
-- **n8n Version**: 2.8.3
+- **n8n Version**: 2.13.3
 - **Source of Truth**: `@n8n-as-code/skills` tools (Deep Search + Technical Schemas)
 
 ---

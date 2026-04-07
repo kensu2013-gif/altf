@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { X, Printer, Send, Check, RefreshCw, Loader2 } from 'lucide-react';
+import { X, Printer, Send, Check, RefreshCw, Loader2, Share2 } from 'lucide-react';
 import { Button } from './Button';
 
 // Wait, I don't see toast in the codebase. I will just use console/alert or create a simple toast if needed.
@@ -92,6 +92,36 @@ export function PreviewModal({ htmlContent, onClose, onSend, onPrint, onOrder, d
         } else if (iframeRef.current && iframeRef.current.contentWindow) {
             // Fallback
             iframeRef.current.contentWindow.print();
+        }
+    };
+
+    const handleShare = async () => {
+        const titleName = docType === 'ORDER' ? '발주서' : docType === 'TRANSACTION' ? '거래명세서' : docType === 'PACKING_LIST' ? '포장내역서' : '견적서';
+        
+        if (navigator.share) {
+            try {
+                const currentContent = iframeRef.current?.contentDocument?.documentElement.outerHTML || htmlContent;
+                const file = new File([currentContent], `${titleName}_${new Date().getTime()}.html`, { type: 'text/html' });
+                
+                try {
+                    // Try sharing the document file directly
+                    await navigator.share({
+                        title: titleName,
+                        files: [file]
+                    });
+                } catch (fallbackErr) {
+                    console.log('File sharing failed, fallback to text', fallbackErr);
+                    // Fallback if file sharing is not supported by the OS (some Android versions)
+                    await navigator.share({
+                        title: titleName,
+                        text: `${titleName} 확인 부탁드립니다.`
+                    });
+                }
+            } catch (err) {
+                console.error("Share error:", err);
+            }
+        } else {
+            alert('이 브라우저/기기에서는 모바일 공유 기능을 지원하지 않습니다. (Safari/Chrome 앱을 이용해주세요)');
         }
     };
 
@@ -195,6 +225,16 @@ export function PreviewModal({ htmlContent, onClose, onSend, onPrint, onOrder, d
                             >
                                 <Printer className="w-4 h-4" />
                                 {docType === 'ORDER' ? '발주서 출력 (Print Order Sheet)' : docType === 'TRANSACTION' ? '거래명세서 인쇄 (Print)' : docType === 'PACKING_LIST' ? '포장 내역서 인쇄 (Print)' : '견적서 발급 (PDF 저장)'}
+                            </Button>
+                        )}
+                        {!hidePrint && (
+                            <Button
+                                variant="outline"
+                                onClick={handleShare}
+                                className="gap-2 font-bold shadow-sm md:hidden justify-center text-teal-700 border-teal-300 hover:bg-teal-50"
+                            >
+                                <Share2 className="w-4 h-4" />
+                                공유하기
                             </Button>
                         )}
 

@@ -1,8 +1,10 @@
 import { useMemo, useState, useEffect, Fragment } from 'react';
 import { useStore } from '../../store/useStore';
+import type { User } from '../../types';
 import { FileText, PackageX, Calendar, Search, Filter, MessageSquare, Send, X, Trash2, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { CalmPageShell } from '../../components/ui/CalmPageShell';
 import { PageTransition } from '../../components/ui/PageTransition';
+import { ManagerMultiSelect } from '../../components/ui/ManagerMultiSelect';
 
 interface PendingItem {
     orderId: string;
@@ -30,11 +32,12 @@ interface PendingOrderGroup {
     deliveryDate: string;
     customerName: string;
     targetCustomerName: string;
+    managers?: { id: string; name: string }[];
     items: PendingItem[];
 }
 
 export default function PendingOrders() {
-    const { orders, setOrders, updateOrder } = useStore((state) => state);
+    const { orders, setOrders, updateOrder, users, fetchUsers } = useStore((state) => state);
     const user = useStore((state) => state.auth.user);
 
     // Filters
@@ -84,9 +87,10 @@ export default function PendingOrders() {
         };
 
         fetchOrders();
+        fetchUsers();
         window.addEventListener('focus', fetchOrders);
         return () => window.removeEventListener('focus', fetchOrders);
-    }, [setOrders, user]);
+    }, [setOrders, fetchUsers, user]);
 
     // Flatten and Filter Items
     const pendingOrderGroups: PendingOrderGroup[] = useMemo(() => {
@@ -163,6 +167,7 @@ export default function PendingOrders() {
         const groupedMap = new Map<string, PendingOrderGroup>();
         filtered.forEach(item => {
             if (!groupedMap.has(item.orderId)) {
+                const originalOrder = orders.find(o => o.id === item.orderId);
                 groupedMap.set(item.orderId, {
                     orderId: item.orderId,
                     poNumber: item.poNumber,
@@ -170,6 +175,7 @@ export default function PendingOrders() {
                     deliveryDate: item.deliveryDate,
                     customerName: item.customerName,
                     targetCustomerName: item.targetCustomerName,
+                    managers: originalOrder?.managers || (originalOrder?.manager ? [{id: originalOrder.manager.id, name: originalOrder.manager.name}] : []),
                     items: []
                 });
             }
@@ -181,6 +187,13 @@ export default function PendingOrders() {
     }, [orders, searchCustomer, searchPo, dateFilter, tagFilter]);
 
     // Handlers
+    const handleUpdateManagersForCustomer = (targetCustomerName: string, managers: { id: string; name: string }[]) => {
+        const matchingOrders = orders.filter(o => 
+            (o.poEndCustomer || o.payload?.customer?.company_name || o.payload?.customer?.contact_name || o.customerName) === targetCustomerName
+        );
+        matchingOrders.forEach(o => updateOrder(o.id, { managers }));
+    };
+
     const handleAddComment = (orderId: string, itemId: string) => {
         if (!newComment.trim() || !user) return;
 
@@ -439,13 +452,20 @@ export default function PendingOrders() {
                                                             {/* Customer Name */}
                                                             {isFirstRow && (
                                                                 <td className={`px-5 py-4 ${displayItems.length > 1 ? 'border-b border-slate-100' : ''}`} rowSpan={displayItems.length}>
-                                                                    <div className="font-bold text-slate-800">
+                                                                    <div className="font-bold text-slate-800 mb-1">
                                                                         {group.targetCustomerName}
                                                                     </div>
                                                                     {group.customerName !== group.targetCustomerName && (
-                                                                        <div className="text-[10px] text-slate-400 mt-1">
+                                                                        <div className="text-[10px] text-slate-400 mb-2">
                                                                             원주문: {group.customerName}
                                                                         </div>
+                                                                    )}
+                                                                    {user?.role && ['MASTER', 'MANAGER', 'admin'].includes(user.role) && (
+                                                                        <ManagerMultiSelect 
+                                                                            currentManagers={group.managers || []}
+                                                                            users={users.filter((u: User) => ['MASTER', 'MANAGER', 'admin'].includes(u.role))}
+                                                                            onUpdate={(managers) => handleUpdateManagersForCustomer(group.targetCustomerName, managers)}
+                                                                        />
                                                                     )}
                                                                 </td>
                                                             )}
@@ -612,4 +632,3 @@ export default function PendingOrders() {
         </CalmPageShell >
     );
 }
-

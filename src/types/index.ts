@@ -186,7 +186,8 @@ export interface Order {
         email: string;
         at: string; // ISO Date
     };
-    manager?: { name: string; id: string; email: string; }; // Permanent Sales Rep
+    managers?: { name: string; id: string; email?: string; }[]; // [NEW] Multiple Sales Reps
+    manager?: { name: string; id: string; email: string; }; // [DEPRECATED] Permanent Sales Rep
     // S3 File Attachments
     customerPO?: { name: string; url: string; }; // Original PO from customer
     deliveryNote?: { name: string; url: string; }; // ALTF delivery note to customer
