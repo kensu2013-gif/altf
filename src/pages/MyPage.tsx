@@ -8,7 +8,7 @@ import { Button } from '../components/ui/Button';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { renderDocumentHTML } from '../lib/documentTemplate';
 import { PreviewModal } from '../components/ui/PreviewModal';
-import { OrderSubmissionOverlay } from '../components/ui/OrderSubmissionOverlay';
+import { DeliveryInfoModal } from '../components/ui/DeliveryInfoModal';
 import { EmailPackageAnimation } from '../components/ui/EmailPackageAnimation';
 import { OrderService } from '../services/orderService';
 import {
@@ -90,11 +90,10 @@ export default function MyPage() {
     const [orders, setOrders] = useState<OrderRecord[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [viewingRecord, setViewingRecord] = useState<{ type: 'QUOTE', record: QuotationRecord } | { type: 'ORDER', record: OrderRecord } | null>(null);
-    const [previewPayload, setPreviewPayload] = useState<{ html: string; type: DocumentType; onOrder?: () => void; hidePrint?: boolean; hideClose?: boolean; } | null>(null);
+    const [previewPayload, setPreviewPayload] = useState<{ html: string; type: DocumentType; onOrder?: () => void; onSend?: () => Promise<boolean>; hidePrint?: boolean; hideClose?: boolean; } | null>(null);
     const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
-    const [isOrderSubmitting, setIsOrderSubmitting] = useState(false);
-    const [isApiSubmitting, setIsApiSubmitting] = useState(false);
-    const [orderPayload, setOrderPayload] = useState<DocumentPayload | null>(null);
+    const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
+    const [pendingQuoteForOrder, setPendingQuoteForOrder] = useState<QuotationRecord | null>(null);
 
     // --- Custom Confirm Dialog State ---
     const [confirmConfig, setConfirmConfig] = useState<{
@@ -261,6 +260,16 @@ export default function MyPage() {
     };
 
     const handleInitiateOrder = (quote: QuotationRecord) => {
+        setPendingQuoteForOrder(quote);
+        setPreviewPayload(null);
+        setIsDeliveryModalOpen(true);
+    };
+
+    const handleDeliveryComplete = (deliveryInfo: DeliveryInfo) => {
+        setIsDeliveryModalOpen(false);
+        const quote = pendingQuoteForOrder;
+        if (!quote) return;
+
         // Construct Order Payload from Quote
         const now = new Date();
         const docNo = `O-${now.toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
@@ -288,7 +297,7 @@ export default function MyPage() {
             };
         });
 
-        const payload: DocumentPayload = {
+        const finalPayload: DocumentPayload = {
             document_type: 'ORDER',
             meta: {
                 doc_no: docNo,
@@ -308,10 +317,10 @@ export default function MyPage() {
             },
             customer: {
                 company_name: quote.customerInfo?.companyName || quote.customerName || '고객사',
-                contact_name: quote.customerInfo?.contactName || user?.contactName || '-',
-                tel: quote.customerInfo?.phone || user?.phone || '-',
+                contact_name: deliveryInfo.contactName,
+                tel: deliveryInfo.contactPhone,
                 email: quote.customerInfo?.email || user?.email || '-',
-                address: quote.customerInfo?.address || user?.address || '-',
+                address: `${deliveryInfo.method === 'FREIGHT' ? '[화물] ' : '[택배] '}${deliveryInfo.method === 'FREIGHT' ? deliveryInfo.branchName : deliveryInfo.address}`,
                 memo: quote.adminResponse?.note // Pass generic note if needed
             },
             items: docItems,
@@ -322,44 +331,33 @@ export default function MyPage() {
             }
         };
 
-        setOrderPayload(payload);
-        setPreviewPayload(null); // Close Preview
-        setIsOrderSubmitting(true); // Open Order Overlay
+        const deliveryNote = `[배송: ${deliveryInfo.method === 'FREIGHT' ? '화물' : '택배'}] ` +
+            `${deliveryInfo.method === 'FREIGHT' ? deliveryInfo.branchName : deliveryInfo.address} ` +
+            `| 담당자: ${deliveryInfo.contactName} (${deliveryInfo.contactPhone})` +
+            (deliveryInfo.additionalRequest ? ` | 요청: ${deliveryInfo.additionalRequest}` : '');
+
+        finalPayload.customer!.memo = finalPayload.customer!.memo
+            ? `${finalPayload.customer!.memo}\n${deliveryNote}`
+            : deliveryNote;
+
+        const html = renderDocumentHTML(finalPayload);
+        setPreviewPayload({
+            html,
+            type: 'ORDER',
+            onSend: () => handleSendOrder(finalPayload)
+        });
     };
 
-    const handleSubmitOrder = async (deliveryInfo: DeliveryInfo) => {
-        if (!orderPayload) return;
-        setIsApiSubmitting(true);
-
-        const finalPayload = { ...orderPayload };
-        if (finalPayload.customer) {
-            // Update Customer Fields with specific Delivery Info
-            finalPayload.customer.contact_name = deliveryInfo.contactName;
-            finalPayload.customer.tel = deliveryInfo.contactPhone;
-
-            const methodPrefix = deliveryInfo.method === 'FREIGHT' ? '[화물] ' : '[택배] ';
-            const addressDetail = deliveryInfo.method === 'FREIGHT' ? deliveryInfo.branchName : deliveryInfo.address;
-            finalPayload.customer.address = `${methodPrefix}${addressDetail}`;
-
-            const deliveryNote = `[배송: ${deliveryInfo.method === 'FREIGHT' ? '화물' : '택배'}] ` +
-                `${deliveryInfo.method === 'FREIGHT' ? deliveryInfo.branchName : deliveryInfo.address} ` +
-                `| 담당자: ${deliveryInfo.contactName} (${deliveryInfo.contactPhone})` +
-                (deliveryInfo.additionalRequest ? ` | 요청: ${deliveryInfo.additionalRequest}` : '');
-
-            finalPayload.customer.memo = finalPayload.customer.memo
-                ? `${finalPayload.customer.memo}\n${deliveryNote}`
-                : deliveryNote;
-        }
-
-        const result = await OrderService.submitOrder(finalPayload);
-        setIsApiSubmitting(false);
+    const handleSendOrder = async (payloadToUse: DocumentPayload): Promise<boolean> => {
+        const result = await OrderService.submitOrder(payloadToUse);
         if (result.success) {
-            setIsOrderSubmitting(false);
             resetNewOrderCount();
             setShowSuccessAnimation(true);
             fetchData(); // Refresh list
+            return true;
         } else {
             alert('발주서 전송에 실패했습니다.');
+            return false;
         }
     };
 
@@ -813,6 +811,7 @@ export default function MyPage() {
                         docType={previewPayload.type}
                         onClose={() => setPreviewPayload(null)}
                         onOrder={previewPayload.onOrder}
+                        onSend={previewPayload.onSend}
                         hidePrint={previewPayload.hidePrint}
                         hideClose={previewPayload.hideClose}
                     />
@@ -820,12 +819,10 @@ export default function MyPage() {
             }
             <EmailPackageAnimation isOpen={showSuccessAnimation} onComplete={handleSuccessAnimationComplete} />
 
-            <OrderSubmissionOverlay
-                isOpen={isOrderSubmitting}
-                onClose={() => setIsOrderSubmitting(false)}
-                onConfirm={handleSubmitOrder}
-                basePayload={orderPayload}
-                isSubmitting={isApiSubmitting}
+            <DeliveryInfoModal
+                isOpen={isDeliveryModalOpen}
+                onClose={() => setIsDeliveryModalOpen(false)}
+                onConfirm={handleDeliveryComplete}
             />
         </CalmPageShell >
     );

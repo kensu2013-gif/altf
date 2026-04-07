@@ -1,5 +1,5 @@
 import { useState, memo, useMemo, useCallback, useEffect } from 'react';
-import type { Order, LineItem, Product } from '../../../types';
+import type { Order, LineItem, Product, User as UserType } from '../../../types';
 // import { generateSku } from '../../../lib/sku'; // REMOVED: Managed in useInventoryIndex
 import { useStore } from '../../../store/useStore';
 import { X, AlertTriangle, Check, Calendar, Package, User, Trash2, Plus, Download, FileText, Minus, Equal, Send, SplitSquareHorizontal, Image } from 'lucide-react';
@@ -33,7 +33,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     const { findProduct } = useInventoryIndex(inventory);
 
-    const linkedUser = useMemo(() => users.find(u => u.id === order.userId), [users, order.userId]);
+    const linkedUser = useMemo(() => users.find((u: UserType) => u.id === order.userId), [users, order.userId]);
     const customerInfo = useMemo(() => {
         const payloadCustomer = order.payload?.customer as Record<string, string> | undefined;
         return {
@@ -80,7 +80,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const [poItems, setPoItems] = useState<LineItem[]>(() => {
         // [FIX] If PO Items specific list exists, use it.
         // If not, clone the Customer Items as the starting point for the PO.
-        if (order.po_items && order.po_items.length> 0) {
+        if (order.po_items && order.po_items.length > 0) {
             return order.po_items;
         }
         return order.items ? [...order.items] : [];
@@ -241,13 +241,13 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     // Get all historical memos for this customer from the entire database
     const availablePresets = useMemo(() => {
         if (!showPresetDropdown) return [];
-        
+
         const key = getPresetKey();
         let saved: string[] = [];
         try {
             const raw = localStorage.getItem(key);
             if (raw) saved = raw.startsWith('[') ? JSON.parse(raw) : [raw];
-        } catch { 
+        } catch {
             // no-op
         }
 
@@ -273,7 +273,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         for (const m of [...saved, ...historicalMemos]) {
             const cleanM = m.trim().replace(/[\uFFFC\uFFFD]/g, '');
             if (!cleanM) continue;
-            
+
             // Generate a deduplication key by removing auto tags and spaces
             const dedupKey = cleanM
                 .replace(/\[.*?\]/g, '') // remove all [tags]
@@ -285,7 +285,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 finalMerged.push(cleanM);
             }
         }
-            
+
         return finalMerged;
     }, [showPresetDropdown, isSupplierMode, supplierInfo.company_name, getPresetKey, order.customerName, order.poEndCustomer]);
 
@@ -313,7 +313,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         const newMemo = shippingMemo.trim();
         existingSaved = existingSaved.filter(s => s !== newMemo);
         existingSaved.unshift(newMemo);
-        
+
         localStorage.setItem(key, JSON.stringify(existingSaved.slice(0, 10)));
         alert(`[${key.replace('delivery_preset_', '')}] 배송 요청사항이 저장되었습니다.`);
         setShowPresetDropdown(false);
@@ -454,7 +454,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         const splitQtyStr = prompt(`현재 수량은 ${item.quantity}입니다. 분할하여 빼낼(새로운 줄로 만들) 수량을 입력하세요.`);
         if (!splitQtyStr) return;
         const splitQty = Number(splitQtyStr);
-        if (isNaN(splitQty) || splitQty <= 0 || splitQty>= item.quantity) {
+        if (isNaN(splitQty) || splitQty <= 0 || splitQty >= item.quantity) {
             alert('유효하지 않은 수량입니다. 기존 수량보다 작아야 합니다.');
             return;
         }
@@ -525,7 +525,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         ? `마킹대기:${item.marking_wait_qty}`
                         : (
                             (product?.currentStock ?? item.currentStock) !== undefined
-                                ? ((product?.currentStock ?? item.currentStock ?? 0) === 0 ? '재고없음' : (item.quantity> (product?.currentStock ?? item.currentStock ?? 0) ? '일부 주문생산' : '출고가능'))
+                                ? ((product?.currentStock ?? item.currentStock ?? 0) === 0 ? '재고없음' : (item.quantity > (product?.currentStock ?? item.currentStock ?? 0) ? '일부 주문생산' : '출고가능'))
                                 : '-'
                         ),
                     location_maker: product?.location || '-'
@@ -595,7 +595,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         ? `마킹대기:${item.marking_wait_qty}`
                         : (
                             (product?.currentStock ?? item.currentStock) !== undefined
-                                ? ((product?.currentStock ?? item.currentStock ?? 0) === 0 ? '재고없음' : (item.quantity> (product?.currentStock ?? item.currentStock ?? 0) ? '일부 주문생산' : '출고가능'))
+                                ? ((product?.currentStock ?? item.currentStock ?? 0) === 0 ? '재고없음' : (item.quantity > (product?.currentStock ?? item.currentStock ?? 0) ? '일부 주문생산' : '출고가능'))
                                 : '-'
                         )
                 };
@@ -769,7 +769,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
         // If price is manually set, we set the supplierRate such that base * (100-rate)/100 = price
         let newRate = item.supplierRate ?? 0;
-        if (basePrice> 0) {
+        if (basePrice > 0) {
             newRate = (1 - (newPrice / basePrice)) * 100;
             // Cap at 2 decimals for precision
             newRate = Math.round(newRate * 100) / 100;
@@ -790,7 +790,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         const product = getProductStock(item);
         let newRate = 0;
         const standardPrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? 0;
-        if (standardPrice> 0) newRate = Math.round((1 - newPrice / standardPrice) * 100);
+        if (standardPrice > 0) newRate = Math.round((1 - newPrice / standardPrice) * 100);
         newItems[index] = { ...item, unitPrice: newPrice, amount: newPrice * item.quantity, discountRate: newRate };
         setDisplayedItems(newItems);
     };
@@ -825,8 +825,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     updatedAt: new Date().toISOString(),
                     updatedBy: user?.email || 'admin'
                 };
-            }).filter(r => r.salesPrice> 0 || r.purchasePrice> 0);
-        if (records.length> 0) saveCustomPrices(records);
+            }).filter(r => r.salesPrice > 0 || r.purchasePrice > 0);
+        if (records.length > 0) saveCustomPrices(records);
     };
 
     const handleJustSave = async () => {
@@ -857,11 +857,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         };
 
         // Process Uploads
-        if (deliveryNoteFiles.length> 0) {
+        if (deliveryNoteFiles.length > 0) {
             const res = await uploadFile(deliveryNoteFiles[0], 'order', order.id + '_delivery');
             if (res) updateData.deliveryNote = res;
         }
-        if (supplierPoFiles.length> 0) {
+        if (supplierPoFiles.length > 0) {
             const res = await uploadFile(supplierPoFiles[0], 'po', order.id + '_po');
             if (res) updateData.supplierPO = res;
         }
@@ -873,7 +873,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const handleSave = async (extraUpdate: Partial<Order> = {}) => {
         persistCustomPrices();
         const finalStatus = extraUpdate.status || (order.status === 'SUBMITTED' ? 'PROCESSING' : order.status);
-        
+
         // Auto Save Preset if COMPLETED
         if (finalStatus === 'COMPLETED') {
             const key = getPresetKey();
@@ -923,11 +923,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             ...extraUpdate
         };
 
-        if (deliveryNoteFiles.length> 0) {
+        if (deliveryNoteFiles.length > 0) {
             const res = await uploadFile(deliveryNoteFiles[0], 'order', order.id + '_delivery');
             if (res) updateData.deliveryNote = res;
         }
-        if (!extraUpdate.supplierPO && supplierPoFiles.length> 0) {
+        if (!extraUpdate.supplierPO && supplierPoFiles.length > 0) {
             // Only upload PO here if we haven't already uploaded it in handleSupplierSave
             const res = await uploadFile(supplierPoFiles[0], 'po', order.id + '_po');
             if (res) updateData.supplierPO = res;
@@ -944,7 +944,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             return;
         }
 
-        const fileStatus = supplierPoFiles.length> 0 ? "있음 (새 첨부)" : (order.supplierPO ? "있음 (기존 파일)" : "없음");
+        const fileStatus = supplierPoFiles.length > 0 ? "있음 (새 첨부)" : (order.supplierPO ? "있음 (기존 파일)" : "없음");
         const priceStr = new Intl.NumberFormat('ko-KR').format(totalSupplierAmount);
 
         const confirmMsg = `[매입 발주서 전송 확인]\n\n첨부파일: ${fileStatus}\n메일 제목: ${emailSubject}\n매입 금액: ${priceStr}원\n\n이대로 벤더사에 매입 발주서를 전송하시겠습니까? (확인을 누르면 전송됩니다)`;
@@ -961,7 +961,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             let attachmentMimeType = null;
             let newSupplierPO = order.supplierPO;
 
-            if (supplierPoFiles.length> 0) {
+            if (supplierPoFiles.length > 0) {
                 const file = supplierPoFiles[0];
                 attachmentMimeType = file.type || 'application/pdf';
 
@@ -1037,7 +1037,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         tags
                     };
                 });
-                const allTxIssued = updatedPoItems.length> 0 && updatedPoItems.every(item => item.transactionIssued);
+                const allTxIssued = updatedPoItems.length > 0 && updatedPoItems.every(item => item.transactionIssued);
                 const newStatus = allTxIssued ? 'COMPLETED' : 'SHIPPED';
 
                 alert(`매입 발주서 전송이 완료되었습니다. 상태가 [${allTxIssued ? '완료' : '배송중'}]으로 변경됩니다.`);
@@ -1249,7 +1249,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                     {/* Buyer Info */}
                                     <div className="space-y-3">
                                         {
-                                            (order.memo || (order.attachments && order.attachments.length> 0)) && (
+                                            (order.memo || (order.attachments && order.attachments.length > 0)) && (
                                                 <div className="bg-yellow-50 p-2 rounded border border-yellow-200 text-xs mb-2">
                                                     {order.memo && (
                                                         <>
@@ -1257,7 +1257,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                             <div className="whitespace-pre-wrap text-slate-700 mb-2"> {(order.memo || '').replace(/[\uFFFC\uFFFD]/g, '').replace(/요청항:/g, '요청사항:')} </div>
                                                         </>
                                                     )}
-                                                    {order.attachments && order.attachments.length> 0 && (
+                                                    {order.attachments && order.attachments.length > 0 && (
                                                         <div className="mt-2 pt-2 border-t border-yellow-200/50">
                                                             <span className="font-bold text-yellow-800 block mb-2"> 첨부된 사진/파일: </span>
                                                             <div className="flex flex-wrap gap-1.5">
@@ -1269,7 +1269,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                         rel="noopener noreferrer"
                                                                         className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-yellow-300 text-yellow-700 hover:bg-yellow-100 rounded text-[10px] font-bold transition-colors shadow-sm">
                                                                         <Image className="w-3 h-3" />
-                                                                        보기 {order.attachments!.length> 1 ? `(${i + 1})` : ''}
+                                                                        보기 {order.attachments!.length > 1 ? `(${i + 1})` : ''}
                                                                     </a>
                                                                 ))}
                                                             </div>
@@ -1346,7 +1346,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                         className="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border border-indigo-200 file:text-sm file:font-medium file:bg-white file:text-indigo-700 hover:file:bg-indigo-50 transition-all cursor-pointer w-full max-w-sm"
                                                         onChange={(e) => {
                                                             setSupplierPoFiles(Array.from(e.target.files || []));
-                                                            if (!hasSavedPO && e.target.files && e.target.files.length> 0) {
+                                                            if (!hasSavedPO && e.target.files && e.target.files.length > 0) {
                                                                 setHasSavedPO(true); // Treat attaching a file as "Saving/Persisting" progress visually
                                                             }
                                                         }}
@@ -1362,7 +1362,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                         )
                                                     }
                                                     {
-                                                        supplierPoFiles.length> 0 && (
+                                                        supplierPoFiles.length > 0 && (
                                                             <div className="text-xs text-indigo-600 font-bold mt-1">
                                                                 선택된 파일: {supplierPoFiles[0].name}
                                                             </div>
@@ -1518,7 +1518,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                     </div>
                                     <div>
                                         <span className="block text-slate-400 text-xs mb-1"> 영업 담당자(Managers) </span>
-                                        <ManagerMultiSelect 
+                                        <ManagerMultiSelect
                                             currentManagers={currentManagers}
                                             users={users.filter(u => ['MASTER', 'MANAGER', 'admin'].includes(u.role))}
                                             onUpdate={setCurrentManagers}
@@ -1529,7 +1529,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         <input
                                             type="text"
                                             value={editableCustomerInfo.bizNo}
-                                            onChange={(e) => setEditableCustomerInfo({...editableCustomerInfo, bizNo: e.target.value})}
+                                            onChange={(e) => setEditableCustomerInfo({ ...editableCustomerInfo, bizNo: e.target.value })}
                                             className="w-full font-mono text-slate-600 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1"
                                             placeholder="***-**-*****"
                                         />
@@ -1539,7 +1539,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         <input
                                             type="text"
                                             value={editableCustomerInfo.bizType}
-                                            onChange={(e) => setEditableCustomerInfo({...editableCustomerInfo, bizType: e.target.value})}
+                                            onChange={(e) => setEditableCustomerInfo({ ...editableCustomerInfo, bizType: e.target.value })}
                                             className="w-full text-slate-600 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1"
                                             placeholder="업태/종목 입력"
                                         />
@@ -1549,7 +1549,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         <input
                                             type="text"
                                             value={editableCustomerInfo.contactName}
-                                            onChange={(e) => setEditableCustomerInfo({...editableCustomerInfo, contactName: e.target.value})}
+                                            onChange={(e) => setEditableCustomerInfo({ ...editableCustomerInfo, contactName: e.target.value })}
                                             className="w-full font-bold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1"
                                             placeholder="담당자명(선택)"
                                         />
@@ -1559,7 +1559,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         <input
                                             type="text"
                                             value={editableCustomerInfo.tel}
-                                            onChange={(e) => setEditableCustomerInfo({...editableCustomerInfo, tel: e.target.value})}
+                                            onChange={(e) => setEditableCustomerInfo({ ...editableCustomerInfo, tel: e.target.value })}
                                             className="w-full font-mono text-slate-600 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1"
                                             placeholder="연락처(선택)"
                                         />
@@ -1648,8 +1648,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     <div className="p-3 text-sm text-slate-500 text-center">저장된 내역이 없습니다.</div>
                                                                 ) : (
                                                                     availablePresets.map((s, idx) => (
-                                                                        <div 
-                                                                            key={idx} 
+                                                                        <div
+                                                                            key={idx}
                                                                             onClick={() => handleLoadPresetItem(s)}
                                                                             className="p-3 border-b border-slate-100 hover:bg-slate-50 cursor-pointer text-xs text-slate-700 whitespace-pre-wrap select-none">
                                                                             {s}
@@ -1667,7 +1667,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                     placeholder="배송 요청사항을 입력하세요."
                                                 />
                                                 {/* NEW: Attached Photos */}
-                                                {order.attachments && order.attachments.length> 0 && (
+                                                {order.attachments && order.attachments.length > 0 && (
                                                     <div className="mt-3 pt-3 border-t border-slate-100">
                                                         <h4 className="text-xs font-bold text-slate-500 mb-2">첨부된 사진/파일 (Customer Attachments)</h4>
                                                         <div className="flex flex-wrap gap-2">
@@ -1679,7 +1679,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     rel="noopener noreferrer"
                                                                     className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded text-xs font-bold transition-colors">
                                                                     <Image className="w-3 h-3" />
-                                                                    첨부사진 보기 {order.attachments!.length> 1 ? `(${i + 1})` : ''}
+                                                                    첨부사진 보기 {order.attachments!.length > 1 ? `(${i + 1})` : ''}
                                                                 </a>
                                                             ))}
                                                         </div>
@@ -1732,7 +1732,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         <th className="px-2 py-3 w-[2%] text-center">
                                             <input
                                                 type="checkbox"
-                                                checked={displayedItems.length> 0 && selectedItems.length === displayedItems.length}
+                                                checked={displayedItems.length > 0 && selectedItems.length === displayedItems.length}
                                                 onChange={(e) => handleSelectAll(e.target.checked)}
                                                 className="w-3.5 h-3.5 cursor-pointer accent-teal-600"
                                                 title="전체 선택/해제"
@@ -1829,7 +1829,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                                     const product = inventory.find(p => p.id === item.productId);
                                                                                     // Calculate new price based on base price and bulk discount
                                                                                     const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
-                                                                                    if (basePrice> 0) {
+                                                                                    if (basePrice > 0) {
                                                                                         const newPrice = Math.round(Math.round(basePrice * (1 - val / 100)) / 10) * 10;
                                                                                         return {
                                                                                             ...item,
@@ -1907,7 +1907,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
                                             // 2. If not found, but we have stored data, create a "Fallback Product"
                                             //    This ensures the UI shows the stored values instead of "Unlinked" / "-"
-                                            if (!product && item.base_price && item.base_price> 0) {
+                                            if (!product && item.base_price && item.base_price > 0) {
                                                 product = {
                                                     id: item.productId || item.itemId || 'fallback-' + idx,
                                                     name: item.name,
@@ -1925,7 +1925,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                             }
 
                                             const currentStock = product ? product.currentStock : 0;
-                                            const isStockInsufficient = item.quantity> currentStock;
+                                            const isStockInsufficient = item.quantity > currentStock;
 
                                             // It is only "Unlinked" if we strictly have NO product (live OR fallback)
                                             const isUnlinked = !product;
@@ -2021,7 +2021,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 onKeyDown={handleKeyDown}
                                                                 className="w-12 text-center px-1 py-1 rounded border border-indigo-200 outline-none focus:border-indigo-500 font-mono font-bold text-slate-800 text-xs"
                                                             />
-                                                            {!isSupplierMode && item.quantity> 1 && (
+                                                            {!isSupplierMode && item.quantity > 1 && (
                                                                 <button
                                                                     onClick={() => handleSplitItem(idx)}
                                                                     className="p-1 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded transition-colors"
@@ -2040,7 +2040,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     {formatCurrency(item.unitPrice)}
                                                                 </td>
                                                                 <td className="px-4 py-3 text-right align-middle text-slate-900 font-mono text-xs font-bold">
-                                                                    {basePrice> 0 ? formatCurrency(basePrice) : '-'
+                                                                    {basePrice > 0 ? formatCurrency(basePrice) : '-'
                                                                     }
                                                                 </td>
                                                                 <td className="px-2 py-3 text-center align-middle">
@@ -2076,7 +2076,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                                             const productBasePrice = product?.base_price ?? targetItem.base_price ?? product?.unitPrice ?? 0;
                                                                                             const rate = targetItem.supplierRate ?? 0;
 
-                                                                                            if (productBasePrice> 0) {
+                                                                                            if (productBasePrice > 0) {
                                                                                                 const targetPrice = Math.ceil(((productBasePrice / 2) * ((100 - rate) / 100) * 1.9) / 10) * 10;
                                                                                                 targetItem.supplierPriceOverride = targetPrice;
                                                                                                 newItems[idx] = targetItem;
@@ -2111,7 +2111,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                         if (!isUnlinked) return null;
                                                                         const specKey = [item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim();
                                                                         const record = customPrices[specKey];
-                                                                        if (record && record.purchasePrice> 0) {
+                                                                        if (record && record.purchasePrice > 0) {
                                                                             return (
                                                                                 <button
                                                                                     className="mt-1 px-1.5 py-0.5 text-[10px] bg-slate-100 text-slate-700 border border-slate-300 rounded hover:bg-slate-200 font-bold whitespace-nowrap shadow-sm block w-full truncate"
@@ -2127,8 +2127,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 <td className="px-4 py-3 text-right align-middle font-mono font-extrabold text-slate-900 text-sm">
                                                                     {formatCurrency(supplierAmount)}
                                                                 </td>
-                                                                <td className={`px-4 py-3 text-right align-middle font-mono font-extrabold text-xs ${profit> 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                                    {profit> 0 ? '+' : ''}{formatCurrency(profit)}
+                                                                <td className={`px-4 py-3 text-right align-middle font-mono font-extrabold text-xs ${profit > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                                    {profit > 0 ? '+' : ''}{formatCurrency(profit)}
                                                                 </td>
                                                                 <td className="px-2 py-3 text-center align-middle">
                                                                     <button
@@ -2171,14 +2171,14 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                                             <div className="flex flex-col items-center mt-1 border border-slate-200 bg-slate-50 rounded p-1 text-[10px] w-full max-w-[90px] mx-auto shadow-sm">
                                                                                                 <span className="text-slate-700 font-bold mb-0.5 whitespace-nowrap">📋 과거 실적확인</span>
                                                                                                 <span className="text-slate-600 truncate w-full flex justify-between" title={`판매: ${formatCurrency(record.salesPrice)}`}>
-                                                                                                    <span className="text-[9px]">판매:</span> 
+                                                                                                    <span className="text-[9px]">판매:</span>
                                                                                                     <span className="font-bold">{formatCurrency(record.salesPrice)}</span>
                                                                                                 </span>
-                                                                                                {(record.purchasePrice> 0) && (
+                                                                                                {(record.purchasePrice > 0) && (
                                                                                                     <span className="text-slate-600 truncate w-full flex justify-between" title={`매입: ${formatCurrency(record.purchasePrice)}`}>
-                                                                                                        <span className="text-[9px]">매입:</span> 
+                                                                                                        <span className="text-[9px]">매입:</span>
                                                                                                         <span className="font-bold">{formatCurrency(record.purchasePrice)}</span>
-                                                                                                </span>
+                                                                                                    </span>
                                                                                                 )}
                                                                                                 <button type="button" onClick={() => {
                                                                                                     const newItems = [...displayedItems];
@@ -2186,7 +2186,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                                                         ...newItems[idx],
                                                                                                         unitPrice: record.salesPrice,
                                                                                                         amount: record.salesPrice * newItems[idx].quantity,
-                                                                                                        supplierPriceOverride: record.purchasePrice> 0 ? record.purchasePrice : newItems[idx].supplierPriceOverride
+                                                                                                        supplierPriceOverride: record.purchasePrice > 0 ? record.purchasePrice : newItems[idx].supplierPriceOverride
                                                                                                     };
                                                                                                     setDisplayedItems(newItems);
                                                                                                 }} className="mt-1 bg-teal-600 text-white rounded hover:bg-teal-700 w-full py-0.5 font-bold transition-colors">적용하기</button>
@@ -2212,7 +2212,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                         )}
                                                                 </td>
                                                                 <td className="px-4 py-3 text-right align-middle font-mono text-sm font-bold text-slate-700">
-                                                                    {standardPrice> 0 ? formatCurrency(standardPrice) : '-'}
+                                                                    {standardPrice > 0 ? formatCurrency(standardPrice) : '-'}
                                                                 </td>
                                                                 <td className="px-4 py-3 text-center align-middle">
                                                                     <div className="relative w-full">
@@ -2301,8 +2301,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                             {/* Profit */}
                                                             <div className="flex flex-col items-end">
                                                                 <span className="text-xs font-bold text-slate-500 mb-1"> 예상 이익(Profit) </span>
-                                                                <span className={`font-mono text-xl font-bold ${totalProfit> 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                                    {totalProfit> 0 ? '+' : ''}{formatCurrency(totalProfit)}
+                                                                <span className={`font-mono text-xl font-bold ${totalProfit > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                                    {totalProfit > 0 ? '+' : ''}{formatCurrency(totalProfit)}
                                                                 </span>
                                                             </div>
 
@@ -2432,7 +2432,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                 </div>
                                             </div>
                                             {
-                                                response.globalDiscountRate> 0 && (
+                                                response.globalDiscountRate > 0 && (
                                                     <div className="text-right text-xs text-red-500 mt-1 font-bold">
                                                         - {formatCurrency(globalDiscountAmount)} 할인 적용됨
                                                     </div>
@@ -2464,7 +2464,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                     <span> {formatCurrency(calculatedTotal)} </span>
                                                 </div>
                                                 {
-                                                    charges.length> 0 && (
+                                                    charges.length > 0 && (
                                                         <div className="space-y-1 pt-2 border-t border-dashed border-slate-200">
                                                             {
                                                                 charges.map((charge, idx) => (
@@ -2481,7 +2481,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 <span>{formatCurrency(charges.reduce((acc, c) => acc + c.amount, 0))} </span>
                                                             </div>
                                                             {
-                                                                response.globalDiscountRate> 0 && (
+                                                                response.globalDiscountRate > 0 && (
                                                                     <div className="flex justify-between font-bold text-red-500 pt-1">
                                                                         <span>전체 할인({response.globalDiscountRate} %): </span>
                                                                         <span> - {formatCurrency(globalDiscountAmount)} </span>
@@ -2539,7 +2539,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                     )
                                                 }
                                                 {
-                                                    deliveryNoteFiles.length> 0 && (
+                                                    deliveryNoteFiles.length > 0 && (
                                                         <div className="text-xs text-teal-600 font-bold mt-1">
                                                             선택된 파일: {deliveryNoteFiles[0].name}
                                                         </div>
@@ -2557,7 +2557,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                     )
                                                 }
                                                 {
-                                                    (order.attachments && order.attachments.length> 0) && (
+                                                    (order.attachments && order.attachments.length > 0) && (
                                                         <div className="mt-2 text-xs bg-slate-100 p-2 rounded">
                                                             <span className="text-slate-500 mr-2"> 일반 첨부파일: </span>
                                                             <ul className="list-disc pl-4">
@@ -2595,12 +2595,12 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                 회수(견적으로 전환)
                             </Button>
                         )}
-                        {!isSupplierMode && order.po_items && order.po_items.length> 0 && order.po_items.some(item => !item.transactionIssued) && (
+                        {!isSupplierMode && order.po_items && order.po_items.length > 0 && order.po_items.some(item => !item.transactionIssued) && (
                             <Button
                                 onClick={async () => {
                                     if (confirm('이 주문의 모든 품목을 "명세표 발행 완료(미결 종료)" 상태로 강제 변경하시겠습니까?\n\n(참고: 운임비 등 수기 추가 품목으로 인해 미결목록에서 안 빠지는 경우 이 버튼을 누르세요.)')) {
                                         const updatedPoItems = order.po_items!.map(poItem => ({ ...poItem, transactionIssued: true }));
-                                        const isPoOverallSent = order.poSent || !!order.supplierPO || (updatedPoItems.length> 0 && updatedPoItems.every(item => item.poSent));
+                                        const isPoOverallSent = order.poSent || !!order.supplierPO || (updatedPoItems.length > 0 && updatedPoItems.every(item => item.poSent));
                                         const newStatus = (updatedPoItems.every(item => item.transactionIssued) && isPoOverallSent) ? 'COMPLETED' : order.status;
                                         await handleSave({ po_items: updatedPoItems, status: newStatus !== order.status ? newStatus : undefined });
                                         alert('미결 리스트에서 성공적으로 강제 종료되었습니다.');
@@ -2652,8 +2652,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                 });
 
                                 // Check if this makes both Sales and Purchase complete
-                                const allTxIssued = updatedPoItems.length> 0 && updatedPoItems.every(item => item.transactionIssued);
-                                const isPoOverallSent = order.poSent || !!order.supplierPO || (updatedPoItems.length> 0 && updatedPoItems.every(item => item.poSent));
+                                const allTxIssued = updatedPoItems.length > 0 && updatedPoItems.every(item => item.transactionIssued);
+                                const isPoOverallSent = order.poSent || !!order.supplierPO || (updatedPoItems.length > 0 && updatedPoItems.every(item => item.poSent));
 
                                 const newStatus = (allTxIssued && isPoOverallSent) ? 'COMPLETED' : order.status;
                                 if (newStatus === 'COMPLETED' && order.status !== 'COMPLETED') {
