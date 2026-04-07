@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { Order, Product } from '../../../types';
-import { TrendingUp, TrendingDown, DollarSign, Users } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Users, Package } from 'lucide-react';
 import { useInventoryIndex } from '../../../hooks/useInventoryIndex';
 
 interface AnalyticsPanelProps {
@@ -14,16 +14,18 @@ export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
     const stats = useMemo(() => {
         let totalSales = 0;
         let totalCost = 0;
+        let sihwaInventoryCost = 0;
+        let otherInventoryCost = 0;
+        
         const managerStats: Record<string, { count: number; profit: number; sales: number }> = {};
 
         orders.forEach(order => {
             // Only count if not cancelled/withdrawn/trash
             if (['CANCELLED', 'WITHDRAWN', 'ON_HOLD'].includes(order.status) || order.isDeleted) return;
 
-            // Sales amount is the final total Amount (which includes confirmedPrice and additionalCharges)
-            // But if it's not confirmed yet, we can use the default totalAmount. Let's just use totalAmount.
             const sales = order.totalAmount || 0;
-            totalSales += sales;
+            const displayCustomer = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase();
+            const isZeroSalesInventory = sales === 0 && displayCustomer.includes('재고');
 
             // Calculate cost from items
             let orderCost = 0;
@@ -45,6 +47,16 @@ export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
                 orderCost += (cost * item.quantity);
             });
 
+            if (isZeroSalesInventory) {
+                if (displayCustomer.includes('서울') || displayCustomer.includes('시화')) {
+                    sihwaInventoryCost += orderCost;
+                } else {
+                    otherInventoryCost += orderCost;
+                }
+                return; // Exclude from general totals and manager stats
+            }
+
+            totalSales += sales;
             totalCost += orderCost;
 
             // Track by Manager
@@ -77,7 +89,9 @@ export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
             totalCost,
             totalProfit,
             marginRate,
-            topManagers
+            topManagers,
+            sihwaInventoryCost,
+            otherInventoryCost
         };
     }, [orders, findProduct]);
 
@@ -97,7 +111,7 @@ export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
                 </div>
             </div>
 
-            <div className="p-5 grid grid-cols-1 md:grid-cols-4 gap-6 relative">
+            <div className="p-5 grid grid-cols-1 md:grid-cols-5 gap-6 relative">
 
                 {/* 1. Sales */}
                 <div className="flex flex-col">
@@ -132,7 +146,26 @@ export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
                     </span>
                 </div>
 
-                {/* 4. Top Managers */}
+                {/* 4. Inventory Transfers (New) */}
+                <div className="flex flex-col border-l border-slate-100 pl-6">
+                    <span className="text-xs font-bold text-slate-400 mb-1 flex items-center gap-1">
+                        <Package className="w-3.5 h-3.5 text-indigo-400" />재고 입고액 (비매출)
+                    </span>
+                    <div className="flex flex-col gap-1 mt-1">
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-500 font-bold">시화재고 (구 서울재고)</span>
+                            <span className="font-bold text-indigo-600">{formatCur(stats.sihwaInventoryCost)}원</span>
+                        </div>
+                        {stats.otherInventoryCost > 0 && (
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="text-slate-500 font-bold">기타재고</span>
+                                <span className="font-bold text-indigo-600">{formatCur(stats.otherInventoryCost)}원</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* 5. Top Managers */}
                 <div className="flex flex-col border-l border-slate-100 pl-6">
                     <span className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1">
                         <Users className="w-3.5 h-3.5" />담당자별 실적 (Top 3)

@@ -74,27 +74,27 @@ export function useInventory() {
             const processed = arr.map((item: RawInventoryItem) => {
                 // 1. Calculate Location Stock Map
                 // 1. Calculate Location Stock Map
-                // Anti-Gravity: Prefer server-provided locationStock if available (it has explicit '시화'/'양산' keys)
-                const locationStock: Record<string, number> = (item.locationStock && Object.keys(item.locationStock).length > 0)
-                    ? { ...item.locationStock }
-                    : {};
+                // Anti-Gravity: Prefer server-provided locationStock if available, mapped '서울' -> '시화'
+                const locationStock: Record<string, number> = {};
 
-                // Only calculate if empty (fail-safe)
-                if (Object.keys(locationStock).length === 0) {
+                if (item.locationStock && Object.keys(item.locationStock).length > 0) {
+                    for (const [key, qty] of Object.entries(item.locationStock)) {
+                        const newKey = (key === '서울' || key === '서울재고') ? '시화' : key;
+                        locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
+                    }
+                } else {
                     // Primary Location (location / ready_qty)
                     if (item.location && item.ready_qty) {
-                        locationStock[item.location] = Number(item.ready_qty);
+                        const newKey = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
+                        locationStock[newKey] = Number(item.ready_qty);
                     }
 
                     // Secondary Location (location1 / sh_qty)
                     if (item.location1 && item.sh_qty) {
-                        // Logic: If location names are same, add qty. If different, set new key.
-                        // Usually they are different (Yangsan vs Sihwa)
-                        const loc1 = item.location1;
+                        const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
                         const qty1 = Number(item.sh_qty);
                         locationStock[loc1] = (locationStock[loc1] || 0) + qty1;
                     }
-
                 }
 
                 // Calculate Total Stock from components
@@ -115,11 +115,15 @@ export function useInventory() {
                     stockStatus = currentStock > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK';
                 }
 
+                // Map main location property as well
+                const mappedLocation = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
+
                 return {
                     ...item, // Keep original props
                     id: item.sku_key || item.id, // S3 uses sku_key
                     name: item.item || item.name, // S3 uses item
                     // thickness, size, material, location, maker usually match keys
+                    location: mappedLocation,
                     unitPrice: item.final_price !== undefined ? item.final_price : item.unitPrice,
                     currentStock: currentStock,
                     stockStatus: stockStatus,

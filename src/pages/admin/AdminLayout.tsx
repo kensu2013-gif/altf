@@ -76,6 +76,7 @@ export default function AdminLayout() {
         { label: '주문 관리', path: '/admin/orders', emoji: '🛒', badge: orders.filter(o => o.status === 'SUBMITTED' && !o.isDeleted).length },
         { label: '미결 관리', path: '/admin/pending', emoji: '⏳', badge: delayedPendingCount },
         { label: '견적 관리', path: '/admin/quotes', emoji: '📝', badge: quotes.filter(q => q.status === 'SUBMITTED' && !q.isDeleted).length },
+        { label: '시화재고 관리', path: '/admin/sihwainventory', emoji: '🏭' },
         { label: '재고 관리', path: '/admin/inventory', emoji: '📦' },
         ...(user?.role === 'MASTER' || user?.role?.toLowerCase() === 'admin' ? [{ label: '접속자 현황', path: '/admin/active-users', emoji: '👀' }] : []),
         { label: '설정', path: '/admin/settings', emoji: '⚙️' },

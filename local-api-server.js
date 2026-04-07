@@ -16,12 +16,12 @@ const uploadMiddleware = multer({
     limits: { fileSize: 20 * 1024 * 1024 } // 20MB limit
 }).single('file');
 
-// Initial Data Structure
 let db = {
     users: [],
     quotations: [],
     orders: [],
-    loginLogs: []
+    loginLogs: [],
+    inventoryHistory: []
 };
 
 // Load Data
@@ -33,7 +33,8 @@ async function loadData() {
             db.quotations = json.quotations || [];
             db.orders = json.orders || [];
             db.loginLogs = json.loginLogs || [];
-            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.loginLogs.length} logs`);
+            db.inventoryHistory = json.inventoryHistory || [];
+            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.loginLogs.length} logs, ${db.inventoryHistory.length} history records`);
         } else {
             // Seed Initial Admin if file doesn't exist
             db.users = [
@@ -288,6 +289,81 @@ const server = http.createServer(async (req, res) => {
             if (!inventoryCache.gzippedData || (now - inventoryCache.timestamp) > CACHE_TTL) {
                 console.log('[API] Cache miss. Fetching inventory from S3...');
                 const inventoryData = await getInventoryFromS3();
+
+                // --- Daily Sihwa Inventory Snapshot Logic ---
+                try {
+                    const kstDate = new Date(now + 9 * 60 * 60 * 1000); // KST
+                    const today = kstDate.toISOString().slice(0, 10);
+                    
+                    const itemsArr = Array.isArray(inventoryData) ? inventoryData : (inventoryData.items || []);
+                    const sihwaStockMap = {};
+                    
+                    itemsArr.forEach(item => {
+                        let stock = 0;
+                        let isSihwa = false;
+
+                        if (item.locationStock) {
+                            for (const [key, qty] of Object.entries(item.locationStock)) {
+                                if (key.includes('서울') || key.includes('시화')) {
+                                    stock += Number(qty);
+                                    isSihwa = true;
+                                }
+                            }
+                        } else {
+                            if ((item.location || '').includes('서울') || (item.location || '').includes('시화')) {
+                                stock += Number(item.ready_qty || item.currentStock || 0);
+                                isSihwa = true;
+                            }
+                            if ((item.location1 || '').includes('서울') || (item.location1 || '').includes('시화')) {
+                                stock += Number(item.sh_qty || 0);
+                                isSihwa = true;
+                            }
+                        }
+
+                        // Add even if stock is 0 but it's marked as Sihwa, to track drops to 0 accurately
+                        if (isSihwa) {
+                            const id = item.sku_key || item.id;
+                            if (id) {
+                                sihwaStockMap[id] = { name: item.item || item.name, stock };
+                            }
+                        }
+                    });
+
+                    const lastRecord = db.inventoryHistory.length > 0 ? db.inventoryHistory[db.inventoryHistory.length - 1] : null;
+
+                    // If it's a new day, or the DB has no records, create today's snapshot
+                    if (!lastRecord || lastRecord.date !== today) {
+                        const newRecord = {
+                            date: today,
+                            stock: sihwaStockMap,
+                            diff: [] 
+                        };
+
+                        if (lastRecord && lastRecord.stock) {
+                            for (const [id, data] of Object.entries(sihwaStockMap)) {
+                                const oldStock = lastRecord.stock[id] ? lastRecord.stock[id].stock : 0;
+                                const change = data.stock - oldStock;
+                                if (change !== 0) {
+                                    newRecord.diff.push({ id, name: data.name, change, from: oldStock, to: data.stock });
+                                }
+                            }
+                            for (const [id, oldData] of Object.entries(lastRecord.stock)) {
+                                if (sihwaStockMap[id] === undefined) {
+                                    newRecord.diff.push({ id, name: oldData.name, change: -oldData.stock, from: oldData.stock, to: 0 });
+                                }
+                            }
+                        }
+
+                        db.inventoryHistory.push(newRecord);
+                        if (db.inventoryHistory.length > 60) db.inventoryHistory.shift(); // Keep 2 months
+                        
+                        await saveData();
+                        console.log(`[API] Generated inventory snapshot for ${today}. Diff count: ${newRecord.diff.length}`);
+                    }
+                } catch (snapErr) {
+                    console.error('[API] Error creating daily inventory snapshot:', snapErr);
+                }
+                // --- End Daily Snapshot Logic ---
 
                 const rawJson = JSON.stringify(inventoryData);
                 inventoryCache.rawData = Buffer.from(rawJson, 'utf-8');
@@ -608,6 +684,20 @@ const server = http.createServer(async (req, res) => {
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(logs));
+        return;
+    }
+
+    // GET /api/admin/inventory-history
+    if (req.method === 'GET' && url.pathname === '/api/admin/inventory-history') {
+        const requesterRole = req.headers['x-requester-role'];
+        if (requesterRole !== 'MASTER' && requesterRole !== 'admin') {
+            res.writeHead(403);
+            res.end(JSON.stringify({ error: 'Forbidden' }));
+            return;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(db.inventoryHistory));
         return;
     }
 
