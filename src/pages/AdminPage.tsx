@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { AdminOrderDetail } from './admin/components/AdminOrderDetail';
 import { AnalyticsPanel } from './admin/components/AnalyticsPanel';
-import type { Order } from '../types';
+import type { Order, User } from '../types';
 import { useInventoryIndex } from '../hooks/useInventoryIndex';
 
 
@@ -325,8 +325,8 @@ export default function AdminPage() {
                                         aria-label="담당자 필터"
                                     >
                                         <option value="all">모든 담당자</option>
-                                        {users.filter((u: any) => ['MASTER', 'MANAGER', 'admin'].includes(u.role)).map((u: any) => (
-                                            <option key={u.id} value={u.id}>{u.contactName || u.name || u.email}</option>
+                                        {users.filter((u: User) => ['MASTER', 'MANAGER', 'admin'].includes(u.role)).map((u: User) => (
+                                            <option key={u.id} value={u.id}>{u.contactName || (u as User & {name?: string}).name || u.email}</option>
                                         ))}
                                     </select>
                                     <button
@@ -443,11 +443,11 @@ export default function AdminPage() {
                                                                 </span>
                                                                 {order.managers && order.managers.length > 0 ? (
                                                                     <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 font-bold ml-auto">
-                                                                        담당: {order.managers.map(m => m.name).join(', ')}
+                                                                        {order.managers.map(m => m.name).join(', ')}
                                                                     </span>
                                                                 ) : order.manager && (
                                                                     <span className="text-[10px] text-slate-500 ml-auto">
-                                                                        담당: {order.manager.name}
+                                                                        {order.manager.name}
                                                                     </span>
                                                                 )}
                                                             </div>

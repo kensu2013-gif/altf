@@ -45,6 +45,7 @@ export default function PendingOrders() {
     const [searchPo, setSearchPo] = useState('');
     const [dateFilter, setDateFilter] = useState<'ALL' | 'URGENT' | 'URGENT_NO_COMMENT'>('URGENT'); // URGENT = <= 7 days
     const [tagFilter, setTagFilter] = useState<string>('ALL'); // [NEW] Tag FILTER
+    const [searchManager, setSearchManager] = useState<string>('all');
 
     // Comment State
     const [activeCommentItemId, setActiveCommentItemId] = useState<string | null>(null);
@@ -182,9 +183,14 @@ export default function PendingOrders() {
             groupedMap.get(item.orderId)!.items.push(item);
         });
 
+        let groups = Array.from(groupedMap.values());
+        if (searchManager !== 'all') {
+            groups = groups.filter(g => g.managers?.some(m => m.id === searchManager || m.name.includes(searchManager)));
+        }
+
         // Sort by 납기 임박순 (Delivery Date ascending)
-        return Array.from(groupedMap.values()).sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
-    }, [orders, searchCustomer, searchPo, dateFilter, tagFilter]);
+        return groups.sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
+    }, [orders, searchCustomer, searchPo, dateFilter, tagFilter, searchManager]);
 
     // Handlers
     const handleUpdateManagersForCustomer = async (targetCustomerName: string, managers: { id: string; name: string }[]) => {
@@ -354,17 +360,32 @@ export default function PendingOrders() {
                         className="bg-transparent border-none outline-none text-sm w-full placeholder:text-slate-400 font-medium"
                     />
                 </div>
-                <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-teal-500/20 focus-within:border-teal-500 transition-all flex-1 min-w-[200px]">
-                    <Search className="w-4 h-4 text-slate-400 mr-2" />
+                <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-teal-500/20 focus-within:border-teal-500 transition-all w-40 shrink-0">
+                    <Search className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
                     <input
                         type="text"
-                        placeholder="발주번호 검색 (ex: 456)"
+                        placeholder="발주번호 (PO) 검색"
                         value={searchPo}
                         onChange={(e) => setSearchPo(e.target.value)}
-                        className="bg-transparent border-none outline-none text-sm w-full placeholder:text-slate-400 font-medium"
+                        className="bg-transparent border-none outline-none text-sm w-full placeholder:text-slate-400 font-medium truncate"
                     />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
+                    <Filter className="w-4 h-4 text-slate-400" />
+                    <select
+                        value={searchManager}
+                        onChange={(e) => setSearchManager(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                        title="담당자 필터"
+                        aria-label="담당자 필터"
+                    >
+                        <option value="all">모든 영업담당자</option>
+                        {users.filter((u: User) => ['MASTER', 'MANAGER', 'admin'].includes(u.role)).map((u: User) => (
+                            <option key={u.id} value={u.id}>{u.contactName || (u as User & {name?: string}).name || u.email}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
                     <Filter className="w-4 h-4 text-slate-400" />
                     <select
                         value={dateFilter}
