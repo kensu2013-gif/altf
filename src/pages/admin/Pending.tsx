@@ -187,11 +187,11 @@ export default function PendingOrders() {
     }, [orders, searchCustomer, searchPo, dateFilter, tagFilter]);
 
     // Handlers
-    const handleUpdateManagersForCustomer = (targetCustomerName: string, managers: { id: string; name: string }[]) => {
-        const matchingOrders = orders.filter(o => 
-            (o.poEndCustomer || o.payload?.customer?.company_name || o.payload?.customer?.contact_name || o.customerName) === targetCustomerName
-        );
-        matchingOrders.forEach(o => updateOrder(o.id, { managers }));
+    const handleUpdateManagersForCustomer = async (targetCustomerName: string, managers: { id: string; name: string }[]) => {
+        const matchingGroups = pendingOrderGroups.filter(g => g.targetCustomerName === targetCustomerName);
+        for (const group of matchingGroups) {
+            await updateOrder(group.orderId, { managers });
+        }
     };
 
     const handleAddComment = (orderId: string, itemId: string) => {
