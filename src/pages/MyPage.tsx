@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore, type DeliveryInfo } from '../store/useStore';
 import { CalmPageShell } from '../components/ui/CalmPageShell';
 import { PageTransition } from '../components/ui/PageTransition';
@@ -32,6 +32,7 @@ interface QuotationRecord {
         address?: string;
     };
     status: 'DRAFT' | 'SUBMITTED' | 'PROCESSING' | 'PROCESSED' | 'COMPLETED';
+    memo?: string;
     createdAt: string;
     adminResponse?: {
         confirmedPrice?: number;
@@ -47,6 +48,11 @@ interface OrderRecord {
     items: LineItem[];
     totalAmount: number;
     customerName: string;
+    customerContactName?: string;
+    customerTel?: string;
+    customerEmail?: string;
+    customerAddress?: string;
+    memo?: string;
     status: string;
     createdAt: string;
     payload?: DocumentPayload; // Optional full payload
@@ -73,10 +79,13 @@ interface MixedLineItem extends LineItem {
 
 export default function MyPage() {
     const navigate = useNavigate();
+    const location = useLocation();
     const user = useStore((state) => state.auth.user);
     const loadQuotation = useStore((state) => state.loadQuotation);
 
-    const [activeTab, setActiveTab] = useState<'profile' | 'quotes' | 'orders'>('quotes');
+    const [activeTab, setActiveTab] = useState<'profile' | 'quotes' | 'orders'>(
+        (location.state?.activeTab as 'profile' | 'quotes' | 'orders') || 'quotes'
+    );
     const [quotations, setQuotations] = useState<QuotationRecord[]>([]);
     const [orders, setOrders] = useState<OrderRecord[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -141,13 +150,21 @@ export default function MyPage() {
 
         // Auto-refresh when tab comes back into focus
         const onFocus = () => {
-
             fetchData();
         };
         window.addEventListener('focus', onFocus);
 
         return () => window.removeEventListener('focus', onFocus);
     }, [user, navigate, resetNewOrderCount, fetchData]);
+
+    useEffect(() => {
+        const routeState = location.state as Record<string, unknown> | null;
+        if (routeState && typeof routeState.activeTab === 'string') {
+            setActiveTab(routeState.activeTab as 'profile' | 'quotes' | 'orders');
+            // Clear the state so refreshing doesn't stick to the tab if they clicked away
+            navigate(location.pathname, { replace: true, state: {} });
+        }
+    }, [location.state, location.pathname, navigate]);
 
     const handleReorder = (items: LineItem[]) => {
         setConfirmConfig({
@@ -242,7 +259,6 @@ export default function MyPage() {
         setShowSuccessAnimation(false);
         window.location.reload();
     };
-
 
     const handleInitiateOrder = (quote: QuotationRecord) => {
         // Construct Order Payload from Quote
@@ -396,10 +412,11 @@ export default function MyPage() {
             },
             customer: {
                 company_name: quote.customerInfo?.companyName || quote.customerName || '고객사',
-                contact_name: quote.customerInfo?.contactName || user?.contactName || '-',
-                tel: quote.customerInfo?.phone || user?.phone || '-',
-                email: quote.customerInfo?.email || user?.email || '-', // [FIX] Updated to prioritize quote.customerInfo
-                address: quote.customerInfo?.address || user?.address || '-'
+                contact_name: quote.customerInfo?.contactName ?? user?.contactName ?? '-',
+                tel: quote.customerInfo?.phone ?? user?.phone ?? '-',
+                email: quote.customerInfo?.email ?? user?.email ?? '-',
+                address: quote.customerInfo?.address ?? user?.address ?? '-',
+                memo: quote.memo
             },
             items: docItems,
             totals: {
@@ -476,12 +493,12 @@ export default function MyPage() {
                 note: order.adminResponse?.note
             },
             customer: {
-                // Use Profile Info specifically as requested
-                company_name: user?.companyName || order.customerName || '고객사',
-                contact_name: user?.contactName || '-',
-                tel: user?.phone || '-',
-                email: user?.email || '-',
-                address: user?.address // Use Sign-up Address
+                company_name: order.customerName || user?.companyName || '고객사',
+                contact_name: order.customerContactName ?? user?.contactName ?? '-',
+                tel: order.customerTel ?? user?.phone ?? '-',
+                email: order.customerEmail ?? user?.email ?? '-',
+                address: order.customerAddress ?? user?.address ?? '-', 
+                memo: order.memo
             },
             items: docItems,
             totals: {
@@ -1044,10 +1061,11 @@ function DetailModal({ record, isOrder, onClose, onOrder }: { record: QuotationR
             },
             customer: {
                 company_name: isOrder ? (record.customerName || user?.companyName || '고객사') : ((record as QuotationRecord).customerInfo?.companyName || record.customerName || user?.companyName || '고객사'),
-                contact_name: isOrder ? (user?.contactName || '-') : ((record as QuotationRecord).customerInfo?.contactName || user?.contactName || '-'),
-                tel: isOrder ? (user?.phone || '-') : ((record as QuotationRecord).customerInfo?.phone || user?.phone || '-'),
-                email: isOrder ? (user?.email || '-') : ((record as QuotationRecord).customerInfo?.email || '-'), // [FIX] Remove user?.email fallback for quotations
-                address: isOrder ? (user?.address || '-') : ((record as QuotationRecord).customerInfo?.address || user?.address || '-')
+                contact_name: isOrder ? ((record as OrderRecord).customerContactName ?? user?.contactName ?? '-') : ((record as QuotationRecord).customerInfo?.contactName ?? user?.contactName ?? '-'),
+                tel: isOrder ? ((record as OrderRecord).customerTel ?? user?.phone ?? '-') : ((record as QuotationRecord).customerInfo?.phone ?? user?.phone ?? '-'),
+                email: isOrder ? ((record as OrderRecord).customerEmail ?? user?.email ?? '-') : ((record as QuotationRecord).customerInfo?.email ?? user?.email ?? '-'), 
+                address: isOrder ? ((record as OrderRecord).customerAddress ?? user?.address ?? '-') : ((record as QuotationRecord).customerInfo?.address ?? user?.address ?? '-'),
+                memo: record.memo || (isOrder && (record as OrderRecord).payload?.customer?.memo ? (record as OrderRecord).payload!.customer!.memo : undefined)
             },
             items: docItems,
             totals: {

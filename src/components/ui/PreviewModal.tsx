@@ -133,6 +133,9 @@ export function PreviewModal({ htmlContent, onClose, onSend, onPrint, onOrder, d
             const success = await onSend();
             if (success) {
                 setSendStatus('success');
+                setTimeout(() => {
+                    onClose();
+                }, 300); // give a brief moment to show success state before hiding
             } else {
                 setSendStatus('error');
             }

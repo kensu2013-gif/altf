@@ -12,7 +12,7 @@ import type { DocumentPayload, DocumentItem, DocumentType } from '../types/docum
 import { renderDocumentHTML } from '../lib/documentTemplate';
 import { OrderService } from '../services/orderService';
 import { CalmPageShell } from '../components/ui/CalmPageShell';
-import { OrderSubmissionOverlay } from '../components/ui/OrderSubmissionOverlay';
+import { DeliveryInfoModal } from '../components/ui/DeliveryInfoModal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { EmailPackageAnimation } from '../components/ui/EmailPackageAnimation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -53,7 +53,6 @@ export default function QuotationEditor() {
     const navigate = useNavigate();
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [attachmentFiles, setAttachmentFiles] = useState<File[]>(uploadState.attachedFile ? [uploadState.attachedFile] : []);
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
     const [currentPayload, setCurrentPayload] = useState<DocumentPayload | null>(null);
     const submitButtonRef = useRef<HTMLButtonElement>(null);
@@ -93,14 +92,17 @@ export default function QuotationEditor() {
 
     // Standalone Customer Info for Quotation
     const [quotationCustomerInfo, setQuotationCustomerInfo] = useState({
-        companyName: user?.companyName || '',
-        contactName: user?.contactName || '',
-        phone: user?.phone || '',
-        email: '', // [FIX] Default to empty to prevent registration email leakage
-        address: user?.address || ''
+        companyName: '',
+        contactName: '',
+        phone: '',
+        email: '',
+        address: ''
     });
 
-    const [isApiSubmitting, setIsApiSubmitting] = useState(false);
+    // Delivery Info State
+    const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
+    const [pendingDocType, setPendingDocType] = useState<DocumentType | null>(null);
+    const [savedDeliveryInfo, setSavedDeliveryInfo] = useState<DeliveryInfo | null>(null);
 
     const handleClearAll = () => {
         if (items.length === 0) return;
@@ -127,8 +129,6 @@ export default function QuotationEditor() {
 
     // Helper to calculate total
     const calculateTotal = (items: LineItem[]) => items.reduce((sum, item) => sum + item.amount, 0);
-
-    // Sku generator helper (local use if specific needed, but better use shared)
 
     const totalAmount = calculateTotal(items);
 
@@ -168,14 +168,8 @@ export default function QuotationEditor() {
                 updates.location = undefined;
                 updates.maker = undefined;
                 updates.marking_wait_qty = undefined;
-
-                // Keep unitPrice as is or reset?
-                // updates.unitPrice = 0; 
             }
         }
-
-        // Recalculate amount if needed (store handles this too, but for UI feedback loop)
-        // Store updateItem handles amount recalc usually.
 
         updateItem(id, updates);
     };
@@ -217,7 +211,7 @@ export default function QuotationEditor() {
         const docItems: DocumentItem[] = items.map((item, idx) => {
             return {
                 no: idx + 1,
-                item_id: item.itemId, // Pass Back Data
+                item_id: item.itemId,
                 item_name: item.name,
                 thickness: item.thickness,
                 size: item.size,
@@ -258,7 +252,7 @@ export default function QuotationEditor() {
                 tel: type === 'QUOTATION' ? quotationCustomerInfo.phone : (user?.phone || '-'),
                 email: type === 'QUOTATION' ? quotationCustomerInfo.email : (user?.email || '-'),
                 address: type === 'QUOTATION' ? quotationCustomerInfo.address : (user?.address || '-'),
-                memo: type === 'QUOTATION' ? quotationMemo : undefined // Pass Inquiry Memo for Quotation
+                memo: type === 'QUOTATION' ? quotationMemo : undefined
             },
             items: docItems,
             totals: {
@@ -268,35 +262,10 @@ export default function QuotationEditor() {
         };
     };
 
-    const handleSaveQuotation = async () => {
+    const handleSaveQuotation = async (extraMemo?: string) => {
         if (!user) return;
 
         try {
-            // Send to Make.com Webhook for Quotation Automation
-            const WEBHOOK_URL = 'https://hook.us2.make.com/YOUR_QUOTE_WEBHOOK_URL_HERE';
-
-            try {
-                const webhookResponse = await fetch(WEBHOOK_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        userId: user.id,
-                        userEmail: user.email,
-                        customerName: user.companyName || 'Guest',
-                        items: items,
-                        totalAmount: totalAmount,
-                        memo: quotationMemo,
-                        status: 'DRAFT',
-                        createdAt: new Date().toISOString()
-                    })
-                });
-                if (!webhookResponse.ok) {
-                    console.error('Quote Webhook returned an error status.');
-                }
-            } catch (err) {
-                console.error('Quote Webhook error:', err);
-            }
-
             const uploadedAttachments: { name: string, url: string }[] = [];
             for (const file of attachmentFiles) {
                 const refId = user.companyName + '_' + Date.now().toString();
@@ -308,12 +277,12 @@ export default function QuotationEditor() {
                 userId: user.id,
                 customerName: quotationCustomerInfo.companyName || user.companyName || 'Guest',
                 customerNumber: user.companyName || 'Guest',
-                customerInfo: quotationCustomerInfo, // [NEW] Pass explicit standalone info to DB
+                customerInfo: quotationCustomerInfo,
                 items: items,
                 totalAmount: totalAmount,
-                memo: quotationMemo,
+                memo: extraMemo ? (quotationMemo ? `${quotationMemo}\n${extraMemo}` : extraMemo) : quotationMemo,
                 status: 'SUBMITTED' as const,
-                attachments: uploadedAttachments // [Added Attachments]
+                attachments: uploadedAttachments
             };
 
             try {
@@ -333,7 +302,6 @@ export default function QuotationEditor() {
                 return;
             }
 
-            // Persist to Local Store only on success
             useStore.getState().addQuotation(payloadData);
 
             setSuccessConfig({
@@ -352,15 +320,6 @@ export default function QuotationEditor() {
             const newPayload = { ...currentPayload };
             if (newPayload.customer) {
                 newPayload.customer.memo = newMemo;
-            } else {
-                newPayload.customer = {
-                    company_name: quotationCustomerInfo.companyName || user?.companyName || 'Guest',
-                    contact_name: quotationCustomerInfo.contactName || user?.contactName || '-',
-                    tel: quotationCustomerInfo.phone || user?.phone || '-',
-                    email: quotationCustomerInfo.email || user?.email || '-',
-                    address: quotationCustomerInfo.address || user?.address || '-',
-                    memo: newMemo
-                };
             }
             setCurrentPayload(newPayload);
             const html = renderDocumentHTML(newPayload);
@@ -369,45 +328,54 @@ export default function QuotationEditor() {
     };
 
     const handleDocAction = (type: DocumentType) => {
-        const payload = generatePayload(type);
-        setCurrentPayload(payload);
-
-        if (type === 'ORDER') {
-            if (items.length === 0) return;
-            setIsSubmitting(true);
-        } else {
-            setPreviewDocType(type);
-            const html = renderDocumentHTML(payload);
-            setPreviewContent(html);
-        }
+        if (type === 'ORDER' && items.length === 0) return;
+        setPendingDocType(type);
+        setIsDeliveryModalOpen(true);
     };
 
-    const handleSendOrder = async (deliveryInfo: DeliveryInfo): Promise<boolean> => {
-        if (!currentPayload) return false;
+    const handleDeliveryComplete = (deliveryInfo: DeliveryInfo) => {
+        setIsDeliveryModalOpen(false);
+        setSavedDeliveryInfo(deliveryInfo);
 
-        setIsApiSubmitting(true);
+        if (!pendingDocType) return;
 
-        const finalPayload = { ...currentPayload };
-        if (finalPayload.customer) {
-            // 1. Update Customer Fields with specific Delivery Info
-            finalPayload.customer.contact_name = deliveryInfo.contactName;
-            finalPayload.customer.tel = deliveryInfo.contactPhone;
+        const payload = generatePayload(pendingDocType);
 
-            // Combine Method + Address/Branch for clear visibility in single address field
+        const deliveryNote = `[배송: ${deliveryInfo.method === 'FREIGHT' ? '화물' : '택배'}] ` +
+            `${deliveryInfo.method === 'FREIGHT' ? deliveryInfo.branchName : deliveryInfo.address} ` +
+            `| 담당자: ${deliveryInfo.contactName} (${deliveryInfo.contactPhone})` +
+            (deliveryInfo.additionalRequest ? ` | 요청: ${deliveryInfo.additionalRequest}` : '');
+
+        if (payload.customer) {
+            payload.customer.contact_name = deliveryInfo.contactName;
+            payload.customer.tel = deliveryInfo.contactPhone;
+
             const methodPrefix = deliveryInfo.method === 'FREIGHT' ? '[화물] ' : '[택배] ';
             const addressDetail = deliveryInfo.method === 'FREIGHT' ? deliveryInfo.branchName : deliveryInfo.address;
-            finalPayload.customer.address = `${methodPrefix}${addressDetail}`;
+            payload.customer.address = `${methodPrefix}${addressDetail}`;
 
-            // 2. Append to Memo (Keep existing logic for redundancy/invoice visibility)
-            const deliveryNote = `[배송: ${deliveryInfo.method === 'FREIGHT' ? '화물' : '택배'}] ` +
-                `${deliveryInfo.method === 'FREIGHT' ? deliveryInfo.branchName : deliveryInfo.address} ` +
-                `| 담당자: ${deliveryInfo.contactName} (${deliveryInfo.contactPhone})` +
-                (deliveryInfo.additionalRequest ? ` | 요청: ${deliveryInfo.additionalRequest}` : '');
-
-            finalPayload.customer.memo = finalPayload.customer.memo
-                ? `${finalPayload.customer.memo}\n${deliveryNote}`
+            payload.customer.memo = payload.customer.memo
+                ? `${payload.customer.memo}\n${deliveryNote}`
                 : deliveryNote;
         }
+
+        // Store the delivery note in the state so handleSaveQuotation can access it since we removed extraMemo argument passing logic from confirm.
+        // Actually, handleSaveQuotation doesn't get called directly from DeliveryModal anymore, it gets called from PreviewModal.
+        // And when called from PreviewModal, `handleSaveQuotation` expects no argument, it relies on State.
+        // So we need to find a way to inject deliveryNote. Wait, `handleSaveQuotation` in `Cart.tsx` 
+        // does take `extraMemo?: string`! But `PreviewModal` `onPrint` calls `() => handleSaveQuotation()`. 
+        // Oh! We need to ensure we pass `deliveryNote` there, OR update `quotationMemo` state right here.
+        setQuotationMemo(quotationMemo ? `${quotationMemo}\n${deliveryNote}` : deliveryNote);
+
+        setCurrentPayload(payload);
+        setPreviewDocType(pendingDocType);
+        const html = renderDocumentHTML(payload);
+        setPreviewContent(html);
+    };
+
+    const handleSendOrder = async (overridePayload?: DocumentPayload): Promise<boolean> => {
+        const payloadToUse = overridePayload || currentPayload;
+        if (!payloadToUse || !savedDeliveryInfo) return false;
 
         const uploadedAttachments: { name: string, url: string }[] = [];
         for (const file of attachmentFiles) {
@@ -417,24 +385,20 @@ export default function QuotationEditor() {
         }
 
         const payloadWithFiles = {
-            ...finalPayload,
-            customerPO: uploadedAttachments.length > 0 ? uploadedAttachments[0] : undefined, // Assign first file as PO if any, or keep in attachments logic
-            // Assuming we pass attachments in payload for OrderService to handle
+            ...payloadToUse,
+            customerPO: uploadedAttachments.length > 0 ? uploadedAttachments[0] : undefined,
             payload: {
                 attachments: uploadedAttachments
             }
         };
 
         const result = await OrderService.submitOrder(payloadWithFiles as unknown as DocumentPayload);
-        setIsApiSubmitting(false);
         if (result.success) {
-            setIsSubmitting(false);
             incrementNewOrderCount();
             setShowSuccessAnimation(true);
             return true;
         } else {
             alert('발주서 전송에 실패했습니다.');
-            setIsSubmitting(false);
             return false;
         }
     };
@@ -442,14 +406,13 @@ export default function QuotationEditor() {
     const handleAnimationComplete = () => {
         setShowSuccessAnimation(false);
         clearQuotation();
-        navigate('/my');
+        navigate('/my', { state: { activeTab: 'orders' } });
     };
 
     return (
         <CalmPageShell className="pb-32">
             <AnimatePresence mode="wait">
                 {items.length === 0 ? (
-                    /* EMPTY STATE */
                     <motion.div
                         key="empty"
                         initial={{ opacity: 0, scale: 0.95 }}
@@ -474,21 +437,10 @@ export default function QuotationEditor() {
                         </div>
                     </motion.div>
                 ) : (
-                    /* CART CONTENT */
                     <motion.div
                         key="cart"
                         exit={{ opacity: 0, y: 20, transition: { duration: 0.3 } }}
                     >
-                        <OrderSubmissionOverlay
-                            isOpen={isSubmitting}
-                            onClose={() => setIsSubmitting(false)}
-                            onConfirm={handleSendOrder}
-                            basePayload={currentPayload}
-                            buttonRef={submitButtonRef}
-                            isSubmitting={isApiSubmitting}
-                        />
-
-                        {/* Header */}
                         <div className="flex items-center justify-between pb-6 mb-2">
                             <motion.div
                                 initial={{ opacity: 0, x: -20 }}
@@ -516,14 +468,19 @@ export default function QuotationEditor() {
                                 htmlContent={previewContent}
                                 onClose={() => setPreviewContent(null)}
                                 docType={previewDocType}
-                                onSend={undefined} // Order uses Overlay, not PreviewModal
-                                onPrint={previewDocType === 'QUOTATION' ? handleSaveQuotation : undefined}
+                                onSend={previewDocType === 'ORDER' ? () => handleSendOrder() : undefined}
+                                onPrint={previewDocType === 'QUOTATION' ? () => handleSaveQuotation() : undefined}
                                 memo={quotationMemo}
                                 onMemoChange={handlePreviewMemoChange}
                             />
                         )}
 
-                        {/* Glassmorphic Table Container */}
+                        <DeliveryInfoModal
+                            isOpen={isDeliveryModalOpen}
+                            onClose={() => setIsDeliveryModalOpen(false)}
+                            onConfirm={handleDeliveryComplete}
+                        />
+
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -686,7 +643,6 @@ export default function QuotationEditor() {
                                                                         {item.stockStatus === 'CHECK_LEAD_TIME' && <Badge color="amber" className="bg-amber-100 text-amber-700 px-2 py-0.5 text-[10px] border border-amber-200 shadow-sm font-bold">납기확인</Badge>}
                                                                     </>
                                                                 )}
-                                                                {/* Marking Wait Indicator */}
                                                                 {(item.marking_wait_qty || 0) > 0 && (
                                                                     <Badge color="purple" className="bg-purple-100 text-purple-700 px-2 py-0.5 text-[10px] border border-violet-200 shadow-sm font-bold mt-1">
                                                                         마킹 대기: {item.marking_wait_qty}
@@ -756,12 +712,7 @@ export default function QuotationEditor() {
                                     </tbody>
                                     <tfoot className="bg-slate-50/90 border-t border-slate-200 backdrop-blur-sm">
                                         <tr>
-                                            <td colSpan={2} className="px-4 py-4">
-                                                <td colSpan={2} className="px-4 py-4">
-                                                    {/* Button Moved to Bottom Bar */}
-                                                </td>
-                                            </td>
-                                            <td colSpan={8} className="px-4 py-4 text-right text-slate-500 font-extrabold text-sm uppercase tracking-wide">
+                                            <td colSpan={11} className="px-4 py-4 text-right text-slate-500 font-extrabold text-sm uppercase tracking-wide">
                                                 총 합계금액(부가세 제외)
                                             </td>
                                             <td className="px-4 py-4 text-right text-xl font-extrabold text-teal-700 font-mono border-l border-slate-200">
@@ -785,7 +736,6 @@ export default function QuotationEditor() {
                             </div >
                         </motion.div>
 
-                        {/* Attachments Section */}
                         <motion.div
                             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
                             className="mt-6 p-5 bg-white/70 backdrop-blur-xl border border-white/40 rounded-3xl shadow-lg ring-1 ring-white/60 mb-6"
@@ -806,8 +756,8 @@ export default function QuotationEditor() {
                                                 if (input.files?.length !== attachmentFiles.length) {
                                                     input.files = dt.files;
                                                 }
-                                            } catch {
-                                                // DataTransfer not supported
+                                            } catch (e) {
+                                                console.error('DataTransfer not supported', e);
                                             }
                                         }
                                     }}
@@ -886,8 +836,7 @@ export default function QuotationEditor() {
                             </div>
                         </motion.div>
 
-                        {/* Legend / Status */}
-                        < motion.div
+                        <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ delay: 0.5 }}
@@ -912,7 +861,6 @@ export default function QuotationEditor() {
                             </div>
                         </motion.div>
 
-                        {/* Sticky Bottom Actions */}
                         <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-white/50 p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-[100] flex items-center justify-between">
                             <div className="max-w-[1400px] mx-auto w-full flex items-center justify-end gap-3 px-4">
                                 {selectedIds.length > 0 && (
@@ -950,7 +898,6 @@ export default function QuotationEditor() {
                 onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
             />
 
-            {/* Success Info Dialog */}
             <ConfirmDialog
                 isOpen={successConfig.isOpen}
                 title={successConfig.title}
