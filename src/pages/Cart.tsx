@@ -329,8 +329,17 @@ export default function QuotationEditor() {
 
     const handleDocAction = (type: DocumentType) => {
         if (type === 'ORDER' && items.length === 0) return;
-        setPendingDocType(type);
-        setIsDeliveryModalOpen(true);
+        
+        if (type === 'QUOTATION') {
+            const payload = generatePayload(type);
+            setCurrentPayload(payload);
+            setPreviewDocType(type);
+            const html = renderDocumentHTML(payload);
+            setPreviewContent(html);
+        } else {
+            setPendingDocType(type);
+            setIsDeliveryModalOpen(true);
+        }
     };
 
     const handleDeliveryComplete = (deliveryInfo: DeliveryInfo) => {

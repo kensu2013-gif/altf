@@ -131,7 +131,7 @@ export default function SihwaInventory() {
 
     const inventoryMap = useMemo(() => {
         const map = new Map<string, Partial<Product> & { id: string }>();
-        inventory.forEach(p => map.set(p.id, p));
+        inventory.forEach((p: Product) => map.set(p.id, p));
         return map;
     }, [inventory]);
 
@@ -229,7 +229,7 @@ export default function SihwaInventory() {
         // Collect all items in inventory currently marked as Sihwa
         const comparisonMap: Record<string, { product: Partial<Product> & { id: string }, currentStock: number, pendingOrderQty: number, recentPurchasePrice: number, recentPurchaseDate: string | null, sellingPrice: number }> = {};
 
-        inventory.forEach(item => {
+        inventory.forEach((item: Product) => {
             // Check if Sihwa
             let isSihwa = false;
             let qty = 0;
