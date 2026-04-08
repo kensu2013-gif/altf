@@ -408,125 +408,129 @@ export default function SihwaInventory() {
                 </div>
             </div>
 
-            {/* A. Monthly Purchase Dashboard */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-slate-800 text-white px-5 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <CalendarDays className="w-5 h-5 text-indigo-400" />
-                        <h2 className="font-bold">월별 시화재고 보충(매입) 현황</h2>
+            {/* Dashboard Top Section: Monthly Status + Daily Trend */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                
+                {/* A. Monthly Purchase Dashboard */}
+                <div className="xl:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                    <div className="bg-slate-800 text-white px-5 py-4 flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-2">
+                            <CalendarDays className="w-5 h-5 text-indigo-400" />
+                            <h2 className="font-bold">월별 시화재고 보충(매입) 현황</h2>
+                        </div>
+                        <select
+                            title="월 선택"
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            className="bg-slate-700 border-none rounded text-sm py-1.5 px-3 text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none placeholder-white appearance-none"
+                        >
+                            {availableMonths.map(m => (
+                                <option key={m} value={m}>{m} 월</option>
+                            ))}
+                        </select>
                     </div>
-                    <select
-                        title="월 선택"
-                        value={selectedMonth}
-                        onChange={(e) => setSelectedMonth(e.target.value)}
-                        className="bg-slate-700 border-none rounded text-sm py-1.5 px-3 text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none placeholder-white appearance-none"
-                    >
-                        {availableMonths.map(m => (
-                            <option key={m} value={m}>{m} 월</option>
-                        ))}
-                    </select>
-                </div>
-                <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 bg-indigo-50/30">
-                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                            <Box className="w-24 h-24 text-teal-600" />
+                    <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-6 bg-indigo-50/30 flex-1">
+                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                <Box className="w-24 h-24 text-teal-600" />
+                            </div>
+                            <div className="flex items-center gap-2 mb-2 text-slate-500">
+                                <PackageSearch className="w-4 h-4 text-teal-500" />
+                                <span className="font-bold text-sm">입고 완료 (COMPLETED)</span>
+                            </div>
+                            <div className="text-3xl font-black text-slate-800 mb-1">
+                                {formatCur(monthData.completedCost)} <span className="text-lg text-slate-400 font-bold tracking-normal">원</span>
+                            </div>
+                            <div className="text-sm font-bold text-teal-600">
+                                총 {monthData.completedCount}건 매입 완료
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2 mb-2 text-slate-500">
-                            <PackageSearch className="w-4 h-4 text-teal-500" />
-                            <span className="font-bold text-sm">입고 완료 (COMPLETED)</span>
-                        </div>
-                        <div className="text-3xl font-black text-slate-800 mb-1">
-                            {formatCur(monthData.completedCost)} <span className="text-lg text-slate-400 font-bold tracking-normal">원</span>
-                        </div>
-                        <div className="text-sm font-bold text-teal-600">
-                            총 {monthData.completedCount}건 매입 완료
-                        </div>
-                    </div>
 
-                    <div className="bg-white p-5 rounded-xl border border-rose-100 shadow-sm relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                            <AlertTriangle className="w-24 h-24 text-rose-600" />
-                        </div>
-                        <div className="flex items-center gap-2 mb-2 text-rose-500">
-                            <TrendingUp className="w-4 h-4" />
-                            <span className="font-bold text-sm">미결 / 대기건 (PENDING)</span>
-                        </div>
-                        <div className="text-3xl font-black text-rose-600 mb-1">
-                            {formatCur(monthData.pendingCost)} <span className="text-lg text-rose-300 font-bold tracking-normal">원</span>
-                        </div>
-                        <div className="text-sm font-bold text-rose-500">
-                            발주 진행 (잔여) {monthData.pendingCount}건 대기 중
+                        <div className="bg-white p-5 rounded-xl border border-rose-100 shadow-sm relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                <AlertTriangle className="w-24 h-24 text-rose-600" />
+                            </div>
+                            <div className="flex items-center gap-2 mb-2 text-rose-500">
+                                <TrendingUp className="w-4 h-4" />
+                                <span className="font-bold text-sm">미결 / 대기건 (PENDING)</span>
+                            </div>
+                            <div className="text-3xl font-black text-rose-600 mb-1">
+                                {formatCur(monthData.pendingCost)} <span className="text-lg text-rose-300 font-bold tracking-normal">원</span>
+                            </div>
+                            <div className="text-sm font-bold text-rose-500">
+                                발주 진행 (잔여) {monthData.pendingCount}건 대기 중
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* B. Daily Trend Analyzer */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50">
-                    <History className="w-5 h-5 text-amber-500" />
-                    <h2 className="font-bold text-slate-800">최근 일간 재고 변동 트렌드 (10일 이내)</h2>
-                </div>
-                <div className="p-0 max-h-[300px] overflow-y-auto">
-                    {historyLoading ? (
-                        <div className="p-8 text-center text-slate-400">데이터를 불러오는 중입니다...</div>
-                    ) : historyData.length === 0 ? (
-                        <div className="p-8 text-center text-slate-400">최근 기록된 변동 이력이 없습니다. (내일 첫 구동 시 생성됩니다)</div>
-                    ) : (
-                        <div className="p-0">
-                            {historyData.slice(-10).reverse().map((snap, idx) => {
-                                const isFirstEver = historyData.length > 0 && snap.date === historyData[0].date;
-                                return (
-                                <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
-                                    <h3 className="font-bold text-slate-800 mb-3 flex flex-wrap items-center gap-2">
-                                        <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono shrink-0">{snap.date}</span>
-                                        {isFirstEver ? (
-                                            <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[11px] font-bold border border-indigo-100">
-                                                초기 기준점 수립 (총 {Object.keys(snap.stock || {}).length}개 품목)
-                                            </span>
-                                        ) : (
-                                            <span className="text-slate-600 font-medium text-sm">변동 항목 {snap.diff?.length || 0}건</span>
-                                        )}
-                                    </h3>
-                                    
-                                    {snap.diff && snap.diff.length > 0 ? (
-                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                                            {snap.diff.map((d, dIdx) => (
-                                                <div key={dIdx} className={`flex items-center justify-between text-sm bg-slate-50 p-2.5 rounded-lg border border-slate-100 border-l-4 ${d.change > 0 ? 'border-l-emerald-500' : 'border-l-rose-500'}`}>
-                                                    <span className="font-bold text-slate-700 truncate mr-2" title={d.name}>{d.name}</span>
-                                                    <div className="flex items-center gap-3 shrink-0">
-                                                        <span className="text-slate-400 font-mono text-xs">{d.from} → {d.to}</span>
-                                                        <span className={`font-black font-mono w-16 text-right ${d.change > 0 ? 'text-teal-600' : 'text-rose-500'}`}>
-                                                            {d.change > 0 ? '+' : ''}{d.change} 
-                                                        </span>
-                                                        {d.change < 0 ? (
-                                                            <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded font-bold">출고</span>
-                                                        ) : (
-                                                            <span className="text-[10px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded font-bold">입고</span>
-                                                        )}
+                {/* B. Daily Trend Analyzer */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                    <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50 shrink-0">
+                        <History className="w-5 h-5 text-amber-500" />
+                        <h2 className="font-bold text-slate-800">일간 재고 트렌드 <span className="text-sm font-normal text-slate-500">(10일)</span></h2>
+                    </div>
+                    <div className="p-0 flex-1 max-h-[300px] xl:max-h-none xl:h-[200px] overflow-y-auto">
+                        {historyLoading ? (
+                            <div className="p-8 text-center text-slate-400">데이터를 불러오는 중입니다...</div>
+                        ) : historyData.length === 0 ? (
+                            <div className="p-8 text-center text-slate-400">최근 기록된 변동 이력이 없습니다. (내일 첫 구동 시 생성됩니다)</div>
+                        ) : (
+                            <div className="p-0">
+                                {historyData.slice(-10).reverse().map((snap, idx) => {
+                                    const isFirstEver = historyData.length > 0 && snap.date === historyData[0].date;
+                                    return (
+                                    <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
+                                        <h3 className="font-bold text-slate-800 mb-3 flex flex-wrap items-center gap-2">
+                                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono shrink-0">{snap.date}</span>
+                                            {isFirstEver ? (
+                                                <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[11px] font-bold border border-indigo-100">
+                                                    초기 기준점 수립 (총 {Object.keys(snap.stock || {}).length}개 품목)
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-600 font-medium text-sm">변동 항목 {snap.diff?.length || 0}건</span>
+                                            )}
+                                        </h3>
+                                        
+                                        {snap.diff && snap.diff.length > 0 ? (
+                                            <div className="grid grid-cols-1 gap-3">
+                                                {snap.diff.map((d, dIdx) => (
+                                                    <div key={dIdx} className={`flex items-center justify-between text-sm bg-slate-50 p-2.5 rounded-lg border border-slate-100 border-l-4 ${d.change > 0 ? 'border-l-emerald-500' : 'border-l-rose-500'}`}>
+                                                        <span className="font-bold text-slate-700 truncate mr-2" title={d.name}>{d.name}</span>
+                                                        <div className="flex items-center gap-3 shrink-0">
+                                                            <span className="text-slate-400 font-mono text-xs">{d.from} → {d.to}</span>
+                                                            <span className={`font-black font-mono w-16 text-right ${d.change > 0 ? 'text-teal-600' : 'text-rose-500'}`}>
+                                                                {d.change > 0 ? '+' : ''}{d.change} 
+                                                            </span>
+                                                            {d.change < 0 ? (
+                                                                <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded font-bold">출고</span>
+                                                            ) : (
+                                                                <span className="text-[10px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded font-bold">입고</span>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : isFirstEver ? (
-                                        <div className="flex items-center gap-3 pl-2 bg-indigo-50/40 p-4 rounded-xl border border-indigo-100/60 mt-1">
-                                            <span className="animate-pulse bg-indigo-500 w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.7)] shrink-0"></span>
-                                            <p className="text-sm font-bold text-indigo-800 leading-snug">
-                                                시화재고 통합관리가 시작된 <span className="underline decoration-indigo-300 underline-offset-4">첫 운영일</span>입니다! <br/>
-                                                <span className="font-medium text-indigo-600 text-[13px] mt-1 inline-block">오늘 시스템이 기록한 재고 세팅값이 내일부터 발생하는 모든 출·입고 변동의 정확한 기준점으로 활용됩니다.</span>
+                                                ))}
+                                            </div>
+                                        ) : isFirstEver ? (
+                                            <div className="flex items-center gap-3 pl-2 bg-indigo-50/40 p-4 rounded-xl border border-indigo-100/60 mt-1">
+                                                <span className="animate-pulse bg-indigo-500 w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.7)] shrink-0"></span>
+                                                <p className="text-sm font-bold text-indigo-800 leading-snug">
+                                                    시화재고 통합관리가 시작된 <span className="underline decoration-indigo-300 underline-offset-4">첫 운영일</span>입니다! <br/>
+                                                    <span className="font-medium text-indigo-600 text-[13px] mt-1 inline-block">오늘 시스템이 기록한 재고 세팅값이 내일부터 발생하는 모든 출·입고 변동의 정확한 기준점으로 활용됩니다.</span>
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-slate-500 font-medium pl-2 bg-slate-50/50 py-2 px-3 rounded-lg border border-slate-100">
+                                                전날 대비 수량 변동이 발생한 품목이 없습니다.
+                                                <span className="text-xs text-slate-400 ml-2 font-normal">(현재 {Object.keys(snap.stock || {}).length}종류의 재고 품목 추적 유지중)</span>
                                             </p>
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm text-slate-500 font-medium pl-2 bg-slate-50/50 py-2 px-3 rounded-lg border border-slate-100">
-                                            전날 대비 수량 변동이 발생한 품목이 없습니다.
-                                            <span className="text-xs text-slate-400 ml-2 font-normal">(현재 {Object.keys(snap.stock || {}).length}종류의 재고 품목 추적 유지중)</span>
-                                        </p>
-                                    )}
-                                </div>
-                                );
-                            })}
-                        </div>
-                    )}
+                                        )}
+                                    </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
