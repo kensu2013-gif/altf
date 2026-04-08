@@ -91,6 +91,38 @@ export default function SihwaInventory() {
         fetchHistory();
     }, []);
 
+    // 1.5 Fetch Orders to sync with inventory
+    const setOrders = useStore(state => state.setOrders);
+    useEffect(() => {
+        if (!user) return;
+
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+        };
+        if (user.id) headers['x-requester-id'] = user.id;
+        if (user.role) headers['x-requester-role'] = user.role;
+
+        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`;
+
+        let lastFetchTime = 0;
+        const fetchOrders = () => {
+            const now = Date.now();
+            if (now - lastFetchTime < 20000) return; // 20초 간격 쓰로틀링
+            lastFetchTime = now;
+            fetch(endpoint, { headers, cache: 'no-store' })
+                .then(res => {
+                    if (res.ok) return res.json();
+                    throw new Error('Failed to fetch orders');
+                })
+                .then(data => {
+                    if (Array.isArray(data)) setOrders(data);
+                })
+                .catch(console.error);
+        };
+
+        fetchOrders();
+    }, [setOrders, user]);
+
     // Filter out irrelevant orders
     const activeOrders = useMemo(() => {
         return orders.filter(order => !['CANCELLED', 'WITHDRAWN'].includes(order.status) && !order.isDeleted);

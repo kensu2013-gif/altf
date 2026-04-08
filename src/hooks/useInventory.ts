@@ -44,10 +44,11 @@ interface RawInventoryItem {
 }
 
 // Fetcher function
-const fetcher = (url: string) => fetch(url).then(r => {
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json();
-});
+const fetcher = async (url: string) => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+};
 
 export function useInventory() {
     const setInventory = useStore((state) => state.setInventory);
@@ -160,3 +161,4 @@ export function useInventory() {
         error: error ? String(error) : null
     };
 }
+
