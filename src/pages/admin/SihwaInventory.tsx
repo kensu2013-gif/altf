@@ -51,6 +51,7 @@ interface InventoryDiffItem {
 interface InventoryHistorySnapshot {
     date: string;
     diff: InventoryDiffItem[];
+    stock?: Record<string, { name: string; stock: number }>;
 }
 
 export default function SihwaInventory() {
@@ -473,11 +474,19 @@ export default function SihwaInventory() {
                         <div className="p-8 text-center text-slate-400">최근 기록된 변동 이력이 없습니다. (내일 첫 구동 시 생성됩니다)</div>
                     ) : (
                         <div className="p-0">
-                            {historyData.slice(-10).reverse().map((snap, idx) => (
+                            {historyData.slice(-10).reverse().map((snap, idx) => {
+                                const isFirstEver = historyData.length > 0 && snap.date === historyData[0].date;
+                                return (
                                 <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
-                                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                                        <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono">{snap.date}</span>
-                                        <span>변동 항목 {snap.diff?.length || 0}건</span>
+                                    <h3 className="font-bold text-slate-800 mb-3 flex flex-wrap items-center gap-2">
+                                        <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono shrink-0">{snap.date}</span>
+                                        {isFirstEver ? (
+                                            <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[11px] font-bold border border-indigo-100">
+                                                초기 기준점 수립 (총 {Object.keys(snap.stock || {}).length}개 품목)
+                                            </span>
+                                        ) : (
+                                            <span className="text-slate-600 font-medium text-sm">변동 항목 {snap.diff?.length || 0}건</span>
+                                        )}
                                     </h3>
                                     
                                     {snap.diff && snap.diff.length > 0 ? (
@@ -499,11 +508,23 @@ export default function SihwaInventory() {
                                                 </div>
                                             ))}
                                         </div>
+                                    ) : isFirstEver ? (
+                                        <div className="flex items-center gap-3 pl-2 bg-indigo-50/40 p-4 rounded-xl border border-indigo-100/60 mt-1">
+                                            <span className="animate-pulse bg-indigo-500 w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.7)] shrink-0"></span>
+                                            <p className="text-sm font-bold text-indigo-800 leading-snug">
+                                                시화재고 통합관리가 시작된 <span className="underline decoration-indigo-300 underline-offset-4">첫 운영일</span>입니다! <br/>
+                                                <span className="font-medium text-indigo-600 text-[13px] mt-1 inline-block">오늘 시스템이 기록한 재고 세팅값이 내일부터 발생하는 모든 출·입고 변동의 정확한 기준점으로 활용됩니다.</span>
+                                            </p>
+                                        </div>
                                     ) : (
-                                        <p className="text-sm text-slate-400 pl-2">전날 대비 수량 변동이 발생한 품목이 없습니다.</p>
+                                        <p className="text-sm text-slate-500 font-medium pl-2 bg-slate-50/50 py-2 px-3 rounded-lg border border-slate-100">
+                                            전날 대비 수량 변동이 발생한 품목이 없습니다.
+                                            <span className="text-xs text-slate-400 ml-2 font-normal">(현재 {Object.keys(snap.stock || {}).length}종류의 재고 품목 추적 유지중)</span>
+                                        </p>
                                     )}
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
