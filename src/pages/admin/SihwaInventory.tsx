@@ -590,6 +590,29 @@ export default function SihwaInventory() {
                                 <th className="px-5 py-3 font-bold text-center">긴급성</th>
                             </tr>
                         </thead>
+                        {inventoryComparison.length > 0 && (
+                            <tbody className="bg-indigo-50/60 border-b-2 border-indigo-200 font-bold shadow-sm">
+                                <tr>
+                                    <td className="px-5 py-4 text-slate-800 text-sm">
+                                        총계 (STUBEND 제외)
+                                    </td>
+                                    <td className="px-5 py-4 text-right text-teal-700 text-sm border-l border-indigo-200/50">
+                                        판매가 기준 보유재고 총액:<br/>
+                                        <span className="text-lg">{formatCur(totalsMap.totalCurrentStockValue)}</span> 원
+                                    </td>
+                                    <td className="px-5 py-4 text-right text-indigo-700 text-sm border-l border-indigo-200/50">
+                                        매입 실적가 기준 보유재고 총액:<br/>
+                                        <span className="text-lg">{formatCur(totalsMap.totalCurrentStockCost)}</span> 원
+                                    </td>
+                                    <td colSpan={2} className="px-5 py-4 border-l border-indigo-200/50"></td>
+                                    <td className="px-5 py-4 text-right text-rose-600 text-sm border-l border-indigo-200/50">
+                                        실적가 기준 입고 대기(발주) 총액:<br/>
+                                        <span className="text-lg">{formatCur(totalsMap.totalPendingPurchaseValue)}</span> 원
+                                    </td>
+                                    <td className="px-5 py-4 border-l border-indigo-200/50"></td>
+                                </tr>
+                            </tbody>
+                        )}
                         <tbody className="divide-y divide-slate-100">
                             {invLoading ? (
                                 <tr>
@@ -644,29 +667,6 @@ export default function SihwaInventory() {
                                 ))
                             )}
                         </tbody>
-                        {inventoryComparison.length > 0 && (
-                            <tfoot className="bg-slate-100/80 border-t-2 border-slate-300 font-bold">
-                                <tr>
-                                    <td className="px-5 py-4 text-slate-800 text-sm">
-                                        총계 (STUBEND 제외)
-                                    </td>
-                                    <td className="px-5 py-4 text-right text-teal-700 text-sm border-l border-slate-200">
-                                        판매가 기준 보유재고 총액:<br/>
-                                        <span className="text-lg">{formatCur(totalsMap.totalCurrentStockValue)}</span> 원
-                                    </td>
-                                    <td className="px-5 py-4 text-right text-indigo-700 text-sm border-l border-slate-200">
-                                        매입 실적가 기준 보유재고 총액:<br/>
-                                        <span className="text-lg">{formatCur(totalsMap.totalCurrentStockCost)}</span> 원
-                                    </td>
-                                    <td colSpan={2} className="px-5 py-4 border-l border-slate-200"></td>
-                                    <td className="px-5 py-4 text-right text-rose-600 text-sm border-l border-slate-200">
-                                        실적가 기준 입고 대기(발주) 총액:<br/>
-                                        <span className="text-lg">{formatCur(totalsMap.totalPendingPurchaseValue)}</span> 원
-                                    </td>
-                                    <td className="px-5 py-4 border-l border-slate-200"></td>
-                                </tr>
-                            </tfoot>
-                        )}
                     </table>
                 </div>
             </div>
