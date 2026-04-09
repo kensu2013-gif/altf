@@ -1223,7 +1223,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     {/* Info Block: Customer (Normal) vs PO Info (Supplier) */}
                     {
                         isSupplierMode ? (
-                            <div className="bg-white rounded-xl border border-indigo-200 p-5 shadow-sm bg-indigo-50/20">
+                            <div className="rounded-xl border border-indigo-200 p-5 shadow-sm bg-indigo-50/20">
                                 <h3 className="text-sm font-bold text-indigo-900 border-b border-indigo-100 pb-3 mb-3 flex items-center gap-2">
                                     <FileText className="w-4 h-4 text-indigo-600" />
                                     발주서 정보 설정(Purchase Order Info)
@@ -1374,7 +1374,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
                                                         if (matches.length > 0) {
                                                             return (
-                                                                <div className="absolute z-100 top-[100%] left-0 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
+                                                                <div className="absolute z-100 top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
                                                                     {matches.map(c => (
                                                                         <button
                                                                             key={c.id || c.companyName}
@@ -1619,7 +1619,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
                                                 if (matches.length > 0) {
                                                     return (
-                                                        <div className="absolute z-100 top-[100%] left-0 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
+                                                        <div className="absolute z-100 top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
                                                             {matches.map(c => (
                                                                 <button
                                                                     key={c.id || c.companyName}
@@ -1696,7 +1696,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         />
                                     </div>
                                     <div className="col-span-2">
-                                        <span className="block text-slate-400 text-xs mb-1"> 배송 주소(Address) </span>
+                                        <span className="block text-slate-400 text-xs mb-1"> 본사 주소(Address) </span>
                                         <input
                                             type="text"
                                             value={editableCustomerInfo.address}
@@ -2118,7 +2118,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 placeholder="품목명"
                                                                 onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
                                                                 onKeyDown={handleKeyDown}
-                                                                className="w-[4.5rem] px-2 py-1.5 rounded border border-slate-200 focus:border-teal-500 outline-none text-xs font-bold text-slate-800"
+                                                                className="w-18 px-2 py-1.5 rounded border border-slate-200 focus:border-teal-500 outline-none text-xs font-bold text-slate-800"
                                                             />
                                                             <span className="text-slate-300 select-none"> -</span>
                                                             <input
@@ -2137,7 +2137,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 title="Size"
                                                                 onChange={(e) => handleItemChange(idx, 'size', e.target.value)}
                                                                 onKeyDown={handleKeyDown}
-                                                                className="w-[6.5rem] px-1 py-1.5 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
+                                                                className="w-26 px-1 py-1.5 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
                                                                 placeholder="Size"
                                                             />
                                                             <span className="text-slate-300 select-none"> -</span>

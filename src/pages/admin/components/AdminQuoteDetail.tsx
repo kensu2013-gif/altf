@@ -59,7 +59,6 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     // Local state for customer info
 
     // CRM Auto-Sync setup
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [crmCustomers, setCrmCustomers] = useState<CrmCustomerOption[]>([]);
     useEffect(() => {
         fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
@@ -78,7 +77,6 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
     const [showSuggestions, setShowSuggestions] = useState(false);
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleCustomerSelect = (c: CrmCustomerOption) => {
         if (window.confirm(`[${c.companyName}]의 연락처, 이메일, 담당자 등 전체 정보를 자동으로 덮어씌울까요?\n(현대배관 등 여러 지점이 있는 업체의 경우 '취소'를 누르시면 상호명만 적용됩니다)`)) {
             setCustomerInfo(prev => ({
@@ -721,7 +719,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
                                         if (matches.length > 0) {
                                             return (
-                                                <div className="absolute z-100 top-[100%] left-0 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
+                                                <div className="absolute z-100 top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
                                                     {matches.map(c => (
                                                         <button
                                                             key={c.id || c.companyName}
