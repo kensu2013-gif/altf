@@ -59,9 +59,10 @@ export default function Customers() {
 
     const fetchCustomers = async () => {
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
-                headers: { 'x-requester-role': user?.role || 'GUEST' }
-            });
+            const headers: Record<string, string> = { 'x-requester-role': user?.role || 'GUEST' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            
+            const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, { headers });
             if (res.ok) {
                 const data = await res.json();
                 setCustomersList(data.filter((c: Customer) => !c.isDeleted));
@@ -75,9 +76,10 @@ export default function Customers() {
         let isMounted = true;
         const loadInit = async () => {
             try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
-                    headers: { 'x-requester-role': user?.role || 'GUEST' }
-                });
+                const headers: Record<string, string> = { 'x-requester-role': user?.role || 'GUEST' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, { headers });
                 if (res.ok) {
                     const data = await res.json();
                     if (isMounted) {
@@ -111,9 +113,12 @@ export default function Customers() {
     const handlePurge = async () => {
         if (!window.confirm("정말 [이메일, 연락처, 주소, 담당자명] 중 하나라도 누락된 업체와 중복 데이터를 싹 지우시겠습니까?\n이 작업은 즉시 S3 데이터베이스에 반영되며 복구할 수 없습니다.")) return;
         try {
+            const headers: Record<string, string> = { 'x-requester-role': user?.role || 'GUEST' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
             const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers/action/purge`, {
                 method: 'POST',
-                headers: { 'x-requester-role': user?.role || 'GUEST' }
+                headers
             });
             if (res.ok) {
                 const data = await res.json();
@@ -131,12 +136,15 @@ export default function Customers() {
     const handleDelete = async (id: string, companyName: string) => {
         if (!window.confirm(`[${companyName}]을(를) 정말 삭제하시겠습니까?`)) return;
         try {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'x-requester-role': user?.role || 'GUEST'
+            };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
             const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers/${id}`, {
                 method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-requester-role': user?.role || 'GUEST'
-                },
+                headers,
                 body: JSON.stringify({ isDeleted: true })
             });
             if (res.ok) {
@@ -151,14 +159,17 @@ export default function Customers() {
         e.preventDefault();
         if (!editingCustomer) return;
         try {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'x-requester-role': user?.role || 'GUEST'
+            };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
             if (editingCustomer.id) {
                 // UPDATE
                 const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers/${editingCustomer.id}`, {
                     method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-requester-role': user?.role || 'GUEST'
-                    },
+                    headers,
                     body: JSON.stringify(editingCustomer)
                 });
                 if (res.ok) {
@@ -170,10 +181,7 @@ export default function Customers() {
                 // CREATE
                 const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-requester-role': user?.role || 'GUEST'
-                    },
+                    headers,
                     body: JSON.stringify(editingCustomer)
                 });
                 if (res.ok) {
