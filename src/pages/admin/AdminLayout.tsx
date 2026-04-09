@@ -71,6 +71,7 @@ export default function AdminLayout() {
 
     const NAV_ITEMS = [
         // { label: '대시보드', path: '/admin', exact: true, emoji: '📊' }, // Maybe later
+        { label: '알트에프 거래처 (CRM)', path: '/admin/customers', emoji: '🏢' },
         { label: '회원 관리', path: '/admin/members', emoji: '👥' },
         { label: '담당자 관리', path: '/admin/managers', emoji: '👨‍💼' },
         { label: '주문 관리', path: '/admin/orders', emoji: '🛒', badge: orders.filter(o => o.status === 'SUBMITTED' && !o.isDeleted).length },

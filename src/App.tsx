@@ -26,6 +26,7 @@ const MarketingConsent = lazy(() => import('./pages/policy/MarketingConsent'));
 // Admin Pages
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
 const AdminMembers = lazy(() => import('./pages/admin/Members'));
+const AdminCustomers = lazy(() => import('./pages/admin/Customers'));
 const AdminManagers = lazy(() => import('./pages/admin/Managers'));
 const AdminOrders = lazy(() => import('./pages/AdminPage'));
 const AdminQuotes = lazy(() => import('./pages/admin/Quotes')); // [RENAME]
@@ -113,6 +114,7 @@ function AnimatedRoutes() {
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<Navigate to="/admin/orders" replace />} />
+              <Route path="customers" element={<PageTransition><AdminCustomers /></PageTransition>} />
               <Route path="members" element={<PageTransition><AdminMembers /></PageTransition>} />
               <Route path="managers" element={<PageTransition><AdminManagers /></PageTransition>} />
               <Route path="orders" element={<PageTransition><AdminOrders /></PageTransition>} />
