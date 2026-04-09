@@ -30,7 +30,7 @@ export default function Customers() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState<Partial<Customer> | null>(null);
 
-    const load = async () => {
+    const fetchCustomers = async () => {
         try {
             const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
                 headers: { 'x-requester-role': user?.role || 'GUEST' }
@@ -45,7 +45,24 @@ export default function Customers() {
     };
 
     useEffect(() => {
-        load();
+        let isMounted = true;
+        const loadInit = async () => {
+            try {
+                const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
+                    headers: { 'x-requester-role': user?.role || 'GUEST' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (isMounted) {
+                        setCustomersList(data.filter((c: Customer) => !c.isDeleted));
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        };
+        loadInit();
+        return () => { isMounted = false; };
     }, [user?.role]);
 
     const handlePurge = async () => {
@@ -58,11 +75,12 @@ export default function Customers() {
             if (res.ok) {
                 const data = await res.json();
                 alert(`정화 완료!\n기존 ${data.originalCount}업체 -> 정예화 후 ${data.newCount}업체로 리셋되었습니다.`);
-                load();
+                fetchCustomers();
             } else {
                 alert('권한이 없거나 오류가 발생했습니다.');
             }
         } catch(e) {
+            console.error(e);
             alert('오류가 발생했습니다.');
         }
     };
@@ -122,6 +140,7 @@ export default function Customers() {
                 }
             }
         } catch(e) {
+            console.error(e);
             alert('저장 중 오류가 발생했습니다.');
         }
     };
@@ -489,19 +508,19 @@ export default function Customers() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 mb-1 block">업체명 (상호) *</label>
-                                        <input required value={editingCustomer?.companyName || ''} onChange={e => setEditingCustomer(p => ({...p, companyName: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        <input title="업체명 (상호)" placeholder="예: (주)알트에프" required value={editingCustomer?.companyName || ''} onChange={e => setEditingCustomer(p => ({...p, companyName: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 mb-1 block">대표자명</label>
-                                        <input value={editingCustomer?.ceo || ''} onChange={e => setEditingCustomer(p => ({...p, ceo: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        <input title="대표자명" placeholder="예: 홍길동" value={editingCustomer?.ceo || ''} onChange={e => setEditingCustomer(p => ({...p, ceo: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 mb-1 block">사업자등록번호 * (중복금지)</label>
-                                        <input required placeholder="000-00-00000" value={editingCustomer?.businessNumber || ''} onChange={e => setEditingCustomer(p => ({...p, businessNumber: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        <input title="사업자등록번호" required placeholder="000-00-00000" value={editingCustomer?.businessNumber || ''} onChange={e => setEditingCustomer(p => ({...p, businessNumber: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 mb-1 block">권역 (8도 분류) *</label>
-                                        <select required value={editingCustomer?.region || '경기도'} onChange={e => setEditingCustomer(p => ({...p, region: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                        <select title="권역 분류" required value={editingCustomer?.region || '경기도'} onChange={e => setEditingCustomer(p => ({...p, region: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                                             <option value="경기도">경기도 (시화배송망)</option>
                                             <option value="경상도">경상도 (부산배송망)</option>
                                             <option value="충청도">충청도</option>
@@ -513,19 +532,19 @@ export default function Customers() {
                                     </div>
                                     <div className="col-span-2">
                                         <label className="text-xs font-bold text-slate-500 mb-1 block">배송 주소지 *</label>
-                                        <input required value={editingCustomer?.address || ''} onChange={e => setEditingCustomer(p => ({...p, address: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        <input title="배송 주소지" placeholder="예: 경기도 시흥시 공단1대로..." required value={editingCustomer?.address || ''} onChange={e => setEditingCustomer(p => ({...p, address: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 mb-1 block">담당자명 *</label>
-                                        <input required value={editingCustomer?.contactName || ''} onChange={e => setEditingCustomer(p => ({...p, contactName: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        <input title="담당자명" placeholder="예: 김철수 과장" required value={editingCustomer?.contactName || ''} onChange={e => setEditingCustomer(p => ({...p, contactName: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 mb-1 block">연락처 (전화번호) *</label>
-                                        <input required value={editingCustomer?.phone || ''} onChange={e => setEditingCustomer(p => ({...p, phone: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        <input title="연락처" placeholder="예: 010-0000-0000" required value={editingCustomer?.phone || ''} onChange={e => setEditingCustomer(p => ({...p, phone: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
                                     </div>
                                     <div className="col-span-2">
                                         <label className="text-xs font-bold text-slate-500 mb-1 block">업무 이메일 *</label>
-                                        <input required type="email" value={editingCustomer?.email || ''} onChange={e => setEditingCustomer(p => ({...p, email: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        <input title="업무 이메일" placeholder="예: info@company.com" required type="email" value={editingCustomer?.email || ''} onChange={e => setEditingCustomer(p => ({...p, email: e.target.value}))} className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
                                     </div>
                                 </div>
                             </form>
