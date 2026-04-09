@@ -22,6 +22,17 @@ interface AdminOrderDetailProps {
 
 // ... (helpers) ...
 
+interface CrmCustomerOption {
+    id?: string;
+    companyName: string;
+    contactName?: string;
+    ceo?: string;
+    email?: string;
+    phone?: string;
+    businessNumber?: string;
+    address?: string;
+    isDeleted?: boolean;
+}
 
 
 export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose, onUpdate, initialMode = 'CUSTOMER' }: AdminOrderDetailProps) {
@@ -40,7 +51,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             name: payloadCustomer?.company_name || user?.companyName || 'Unknown',
             contactName: payloadCustomer?.contact_name || user?.contactName || '',
             tel: payloadCustomer?.tel || user?.phone || '',
-            bizNo: payloadCustomer?.biz_no || user?.bizNo || '-'
+            bizNo: payloadCustomer?.business_no || payloadCustomer?.biz_no || user?.bizNo || '-',
+            email: payloadCustomer?.email || user?.email || '',
+            address: payloadCustomer?.address || user?.address || ''
         };
     }, [order.payload, user]);
 
@@ -55,11 +68,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         bizType: order.customerBizType || '',
         contactName: cleanDefault(order.customerContactName || customerInfo.contactName),
         tel: cleanDefault(order.customerTel || customerInfo.tel),
-        email: cleanDefault(order.customerEmail || (customerInfo as any).email || ''),
-        address: cleanDefault(order.customerAddress || (customerInfo as any).address || '')
+        email: cleanDefault(order.customerEmail || customerInfo.email),
+        address: cleanDefault(order.customerAddress || customerInfo.address)
     });
 
-    const [crmCustomers, setCrmCustomers] = useState<any[]>([]);
+    const [crmCustomers, setCrmCustomers] = useState<CrmCustomerOption[]>([]);
     useEffect(() => {
         fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
             headers: {
@@ -70,7 +83,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         })
         .then(res => res.json())
         .then(data => {
-            if (data.customers) setCrmCustomers(data.customers);
+            if (Array.isArray(data)) setCrmCustomers(data.filter((c: CrmCustomerOption) => !c.isDeleted));
         })
         .catch(console.error);
     }, [user]);
@@ -398,26 +411,41 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         setEmailAttachmentName(`${seq} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${poEndCustomer.replace('(주)', '').trim() || '에스제이엔브이'}).pdf`);
     };
 
+    const [showCrmSuggestions, setShowCrmSuggestions] = useState(false);
+
     const handlePoEndCustomerChange = (newCustomer: string) => {
         setPoEndCustomer(newCustomer);
         const matchInfo = poNumber.match(/\d+$/);
         const seq = matchInfo ? matchInfo[0] : poNumber;
         setEmailAttachmentName(`${seq} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${newCustomer.replace('(주)', '').trim() || '에스제이엔브이'}).pdf`);
+    };
 
-        // CRM Sync Check
-        const crmMatch = crmCustomers.find(c => c.companyName === newCustomer);
-        if (crmMatch) {
-            if (window.confirm(`CRM 데이터를 수신했습니다!\n[${crmMatch.companyName}]\n\n업체 주소가 아래와 맞습니까?\n${crmMatch.address}\n\n(확인 시 사업자번호, 주소, 담당자, 전화/이메일 정보가 덮어씌워집니다)`)) {
-                setEditableCustomerInfo(prev => ({
-                    ...prev,
-                    bizNo: crmMatch.businessNumber || prev.bizNo,
-                    address: crmMatch.address || prev.address,
-                    contactName: crmMatch.contactName || prev.contactName,
-                    email: crmMatch.email || prev.email,
-                    tel: crmMatch.phone || prev.tel
-                }));
-            }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleCustomerSelect = (c: any) => {
+        if (window.confirm(`[${c.companyName}]의 연락처, 이메일, 담당자 등 전체 정보를 자동으로 덮어씌울까요?\n(현대배관 등 여러 지점이 있는 업체의 경우 '취소'를 누르시면 상호명만 적용됩니다)`)) {
+            setPoEndCustomer(c.companyName);
+            setEditableCustomerInfo(prev => ({
+                ...prev,
+                bizNo: c.businessNumber || prev.bizNo,
+                address: c.address || prev.address,
+                contactName: c.contactName || c.ceo || prev.contactName,
+                email: c.email || prev.email,
+                tel: c.phone || prev.tel
+            }));
+            const matchInfo = poNumber.match(/\d+$/);
+            const seq = matchInfo ? matchInfo[0] : poNumber;
+            setEmailAttachmentName(`${seq} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${c.companyName.replace('(주)', '').trim() || '에스제이엔브이'}).pdf`);
+        } else {
+            setPoEndCustomer(c.companyName);
+            setEditableCustomerInfo(prev => ({ 
+                ...prev,
+                bizNo: c.businessNumber || prev.bizNo 
+            }));
+            const matchInfo = poNumber.match(/\d+$/);
+            const seq = matchInfo ? matchInfo[0] : poNumber;
+            setEmailAttachmentName(`${seq} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${c.companyName.replace('(주)', '').trim() || '에스제이엔브이'}).pdf`);
         }
+        setShowCrmSuggestions(false);
     };
 
     // Calculation based on Selected Items
@@ -1324,16 +1352,45 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                             <h4 className="text-xs font-bold text-indigo-700 uppercase"> 발주자(Buyer) / 배송지(Ship To) </h4>
                                             <div className="flex items-center gap-2">
                                                 <span className="text-xs font-bold text-indigo-700 uppercase"> CUSTOMER </span>
-                                                <input
-                                                    value={poEndCustomer}
-                                                    onChange={e => {
-                                                        handlePoEndCustomerChange(e.target.value);
-                                                        if (!customerTouched) setCustomerTouched(true);
-                                                    }}
-                                                    className={`px-2 py-1 text-sm font-bold border rounded min-w-[140px] shadow-sm outline-none transition-all ${!customerTouched ? 'border-red-400 ring-2 ring-red-400 animate-pulse text-red-900' : 'border-indigo-200 focus:border-indigo-500 text-indigo-900'}`}
-                                                    placeholder="고객사 이름"
-                                                    title="PO에 표시될 요청 고객사 이름을 수정할 수 있습니다."
-                                                />
+                                                <div className="relative group/autocomplete">
+                                                    <input
+                                                        value={poEndCustomer}
+                                                        onChange={e => {
+                                                            handlePoEndCustomerChange(e.target.value);
+                                                            if (!customerTouched) setCustomerTouched(true);
+                                                            setShowCrmSuggestions(true);
+                                                        }}
+                                                        onFocus={() => setShowCrmSuggestions(true)}
+                                                        className={`px-2 py-1 text-sm font-bold border rounded min-w-[140px] shadow-sm outline-none transition-all ${!customerTouched ? 'border-red-400 ring-2 ring-red-400 animate-pulse text-red-900' : 'border-indigo-200 focus:border-indigo-500 text-indigo-900'}`}
+                                                        placeholder="고객사 이름"
+                                                        title="PO에 표시될 요청 고객사 이름을 수정할 수 있습니다."
+                                                    />
+                                                    {showCrmSuggestions && poEndCustomer.length > 0 && Array.isArray(crmCustomers) && (() => {
+                                                        const searchClean = poEndCustomer.replace(/[()주식회사\s]/g, '').toLowerCase();
+                                                        const matches = crmCustomers.filter(c => {
+                                                            if (!c?.companyName) return false;
+                                                            return c.companyName.replace(/[()주식회사\s]/g, '').toLowerCase().includes(searchClean);
+                                                        }).slice(0, 5);
+
+                                                        if (matches.length > 0) {
+                                                            return (
+                                                                <div className="absolute z-100 top-[100%] left-0 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
+                                                                    {matches.map(c => (
+                                                                        <button
+                                                                            key={c.id || c.companyName}
+                                                                            className="w-full text-left px-3 py-2 text-xs hover:bg-teal-50 focus:bg-teal-50 focus:outline-none transition-colors border-b border-slate-100 last:border-0"
+                                                                            onClick={() => handleCustomerSelect(c)}
+                                                                        >
+                                                                            <div className="font-bold text-slate-800">{c.companyName}</div>
+                                                                            <div className="text-slate-500 text-[10px] truncate">{c.address || c.businessNumber || '정보 없음'}</div>
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-3">
@@ -1540,16 +1597,45 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                     </div>
                                     <div>
                                         <span className="block text-slate-400 text-xs mb-1"> 업체명(Customer) </span>
-                                        <input
-                                            type="text"
-                                            value={poEndCustomer}
-                                            onChange={(e) => {
-                                                handlePoEndCustomerChange(e.target.value);
-                                                if (!customerTouched) setCustomerTouched(true);
-                                            }}
-                                            className={`w-full font-bold text-slate-800 bg-transparent border-b hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1 ${!customerTouched ? 'border-transparent' : 'border-teal-400 border-dotted'}`}
-                                            placeholder="고객사명 수정"
-                                        />
+                                        <div className="relative group/autocomplete">
+                                            <input
+                                                type="text"
+                                                value={poEndCustomer}
+                                                onChange={(e) => {
+                                                    handlePoEndCustomerChange(e.target.value);
+                                                    if (!customerTouched) setCustomerTouched(true);
+                                                    setShowCrmSuggestions(true);
+                                                }}
+                                                onFocus={() => setShowCrmSuggestions(true)}
+                                                className={`w-full font-bold text-slate-800 bg-transparent border-b hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1 ${!customerTouched ? 'border-transparent' : 'border-teal-400 border-dotted'}`}
+                                                placeholder="고객사명 수정"
+                                            />
+                                            {showCrmSuggestions && poEndCustomer.length > 0 && Array.isArray(crmCustomers) && (() => {
+                                                const searchClean = poEndCustomer.replace(/[()주식회사\s]/g, '').toLowerCase();
+                                                const matches = crmCustomers.filter(c => {
+                                                    if (!c?.companyName) return false;
+                                                    return c.companyName.replace(/[()주식회사\s]/g, '').toLowerCase().includes(searchClean);
+                                                }).slice(0, 5);
+
+                                                if (matches.length > 0) {
+                                                    return (
+                                                        <div className="absolute z-100 top-[100%] left-0 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
+                                                            {matches.map(c => (
+                                                                <button
+                                                                    key={c.id || c.companyName}
+                                                                    className="w-full text-left px-3 py-2 text-xs hover:bg-teal-50 focus:bg-teal-50 focus:outline-none transition-colors border-b border-slate-100 last:border-0"
+                                                                    onClick={() => handleCustomerSelect(c)}
+                                                                >
+                                                                    <div className="font-bold text-slate-800">{c.companyName}</div>
+                                                                    <div className="text-slate-500 text-[10px] truncate">{c.address || c.businessNumber || '정보 없음'}</div>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
+                                        </div>
                                     </div>
                                     <div>
                                         <span className="block text-slate-400 text-xs mb-1"> 영업 담당자(Managers) </span>

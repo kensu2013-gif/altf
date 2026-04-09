@@ -23,6 +23,17 @@ import { findMatchingProduct } from '../../../lib/productUtils';
 
 // Helper: Get Stock Status Text
 
+interface CrmCustomerOption {
+    id?: string;
+    companyName: string;
+    contactName?: string;
+    ceo?: string;
+    email?: string;
+    phone?: string;
+    businessNumber?: string;
+    address?: string;
+    isDeleted?: boolean;
+}
 
 export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQuoteDetailProps) {
     const inventory = useStore((state) => state.inventory);
@@ -46,6 +57,48 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const [isApiSubmitting, setIsApiSubmitting] = useState(false);
 
     // Local state for customer info
+
+    // CRM Auto-Sync setup
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [crmCustomers, setCrmCustomers] = useState<CrmCustomerOption[]>([]);
+    useEffect(() => {
+        fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
+            headers: {
+                'Content-Type': 'application/json',
+                ...(user?.id ? { 'x-requester-id': user.id } : {}),
+                ...(user?.role ? { 'x-requester-role': user.role } : {})
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (Array.isArray(data)) setCrmCustomers(data.filter((c: CrmCustomerOption) => !c.isDeleted));
+        })
+        .catch(console.error);
+    }, [user]);
+
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleCustomerSelect = (c: CrmCustomerOption) => {
+        if (window.confirm(`[${c.companyName}]의 연락처, 이메일, 담당자 등 전체 정보를 자동으로 덮어씌울까요?\n(현대배관 등 여러 지점이 있는 업체의 경우 '취소'를 누르시면 상호명만 적용됩니다)`)) {
+            setCustomerInfo(prev => ({
+                ...prev,
+                companyName: c.companyName,
+                address: c.address || prev.address,
+                contactName: c.contactName || c.ceo || prev.contactName,
+                email: c.email || prev.email,
+                phone: c.phone || prev.phone,
+                bizNo: c.businessNumber || prev.bizNo
+            }));
+        } else {
+            setCustomerInfo(prev => ({ 
+                ...prev, 
+                companyName: c.companyName,
+                bizNo: c.businessNumber || prev.bizNo
+            }));
+        }
+        setShowSuggestions(false);
+    };
 
     const [customerInfo, setCustomerInfo] = useState(() => ({
         companyName: quote.customerInfo?.companyName || customerUser?.companyName || quote.customerNumber,
@@ -580,6 +633,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 tel: customerInfo.phone,
                 email: customerInfo.email,
                 address: customerInfo.address,
+                business_no: customerInfo.bizNo,
                 memo: response.note // Pass generic note if needed
             },
             items: docItems,
@@ -642,15 +696,56 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                 <User className="w-4 h-4 text-teal-600" />
                                 고객 정보 (Customer Info)
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="relative group/autocomplete">
                                     <label className="block text-xs font-bold text-slate-500 mb-1">회사명 (Company)</label>
                                     <input
                                         type="text"
                                         title="Company Name"
                                         placeholder="Company Name"
                                         value={customerInfo.companyName}
-                                        onChange={(e) => setCustomerInfo({ ...customerInfo, companyName: e.target.value })}
+                                        onChange={(e) => {
+                                            setCustomerInfo({ ...customerInfo, companyName: e.target.value });
+                                            setShowSuggestions(true);
+                                        }}
+                                        onFocus={() => setShowSuggestions(true)}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded text-sm outline-none focus:border-teal-500"
+                                    />
+                                    {showSuggestions && customerInfo.companyName.length > 0 && Array.isArray(crmCustomers) && (() => {
+                                        const searchClean = customerInfo.companyName.replace(/[()주식회사\s]/g, '').toLowerCase();
+                                        const matches = crmCustomers.filter(c => {
+                                            if (!c?.companyName) return false;
+                                            const cClean = c.companyName.replace(/[()주식회사\s]/g, '').toLowerCase();
+                                            return cClean.includes(searchClean);
+                                        }).slice(0, 5); // Max 5 suggestions
+
+                                        if (matches.length > 0) {
+                                            return (
+                                                <div className="absolute z-100 top-[100%] left-0 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
+                                                    {matches.map(c => (
+                                                        <button
+                                                            key={c.id || c.companyName}
+                                                            className="w-full text-left px-3 py-2 text-xs hover:bg-teal-50 focus:bg-teal-50 focus:outline-none transition-colors border-b border-slate-100 last:border-0"
+                                                            onClick={() => handleCustomerSelect(c)}
+                                                        >
+                                                            <div className="font-bold text-slate-800">{c.companyName}</div>
+                                                            <div className="text-slate-500 text-[10px] truncate">{c.address || c.businessNumber || '정보 없음'}</div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">사업자번호 (Biz No)</label>
+                                    <input
+                                        type="text"
+                                        title="Business Number"
+                                        placeholder="***-**-*****"
+                                        value={customerInfo.bizNo}
+                                        onChange={(e) => setCustomerInfo({ ...customerInfo, bizNo: e.target.value })}
                                         className="w-full px-3 py-2 border border-slate-200 rounded text-sm outline-none focus:border-teal-500"
                                     />
                                 </div>
@@ -687,7 +782,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         className="w-full px-3 py-2 border border-slate-200 rounded text-sm outline-none focus:border-teal-500"
                                     />
                                 </div>
-                                <div className="md:col-span-2">
+                                <div className="md:col-span-2 lg:col-span-3">
                                     <label className="block text-xs font-bold text-slate-500 mb-1">주소 (Address)</label>
                                     <input
                                         type="text"
@@ -1028,16 +1123,44 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1">납품 가능일 (Delivery Date)</label>
-                                    <div className="relative">
-                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input
-                                            type="date"
-                                            title="Delivery Date"
-                                            className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-slate-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
-                                            value={response.deliveryDate}
-                                            onChange={(e) => setResponse({ ...response, deliveryDate: e.target.value })}
-                                        />
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">납품 가능/예상일 (Delivery Date)</label>
+                                    <div className="relative flex flex-col gap-2">
+                                        <div className="relative">
+                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
+                                            <select
+                                                title="납품 가능/예상일 선택"
+                                                className="w-full pl-9 pr-8 py-2.5 rounded-lg border border-slate-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none text-sm appearance-none bg-white relative z-0"
+                                                value={(!response.deliveryDate || ["발주후 1~3일", "발주후 15일", "발주후 25~30일", "발주후 45~60일", "발주후 90일 이상"].includes(response.deliveryDate)) ? response.deliveryDate : 'custom'}
+                                                onChange={(e) => {
+                                                    if (e.target.value === 'custom') {
+                                                        setResponse({ ...response, deliveryDate: ' ' }); // Trigger custom mode
+                                                    } else {
+                                                        setResponse({ ...response, deliveryDate: e.target.value });
+                                                    }
+                                                }}
+                                            >
+                                                <option value="" disabled>납기 선택 (또는 직접 입력)</option>
+                                                <option value="발주후 1~3일">발주후 1~3일</option>
+                                                <option value="발주후 15일">발주후 15일</option>
+                                                <option value="발주후 25~30일">발주후 25~30일</option>
+                                                <option value="발주후 45~60일">발주후 45~60일</option>
+                                                <option value="발주후 90일 이상">발주후 90일 이상</option>
+                                                <option value="custom">직접 입력...</option>
+                                            </select>
+                                            {/* Select Chevron */}
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 border-t-4 border-t-slate-600 border-x-[3px] border-x-transparent" />
+                                        </div>
+                                        {/* Show text input only if it's not empty and not one of the presets */}
+                                        {response.deliveryDate !== '' && !["발주후 1~3일", "발주후 15일", "발주후 25~30일", "발주후 45~60일", "발주후 90일 이상"].includes(response.deliveryDate) && (
+                                            <input
+                                                type="text"
+                                                placeholder="원하시는 납기 정보를 직접 입력해주세요"
+                                                className="w-full px-4 py-2.5 rounded-lg border border-teal-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none text-sm bg-teal-50/10 shadow-inner"
+                                                value={response.deliveryDate === ' ' ? '' : response.deliveryDate}
+                                                onChange={(e) => setResponse({ ...response, deliveryDate: e.target.value })}
+                                                autoFocus
+                                            />
+                                        )}
                                     </div>
                                 </div>
 

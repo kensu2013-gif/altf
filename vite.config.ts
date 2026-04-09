@@ -62,6 +62,10 @@ export default defineConfig({
         target: 'https://altf-api.onrender.com',
         changeOrigin: true,
       },
+      '/api/customers': {
+        target: 'https://altf-api.onrender.com',
+        changeOrigin: true,
+      },
     },
   },
 })

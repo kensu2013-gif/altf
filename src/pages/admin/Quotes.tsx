@@ -235,7 +235,7 @@ export default function AdminQuotes() {
                     <FilterButton active={filterStatus === 'PROCESSING'} onClick={() => setFilterStatus('PROCESSING')} label="응답대기 (Processing)" count={quoteCounts.PROCESSING} />
                     <FilterButton active={filterStatus === 'PROCESSED'} onClick={() => setFilterStatus('PROCESSED')} label="답변완료 (Processed)" count={quoteCounts.PROCESSED} />
                     <FilterButton active={filterStatus === 'COMPLETED'} onClick={() => setFilterStatus('COMPLETED')} label="주문접수 (Completed)" count={quoteCounts.COMPLETED} />
-                    <div className="w-[1px] h-4 bg-slate-200 mx-1" />
+                    <div className="w-px h-4 bg-slate-200 mx-1" />
                     <button
                         onClick={() => setFilterStatus('TRASH')}
                         className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-md transition-all whitespace-nowrap ${filterStatus === 'TRASH' ? 'bg-red-50 text-red-600 shadow-sm ring-1 ring-red-200' : 'text-slate-400 hover:text-red-500'}`}
@@ -476,7 +476,7 @@ function StatusSelect({ status, onChange }: { status: string; onChange: (val: st
                 <option value="COMPLETED">주문접수 (Completed)</option>
             </select>
             {/* Simple CSS Chevron */}
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 border-t-[4px] border-t-slate-600 border-x-[3px] border-x-transparent" />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 border-t-4 border-t-slate-600 border-x-[3px] border-x-transparent" />
         </div>
     );
 }

@@ -96,8 +96,63 @@ export default function QuotationEditor() {
         contactName: '',
         phone: '',
         email: '',
-        address: ''
+        address: '',
+        bizNo: ''
     });
+
+    interface CrmCustomerOption {
+        id: string;
+        companyName: string;
+        businessNumber?: string;
+        ceo?: string;
+        contactName?: string;
+        phone?: string;
+        email?: string;
+        address?: string;
+        isDeleted?: boolean;
+    }
+
+    // CRM Auto-fill State
+    const [crmCustomers, setCrmCustomers] = useState<CrmCustomerOption[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    
+    useEffect(() => {
+        if (!user) return;
+        fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
+            headers: { 'x-requester-role': user.role || 'GUEST' }
+        })
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setCrmCustomers(data.filter((c: CrmCustomerOption) => !c.isDeleted)))
+        .catch(console.error);
+    }, [user]);
+
+    const stripCorpName = (name: string) => (name || '').replace(/[()주식회사\s]/g, '').trim();
+
+    const handleCustomerSelect = (c: CrmCustomerOption) => {
+        if (window.confirm(`[${c.companyName}]의 연락처, 이메일, 담당자 등 전체 정보를 자동으로 덮어씌울까요?\n(현대배관 등 여러 지점이 있는 업체의 경우 '취소'를 누르시면 상호명만 적용됩니다)`)) {
+            setQuotationCustomerInfo(prev => ({
+                ...prev,
+                companyName: c.companyName,
+                contactName: c.contactName || c.ceo || prev.contactName,
+                phone: c.phone || prev.phone,
+                email: c.email || prev.email,
+                address: c.address || prev.address,
+                bizNo: c.businessNumber || prev.bizNo
+            }));
+        } else {
+            setQuotationCustomerInfo(prev => ({ 
+                ...prev, 
+                companyName: c.companyName,
+                bizNo: c.businessNumber || prev.bizNo 
+            }));
+        }
+        setShowSuggestions(false);
+    };
+
+    const crmSuggestions = crmCustomers.filter(c => 
+        quotationCustomerInfo.companyName && 
+        stripCorpName(c.companyName).includes(stripCorpName(quotationCustomerInfo.companyName))
+    );
 
     // Delivery Info State
     const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
@@ -252,6 +307,7 @@ export default function QuotationEditor() {
                 tel: type === 'QUOTATION' ? quotationCustomerInfo.phone : (user?.phone || '-'),
                 email: type === 'QUOTATION' ? quotationCustomerInfo.email : (user?.email || '-'),
                 address: type === 'QUOTATION' ? quotationCustomerInfo.address : (user?.address || '-'),
+                business_no: type === 'QUOTATION' ? quotationCustomerInfo.bizNo : (user?.bizNo || '-'),
                 memo: type === 'QUOTATION' ? quotationMemo : undefined
             },
             items: docItems,
@@ -801,15 +857,45 @@ export default function QuotationEditor() {
                                 <User className="w-4 h-4 text-teal-600" />
                                 견적 요청자 정보 (발송 시 적용됨)
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="space-y-1">
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+                                <div className="space-y-1 relative">
                                     <label className="text-xs font-bold text-slate-500">회사/기관명</label>
                                     <input
                                         type="text"
                                         value={quotationCustomerInfo.companyName}
-                                        onChange={e => setQuotationCustomerInfo(p => ({ ...p, companyName: e.target.value }))}
+                                        onChange={e => {
+                                            setQuotationCustomerInfo(p => ({ ...p, companyName: e.target.value }));
+                                            setShowSuggestions(true);
+                                        }}
+                                        onFocus={() => setShowSuggestions(true)}
+                                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                                         className="w-full text-sm py-2 px-3 border border-slate-200 rounded-lg focus:border-teal-500 outline-none"
                                         placeholder="회사명 입력"
+                                    />
+                                    {showSuggestions && quotationCustomerInfo.companyName && crmSuggestions.length > 0 && (
+                                        <div className="absolute top-full left-0 w-full bg-white border border-slate-200 shadow-xl rounded-lg mt-1 z-50 max-h-60 overflow-y-auto">
+                                            {crmSuggestions.map(c => (
+                                                <button
+                                                    key={c.id}
+                                                    type="button"
+                                                    className="w-full text-left px-3 py-2 text-sm hover:bg-teal-50 transition-colors border-b border-slate-100 last:border-0"
+                                                    onClick={() => handleCustomerSelect(c)}
+                                                >
+                                                    <span className="font-bold text-teal-800">{c.companyName}</span>
+                                                    {c.ceo && <span className="text-[10px] text-slate-400 ml-2">({c.ceo} 대표)</span>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500">사업자번호</label>
+                                    <input
+                                        type="text"
+                                        value={quotationCustomerInfo.bizNo}
+                                        onChange={e => setQuotationCustomerInfo(p => ({ ...p, bizNo: e.target.value }))}
+                                        className="w-full text-sm py-2 px-3 border border-slate-200 rounded-lg focus:border-teal-500 outline-none"
+                                        placeholder="***-**-*****"
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -870,7 +956,7 @@ export default function QuotationEditor() {
                             </div>
                         </motion.div>
 
-                        <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-white/50 p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-[100] flex items-center justify-between">
+                        <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-white/50 p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-100 flex items-center justify-between">
                             <div className="max-w-[1400px] mx-auto w-full flex items-center justify-end gap-3 px-4">
                                 {selectedIds.length > 0 && (
                                     <Button

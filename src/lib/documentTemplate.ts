@@ -315,6 +315,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 <div class="box">
                     <h3>공급받는자 (Customer)</h3>
                     <div class="row"><span class="label">상호</span><span class="value">${customer.company_name || '-'}</span></div>
+                    ${customer.business_no ? `<div class="row"><span class="label">사업자번호</span><span class="value">${customer.business_no}</span></div>` : ''}
                     <div class="row"><span class="label">담당자</span><span class="value">${customer.contact_name || '-'}</span></div>
                     ${customer.tel ? `<div class="row"><span class="label">연락처</span><span class="value">${customer.tel}</span></div>` : ''}
                     ${customer.email ? `<div class="row"><span class="label">이메일</span><span class="value">${customer.email}</span></div>` : ''}
@@ -450,6 +451,15 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             })()}
                 ` : `
                     ${(() => {
+            if (document_type === 'QUOTATION') {
+                return `
+                            <div style="margin-bottom: 12px;">
+                                <span class="delivery-title">견적 유효기간 (Validity)</span>
+                                <div class="delivery-content" style="font-weight:700; color:#e11d48;">견적유효기간은 발신일로 부터 1주일이내 입니다.</div>
+                            </div>
+                `;
+            }
+
             // Estimated Delivery Logic
             // [MOD] Hide Estimated Delivery if Confirmed Delivery exists or if it's a Transaction Statement or Packing List
             if (isTransaction || isPackingList || meta.delivery_date) return '';
@@ -473,9 +483,9 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
         })()}
                     ${meta.delivery_date ? `
                             <div style="margin-bottom: 12px;">
-                                <span class="delivery-title" style="color:#0f766e;">${isTransaction ? '출고일자 (Shipment Date)' : '확정 납기 (Confirmed Delivery)'}</span>
+                                <span class="delivery-title" style="color:#0f766e;">${isTransaction ? '출고일자 (Shipment Date)' : (document_type === 'QUOTATION' ? '납품 가능일 (Delivery Date)' : '확정 납기 (Confirmed Delivery)')}</span>
                                 <div class="delivery-content" style="font-weight:800; color:#0f766e; font-size: 14px;">
-                                    ${new Date(meta.delivery_date).toLocaleDateString()}
+                                    ${/^\\d{4}-\\d{2}-\\d{2}/.test(meta.delivery_date) ? new Date(meta.delivery_date).toLocaleDateString() : meta.delivery_date}
                                 </div>
                             </div>
                     ` : ''}

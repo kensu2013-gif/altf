@@ -18,6 +18,8 @@ interface Customer {
     isDeleted?: boolean;
 }
 
+export const stripCorp = (name: string) => (name || '').replace(/\(주\)|주식회사|\s/g, '').trim();
+
 export default function Customers() {
     const user = useStore(state => state.auth.user);
     const orders = useStore(state => state.orders);
@@ -164,8 +166,22 @@ export default function Customers() {
                 (c.contactName && c.contactName.toLowerCase().includes(low))
             );
         }
-        return list;
-    }, [searchTerm, selectedRegion, customersList]);
+        
+        // 주문 빈도수 계산
+        const freqs: Record<string, number> = {};
+        orders.forEach(o => {
+            if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN') return;
+            const stripped = stripCorp(o.customerName);
+            freqs[stripped] = (freqs[stripped] || 0) + 1;
+        });
+
+        // 빈도수가 높은 업체를 위로 정렬
+        return [...list].sort((a, b) => {
+            const freqA = freqs[stripCorp(a.companyName)] || 0;
+            const freqB = freqs[stripCorp(b.companyName)] || 0;
+            return freqB - freqA;
+        });
+    }, [searchTerm, selectedRegion, customersList, orders]);
 
     const stats = useMemo(() => {
         return {
@@ -183,7 +199,7 @@ export default function Customers() {
         orders.forEach(o => {
             if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN') return;
             
-            const customer = customersList.find(c => c.companyName === o.customerName);
+            const customer = customersList.find(c => stripCorp(c.companyName) === stripCorp(o.customerName));
             const region = customer?.region || 'CRM 미등록/예외';
             
             if (!regionMap[region]) {
@@ -279,25 +295,25 @@ export default function Customers() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl p-5 shadow-lg text-white flex flex-col relative overflow-hidden group">
+                        <div className="bg-linear-to-br from-indigo-500 to-indigo-700 rounded-2xl p-5 shadow-lg text-white flex flex-col relative overflow-hidden group">
                             <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-10 transform group-hover:scale-110 transition-transform"><Building2 className="w-24 h-24" /></div>
                             <h3 className="font-bold flex items-center gap-2 opacity-90"><Users className="w-4 h-4"/>총 거래망 유지</h3>
                             <p className="text-4xl font-black mt-2 z-10">{stats.total}<span className="text-lg font-bold opacity-80 ml-1">업체</span></p>
                         </div>
 
-                        <div className="bg-gradient-to-br from-teal-500 to-emerald-600 rounded-2xl p-5 shadow-lg text-white flex flex-col relative overflow-hidden group">
+                        <div className="bg-linear-to-br from-teal-500 to-emerald-600 rounded-2xl p-5 shadow-lg text-white flex flex-col relative overflow-hidden group">
                             <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-10 transform group-hover:scale-110 transition-transform"><MapPin className="w-24 h-24" /></div>
                             <h3 className="font-bold flex items-center gap-2 opacity-90"><MapPin className="w-4 h-4"/>경기도권 (시화 배송망)</h3>
                             <p className="text-4xl font-black mt-2 z-10">{stats['경기도']}<span className="text-lg font-bold opacity-80 ml-1">업체</span></p>
                         </div>
 
-                        <div className="bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl p-5 shadow-lg text-white flex flex-col relative overflow-hidden group">
+                        <div className="bg-linear-to-br from-sky-500 to-blue-600 rounded-2xl p-5 shadow-lg text-white flex flex-col relative overflow-hidden group">
                             <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-10 transform group-hover:scale-110 transition-transform"><MapPin className="w-24 h-24" /></div>
                             <h3 className="font-bold flex items-center gap-2 opacity-90"><MapPin className="w-4 h-4"/>경상도권 (부산 배송망)</h3>
                             <p className="text-4xl font-black mt-2 z-10">{stats['경상도']}<span className="text-lg font-bold opacity-80 ml-1">업체</span></p>
                         </div>
 
-                        <div className="bg-gradient-to-br from-slate-600 to-slate-800 rounded-2xl p-5 shadow-lg text-white flex flex-col relative overflow-hidden group">
+                        <div className="bg-linear-to-br from-slate-600 to-slate-800 rounded-2xl p-5 shadow-lg text-white flex flex-col relative overflow-hidden group">
                             <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-10 transform group-hover:scale-110 transition-transform"><Activity className="w-24 h-24" /></div>
                             <h3 className="font-bold flex items-center gap-2 opacity-90"><TrendingUp className="w-4 h-4"/>충청/전라/강원 기타</h3>
                             <p className="text-4xl font-black mt-2 z-10">{stats.etc}<span className="text-lg font-bold opacity-80 ml-1">업체</span></p>
@@ -335,9 +351,9 @@ export default function Customers() {
                             <table className="w-full text-left text-sm whitespace-nowrap">
                                 <thead className="bg-slate-100/80 text-slate-600 font-bold border-b border-slate-200">
                                     <tr>
-                                        <th className="px-5 py-3">속령 (지점)</th>
+                                        <th className="px-5 py-3">지역구분</th>
                                         <th className="px-5 py-3">업체명 (대표자)</th>
-                                        <th className="px-5 py-3">무결성 체크</th>
+                                        <th className="px-5 py-3">사업자 번호</th>
                                         <th className="px-5 py-3">배송/주소지</th>
                                         <th className="px-5 py-3">연락처/담당망</th>
                                         <th className="px-5 py-3 text-center">관리</th>
@@ -351,12 +367,14 @@ export default function Customers() {
                                         return (
                                         <tr key={c.id} className="hover:bg-slate-50 transition-colors group">
                                             <td className="px-5 py-3 font-medium">
-                                                {c.region === '경기도' ? (
-                                                    <span className="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full text-xs font-bold">경기도권</span>
-                                                ) : c.region === '경상도' ? (
-                                                    <span className="bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full text-xs font-bold">경상도권</span>
-                                                ) : (
-                                                    <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full text-xs font-bold">{c.region}</span>
+                                                {c.region === '경기도' && <span className="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full text-xs font-bold">경기도권</span>}
+                                                {c.region === '경상도' && <span className="bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full text-xs font-bold">경상도권</span>}
+                                                {c.region === '충청도' && <span className="bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full text-xs font-bold">충청도권</span>}
+                                                {c.region === '전라도' && <span className="bg-rose-100 text-rose-700 px-2.5 py-1 rounded-full text-xs font-bold">전라도권</span>}
+                                                {c.region === '강원도' && <span className="bg-cyan-100 text-cyan-700 px-2.5 py-1 rounded-full text-xs font-bold">강원도권</span>}
+                                                {c.region === '제주도' && <span className="bg-fuchsia-100 text-fuchsia-700 px-2.5 py-1 rounded-full text-xs font-bold">제주도권</span>}
+                                                {!['경기도', '경상도', '충청도', '전라도', '강원도', '제주도'].includes(c.region || '') && (
+                                                    <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full text-xs font-bold">{c.region || '미분류'}</span>
                                                 )}
                                             </td>
                                             <td className="px-5 py-3 font-bold text-slate-800">{c.companyName} <span className="text-[10px] text-slate-400 font-normal ml-1">({c.ceo || '-'})</span></td>
@@ -456,7 +474,7 @@ export default function Customers() {
                                                     <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{qty}본</span>
                                                 </li>
                                             ))}
-                                            {reg.topItems.length === 0 && <span className="text-slate-400 text-sm">판매된 아이템이 없습니다.</span>}
+                                            {reg.topItems.length === 0 && <li className="text-slate-400 text-sm">판매된 아이템이 없습니다.</li>}
                                         </ul>
                                     </div>
                                     {reg.region === 'CRM 미등록/예외' && reg.missingArray.length > 0 && (

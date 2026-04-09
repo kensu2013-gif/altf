@@ -44,6 +44,16 @@ export default function AdminLayout() {
         localStorage.setItem('altfAdminSidebar', String(isSidebarOpen));
     }, [isSidebarOpen]);
 
+    // [MOD] Auto-collapse sidebar when navigating to Quote Management (/admin/quotes) to save space
+    // Using render-phase state update to avoid cascading re-renders (Fixes ESLint warning)
+    const [prevPathname, setPrevPathname] = useState(location.pathname);
+    if (location.pathname !== prevPathname) {
+        setPrevPathname(location.pathname);
+        if (location.pathname === '/admin/quotes') {
+            setSidebarOpen(false);
+        }
+    }
+
     // [MOD] Ensure inventory is loaded/validated when accessing Admin Panel
     useInventory();
 
@@ -136,7 +146,7 @@ export default function AdminLayout() {
                             `}
                         >
                             <div className="flex items-center gap-3 w-full justify-center md:justify-start">
-                                <div className="relative flex-shrink-0">
+                                <div className="relative shrink-0">
                                     <span className={`flex items-center justify-center transition-all ${isSidebarOpen ? 'text-xl w-6 h-6' : 'text-2xl w-8 h-8'}`}>
                                         {item.emoji}
                                     </span>
@@ -163,7 +173,7 @@ export default function AdminLayout() {
                         onClick={handleLogout}
                         className="flex items-center gap-3 w-full px-4 py-2 text-rose-400 hover:text-rose-300 hover:bg-slate-800 rounded-lg transition-colors"
                     >
-                        <span className={`flex items-center justify-center flex-shrink-0 transition-all ${isSidebarOpen ? 'text-xl w-6 h-6' : 'text-2xl w-8 h-8 mx-auto'}`}>
+                        <span className={`flex items-center justify-center shrink-0 transition-all ${isSidebarOpen ? 'text-xl w-6 h-6' : 'text-2xl w-8 h-8 mx-auto'}`}>
                             🚪
                         </span>
                         {isSidebarOpen && <span className="text-sm font-medium">로그아웃</span>}
