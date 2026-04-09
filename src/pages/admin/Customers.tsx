@@ -34,7 +34,7 @@ export default function Customers() {
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    setCustomersList(data.filter((c: any) => !c.isDeleted));
+                    setCustomersList(data.filter((c: Customer) => !c.isDeleted));
                 }
             } catch (e) {
                 console.error(e);
