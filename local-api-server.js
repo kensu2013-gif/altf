@@ -21,7 +21,8 @@ let db = {
     quotations: [],
     orders: [],
     loginLogs: [],
-    inventoryHistory: []
+    inventoryHistory: [],
+    customers: []
 };
 
 // Load Data
@@ -34,7 +35,21 @@ async function loadData() {
             db.orders = json.orders || [];
             db.loginLogs = json.loginLogs || [];
             db.inventoryHistory = json.inventoryHistory || [];
-            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.loginLogs.length} logs, ${db.inventoryHistory.length} history records`);
+            db.customers = json.customers || [];
+            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.loginLogs.length} logs, ${db.inventoryHistory.length} history, ${db.customers.length} customers`);
+            
+            // Seed Customers if empty
+            if (db.customers.length === 0) {
+                try {
+                    const fs = await import('fs');
+                    const initData = fs.readFileSync('./src/data/customers_init.json', 'utf8');
+                    db.customers = JSON.parse(initData);
+                    console.log(`[API] DB Customers was empty. Seeded ${db.customers.length} from local init file.`);
+                    await saveData();
+                } catch (e) {
+                    console.log(`[API] Failed to seed customers mapping: ${e.message}`);
+                }
+            }
         } else {
             // Seed Initial Admin if file doesn't exist
             db.users = [
@@ -817,15 +832,8 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(403);
             return res.end(JSON.stringify({ error: 'Forbidden' }));
         }
-        try {
-            const fs = await import('fs');
-            const data = fs.readFileSync('./data/customers.json', 'utf8');
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(data);
-        } catch (e) {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end('[]');
-        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(db.customers || []));
         return;
     }
 
@@ -842,18 +850,12 @@ const server = http.createServer(async (req, res) => {
         req.on('end', async () => {
             try {
                 const updates = JSON.parse(body);
-                const fs = await import('fs');
-                let customers = [];
-                try {
-                    customers = JSON.parse(fs.readFileSync('./data/customers.json', 'utf8'));
-                } catch (e) {}
-
-                const index = customers.findIndex(c => c.id === id);
+                const index = (db.customers || []).findIndex(c => c.id === id);
                 if (index !== -1) {
-                    customers[index] = { ...customers[index], ...updates };
-                    fs.writeFileSync('./data/customers.json', JSON.stringify(customers, null, 2));
+                    db.customers[index] = { ...db.customers[index], ...updates };
+                    await saveData();
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(customers[index]));
+                    res.end(JSON.stringify(db.customers[index]));
                 } else {
                     res.writeHead(404);
                     res.end(JSON.stringify({ error: 'Not found' }));
