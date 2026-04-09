@@ -1,68 +1,27 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { useInventory } from '../../hooks/useInventory';
 import { 
     Factory, 
-    CalendarDays, 
     TrendingUp, 
     AlertTriangle,
-    PackageSearch,
     Box,
-    History,
     BrainCircuit,
     ChevronDown,
     ChevronRight,
     Activity
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
-import type { Product } from '../../types';
+
 import salesHistoryRaw from '../../data/sales_history.json';
 
 const salesHistory = salesHistoryRaw as Record<string, { salesVolume: number, salesFreq: number }>;
 
-// Helper: Format currency
-const formatCur = (num: number) => new Intl.NumberFormat('ko-KR').format(num);
-
-// Helper: Calculate Selling Price based on item rules
-const calculateSellingPrice = (id: string, basePrice: number): number => {
-    const upperId = id.toUpperCase();
-    if (upperId.startsWith('CAP') || upperId.endsWith('-W')) {
-        return Math.round((basePrice * 35 / 100) / 10) * 10;
-    } else if (upperId.endsWith('-S')) {
-        return Math.round((basePrice * 65 / 100) / 10) * 10;
-    }
-    return basePrice;
-};
-
-// Helper: Calculate Fallback Purchase Price based on item rules
-const calculateFallbackPurchasePrice = (id: string, basePrice: number): number => {
-    const upperId = id.toUpperCase();
-    if (upperId.endsWith('-S') && !upperId.startsWith('CAP')) {
-        return Math.round((basePrice * 55 / 100) / 10) * 10;
-    } else {
-        return Math.round((basePrice * 28 / 100) / 10) * 10;
-    }
-};
-
-interface InventoryDiffItem {
-    name: string;
-    from: number;
-    to: number;
-    change: number;
-}
-
-interface InventoryHistorySnapshot {
-    date: string;
-    diff: InventoryDiffItem[];
-    stock?: Record<string, { name: string; stock: number }>;
-}
+// Helpers removed (unused in Tableau view)
 
 export default function SihwaInventory() {
-    const { orders, user } = useStore(useShallow(state => ({ orders: state.orders, user: state.auth.user })));
+    const { user } = useStore(useShallow(state => ({ user: state.auth.user })));
     const { inventory, isLoading: invLoading } = useInventory();
-    
-    const [historyData, setHistoryData] = useState<InventoryHistorySnapshot[]>([]);
-    const [historyLoading, setHistoryLoading] = useState(true);
     
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState<'AI' | 'ALL'>('AI');
@@ -75,137 +34,7 @@ export default function SihwaInventory() {
         setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
-    // 1. Fetch History Data from the local-api-server
-    useEffect(() => {
-        const fetchHistory = async () => {
-            try {
-                const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/admin/inventory-history', {
-                    headers: { 'x-requester-role': 'admin' }
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    setHistoryData(data);
-                }
-            } catch (err) {
-                console.error('Failed to fetch inventory history:', err);
-            } finally {
-                setHistoryLoading(false);
-            }
-        };
-        fetchHistory();
-    }, []);
-
-    // 1.5 Fetch Orders to sync with inventory
-    const setOrders = useStore(state => state.setOrders);
-    useEffect(() => {
-        if (!user) return;
-
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json'
-        };
-        if (user.id) headers['x-requester-id'] = user.id;
-        if (user.role) headers['x-requester-role'] = user.role;
-
-        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`;
-
-        let lastFetchTime = 0;
-        const fetchOrders = () => {
-            const now = Date.now();
-            if (now - lastFetchTime < 20000) return; // 20초 간격 쓰로틀링
-            lastFetchTime = now;
-            fetch(endpoint, { headers, cache: 'no-store' })
-                .then(res => {
-                    if (res.ok) return res.json();
-                    throw new Error('Failed to fetch orders');
-                })
-                .then(data => {
-                    if (Array.isArray(data)) setOrders(data);
-                })
-                .catch(console.error);
-        };
-
-        fetchOrders();
-    }, [setOrders, user]);
-
-    // Filter out irrelevant orders
-    const activeOrders = useMemo(() => {
-        return orders.filter(order => !['CANCELLED', 'WITHDRAWN'].includes(order.status) && !order.isDeleted);
-    }, [orders]);
-
-    const sihwaOrders = useMemo(() => {
-        return activeOrders.filter(order => {
-            const displayCustomer = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase();
-            const normalizedCustomer = displayCustomer.replace(/\s+/g, '');
-            return normalizedCustomer.includes('재고') || 
-                   normalizedCustomer.includes('서울') || 
-                   normalizedCustomer.includes('시화') || 
-                   normalizedCustomer.includes('에스제이엔브이') || 
-                   normalizedCustomer.includes('sjnv') || 
-                   normalizedCustomer.includes('알트에프') || 
-                   normalizedCustomer.includes('altf');
-        });
-    }, [activeOrders]);
-
-    // Split into Monthly Buckets
-    const currentMonthPrefix = new Date().toISOString().slice(0, 7);
-    const [selectedMonth, setSelectedMonth] = useState(currentMonthPrefix);
-
-    const availableMonths = useMemo(() => {
-        const months = new Set<string>();
-        sihwaOrders.forEach(o => {
-            const m = new Date(o.createdAt).toISOString().slice(0, 7);
-            months.add(m);
-        });
-        months.add(currentMonthPrefix);
-        return Array.from(months).sort().reverse();
-    }, [sihwaOrders, currentMonthPrefix]);
-
-    const inventoryMap = useMemo(() => {
-        const map = new Map<string, Partial<Product> & { id: string }>();
-        inventory.forEach((p: Product) => map.set(p.id, p));
-        return map;
-    }, [inventory]);
-
-    const monthData = useMemo(() => {
-        const monthlyOrders = sihwaOrders.filter(o => new Date(o.createdAt).toISOString().slice(0, 7) === selectedMonth);
-        
-        let completedCost = 0;
-        let pendingCost = 0;
-        let completedCount = 0;
-        let pendingCount = 0;
-
-        monthlyOrders.forEach(o => {
-            const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
-            
-            items.forEach(item => {
-                const id = item.productId || (item as { item_id?: string }).item_id || '';
-                const product = inventoryMap.get(id);
-                const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
-                let cost = 0;
-                if (item.supplierRate !== undefined) {
-                    cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
-                } else if (product) {
-                    const rate = product.rate_act2 ?? product.rate_act ?? product.rate_pct ?? 0;
-                    cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
-                }
-                const itemQty = Number(item.quantity ?? item.qty ?? 0);
-                
-                if (o.status === 'COMPLETED' || item.transactionIssued) {
-                    completedCost += (cost * itemQty);
-                } else {
-                    pendingCost += (cost * itemQty);
-                }
-            });
-
-            if (o.status === 'COMPLETED' || (items.length > 0 && items.every(i => i.transactionIssued))) {
-                completedCount++;
-            } else {
-                pendingCount++;
-            }
-        });
-
-        return { completedCost, pendingCost, completedCount, pendingCount, orders: monthlyOrders };
-    }, [sihwaOrders, selectedMonth, inventoryMap]);
+    // Removed unused orders fetch and maps
 
     // 4. Smart Stock Intelligence Mapper
     const analyzedInventory = useMemo(() => {
