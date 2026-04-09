@@ -809,6 +809,64 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // --- CUSTOMERS (CRM) APIs ---
+    // GET /api/customers
+    if (req.method === 'GET' && url.pathname === '/api/customers') {
+        const requesterRole = req.headers['x-requester-role'];
+        if (requesterRole !== 'MASTER' && requesterRole !== 'admin') {
+            res.writeHead(403);
+            return res.end(JSON.stringify({ error: 'Forbidden' }));
+        }
+        try {
+            const fs = await import('fs');
+            const data = fs.readFileSync('./data/customers.json', 'utf8');
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(data);
+        } catch (e) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end('[]');
+        }
+        return;
+    }
+
+    // PATCH /api/customers/:id
+    if (req.method === 'PATCH' && url.pathname.startsWith('/api/customers/')) {
+        const requesterRole = req.headers['x-requester-role'];
+        if (requesterRole !== 'MASTER' && requesterRole !== 'admin') {
+            res.writeHead(403);
+            return res.end(JSON.stringify({ error: 'Forbidden' }));
+        }
+        const id = url.pathname.split('/').pop();
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const updates = JSON.parse(body);
+                const fs = await import('fs');
+                let customers = [];
+                try {
+                    customers = JSON.parse(fs.readFileSync('./data/customers.json', 'utf8'));
+                } catch (e) {}
+
+                const index = customers.findIndex(c => c.id === id);
+                if (index !== -1) {
+                    customers[index] = { ...customers[index], ...updates };
+                    fs.writeFileSync('./data/customers.json', JSON.stringify(customers, null, 2));
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(customers[index]));
+                } else {
+                    res.writeHead(404);
+                    res.end(JSON.stringify({ error: 'Not found' }));
+                }
+            } catch (e) {
+                console.error('[API] Error updating customer:', e);
+                res.writeHead(500);
+                res.end(JSON.stringify({ error: 'Server Error' }));
+            }
+        });
+        return;
+    }
+
     // --- MY PAGE APIs ---
 
     // POST /api/my/quotations (Save Quotation)

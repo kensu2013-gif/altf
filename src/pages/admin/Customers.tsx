@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
-import { Users, MapPin, Building2, TrendingUp, Search, Contact, Activity } from 'lucide-react';
-import rawCustomers from '../../data/customers.json';
+import { useState, useMemo, useEffect } from 'react';
+import { Users, MapPin, Building2, TrendingUp, Search, Contact, Activity, AlertTriangle, Trash2 } from 'lucide-react';
+import { useStore } from '../../store/useStore';
 
 interface Customer {
     id: string;
@@ -15,19 +15,62 @@ interface Customer {
     contactName: string;
     phone: string;
     email: string;
+    isDeleted?: boolean;
 }
 
-const customersList = rawCustomers as Customer[];
-
 export default function Customers() {
+    const user = useStore(state => state.auth.user);
+    const [customersList, setCustomersList] = useState<Customer[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
+
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
+                    headers: {
+                        'x-requester-role': user?.role || 'GUEST'
+                    }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setCustomersList(data.filter((c: any) => !c.isDeleted));
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        };
+        load();
+    }, [user?.role]);
+
+    const handleDelete = async (id: string, companyName: string) => {
+        if (!window.confirm(`[${companyName}]을(를) 삭제하시겠습니까?\n이 작업은 취소할 수 없습니다.`)) return;
+        
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers/${id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-requester-role': user?.role || 'GUEST'
+                },
+                body: JSON.stringify({ isDeleted: true })
+            });
+            if (res.ok) {
+                setCustomersList(prev => prev.filter(c => c.id !== id));
+            } else {
+                alert('삭제 권한이 없거나 실패했습니다.');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('삭제 중 오류가 발생했습니다.');
+        }
+    };
 
     const regions = useMemo(() => {
         const set = new Set<string>();
         customersList.forEach(c => c.region && set.add(c.region));
         return Array.from(set).sort();
-    }, []);
+    }, [customersList]);
 
     const filtered = useMemo(() => {
         let list = customersList;
@@ -43,16 +86,26 @@ export default function Customers() {
             );
         }
         return list;
-    }, [searchTerm, selectedRegion]);
+    }, [searchTerm, selectedRegion, customersList]);
 
     const stats = useMemo(() => {
         return {
             total: customersList.length,
-            "s 수도권": customersList.filter(c => c.region === '수도권(시화권)').length,
-            "b 부산권": customersList.filter(c => c.region === '부산/경남권').length,
-            etc: customersList.filter(c => c.region !== '수도권(시화권)' && c.region !== '부산/경남권').length
+            "경기도": customersList.filter(c => c.region === '경기도').length,
+            "경상도": customersList.filter(c => c.region === '경상도').length,
+            etc: customersList.filter(c => c.region !== '경기도' && c.region !== '경상도').length
         };
-    }, []);
+    }, [customersList]);
+
+    if (user?.role !== 'MASTER') {
+        return (
+            <div className="flex flex-col items-center justify-center h-full pt-20 text-slate-500">
+                <AlertTriangle className="w-16 h-16 text-rose-500 mb-4" />
+                <h1 className="text-2xl font-bold text-slate-800">접근 권한 없음</h1>
+                <p className="mt-2">알트에프 거래처(CRM) 원장 관리는 MASTER 권한만 접근할 수 있습니다.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20">
@@ -60,10 +113,10 @@ export default function Customers() {
                 <div>
                     <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
                         <Users className="w-7 h-7 text-indigo-600" />
-                        지역별 전사 거래처 (CRM) 분석망
+                        지역별 전사 거래처 (CRM) 마스터 관리
                     </h1>
                     <p className="text-slate-500 text-[15px] mt-1 tracking-tight">
-                        지역별 거래처 밀집도와 배송 현황을 분석하여 신규 물류 창고 및 직배송 라인업 전략을 수립합니다.
+                        지역별 8도 세분화 현황 확인 및 거래처 연락처/사업자번호 무결성 확보 시스템입니다.
                     </p>
                 </div>
             </div>
@@ -81,8 +134,8 @@ export default function Customers() {
                     <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-10 transform group-hover:scale-110 transition-transform">
                         <MapPin className="w-24 h-24" />
                     </div>
-                    <h3 className="font-bold flex items-center gap-2 opacity-90"><MapPin className="w-4 h-4"/>수도권 (시화권) 베이스</h3>
-                    <p className="text-4xl font-black mt-2 z-10">{stats['s 수도권']}<span className="text-lg font-bold opacity-80 ml-1">업체</span></p>
+                    <h3 className="font-bold flex items-center gap-2 opacity-90"><MapPin className="w-4 h-4"/>경기도권 (시화 배송망)</h3>
+                    <p className="text-4xl font-black mt-2 z-10">{stats['경기도']}<span className="text-lg font-bold opacity-80 ml-1">업체</span></p>
                     <p className="text-sm opacity-80 mt-1">Sihwa 직배송 라우팅 거점</p>
                 </div>
 
@@ -90,8 +143,8 @@ export default function Customers() {
                     <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-10 transform group-hover:scale-110 transition-transform">
                         <MapPin className="w-24 h-24" />
                     </div>
-                    <h3 className="font-bold flex items-center gap-2 opacity-90"><MapPin className="w-4 h-4"/>부산/경남/울산 베이스</h3>
-                    <p className="text-4xl font-black mt-2 z-10">{stats['b 부산권']}<span className="text-lg font-bold opacity-80 ml-1">업체</span></p>
+                    <h3 className="font-bold flex items-center gap-2 opacity-90"><MapPin className="w-4 h-4"/>경상도권 (부산 배송망)</h3>
+                    <p className="text-4xl font-black mt-2 z-10">{stats['경상도']}<span className="text-lg font-bold opacity-80 ml-1">업체</span></p>
                     <p className="text-sm opacity-80 mt-1">Busan 메인 물류망</p>
                 </div>
 
@@ -99,7 +152,7 @@ export default function Customers() {
                     <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-10 transform group-hover:scale-110 transition-transform">
                         <Activity className="w-24 h-24" />
                     </div>
-                    <h3 className="font-bold flex items-center gap-2 opacity-90"><TrendingUp className="w-4 h-4"/>기타 (충청/전라 등)</h3>
+                    <h3 className="font-bold flex items-center gap-2 opacity-90"><TrendingUp className="w-4 h-4"/>충청/전라/강원 외 기타</h3>
                     <p className="text-4xl font-black mt-2 z-10">{stats.etc}<span className="text-lg font-bold opacity-80 ml-1">업체</span></p>
                     <p className="text-sm opacity-80 mt-1">택배 및 화물 조달 거점</p>
                 </div>
@@ -108,7 +161,7 @@ export default function Customers() {
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
                     <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-600 mr-2">지역 필터링:</span>
+                        <span className="font-bold text-slate-600 mr-2">지역(8도) 필터링:</span>
                         <select 
                             title="지역 필터링"
                             aria-label="지역 필터링"
@@ -137,41 +190,70 @@ export default function Customers() {
                     <table className="w-full text-left text-sm whitespace-nowrap">
                         <thead className="bg-slate-100/80 text-slate-600 font-bold border-b border-slate-200">
                             <tr>
-                                <th className="px-5 py-3">소속 지역 (거점망)</th>
+                                <th className="px-5 py-3">속령 (8도)</th>
                                 <th className="px-5 py-3">거래처 상호명</th>
+                                <th className="px-5 py-3">무결성 체크</th>
                                 <th className="px-5 py-3">실제 직배송 주소지</th>
-                                <th className="px-5 py-3">주요 취급 물품군</th>
-                                <th className="px-5 py-3">담당자 연락처</th>
+                                <th className="px-5 py-3">담당자 연락처 (이메일/전화)</th>
+                                <th className="px-5 py-3 text-center">관리</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {filtered.slice(0, 300).map(c => (
-                                <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                            {filtered.slice(0, 300).map(c => {
+                                const missingEmail = !c.email || c.email.trim() === '';
+                                const missingBizNo = !c.businessNumber || c.businessNumber.trim() === '';
+
+                                return (
+                                <tr key={c.id} className="hover:bg-slate-50 transition-colors group">
                                     <td className="px-5 py-3 font-medium">
-                                        {c.region === '수도권(시화권)' ? (
-                                            <span className="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full text-xs font-bold">시화권 직배물류</span>
-                                        ) : c.region === '부산/경남권' ? (
-                                            <span className="bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full text-xs font-bold">부산권 메인물류</span>
+                                        {c.region === '경기도' ? (
+                                            <span className="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full text-xs font-bold">경기도권</span>
+                                        ) : c.region === '경상도' ? (
+                                            <span className="bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full text-xs font-bold">경상도권</span>
                                         ) : (
-                                            <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full text-xs font-bold">택배/화물 조달망</span>
+                                            <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full text-xs font-bold">{c.region}</span>
                                         )}
                                     </td>
-                                    <td className="px-5 py-3 font-bold text-slate-800">{c.companyName} <span className="text-[10px] text-slate-400 font-normal ml-1">({c.ceo})</span></td>
-                                    <td className="px-5 py-3 text-slate-600 text-[13px] hover:text-indigo-600 cursor-pointer max-w-xs truncate" title={c.address}>
+                                    <td className="px-5 py-3 font-bold text-slate-800">{c.companyName} <span className="text-[10px] text-slate-400 font-normal ml-1">({c.ceo || '-'})</span></td>
+                                    <td className="px-5 py-3">
+                                        <div className="flex gap-1">
+                                            {missingBizNo ? (
+                                                <span className="bg-rose-50 text-rose-500 border border-rose-200 px-2 py-0.5 rounded text-[10px] font-bold">사업자번호 누락</span>
+                                            ) : (
+                                                <span className="text-slate-400 text-xs font-mono">{c.businessNumber}</span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="px-5 py-3 text-slate-600 text-[13px] hover:text-indigo-600 cursor-pointer max-w-[200px] truncate" title={c.address}>
                                         <MapPin className="w-3.5 h-3.5 inline mr-1 text-slate-400"/>
                                         {c.address}
                                     </td>
-                                    <td className="px-5 py-3 text-slate-500 font-medium text-xs">{c.items}</td>
                                     <td className="px-5 py-3 text-slate-700 font-bold border-l border-slate-50 bg-slate-50/50">
-                                        <div className="flex flex-col">
+                                        <div className="flex flex-col gap-0.5">
                                             <span className="flex items-center gap-1.5"><Contact className="w-3.5 h-3.5 text-indigo-400"/>{c.contactName || '미지정'} ({c.phone || '-'})</span>
+                                            {missingEmail ? (
+                                                <span className="bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded text-[10px] font-bold w-fit">이메일 누락</span>
+                                            ) : (
+                                                <span className="text-[11px] text-slate-500 font-normal ml-5">{c.email}</span>
+                                            )}
                                         </div>
                                     </td>
+                                    <td className="px-5 py-3 text-center">
+                                        <button 
+                                            onClick={() => handleDelete(c.id, c.companyName)}
+                                            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all outline-none focus:outline-none"
+                                            title="거래처 삭제 (소프트 삭제)"
+                                            aria-label="거래처 삭제"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </td>
                                 </tr>
-                            ))}
+                                )
+                            })}
                             {filtered.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="px-5 py-12 text-center text-slate-400 font-medium">
+                                    <td colSpan={6} className="px-5 py-12 text-center text-slate-400 font-medium">
                                         검색된 지역 거래처 정보가 없습니다.
                                     </td>
                                 </tr>

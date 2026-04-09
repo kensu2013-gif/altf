@@ -463,6 +463,35 @@ export default function SihwaInventory() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+            {/* AI Accuracy Confidence Metric */}
+            <div className="bg-gradient-to-r from-slate-800 to-indigo-900 rounded-2xl p-5 shadow-lg text-white flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-700/50">
+                <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full border-4 border-teal-400 border-t-transparent animate-spin-slow flex items-center justify-center relative">
+                        <div className="absolute inset-0 flex items-center justify-center text-sm font-black text-teal-400">76%</div>
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-black text-white flex items-center gap-2">
+                            AI 재고 예측 목표 신뢰도 (Accuracy)
+                            <span className="bg-amber-500 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Learning</span>
+                        </h2>
+                        <p className="text-slate-300 text-[13px] mt-1 pr-4">
+                            현재 시화재고 출고량의 대부분을 '수도권(경기) 판매'로 간주하여 분석 중입니다.<br/>
+                            <span className="text-teal-300">지역별 맞춤 CRM/주문 태깅 데이터가 누적</span>될수록 신뢰도가 95%+ 까지 향상됩니다.
+                        </p>
+                    </div>
+                </div>
+                <div className="flex flex-col gap-2 bg-black/20 p-3 rounded-xl border border-white/10 md:w-64">
+                    <div className="flex justify-between text-xs font-bold text-slate-300">
+                        <span>현재 데이터 연동률</span>
+                        <span className="text-white">76% / 100%</span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-700 rounded-full overflow-hidden">
+                        <div className="h-full bg-teal-400 w-[76%] rounded-full shadow-[0_0_10px_rgba(45,212,191,0.5)]"></div>
+                    </div>
+                    <span className="text-[10px] text-right text-slate-400">CRM 연동 + 웹 주문 활성화 대기중</span>
+                </div>
+            </div>
+
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
