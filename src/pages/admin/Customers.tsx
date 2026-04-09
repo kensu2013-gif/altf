@@ -88,14 +88,14 @@ export default function Customers() {
                 }
                 
                 // Fetch Orders to ensure BI Engine survives Hard Refresh (F5)
-                const headers: Record<string, string> = {
+                const orderHeaders: Record<string, string> = {
                     'Content-Type': 'application/json'
                 };
-                if (token) headers['Authorization'] = `Bearer ${token}`;
-                if (user?.id) headers['x-requester-id'] = user.id;
-                if (user?.role) headers['x-requester-role'] = user.role;
+                if (token) orderHeaders['Authorization'] = `Bearer ${token}`;
+                if (user?.id) orderHeaders['x-requester-id'] = user.id;
+                if (user?.role) orderHeaders['x-requester-role'] = user.role;
 
-                const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`, { headers });
+                const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`, { headers: orderHeaders });
                 if (ordersRes.ok) {
                     const ordersData = await ordersRes.json();
                     if (isMounted && Array.isArray(ordersData)) {
