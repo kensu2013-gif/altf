@@ -8,10 +8,17 @@ import {
     AlertTriangle,
     PackageSearch,
     Box,
-    History
+    History,
+    BrainCircuit,
+    ChevronDown,
+    ChevronRight,
+    Activity
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Product } from '../../types';
+import salesHistoryRaw from '../../data/sales_history.json';
+
+const salesHistory = salesHistoryRaw as Record<string, { salesVolume: number, salesFreq: number }>;
 
 // Helper: Format currency
 const formatCur = (num: number) => new Intl.NumberFormat('ko-KR').format(num);
@@ -20,10 +27,8 @@ const formatCur = (num: number) => new Intl.NumberFormat('ko-KR').format(num);
 const calculateSellingPrice = (id: string, basePrice: number): number => {
     const upperId = id.toUpperCase();
     if (upperId.startsWith('CAP') || upperId.endsWith('-W')) {
-        // 요율 65% 적용: 100% - 65% = 35%
         return Math.round((basePrice * 35 / 100) / 10) * 10;
     } else if (upperId.endsWith('-S')) {
-        // 요율 35% 적용: 100% - 35% = 65%
         return Math.round((basePrice * 65 / 100) / 10) * 10;
     }
     return basePrice;
@@ -33,10 +38,8 @@ const calculateSellingPrice = (id: string, basePrice: number): number => {
 const calculateFallbackPurchasePrice = (id: string, basePrice: number): number => {
     const upperId = id.toUpperCase();
     if (upperId.endsWith('-S') && !upperId.startsWith('CAP')) {
-        // 요율 45% 적용: 100% - 45% = 55%
         return Math.round((basePrice * 55 / 100) / 10) * 10;
     } else {
-        // 기본 요율 72% 적용: 100% - 72% = 28%
         return Math.round((basePrice * 28 / 100) / 10) * 10;
     }
 };
@@ -62,16 +65,16 @@ export default function SihwaInventory() {
     const [historyLoading, setHistoryLoading] = useState(true);
     
     const [searchTerm, setSearchTerm] = useState('');
-    const [showPendingOnly, setShowPendingOnly] = useState(false);
-    const [sortConfig, setSortConfig] = useState<{ key: 'id' | 'currentStock' | 'pendingOrderQty', direction: 'asc' | 'desc' }>({ key: 'currentStock', direction: 'desc' });
+    const [activeTab, setActiveTab] = useState<'AI' | 'ALL'>('AI');
+    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+        'CRITICAL': true,
+        'WARNING': true
+    });
 
-    const handleSort = (key: 'id' | 'currentStock' | 'pendingOrderQty') => {
-        setSortConfig(prev => ({
-            key,
-            direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
-        }));
+    const toggleGroup = (key: string) => {
+        setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
     };
-    
+
     // 1. Fetch History Data from the local-api-server
     useEffect(() => {
         const fetchHistory = async () => {
@@ -129,27 +132,22 @@ export default function SihwaInventory() {
         return orders.filter(order => !['CANCELLED', 'WITHDRAWN'].includes(order.status) && !order.isDeleted);
     }, [orders]);
 
-    // Define internal stock orders for the top dashboard
     const sihwaOrders = useMemo(() => {
         return activeOrders.filter(order => {
             const displayCustomer = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase();
             const normalizedCustomer = displayCustomer.replace(/\s+/g, '');
-            const isInternalStock = 
-                normalizedCustomer.includes('재고') || 
-                normalizedCustomer.includes('서울') || 
-                normalizedCustomer.includes('시화') || 
-                normalizedCustomer.includes('에스제이엔브이') || 
-                normalizedCustomer.includes('sjnv') || 
-                normalizedCustomer.includes('알트에프') || 
-                normalizedCustomer.includes('altf');
-            
-            // matches '서울' or '시화' as per new policy, or just general internal ALTF restock
-            return isInternalStock;
+            return normalizedCustomer.includes('재고') || 
+                   normalizedCustomer.includes('서울') || 
+                   normalizedCustomer.includes('시화') || 
+                   normalizedCustomer.includes('에스제이엔브이') || 
+                   normalizedCustomer.includes('sjnv') || 
+                   normalizedCustomer.includes('알트에프') || 
+                   normalizedCustomer.includes('altf');
         });
     }, [activeOrders]);
 
     // Split into Monthly Buckets
-    const currentMonthPrefix = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const currentMonthPrefix = new Date().toISOString().slice(0, 7);
     const [selectedMonth, setSelectedMonth] = useState(currentMonthPrefix);
 
     const availableMonths = useMemo(() => {
@@ -158,7 +156,7 @@ export default function SihwaInventory() {
             const m = new Date(o.createdAt).toISOString().slice(0, 7);
             months.add(m);
         });
-        months.add(currentMonthPrefix); // Ensure current month is always an option
+        months.add(currentMonthPrefix);
         return Array.from(months).sort().reverse();
     }, [sihwaOrders, currentMonthPrefix]);
 
@@ -209,180 +207,91 @@ export default function SihwaInventory() {
         return { completedCost, pendingCost, completedCount, pendingCount, orders: monthlyOrders };
     }, [sihwaOrders, selectedMonth, inventoryMap]);
 
-    // 3. Extract actual Purchase History for "서울재고" from all orders
-    const recentSeoulPurchaseInfoMap = useMemo(() => {
-        const pMap: Record<string, { price: number; date: string }> = {};
-        
-        // Sort orders by date ascending so that the latest (newest) order overwrites older ones
-        // or sort descending and take the first one. Let's sort descending and break/continue isn't easy here,
-        // so we'll just process ascending (oldest to newest) to let the newest win!
-        const sortedOrders = [...orders].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    // 4. Smart Stock Intelligence Mapper
+    const analyzedInventory = useMemo(() => {
+        const processedList = [];
 
-        for (const order of sortedOrders) {
-            if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) continue;
-            
-            const displayCustomer = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase();
-            const isSeoulStock = displayCustomer.includes('서울') && displayCustomer.includes('재고');
-            
-            if (isSeoulStock) {
-                const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
-                if (!items) continue;
-                
-                for (const item of items) {
-                    const itemRec = item as unknown as Record<string, unknown>;
-                    const id = item.productId || (typeof itemRec.item_id === 'string' ? itemRec.item_id : undefined);
-                    if (!id) continue;
-                    
-                    let cost = 0;
-                    const rawBasePrice = item.base_price ?? item.unitPrice ?? 0;
-                    
-                    if (item.supplierRate !== undefined) {
-                        // Apply deduction logic (like rate 72 -> unitPrice * 28%) if the order actually used it
-                        cost = Math.round((rawBasePrice * (100 - item.supplierRate) / 100) / 10) * 10;
-                    } else if (typeof itemRec.purchasePrice === 'number' && itemRec.purchasePrice > 0) {
-                        cost = itemRec.purchasePrice;
-                    } else {
-                        cost = calculateFallbackPurchasePrice(id, rawBasePrice);
-                    }
-
-                    if (cost > 0) {
-                        pMap[id] = {
-                            price: cost,
-                            date: new Date(order.createdAt).toISOString().split('T')[0]
-                        };
-                    }
-                }
-            }
-        }
-        return pMap;
-    }, [orders]);
-
-    // 4. Stock vs Pending Items Mapper
-    const inventoryComparison = useMemo(() => {
-        // Collect all items in inventory currently marked as Sihwa
-        const comparisonMap: Record<string, { product: Partial<Product> & { id: string }, currentStock: number, pendingOrderQty: number, recentPurchasePrice: number, recentPurchaseDate: string | null, sellingPrice: number }> = {};
-
-        inventory.forEach((item: Product) => {
-            // Check if Sihwa
-            let isSihwa = false;
-            let qty = 0;
+        for (const item of inventory) {
+            let shQty = 0;
+            let ysQty = 0;
 
             if (item.locationStock) {
-                for (const [key, q] of Object.entries(item.locationStock)) {
-                    if (key.includes('서울') || key.includes('시화')) {
-                        isSihwa = true;
-                        qty += Number(q);
+                if (item.locationStock['시화'] !== undefined) shQty += Number(item.locationStock['시화']);
+                if (item.locationStock['서울'] !== undefined) shQty += Number(item.locationStock['서울']);
+                if (item.locationStock['양산'] !== undefined) ysQty += Number(item.locationStock['양산']);
+                if (item.locationStock['대경'] !== undefined) ysQty += Number(item.locationStock['대경']);
+            } else {
+                if ((item.location || '').includes('시화') || (item.location || '').includes('서울')) {
+                    shQty = item.currentStock;
+                } else if ((item.location || '').includes('양산') || (item.location || '').includes('대경')) {
+                    ysQty = item.currentStock;
+                }
+            }
+
+            // Fallback for safety: if no explicit location info but stock exists, determine by default.
+            // But we trust locationStock more.
+
+            const salesData = salesHistory[item.id] || { salesVolume: 0, salesFreq: 0 };
+            const safeStock = Math.ceil((salesData.salesVolume / 12) * 1.5);
+            const deficit = safeStock - shQty;
+
+            let statusCategory = 'IDLE'; // Not much activity
+            let statusLabel = '데이터 없음';
+
+            if (salesData.salesVolume > 0) {
+                if (shQty <= 0) {
+                    if (ysQty <= 0) {
+                        statusCategory = 'CRITICAL';
+                        statusLabel = '🚨 선발주 요망 (매입처 결품)';
+                    } else {
+                        statusCategory = 'WARNING';
+                        statusLabel = '⚠️ 발주 필요 (매입처 구매)';
                     }
-                }
-            } else if ((item.location || '').includes('시화') || (item.location || '').includes('서울')) {
-                isSihwa = true;
-                qty = item.currentStock;
-            }
-
-            if (isSihwa && qty > 0) {
-                const basePrice = item.base_price ?? item.unitPrice ?? 0;
-                const recentInfo = recentSeoulPurchaseInfoMap[item.id];
-                comparisonMap[item.id] = {
-                    product: item,
-                    currentStock: qty,
-                    pendingOrderQty: 0,
-                    recentPurchasePrice: recentInfo ? recentInfo.price : calculateFallbackPurchasePrice(item.id, basePrice),
-                    recentPurchaseDate: recentInfo ? recentInfo.date : null,
-                    sellingPrice: calculateSellingPrice(item.id, basePrice)
-                };
-            }
-        });
-
-        // Add Pending Order Qty
-        sihwaOrders.filter(o => o.status !== 'COMPLETED').forEach(order => {
-            const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
-            items.forEach(item => {
-                if (item.transactionIssued) return; // 미결에서 처리 완료(입고 완료)된 항목은 대기 수량에서 제외
-
-                const id = item.productId || (item as { item_id?: string }).item_id || 'UNKNOWN';
-                
-                let rawBasePrice = item.base_price ?? item.unitPrice ?? 0;
-                const product = inventoryMap.get(id);
-                if (product) {
-                    rawBasePrice = item.base_price ?? product.base_price ?? product.unitPrice ?? 0;
-                }
-
-                const finalSellingPrice = calculateSellingPrice(id, rawBasePrice);
-                const recentInfo = recentSeoulPurchaseInfoMap[id];
-                const actualCost = recentInfo ? recentInfo.price : calculateFallbackPurchasePrice(id, rawBasePrice);
-                const actualDate = recentInfo ? recentInfo.date : null;
-
-                const addQty = Number(item.quantity ?? item.qty ?? 0);
-
-                if (!comparisonMap[id]) {
-                    comparisonMap[id] = {
-                        product: product || { id, name: item.name || item.item_name || '미등록 상품', stockStatus: 'OUT_OF_STOCK' },
-                        currentStock: 0,
-                        pendingOrderQty: addQty,
-                        recentPurchasePrice: actualCost,
-                        recentPurchaseDate: actualDate,
-                        sellingPrice: finalSellingPrice
-                    };
+                } else if (shQty < safeStock) {
+                    statusCategory = 'WARNING';
+                    statusLabel = '⚠️ 안전재고 미달 (발주 필요)';
                 } else {
-                    comparisonMap[id].pendingOrderQty += addQty;
-                    comparisonMap[id].recentPurchasePrice = actualCost; // Overwrite with latest cost
-                    comparisonMap[id].recentPurchaseDate = actualDate;
-                    comparisonMap[id].sellingPrice = finalSellingPrice;
+                    statusCategory = 'SAFE';
+                    statusLabel = '✅ 적정 유지중';
                 }
+            } else if (shQty > 0 || ysQty > 0) {
+                 statusCategory = 'SAFE';
+                 statusLabel = '✅ 판매미비 (보유중)';
+            }
+
+            processedList.push({
+                product: item,
+                shQty,
+                ysQty,
+                ...salesData,
+                safeStock,
+                deficit: deficit > 0 ? deficit : 0,
+                statusCategory,
+                statusLabel
             });
-        });
+        }
 
-        let result = Object.values(comparisonMap);
-        
+        // Apply Search Term
+        let filtered = processedList;
         if (searchTerm) {
-            const lowerSearch = searchTerm.toLowerCase();
-            result = result.filter(r => r.product.id.toLowerCase().includes(lowerSearch));
+            const lowerQuery = searchTerm.toLowerCase();
+            filtered = processedList.filter(row => 
+                row.product.id.toLowerCase().includes(lowerQuery) || 
+                (row.product.name && row.product.name.toLowerCase().includes(lowerQuery))
+            );
         }
 
-        if (showPendingOnly) {
-            result = result.filter(r => r.pendingOrderQty > 0 || r.currentStock <= 0);
-        }
+        return filtered.sort((a, b) => b.salesFreq - a.salesFreq || b.salesVolume - a.salesVolume);
+    }, [inventory, searchTerm]);
 
-        return result.sort((a, b) => {
-            const isStubA = a.product.id.toLowerCase().includes('stubend');
-            const isStubB = b.product.id.toLowerCase().includes('stubend');
-            
-            if (isStubA && !isStubB) return 1;
-            if (!isStubA && isStubB) return -1;
-
-            const dir = sortConfig.direction === 'asc' ? 1 : -1;
-            if (sortConfig.key === 'id') {
-                return a.product.id.localeCompare(b.product.id) * dir;
-            }
-            if (sortConfig.key === 'currentStock') {
-                return (a.currentStock - b.currentStock) * dir;
-            }
-            if (sortConfig.key === 'pendingOrderQty') {
-                return (a.pendingOrderQty - b.pendingOrderQty) * dir;
-            }
-            return 0;
-        });
-    }, [inventory, inventoryMap, sihwaOrders, searchTerm, sortConfig, showPendingOnly, recentSeoulPurchaseInfoMap]);
-
-    // Calculate totals (excluding STUBEND)
-    const totalsMap = useMemo(() => {
-        let totalCurrentStockValue = 0;
-        let totalCurrentStockCost = 0;
-        let totalPendingPurchaseValue = 0;
-
-        inventoryComparison.forEach(row => {
-            if (row.product.id.toLowerCase().includes('stubend')) return;
-            totalCurrentStockValue += (row.currentStock * row.sellingPrice);
-            totalCurrentStockCost += (row.currentStock * row.recentPurchasePrice);
-            totalPendingPurchaseValue += (row.pendingOrderQty * row.recentPurchasePrice);
-        });
-
+    // Aggregate stats for Tableau cards
+    const stats = useMemo(() => {
         return {
-            totalCurrentStockValue,
-            totalCurrentStockCost,
-            totalPendingPurchaseValue
+            critical: analyzedInventory.filter(r => r.statusCategory === 'CRITICAL'),
+            warning: analyzedInventory.filter(r => r.statusCategory === 'WARNING'),
+            safeActive: analyzedInventory.filter(r => r.statusCategory === 'SAFE' && r.salesFreq > 10)
         };
-    }, [inventoryComparison]);
+    }, [analyzedInventory]);
 
     if (user?.role === 'MANAGER') {
         return (
@@ -399,278 +308,226 @@ export default function SihwaInventory() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-                        <Factory className="w-6 h-6 text-indigo-600" />
-                        시화재고 통합 관리
+                        <BrainCircuit className="w-7 h-7 text-indigo-600" />
+                        AI 통합 재고 분석 (Tableau 뷰)
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1">
-                        월별 구매 현황, 보유량 대조 및 재고 증감 일일 트렌드를 파악합니다.
+                    <p className="text-slate-500 text-[15px] mt-1 tracking-tight">
+                        실제 판매량을 기반으로 시화재고(내 재고)와 대경재고(매입처)를 분리 평가하고 사입 방침을 최적화합니다.
                     </p>
                 </div>
             </div>
 
-            {/* Dashboard Top Section: Monthly Status + Daily Trend */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Smart Tableau Dashboard */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 xl:gap-6">
+                <div className="bg-gradient-to-br from-rose-500 to-red-600 rounded-2xl p-5 shadow-lg shadow-rose-200 text-white flex flex-col relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 -mr-6 -mt-6 p-4 opacity-20 transform group-hover:scale-110 transition-transform duration-500">
+                        <AlertTriangle className="w-32 h-32" />
+                    </div>
+                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><AlertTriangle className="w-5 h-5"/>매입처 동반 결품 위험 (선발주)</h3>
+                    <p className="text-4xl font-black mb-1 z-10">{stats.critical.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
+                    <p className="text-sm font-medium opacity-80 z-10">내 재고가 0이면서 매입처 대경재고 마저 없는 초긴급 품목</p>
+                </div>
                 
-                {/* A. Monthly Purchase Dashboard */}
-                <div className="xl:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                    <div className="bg-slate-800 text-white px-5 py-4 flex items-center justify-between shrink-0">
-                        <div className="flex items-center gap-2">
-                            <CalendarDays className="w-5 h-5 text-indigo-400" />
-                            <h2 className="font-bold">월별 시화재고 보충(매입) 현황</h2>
-                        </div>
-                        <select
-                            title="월 선택"
-                            value={selectedMonth}
-                            onChange={(e) => setSelectedMonth(e.target.value)}
-                            className="bg-slate-700 border-none rounded text-sm py-1.5 px-3 text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none placeholder-white appearance-none"
-                        >
-                            {availableMonths.map(m => (
-                                <option key={m} value={m}>{m} 월</option>
-                            ))}
-                        </select>
+                <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl p-5 shadow-lg shadow-amber-200 text-white flex flex-col relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-20 transform group-hover:rotate-12 transition-transform duration-500">
+                        <Box className="w-32 h-32" />
                     </div>
-                    <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-6 bg-indigo-50/30 flex-1">
-                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                                <Box className="w-24 h-24 text-teal-600" />
-                            </div>
-                            <div className="flex items-center gap-2 mb-2 text-slate-500">
-                                <PackageSearch className="w-4 h-4 text-teal-500" />
-                                <span className="font-bold text-sm">입고 완료 (COMPLETED)</span>
-                            </div>
-                            <div className="text-3xl font-black text-slate-800 mb-1">
-                                {formatCur(monthData.completedCost)} <span className="text-lg text-slate-400 font-bold tracking-normal">원</span>
-                            </div>
-                            <div className="text-sm font-bold text-teal-600">
-                                총 {monthData.completedCount}건 매입 완료
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-5 rounded-xl border border-rose-100 shadow-sm relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                                <AlertTriangle className="w-24 h-24 text-rose-600" />
-                            </div>
-                            <div className="flex items-center gap-2 mb-2 text-rose-500">
-                                <TrendingUp className="w-4 h-4" />
-                                <span className="font-bold text-sm">미결 / 대기건 (PENDING)</span>
-                            </div>
-                            <div className="text-3xl font-black text-rose-600 mb-1">
-                                {formatCur(monthData.pendingCost)} <span className="text-lg text-rose-300 font-bold tracking-normal">원</span>
-                            </div>
-                            <div className="text-sm font-bold text-rose-500">
-                                발주 진행 (잔여) {monthData.pendingCount}건 대기 중
-                            </div>
-                        </div>
-                    </div>
+                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><Factory className="w-5 h-5"/>일반 발주 요망 (안전재고 미달)</h3>
+                    <p className="text-4xl font-black mb-1 z-10">{stats.warning.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
+                    <p className="text-sm font-medium opacity-80 z-10">대경 재고는 있으나, 목표 안전치에 미달된 품목</p>
                 </div>
 
-                {/* B. Daily Trend Analyzer */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                    <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50 shrink-0">
-                        <History className="w-5 h-5 text-amber-500" />
-                        <h2 className="font-bold text-slate-800">일간 재고 트렌드 <span className="text-sm font-normal text-slate-500">(10일)</span></h2>
+                <div className="bg-gradient-to-br from-teal-500 to-emerald-600 rounded-2xl p-5 shadow-lg shadow-teal-200 text-white flex flex-col relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-20 transform group-hover:-translate-y-2 transition-transform duration-500">
+                        <Activity className="w-32 h-32" />
                     </div>
-                    <div className="p-0 flex-1 max-h-[300px] xl:max-h-none xl:h-[200px] overflow-y-auto">
-                        {historyLoading ? (
-                            <div className="p-8 text-center text-slate-400">데이터를 불러오는 중입니다...</div>
-                        ) : historyData.length === 0 ? (
-                            <div className="p-8 text-center text-slate-400">최근 기록된 변동 이력이 없습니다. (내일 첫 구동 시 생성됩니다)</div>
-                        ) : (
-                            <div className="p-0">
-                                {historyData.slice(-10).reverse().map((snap, idx) => {
-                                    const isFirstEver = historyData.length > 0 && snap.date === historyData[0].date;
-                                    return (
-                                    <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
-                                        <h3 className="font-bold text-slate-800 mb-3 flex flex-wrap items-center gap-2">
-                                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono shrink-0">{snap.date}</span>
-                                            {isFirstEver ? (
-                                                <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[11px] font-bold border border-indigo-100">
-                                                    초기 기준점 수립 (총 {Object.keys(snap.stock || {}).length}개 품목)
-                                                </span>
-                                            ) : (
-                                                <span className="text-slate-600 font-medium text-sm">변동 항목 {snap.diff?.length || 0}건</span>
-                                            )}
-                                        </h3>
-                                        
-                                        {snap.diff && snap.diff.length > 0 ? (
-                                            <div className="grid grid-cols-1 gap-3">
-                                                {snap.diff.map((d, dIdx) => (
-                                                    <div key={dIdx} className={`flex items-center justify-between text-sm bg-slate-50 p-2.5 rounded-lg border border-slate-100 border-l-4 ${d.change > 0 ? 'border-l-emerald-500' : 'border-l-rose-500'}`}>
-                                                        <span className="font-bold text-slate-700 truncate mr-2" title={d.name}>{d.name}</span>
-                                                        <div className="flex items-center gap-3 shrink-0">
-                                                            <span className="text-slate-400 font-mono text-xs">{d.from} → {d.to}</span>
-                                                            <span className={`font-black font-mono w-16 text-right ${d.change > 0 ? 'text-teal-600' : 'text-rose-500'}`}>
-                                                                {d.change > 0 ? '+' : ''}{d.change} 
-                                                            </span>
-                                                            {d.change < 0 ? (
-                                                                <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded font-bold">출고</span>
-                                                            ) : (
-                                                                <span className="text-[10px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded font-bold">입고</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : isFirstEver ? (
-                                            <div className="flex items-center gap-3 pl-2 bg-indigo-50/40 p-4 rounded-xl border border-indigo-100/60 mt-1">
-                                                <span className="animate-pulse bg-indigo-500 w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.7)] shrink-0"></span>
-                                                <p className="text-sm font-bold text-indigo-800 leading-snug">
-                                                    시화재고 통합관리가 시작된 <span className="underline decoration-indigo-300 underline-offset-4">첫 운영일</span>입니다! <br/>
-                                                    <span className="font-medium text-indigo-600 text-[13px] mt-1 inline-block">오늘 시스템이 기록한 재고 세팅값이 내일부터 발생하는 모든 출·입고 변동의 정확한 기준점으로 활용됩니다.</span>
-                                                </p>
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-slate-500 font-medium pl-2 bg-slate-50/50 py-2 px-3 rounded-lg border border-slate-100">
-                                                전날 대비 수량 변동이 발생한 품목이 없습니다.
-                                                <span className="text-xs text-slate-400 ml-2 font-normal">(현재 {Object.keys(snap.stock || {}).length}종류의 재고 품목 추적 유지중)</span>
-                                            </p>
-                                        )}
-                                    </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><TrendingUp className="w-5 h-5"/>고회전 적정 보유</h3>
+                    <p className="text-4xl font-black mb-1 z-10">{stats.safeActive.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
+                    <p className="text-sm font-medium opacity-80 z-10">판매 빈도가 높은 주력 품목 중 안전재고 이상 확보됨</p>
                 </div>
             </div>
 
-            {/* C. Stock vs Pending Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50">
-                    <div className="flex items-center gap-2">
-                        <Box className="w-5 h-5 text-teal-600" />
-                        <h2 className="font-bold text-slate-800">
-                            품목별 현재고 vs 입고 대기 (발주) 수량
-                        </h2>
+            {/* Smart Table Settings & Filters */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
+                    <div className="flex bg-slate-200/50 p-1 rounded-lg">
+                        <button 
+                            className={`px-6 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'AI' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            onClick={() => setActiveTab('AI')}
+                        >
+                            AI 요약보기 (Action Items)
+                        </button>
+                        <button 
+                            className={`px-6 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'ALL' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            onClick={() => setActiveTab('ALL')}
+                        >
+                            전체 재고 리스트
+                        </button>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-                            <input 
-                                type="checkbox" 
-                                checked={showPendingOnly}
-                                onChange={e => setShowPendingOnly(e.target.checked)}
-                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
-                            />
-                            <span className="font-bold">입고 대기 및 결품/보충 필요 품목만 보기</span>
-                        </label>
+                    
+                    <div className="flex items-center gap-2">
                         <input
                             type="text"
-                            placeholder="ID 검색..."
+                            placeholder="코드 또는 품명 검색..."
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
-                            className="bg-white border border-slate-300 rounded text-sm px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64"
+                            className="bg-white border text-slate-700 border-slate-300 rounded font-medium text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:border-indigo-500  w-full md:w-64 shadow-inner"
                         />
                     </div>
                 </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-100/50 border-y border-slate-200 text-slate-500 uppercase text-xs whitespace-nowrap">
-                            <tr>
-                                <th 
-                                    className="px-5 py-3 font-bold cursor-pointer hover:bg-slate-200 transition-colors"
-                                    onClick={() => handleSort('id')}
-                                >
-                                    품목 ID {sortConfig.key === 'id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                </th>
-                                <th className="px-5 py-3 font-bold text-right text-teal-600">실제 판매 단가</th>
-                                <th className="px-5 py-3 font-bold text-right">매입 실적가</th>
-                                <th 
-                                    className="px-5 py-3 font-bold text-right text-indigo-600 cursor-pointer hover:bg-slate-200 transition-colors"
-                                    onClick={() => handleSort('currentStock')}
-                                >
-                                    현재 보유고 {sortConfig.key === 'currentStock' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                </th>
-                                <th className="px-5 py-3 font-bold text-center">잔량 비교</th>
-                                <th 
-                                    className="px-5 py-3 font-bold text-right text-rose-500 cursor-pointer hover:bg-slate-200 transition-colors"
-                                    onClick={() => handleSort('pendingOrderQty')}
-                                >
-                                    입고 대기 (발주진행) {sortConfig.key === 'pendingOrderQty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                </th>
-                                <th className="px-5 py-3 font-bold text-center">긴급성</th>
-                            </tr>
-                        </thead>
-                        {inventoryComparison.length > 0 && (
-                            <tbody className="bg-indigo-50/60 border-b-2 border-indigo-200 font-bold shadow-sm">
-                                <tr>
-                                    <td className="px-5 py-4 text-slate-800 text-sm">
-                                        총계 (STUBEND 제외)
-                                    </td>
-                                    <td className="px-5 py-4 text-right text-teal-700 text-sm border-l border-indigo-200/50">
-                                        판매가 기준 보유재고 총액:<br/>
-                                        <span className="text-lg">{formatCur(totalsMap.totalCurrentStockValue)}</span> 원
-                                    </td>
-                                    <td className="px-5 py-4 text-right text-indigo-700 text-sm border-l border-indigo-200/50">
-                                        매입 실적가 기준 보유재고 총액:<br/>
-                                        <span className="text-lg">{formatCur(totalsMap.totalCurrentStockCost)}</span> 원
-                                    </td>
-                                    <td colSpan={2} className="px-5 py-4 border-l border-indigo-200/50"></td>
-                                    <td className="px-5 py-4 text-right text-rose-600 text-sm border-l border-indigo-200/50">
-                                        실적가 기준 입고 대기(발주) 총액:<br/>
-                                        <span className="text-lg">{formatCur(totalsMap.totalPendingPurchaseValue)}</span> 원
-                                    </td>
-                                    <td className="px-5 py-4 border-l border-indigo-200/50"></td>
-                                </tr>
-                            </tbody>
-                        )}
-                        <tbody className="divide-y divide-slate-100">
-                            {invLoading ? (
-                                <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400">데이터를 불러오는 중입니다...</td>
-                                </tr>
-                            ) : inventoryComparison.length === 0 ? (
-                                <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400">비교할 시화재고 품목이 없습니다.</td>
-                                </tr>
+
+                <div className="overflow-x-auto p-4">
+                    {invLoading ? (
+                        <div className="py-20 flex justify-center text-slate-400 font-medium">데이터를 분석 중입니다...</div>
+                    ) : (
+                        <div className="space-y-6">
+                            {(activeTab === 'ALL' || searchTerm !== '') ? (
+                                /* 전체 테이블 형식 */
+                                <table className="w-full text-left text-sm whitespace-nowrap">
+                                    <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200">
+                                        <tr>
+                                            <th className="px-4 py-3">품목 아이디</th>
+                                            <th className="px-4 py-3 text-right">1년 판매량</th>
+                                            <th className="px-4 py-3 text-center">안전재고(1.5m)</th>
+                                            <th className="px-4 py-3 text-right text-indigo-600 bg-indigo-50/30">시화재고 (우리)</th>
+                                            <th className="px-4 py-3 text-right text-slate-600 bg-slate-50">대경재고 (제휴)</th>
+                                            <th className="px-4 py-3 text-center">인공지능 진단</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {analyzedInventory.slice(0, 500).map(row => (
+                                            <tr key={row.product.id} className="hover:bg-slate-50 group">
+                                                <td className="px-4 py-3 font-mono font-bold text-slate-700">{row.product.id}</td>
+                                                <td className="px-4 py-3 text-right text-slate-600">
+                                                    {row.salesVolume > 0 ? (
+                                                        <span><span className="font-bold text-slate-800">{row.salesVolume}</span>개 <span className="text-[10px] bg-slate-100 px-1 rounded text-slate-500">({row.salesFreq}회)</span></span>
+                                                    ) : '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-center font-mono text-slate-400">
+                                                    {row.safeStock > 0 ? row.safeStock : '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-black font-mono text-indigo-600 bg-indigo-50/20">
+                                                    {row.shQty}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-black font-mono text-slate-600 bg-slate-50/40 opacity-70 group-hover:opacity-100 transition-opacity">
+                                                    {row.ysQty}
+                                                </td>
+                                                <td className="px-4 py-3 text-center text-xs font-bold">
+                                                    {row.statusCategory === 'CRITICAL' && <span className="bg-rose-100 text-rose-700 px-2 py-1 rounded shadow-sm">{row.statusLabel}</span>}
+                                                    {row.statusCategory === 'WARNING' && <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded shadow-sm">{row.statusLabel}</span>}
+                                                    {row.statusCategory === 'SAFE' && <span className="text-teal-600">{row.statusLabel}</span>}
+                                                    {row.statusCategory === 'IDLE' && <span className="text-slate-400">{row.statusLabel}</span>}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             ) : (
-                                inventoryComparison.map((row) => (
-                                    <tr key={row.product.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-5 py-3 font-bold font-mono text-xs text-slate-700 whitespace-nowrap">{row.product.id}</td>
-                                        <td className="px-5 py-3 text-right font-mono text-teal-700 bg-teal-50/20">
-                                            {formatCur(row.sellingPrice)}
-                                        </td>
-                                        <td className="px-5 py-3 text-right">
-                                            <div className="font-mono text-slate-600 font-bold">
-                                                {formatCur(row.recentPurchasePrice)}
+                                /* 아코디언 컴포넌트 형식 (Tableau Summary 뷰) */
+                                <div className="space-y-4 max-w-5xl mx-auto pb-8">
+                                    {/* CRITICAL Section */}
+                                    <div className="border border-rose-200 rounded-xl overflow-hidden shadow-sm">
+                                        <button 
+                                            onClick={() => toggleGroup('CRITICAL')}
+                                            className="w-full flex items-center justify-between px-5 py-4 bg-rose-50 hover:bg-rose-100 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                {expandedGroups['CRITICAL'] ? <ChevronDown className="w-5 h-5 text-rose-500"/> : <ChevronRight className="w-5 h-5 text-rose-500"/>}
+                                                <h3 className="font-bold text-rose-800 text-lg">🚨 선발주 요망 리스트 <span className="text-sm font-medium text-rose-500 ml-2">(대경매입처 동반 결품)</span></h3>
                                             </div>
-                                            {row.recentPurchaseDate && (
-                                                <div className="text-[10px] text-slate-400 mt-0.5" title="최근 서울재고 매입 기준">
-                                                    {row.recentPurchaseDate}
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="px-5 py-3 text-right font-mono font-black text-indigo-700 bg-indigo-50/30">
-                                            {row.currentStock.toLocaleString()}
-                                        </td>
-                                        <td className="px-5 py-3 text-center">
-                                            {row.pendingOrderQty > 0 ? (
-                                                <span className="text-rose-400 mx-2">←</span>
-                                            ) : (
-                                                <span className="text-slate-300 mx-2">-</span>
-                                            )}
-                                        </td>
-                                        <td className="px-5 py-3 text-right font-mono font-black text-rose-600 bg-rose-50/30">
-                                            {row.pendingOrderQty > 0 ? row.pendingOrderQty.toLocaleString() : '-'}
-                                        </td>
-                                        <td className="px-5 py-3 text-center">
-                                            {row.currentStock <= 0 && row.pendingOrderQty > 0 ? (
-                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 animate-pulse">긴급 보충!</span>
-                                            ) : row.pendingOrderQty > 0 ? (
-                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">보충중</span>
-                                            ) : row.currentStock <= 0 && row.pendingOrderQty === 0 ? (
-                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600">결품</span>
-                                            ) : (
-                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-100 text-teal-700">보유중</span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))
+                                            <span className="bg-rose-200 text-rose-800 font-black px-3 py-1 rounded-full text-sm">{stats.critical.length}건</span>
+                                        </button>
+                                        
+                                        {expandedGroups['CRITICAL'] && (
+                                            <div className="bg-white border-t border-rose-100">
+                                                {stats.critical.length > 0 ? (
+                                                <table className="w-full text-sm text-left">
+                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100">
+                                                        <tr>
+                                                            <th className="px-5 py-3 pt-3">품목 코드</th>
+                                                            <th className="px-5 py-3 text-right">총 판/회수</th>
+                                                            <th className="px-5 py-3 text-right text-rose-600 bg-rose-50/50">시화재고</th>
+                                                            <th className="px-5 py-3 text-right">대경재고</th>
+                                                            <th className="px-5 py-3 text-right font-black">부족분</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {stats.critical.map(row => (
+                                                            <tr key={row.product.id} className="hover:bg-slate-50">
+                                                                <td className="px-5 py-4 font-mono font-bold text-slate-800">{row.product.id}</td>
+                                                                <td className="px-5 py-4 text-right">
+                                                                    <span className="font-black text-slate-700">{row.salesVolume}</span> <span className="text-xs text-slate-400">({row.salesFreq}회)</span>
+                                                                </td>
+                                                                <td className="px-5 py-4 text-right font-black font-mono text-rose-600 bg-rose-50/30">0</td>
+                                                                <td className="px-5 py-4 text-right font-black font-mono text-slate-400">0</td>
+                                                                <td className="px-5 py-4 text-right font-black text-rose-600">-{row.deficit}개</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                                ) : <div className="p-8 text-center text-slate-400">훌륭합니다! 매입처 결품으로 인한 리스크 항목이 없습니다.</div>}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* WARNING Section */}
+                                    <div className="border border-amber-200 rounded-xl overflow-hidden shadow-sm">
+                                        <button 
+                                            onClick={() => toggleGroup('WARNING')}
+                                            className="w-full flex items-center justify-between px-5 py-4 bg-amber-50 hover:bg-amber-100 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                {expandedGroups['WARNING'] ? <ChevronDown className="w-5 h-5 text-amber-600"/> : <ChevronRight className="w-5 h-5 text-amber-600"/>}
+                                                <h3 className="font-bold text-amber-800 text-lg">⚠️ 일반 발주 필요 리스트 <span className="text-sm font-medium text-amber-600 ml-2">(시화재고 안잔성 미달)</span></h3>
+                                            </div>
+                                            <span className="bg-amber-200 text-amber-800 font-black px-3 py-1 rounded-full text-sm">{stats.warning.length}건</span>
+                                        </button>
+                                        
+                                        {expandedGroups['WARNING'] && (
+                                            <div className="bg-white border-t border-amber-100">
+                                                {stats.warning.length > 0 ? (
+                                                <table className="w-full text-sm text-left">
+                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100">
+                                                        <tr>
+                                                            <th className="px-5 py-3 pt-3">품목 코드</th>
+                                                            <th className="px-5 py-3 text-right">총 판/회수</th>
+                                                            <th className="px-5 py-3 text-right text-indigo-600 bg-amber-50/30">시화재고</th>
+                                                            <th className="px-5 py-3 text-right text-slate-600">대경재고</th>
+                                                            <th className="px-5 py-3 text-right font-black">부족분</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {stats.warning.map(row => (
+                                                            <tr key={row.product.id} className="hover:bg-slate-50">
+                                                                <td className="px-5 py-4 font-mono font-bold text-slate-800">{row.product.id}</td>
+                                                                <td className="px-5 py-4 text-right">
+                                                                    <span className="font-black text-slate-700">{row.salesVolume}</span> <span className="text-xs text-slate-400">({row.salesFreq}회)</span>
+                                                                </td>
+                                                                <td className="px-5 py-4 text-right font-black font-mono text-indigo-600 bg-amber-50/10">
+                                                                    <span className="text-xs mr-2 text-slate-400">(목표:{row.safeStock})</span>
+                                                                    {row.shQty}
+                                                                </td>
+                                                                <td className="px-5 py-4 text-right font-black font-mono text-teal-600">
+                                                                    보유중 ({row.ysQty})
+                                                                </td>
+                                                                <td className="px-5 py-4 text-right font-black text-amber-600">필요 -{row.deficit}개</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                                ) : <div className="p-8 text-center text-slate-400">발주가 필요한 품목이 없습니다. 시화재고 관리가 매우 이상적입니다!</div>}
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                </div>
                             )}
-                        </tbody>
-                    </table>
+                        </div>
+                    )}
                 </div>
             </div>
             
         </div>
     );
 }
+

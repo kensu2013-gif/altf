@@ -344,9 +344,7 @@ export default function Signup() {
                                             value={formData.address}
                                             onChange={handleChange}
                                             required
-                                            placeholder="주소 검색을 이용해주세요"
-                                            readOnly
-                                            onClick={() => setIsAddressModalOpen(true)}
+                                            placeholder="상세 배송지 주소 (직접 입력 또는 검색)"
                                         />
                                     </div>
                                     <Button

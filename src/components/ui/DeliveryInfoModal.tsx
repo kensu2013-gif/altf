@@ -138,12 +138,10 @@ export function DeliveryInfoModal({ isOpen, onClose, onConfirm }: DeliveryInfoMo
                                                 <div className="flex gap-2">
                                                     <input
                                                         type="text"
-                                                        placeholder="배송지 주소 검색"
-                                                        className="w-full pl-12 pr-4 py-3 text-sm font-medium border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all placeholder:text-slate-400 shadow-sm cursor-pointer"
+                                                        placeholder="상세 배송지 주소 (직접 입력 또는 우측 검색 이용)"
+                                                        className="w-full pl-12 pr-4 py-3 text-sm font-medium border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all placeholder:text-slate-400 shadow-sm"
                                                         value={deliveryInfo.address}
                                                         onChange={(e) => handleUpdate('address', e.target.value)}
-                                                        onClick={() => setIsAddressModalOpen(true)}
-                                                        readOnly
                                                     />
                                                     <Button
                                                         type="button"

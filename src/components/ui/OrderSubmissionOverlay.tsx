@@ -251,11 +251,10 @@ export function OrderSubmissionOverlay({ isOpen, onClose, onConfirm, basePayload
                                                             <div className="flex gap-2">
                                                                 <input
                                                                     type="text"
-                                                                    placeholder="배송지 주소 입력"
+                                                                    placeholder="상세 배송지 주소 (직접 입력 또는 검색)"
                                                                     className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all placeholder:text-slate-300"
                                                                     value={deliveryInfo.address}
                                                                     onChange={(e) => handleUpdate('address', e.target.value)}
-                                                                    onClick={() => setIsAddressModalOpen(true)}
                                                                 />
                                                                 <Button
                                                                     type="button"

@@ -1,0 +1,4778 @@
+{
+  "90E(L)-S10S-25A-STS304-W": {
+    "salesVolume": 17153.0,
+    "salesFreq": 78.0
+  },
+  "90E(L)-S10S-50A-STS304-W": {
+    "salesVolume": 12598.0,
+    "salesFreq": 124.0
+  },
+  "90E(L)-S10S-32A-STS304-W": {
+    "salesVolume": 6949.0,
+    "salesFreq": 49.0
+  },
+  "90E(L)-S10S-40A-STS304-W": {
+    "salesVolume": 8272.0,
+    "salesFreq": 73.0
+  },
+  "90E(L)-S10S-20A-STS304-W": {
+    "salesVolume": 7714.0,
+    "salesFreq": 36.0
+  },
+  "CAP-S10S-32A-STS304-S": {
+    "salesVolume": 2216.0,
+    "salesFreq": 10.0
+  },
+  "T(S)-S10S-32A-STS304-W": {
+    "salesVolume": 2066.0,
+    "salesFreq": 24.0
+  },
+  "90E(L)-S10S-15A-STS304-W": {
+    "salesVolume": 7429.0,
+    "salesFreq": 33.0
+  },
+  "90E(L)-S10S-65A-STS304-W": {
+    "salesVolume": 4032.0,
+    "salesFreq": 75.0
+  },
+  "90E(L)-S20S-25A-STS304-W": {
+    "salesVolume": 2334.0,
+    "salesFreq": 29.0
+  },
+  "90E(L)-S10S-80A-STS304-W": {
+    "salesVolume": 4457.0,
+    "salesFreq": 124.0
+  },
+  "90E(L)-S20S-32A-STS304-W": {
+    "salesVolume": 2260.0,
+    "salesFreq": 27.0
+  },
+  "CAP-S10S-50A-STS304-S": {
+    "salesVolume": 934.0,
+    "salesFreq": 25.0
+  },
+  "R(C)-S10S-20A X 15A-STS304-W": {
+    "salesVolume": 440.0,
+    "salesFreq": 10.0
+  },
+  "T(S)-S10S-25A-STS304-W": {
+    "salesVolume": 1306.0,
+    "salesFreq": 28.0
+  },
+  "T(S)-S10S-50A-STS304-W": {
+    "salesVolume": 1160.0,
+    "salesFreq": 58.0
+  },
+  "90E(L)-S10S-100A-STS304-W": {
+    "salesVolume": 2606.0,
+    "salesFreq": 96.0
+  },
+  "45E(L)-S10S-25A-STS304-W": {
+    "salesVolume": 580.0,
+    "salesFreq": 11.0
+  },
+  "90E(L)-S10S-25A-STS304-S": {
+    "salesVolume": 746.0,
+    "salesFreq": 9.0
+  },
+  "90E(L)-S40S-25A-STS304-W": {
+    "salesVolume": 1014.0,
+    "salesFreq": 26.0
+  },
+  "45E(L)-S20S-25A-STS304-W": {
+    "salesVolume": 724.0,
+    "salesFreq": 8.0
+  },
+  "90E(L)-S80S-25A-STS304-S": {
+    "salesVolume": 887.0,
+    "salesFreq": 22.0
+  },
+  "R(C)-S10S-50A X 40A-STS304-W": {
+    "salesVolume": 624.0,
+    "salesFreq": 28.0
+  },
+  "T(S)-S10S-65A-STS304-W": {
+    "salesVolume": 517.0,
+    "salesFreq": 28.0
+  },
+  "45E(L)-S10S-65A-STS304-W": {
+    "salesVolume": 374.0,
+    "salesFreq": 10.0
+  },
+  "90E(L)-S10S-25A-STS316L-W": {
+    "salesVolume": 1009.0,
+    "salesFreq": 21.0
+  },
+  "90E(L)-S10S-150A-STS304-W": {
+    "salesVolume": 1180.0,
+    "salesFreq": 74.0
+  },
+  "90E(L)-S20S-50A-STS304-W": {
+    "salesVolume": 1126.0,
+    "salesFreq": 63.0
+  },
+  "90E(S)-S10S-100A-STS304-W": {
+    "salesVolume": 532.0,
+    "salesFreq": 22.0
+  },
+  "90E(L)-S10S-50A-STS316L-W": {
+    "salesVolume": 593.0,
+    "salesFreq": 28.0
+  },
+  "90E(S)-S10S-25A-STS304-W": {
+    "salesVolume": 288.0,
+    "salesFreq": 8.0
+  },
+  "45E(L)-S10S-32A-STS304-W": {
+    "salesVolume": 276.0,
+    "salesFreq": 5.0
+  },
+  "T(S)-S10S-15A-STS304-W": {
+    "salesVolume": 445.0,
+    "salesFreq": 13.0
+  },
+  "45E(L)-S10S-50A-STS304-W": {
+    "salesVolume": 732.0,
+    "salesFreq": 24.0
+  },
+  "T(S)-S10S-20A-STS304-W": {
+    "salesVolume": 475.0,
+    "salesFreq": 17.0
+  },
+  "90E(S)-S10S-50A-STS304-W": {
+    "salesVolume": 443.0,
+    "salesFreq": 10.0
+  },
+  "R(C)-S10S-25A X 15A-STS304-W": {
+    "salesVolume": 376.0,
+    "salesFreq": 15.0
+  },
+  "90E(S)-S10S-200A-STS304-W": {
+    "salesVolume": 408.0,
+    "salesFreq": 38.0
+  },
+  "T(S)-S10S-20A-STS304-S": {
+    "salesVolume": 301.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S10S-80A-STS304-W": {
+    "salesVolume": 398.0,
+    "salesFreq": 23.0
+  },
+  "45E(L)-S20S-32A-STS304-W": {
+    "salesVolume": 336.0,
+    "salesFreq": 5.0
+  },
+  "90E(L)-S10S-40A-STS316L-W": {
+    "salesVolume": 467.0,
+    "salesFreq": 20.0
+  },
+  "90E(S)-S10S-40A-STS304-W": {
+    "salesVolume": 240.0,
+    "salesFreq": 6.0
+  },
+  "T(S)-S10S-25A-STS316L-W": {
+    "salesVolume": 308.0,
+    "salesFreq": 7.0
+  },
+  "T(S)-S10S-25A-STS304-S": {
+    "salesVolume": 281.0,
+    "salesFreq": 6.0
+  },
+  "90E(S)-S10S-150A-STS304-W": {
+    "salesVolume": 431.0,
+    "salesFreq": 35.0
+  },
+  "90E(L)-S10S-200A-STS304-W": {
+    "salesVolume": 636.0,
+    "salesFreq": 57.0
+  },
+  "90E(L)-S20S-25A-STS316L-W": {
+    "salesVolume": 328.0,
+    "salesFreq": 8.0
+  },
+  "CAP-S10S-80A-STS304-S": {
+    "salesVolume": 214.0,
+    "salesFreq": 14.0
+  },
+  "45E(L)-S10S-15A-STS304-W": {
+    "salesVolume": 120.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S20S-80A-STS304-W": {
+    "salesVolume": 668.0,
+    "salesFreq": 41.0
+  },
+  "90E(L)-S10S-50A-STS304-S": {
+    "salesVolume": 271.0,
+    "salesFreq": 9.0
+  },
+  "T(S)-S10S-100A-STS304-W": {
+    "salesVolume": 385.0,
+    "salesFreq": 37.0
+  },
+  "90E(L)-S20S-32A-STS316L-W": {
+    "salesVolume": 200.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-50A X 25A-STS304-W": {
+    "salesVolume": 317.0,
+    "salesFreq": 27.0
+  },
+  "90E(S)-S40S-65A-STS304-W": {
+    "salesVolume": 221.0,
+    "salesFreq": 4.0
+  },
+  "T(S)-S10S-40A-STS304-W": {
+    "salesVolume": 933.0,
+    "salesFreq": 31.0
+  },
+  "CAP-S10S-100A-STS304-S": {
+    "salesVolume": 298.0,
+    "salesFreq": 11.0
+  },
+  "T(S)-S10S-80A-STS304-W": {
+    "salesVolume": 482.0,
+    "salesFreq": 51.0
+  },
+  "90E(L)-S10S-32A-STS316L-W": {
+    "salesVolume": 332.0,
+    "salesFreq": 8.0
+  },
+  "CAP-S10S-125A-STS304-S": {
+    "salesVolume": 164.0,
+    "salesFreq": 11.0
+  },
+  "90E(L)-S10S-125A-STS304-W": {
+    "salesVolume": 961.0,
+    "salesFreq": 39.0
+  },
+  "CAP-S10S-65A-STS304-S": {
+    "salesVolume": 228.0,
+    "salesFreq": 14.0
+  },
+  "90E(L)-S10S-2-1/2\"-WP316L-W": {
+    "salesVolume": 163.0,
+    "salesFreq": 6.0
+  },
+  "CAP-S10S-25A-STS304-S": {
+    "salesVolume": 1172.0,
+    "salesFreq": 12.0
+  },
+  "R(C)-S10S-100A X 80A-STS304-W": {
+    "salesVolume": 299.0,
+    "salesFreq": 22.0
+  },
+  "T(S)-S10S-32A-STS316L-W": {
+    "salesVolume": 30.0,
+    "salesFreq": 4.0
+  },
+  "CAP-S10S-40A-STS304-S": {
+    "salesVolume": 348.0,
+    "salesFreq": 10.0
+  },
+  "90E(L)-S20S-15A-STS304-W": {
+    "salesVolume": 249.0,
+    "salesFreq": 6.0
+  },
+  "45E(L)-S10S-100A-STS304-W": {
+    "salesVolume": 342.0,
+    "salesFreq": 19.0
+  },
+  "R(C)-S10S-80A X 50A-STS304-W": {
+    "salesVolume": 231.0,
+    "salesFreq": 30.0
+  },
+  "90E(S)-S10S-250A-STS304-W": {
+    "salesVolume": 171.0,
+    "salesFreq": 17.0
+  },
+  "45E(L)-S10S-40A-STS304-W": {
+    "salesVolume": 162.0,
+    "salesFreq": 10.0
+  },
+  "90E(L)-S40S-80A-STS316L-W": {
+    "salesVolume": 189.0,
+    "salesFreq": 10.0
+  },
+  "R(C)-S10S-25A X 20A-STS304-W": {
+    "salesVolume": 291.0,
+    "salesFreq": 10.0
+  },
+  "T(R)-S10S-32A X 25A-STS304-W": {
+    "salesVolume": 80.0,
+    "salesFreq": 3.0
+  },
+  "90E(S)-S10S-125A-STS304-W": {
+    "salesVolume": 175.0,
+    "salesFreq": 19.0
+  },
+  "90E(L)-S20S-40A-STS304-W": {
+    "salesVolume": 390.0,
+    "salesFreq": 20.0
+  },
+  "CAP-S10S-50A-STS316L-S": {
+    "salesVolume": 116.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S20S-65A-STS304-W": {
+    "salesVolume": 559.0,
+    "salesFreq": 37.0
+  },
+  "90E(S)-S10S-32A-STS304-W": {
+    "salesVolume": 180.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S20S-40A-STS316L-W": {
+    "salesVolume": 115.0,
+    "salesFreq": 8.0
+  },
+  "90E(S)-S40S-125A-STS316L-W": {
+    "salesVolume": 53.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S10S-150A-STS304-W": {
+    "salesVolume": 253.0,
+    "salesFreq": 28.0
+  },
+  "T(R)-S10S-20A X 15A-STS304-W": {
+    "salesVolume": 237.0,
+    "salesFreq": 9.0
+  },
+  "R(C)-S10S-65A X 50A-STS304-W": {
+    "salesVolume": 204.0,
+    "salesFreq": 16.0
+  },
+  "90E(L)-S10S-5\"-WP316L-W": {
+    "salesVolume": 91.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S10S-300A-STS304-W": {
+    "salesVolume": 150.0,
+    "salesFreq": 25.0
+  },
+  "90E(L)-S10S-250A-STS304-W": {
+    "salesVolume": 323.0,
+    "salesFreq": 41.0
+  },
+  "90E(L)-S20S-100A-STS304-W": {
+    "salesVolume": 347.0,
+    "salesFreq": 31.0
+  },
+  "90E(L)-S10S-6\"-WP304-W": {
+    "salesVolume": 196.0,
+    "salesFreq": 26.0
+  },
+  "90E(L)-S10S-65A-STS304-S": {
+    "salesVolume": 306.0,
+    "salesFreq": 5.0
+  },
+  "T(R)-S10S-32A X 15A-STS316L-W": {
+    "salesVolume": 90.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S10S-80A-STS304-S": {
+    "salesVolume": 98.0,
+    "salesFreq": 6.0
+  },
+  "T(S)-S10S-50A-STS316L-W": {
+    "salesVolume": 150.0,
+    "salesFreq": 18.0
+  },
+  "T(S)-S10S-150A-STS304-W": {
+    "salesVolume": 272.0,
+    "salesFreq": 48.0
+  },
+  "T(R)-S10S-40A X 15A-STS304-W": {
+    "salesVolume": 181.0,
+    "salesFreq": 13.0
+  },
+  "90E(L)-S20S-200A-STS304-W": {
+    "salesVolume": 148.0,
+    "salesFreq": 8.0
+  },
+  "T(R)-S10S-100A X 40A-STS304-W": {
+    "salesVolume": 112.0,
+    "salesFreq": 8.0
+  },
+  "90E(L)-S10S-6\"-WP304-S": {
+    "salesVolume": 158.0,
+    "salesFreq": 11.0
+  },
+  "R(C)-S10S-50A X 25A-STS304-W": {
+    "salesVolume": 100.0,
+    "salesFreq": 11.0
+  },
+  "90E(L)-S40S-50A-STS316L-W": {
+    "salesVolume": 142.0,
+    "salesFreq": 18.0
+  },
+  "R(C)-S10S-150A X 80A-STS304-W": {
+    "salesVolume": 135.0,
+    "salesFreq": 7.0
+  },
+  "90E(L)-S40S-50A-STS304-W": {
+    "salesVolume": 354.0,
+    "salesFreq": 27.0
+  },
+  "90E(L)-S10S-250A-STS316L-W": {
+    "salesVolume": 193.0,
+    "salesFreq": 10.0
+  },
+  "T(S)-S20S-25A-STS304-W": {
+    "salesVolume": 74.0,
+    "salesFreq": 9.0
+  },
+  "CAP-S10S-200A-STS304-S": {
+    "salesVolume": 110.0,
+    "salesFreq": 20.0
+  },
+  "T(R)-S10S-40A X 25A-STS304-W": {
+    "salesVolume": 161.0,
+    "salesFreq": 11.0
+  },
+  "45E(L)-S10S-125A-STS304-W": {
+    "salesVolume": 123.0,
+    "salesFreq": 19.0
+  },
+  "R(C)-S10S-80A X 40A-STS304-W": {
+    "salesVolume": 169.0,
+    "salesFreq": 17.0
+  },
+  "90E(L)-S10S-15A-STS304-S": {
+    "salesVolume": 106.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S10S-100A X 65A-STS304-W": {
+    "salesVolume": 158.0,
+    "salesFreq": 12.0
+  },
+  "45E(L)-S40S-50A-STS304-W": {
+    "salesVolume": 91.0,
+    "salesFreq": 7.0
+  },
+  "CAP-S10S-15A-STS304-S": {
+    "salesVolume": 106.0,
+    "salesFreq": 5.0
+  },
+  "CAP-S10S-25A-STS316L-S": {
+    "salesVolume": 114.0,
+    "salesFreq": 3.0
+  },
+  "45E(L)-S10S-200A-STS304-W": {
+    "salesVolume": 102.0,
+    "salesFreq": 20.0
+  },
+  "R(C)-S10S-100A X 40A-STS304-W": {
+    "salesVolume": 27.0,
+    "salesFreq": 4.0
+  },
+  "90E(L)-S10S-90A-STS304-W": {
+    "salesVolume": 58.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S10S-100A X 25A-STS304-W": {
+    "salesVolume": 130.0,
+    "salesFreq": 6.0
+  },
+  "T(R)-S10S-250A X 100A-STS316L-W": {
+    "salesVolume": 108.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S10S-80A-STS316L-W": {
+    "salesVolume": 176.0,
+    "salesFreq": 19.0
+  },
+  "T(S)-S10S-50A-STS304-S": {
+    "salesVolume": 32.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S40S-20A-STS304-W": {
+    "salesVolume": 259.0,
+    "salesFreq": 15.0
+  },
+  "T(S)-S10S-6\"-WP316L-W": {
+    "salesVolume": 63.0,
+    "salesFreq": 6.0
+  },
+  "T(R)-S10S-40A X 32A-STS304-W": {
+    "salesVolume": 51.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-25A X 15A-STS304-W": {
+    "salesVolume": 244.0,
+    "salesFreq": 12.0
+  },
+  "CAP-S20S-50A-STS316L-S": {
+    "salesVolume": 50.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-32A X 20A-STS304-W": {
+    "salesVolume": 57.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-50A X 25A-STS304-S": {
+    "salesVolume": 52.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S20S-50A-STS304-W": {
+    "salesVolume": 178.0,
+    "salesFreq": 31.0
+  },
+  "T(R)-S10S-100A X 50A-STS304-W": {
+    "salesVolume": 154.0,
+    "salesFreq": 23.0
+  },
+  "CAP-S10S-150A-STS304-S": {
+    "salesVolume": 77.0,
+    "salesFreq": 14.0
+  },
+  "90E(L)-S20S-100A-STS316L-W": {
+    "salesVolume": 150.0,
+    "salesFreq": 12.0
+  },
+  "90E(L)-S40S-2-1/2\"-WP316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-80A X 50A-STS304-W": {
+    "salesVolume": 842.0,
+    "salesFreq": 21.0
+  },
+  "R(C)-S10S-32A X 25A-STS304-W": {
+    "salesVolume": 102.0,
+    "salesFreq": 6.0
+  },
+  "90E(L)-S10S-40A-STS304-S": {
+    "salesVolume": 168.0,
+    "salesFreq": 4.0
+  },
+  "90E(L)-S40S-65A-STS304-W": {
+    "salesVolume": 85.0,
+    "salesFreq": 9.0
+  },
+  "T(S)-S10S-40A-STS316L-W": {
+    "salesVolume": 91.0,
+    "salesFreq": 8.0
+  },
+  "T(R)-S10S-80A X 25A-STS304-W": {
+    "salesVolume": 74.0,
+    "salesFreq": 8.0
+  },
+  "T(S)-S10S-125A-STS304-W": {
+    "salesVolume": 149.0,
+    "salesFreq": 30.0
+  },
+  "R(E)-S10S-100A X 80A-STS304-W": {
+    "salesVolume": 54.0,
+    "salesFreq": 12.0
+  },
+  "90E(L)-S20S-300A-STS304-W": {
+    "salesVolume": 92.0,
+    "salesFreq": 9.0
+  },
+  "90E(S)-S10S-300A-STS304-W": {
+    "salesVolume": 75.0,
+    "salesFreq": 11.0
+  },
+  "90E(L)-S10S-6\"-WP316L-W": {
+    "salesVolume": 43.0,
+    "salesFreq": 5.0
+  },
+  "T(R)-S10S-50A X 32A-STS304-W": {
+    "salesVolume": 102.0,
+    "salesFreq": 7.0
+  },
+  "90E(L)-S40S-40A-STS304-W": {
+    "salesVolume": 133.0,
+    "salesFreq": 12.0
+  },
+  "R(C)-S10S-300A X 200A-STS304-W": {
+    "salesVolume": 41.0,
+    "salesFreq": 6.0
+  },
+  "CAP-S10S-300A-STS316L-S": {
+    "salesVolume": 36.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S10S-80A X 65A-STS304-W": {
+    "salesVolume": 115.0,
+    "salesFreq": 16.0
+  },
+  "90E(L)-S40S-6\"-WP304-W": {
+    "salesVolume": 29.0,
+    "salesFreq": 5.0
+  },
+  "R(C)-S10S-100A X 32A-STS304-W": {
+    "salesVolume": 36.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-125A X 100A-STS304-W": {
+    "salesVolume": 191.0,
+    "salesFreq": 20.0
+  },
+  "CAP-S10S-20A-STS304-S": {
+    "salesVolume": 140.0,
+    "salesFreq": 3.0
+  },
+  "90E(S)-S10S-40A-STS316L-W": {
+    "salesVolume": 35.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-80A-STS304-W": {
+    "salesVolume": 63.0,
+    "salesFreq": 14.0
+  },
+  "T(S)-S20S-40A-STS316L-W": {
+    "salesVolume": 36.0,
+    "salesFreq": 6.0
+  },
+  "90E(S)-S10S-80A-STS304-W": {
+    "salesVolume": 160.0,
+    "salesFreq": 13.0
+  },
+  "45E(L)-S10S-50A-STS316L-W": {
+    "salesVolume": 103.0,
+    "salesFreq": 10.0
+  },
+  "T(R)-S20S-80A X 50A-STS304-W": {
+    "salesVolume": 54.0,
+    "salesFreq": 9.0
+  },
+  "45E(L)-S10S-40A-STS316L-W": {
+    "salesVolume": 77.0,
+    "salesFreq": 6.0
+  },
+  "90E(S)-S20S-65A-STS304-W": {
+    "salesVolume": 34.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-40A X 25A-STS304-W": {
+    "salesVolume": 82.0,
+    "salesFreq": 8.0
+  },
+  "CAP-S10S-250A-STS316L-S": {
+    "salesVolume": 32.0,
+    "salesFreq": 4.0
+  },
+  "CAP-S40S-6\"-WP304-S": {
+    "salesVolume": 131.0,
+    "salesFreq": 5.0
+  },
+  "90E(L)-S40S-65A-STS316L-W": {
+    "salesVolume": 74.0,
+    "salesFreq": 5.0
+  },
+  "T(R)-S10S-100A X 80A-STS304-W": {
+    "salesVolume": 45.0,
+    "salesFreq": 5.0
+  },
+  "90E(L)-S40S-15A-STS304-W": {
+    "salesVolume": 255.0,
+    "salesFreq": 16.0
+  },
+  "R(C)-S10S-40A X 15A-STS304-W": {
+    "salesVolume": 52.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S40S-100A-STS304-W": {
+    "salesVolume": 65.0,
+    "salesFreq": 16.0
+  },
+  "CAP-S20S-125A-STS316L-S": {
+    "salesVolume": 45.0,
+    "salesFreq": 6.0
+  },
+  "T(S)-S40S-125A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S10S-250A-STS304-S": {
+    "salesVolume": 36.0,
+    "salesFreq": 10.0
+  },
+  "45E(L)-S10S-2\"-WP304-W": {
+    "salesVolume": 89.0,
+    "salesFreq": 16.0
+  },
+  "T(S)-S10S-200A-STS304-W": {
+    "salesVolume": 92.0,
+    "salesFreq": 28.0
+  },
+  "R(C)-S10S-125A X 80A-STS304-W": {
+    "salesVolume": 51.0,
+    "salesFreq": 13.0
+  },
+  "90E(L)-S10S-20A-STS316L-W": {
+    "salesVolume": 420.0,
+    "salesFreq": 10.0
+  },
+  "T(S)-S10S-250A-STS304-W": {
+    "salesVolume": 51.0,
+    "salesFreq": 17.0
+  },
+  "T(S)-S40S-50A-STS316L-W": {
+    "salesVolume": 30.0,
+    "salesFreq": 5.0
+  },
+  "R(C)-S10S-150A X 50A-STS304-W": {
+    "salesVolume": 24.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S40S-6\"-WP304-S": {
+    "salesVolume": 23.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S10S-100A X 50A-STS304-W": {
+    "salesVolume": 49.0,
+    "salesFreq": 11.0
+  },
+  "T(S)-S40S-80A-STS304-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 3.0
+  },
+  "45E(L)-S10S-6\"-WP304-W": {
+    "salesVolume": 35.0,
+    "salesFreq": 8.0
+  },
+  "T(S)-S40S-32A-STS304-W": {
+    "salesVolume": 27.0,
+    "salesFreq": 4.0
+  },
+  "R(C)-S10S-50A X 20A-STS304-W": {
+    "salesVolume": 72.0,
+    "salesFreq": 4.0
+  },
+  "90E(L)-S10S-125A-STS304-S": {
+    "salesVolume": 21.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S10S-300A-STS304-W": {
+    "salesVolume": 39.0,
+    "salesFreq": 7.0
+  },
+  "R(C)-S10S-250A X 150A-STS304-W": {
+    "salesVolume": 92.0,
+    "salesFreq": 13.0
+  },
+  "R(C)-S10S-100A X 25A-STS304-W": {
+    "salesVolume": 20.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S40S-50A-STS316L-W": {
+    "salesVolume": 43.0,
+    "salesFreq": 3.0
+  },
+  "90E(S)-S80S-65A-STS304-S": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-50A X 15A-STS304-W": {
+    "salesVolume": 92.0,
+    "salesFreq": 8.0
+  },
+  "45E(S)-S10S-350A-STS304-W": {
+    "salesVolume": 20.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-2\"-WP304-W": {
+    "salesVolume": 25.0,
+    "salesFreq": 3.0
+  },
+  "45E(S)-S10S-40A-STS316L-W": {
+    "salesVolume": 20.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-2-1/2\" X 1-1/4\"-WP316L-W": {
+    "salesVolume": 20.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-65A X 15A-STS304-W": {
+    "salesVolume": 20.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-50A X 40A-STS304-W": {
+    "salesVolume": 66.0,
+    "salesFreq": 11.0
+  },
+  "R(C)-S40S-80A X 50A-STS316L-W": {
+    "salesVolume": 22.0,
+    "salesFreq": 6.0
+  },
+  "R(C)-S20S-50A X 40A-STS304-W": {
+    "salesVolume": 34.0,
+    "salesFreq": 7.0
+  },
+  "45E(L)-S20S-50A-STS304-W": {
+    "salesVolume": 108.0,
+    "salesFreq": 14.0
+  },
+  "CAP-S10S-32A-STS316L-S": {
+    "salesVolume": 12.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-50A-STS304-S": {
+    "salesVolume": 57.0,
+    "salesFreq": 6.0
+  },
+  "R(C)-S20S-65A X 50A-STS304-W": {
+    "salesVolume": 21.0,
+    "salesFreq": 5.0
+  },
+  "R(C)-S10S-150A X 100A-STS304-W": {
+    "salesVolume": 62.0,
+    "salesFreq": 17.0
+  },
+  "90E(L)-S10S-65A-STS316L-W": {
+    "salesVolume": 23.0,
+    "salesFreq": 8.0
+  },
+  "90E(L)-S20S-65A-STS316L-W": {
+    "salesVolume": 79.0,
+    "salesFreq": 12.0
+  },
+  "R(C)-S10S-65A X 40A-STS304-W": {
+    "salesVolume": 70.0,
+    "salesFreq": 9.0
+  },
+  "CAP-S10S-400A-STS304-S": {
+    "salesVolume": 29.0,
+    "salesFreq": 8.0
+  },
+  "90E(S)-S10S-65A-STS316L-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-150A X 80A-STS304-W": {
+    "salesVolume": 48.0,
+    "salesFreq": 8.0
+  },
+  "R(C)-S10S-200A X 150A-STS304-W": {
+    "salesVolume": 90.0,
+    "salesFreq": 21.0
+  },
+  "CAP-S20S-150A-STS304-S": {
+    "salesVolume": 26.0,
+    "salesFreq": 9.0
+  },
+  "90E(L)-S20S-150A-STS316L-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-40A X 32A-STS304-W": {
+    "salesVolume": 154.0,
+    "salesFreq": 8.0
+  },
+  "T(R)-S10S-125A X 80A-STS304-W": {
+    "salesVolume": 24.0,
+    "salesFreq": 6.0
+  },
+  "CAP-S40S-150A-STS304-S": {
+    "salesVolume": 20.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S20S-100A X 50A-STS304-W": {
+    "salesVolume": 30.0,
+    "salesFreq": 4.0
+  },
+  "T(S)-S40S-25A-STS304-W": {
+    "salesVolume": 41.0,
+    "salesFreq": 9.0
+  },
+  "90E(L)-S20S-150A-STS304-W": {
+    "salesVolume": 109.0,
+    "salesFreq": 17.0
+  },
+  "90E(S)-S10S-100A-STS316L-W": {
+    "salesVolume": 13.0,
+    "salesFreq": 4.0
+  },
+  "R(C)-S20S-50A X 40A-STS316L-W": {
+    "salesVolume": 24.0,
+    "salesFreq": 7.0
+  },
+  "90E(L)-S20S-250A-STS304-W": {
+    "salesVolume": 76.0,
+    "salesFreq": 11.0
+  },
+  "R(C)-S10S-125A X 50A-STS304-W": {
+    "salesVolume": 25.0,
+    "salesFreq": 5.0
+  },
+  "45E(L)-S10S-2-1/2\"-WP316L-W": {
+    "salesVolume": 18.0,
+    "salesFreq": 5.0
+  },
+  "T(S)-S20S-50A-STS316L-W": {
+    "salesVolume": 68.0,
+    "salesFreq": 6.0
+  },
+  "R(C)-S10S-40A X 25A-STS316L-W": {
+    "salesVolume": 61.0,
+    "salesFreq": 8.0
+  },
+  "T(S)-S20S-32A-STS304-W": {
+    "salesVolume": 34.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S40S-2-1/2\"-WP304-W": {
+    "salesVolume": 38.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S10S-25A X 20A-STS316L-W": {
+    "salesVolume": 14.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-80A X 25A-STS304-W": {
+    "salesVolume": 22.0,
+    "salesFreq": 4.0
+  },
+  "45E(L)-S10S-80A-STS316L-W": {
+    "salesVolume": 42.0,
+    "salesFreq": 10.0
+  },
+  "45E(L)-S20S-100A-STS304-W": {
+    "salesVolume": 47.0,
+    "salesFreq": 10.0
+  },
+  "T(R)-S10S-65A X 40A-STS304-W": {
+    "salesVolume": 65.0,
+    "salesFreq": 9.0
+  },
+  "T(S)-S20S-40A-STS304-W": {
+    "salesVolume": 55.0,
+    "salesFreq": 8.0
+  },
+  "90E(S)-S20S-200A-STS316L-W": {
+    "salesVolume": 38.0,
+    "salesFreq": 3.0
+  },
+  "T(S)-S10S-90A-STS304-W": {
+    "salesVolume": 13.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-125A X 65A-STS304-W": {
+    "salesVolume": 73.0,
+    "salesFreq": 4.0
+  },
+  "T(S)-S40S-100A-STS304-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 6.0
+  },
+  "T(S)-S20S-80A-STS304-W": {
+    "salesVolume": 55.0,
+    "salesFreq": 15.0
+  },
+  "T(S)-S10S-300A-STS304-W": {
+    "salesVolume": 42.0,
+    "salesFreq": 10.0
+  },
+  "R(E)-S10S-50A X 25A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-65A X 50A-STS304-W": {
+    "salesVolume": 86.0,
+    "salesFreq": 12.0
+  },
+  "90E(L)-S10S-20A-STS304-S": {
+    "salesVolume": 20.0,
+    "salesFreq": 3.0
+  },
+  "CAP-S10S-8\"-WP316L-S": {
+    "salesVolume": 12.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S20S-40A X 32A-STS304-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S20S-20A-STS304-W": {
+    "salesVolume": 224.0,
+    "salesFreq": 5.0
+  },
+  "CAP-S40S-8\"-WP304-S": {
+    "salesVolume": 14.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S10S-200A X 150A-STS304-W": {
+    "salesVolume": 11.0,
+    "salesFreq": 4.0
+  },
+  "CAP-S40S-80A-STS304-S": {
+    "salesVolume": 32.0,
+    "salesFreq": 7.0
+  },
+  "R(C)-S10S-125A X 65A-STS304-W": {
+    "salesVolume": 31.0,
+    "salesFreq": 5.0
+  },
+  "T(S)-S20S-125A-STS316L-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S10S-65A-STS304-W": {
+    "salesVolume": 105.0,
+    "salesFreq": 6.0
+  },
+  "45E(L)-S40S-2\"-WP304-S": {
+    "salesVolume": 12.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S10S-15A-STS316L-W": {
+    "salesVolume": 207.0,
+    "salesFreq": 10.0
+  },
+  "90E(L)-S40S-32A-STS304-W": {
+    "salesVolume": 99.0,
+    "salesFreq": 6.0
+  },
+  "45E(L)-S20S-80A-STS304-W": {
+    "salesVolume": 23.0,
+    "salesFreq": 7.0
+  },
+  "90E(L)-S40S-10\"-WP304-S": {
+    "salesVolume": 11.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S20S-150A-STS304-S": {
+    "salesVolume": 11.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-80A X 50A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-150A X 100A-STS316L-W": {
+    "salesVolume": 23.0,
+    "salesFreq": 9.0
+  },
+  "T(S)-S10S-250A-STS316L-W": {
+    "salesVolume": 53.0,
+    "salesFreq": 6.0
+  },
+  "CAP-S10S-150A-STS316L-S": {
+    "salesVolume": 12.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S20S-80A-STS316L-W": {
+    "salesVolume": 88.0,
+    "salesFreq": 11.0
+  },
+  "45E(L)-S40S-40A-STS304-W": {
+    "salesVolume": 22.0,
+    "salesFreq": 4.0
+  },
+  "45E(L)-S10S-3\"-WP304-W": {
+    "salesVolume": 42.0,
+    "salesFreq": 9.0
+  },
+  "T(R)-S10S-32A X 15A-STS304-W": {
+    "salesVolume": 76.0,
+    "salesFreq": 4.0
+  },
+  "45E(L)-S10S-150A-STS316L-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S80S-100A-STS316L-S": {
+    "salesVolume": 13.0,
+    "salesFreq": 5.0
+  },
+  "90E(L)-S10S-125A-STS316L-W": {
+    "salesVolume": 43.0,
+    "salesFreq": 4.0
+  },
+  "R(C)-S10S-90A X 80A-STS304-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 4.0
+  },
+  "90E(S)-S20S-50A-STS304-W": {
+    "salesVolume": 24.0,
+    "salesFreq": 4.0
+  },
+  "90E(L)-S40S-40A-STS316L-W": {
+    "salesVolume": 76.0,
+    "salesFreq": 4.0
+  },
+  "90E(S)-S40S-40A-STS304-W": {
+    "salesVolume": 75.0,
+    "salesFreq": 9.0
+  },
+  "R(C)-S20S-32A X 25A-STS304-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-25A X 20A-STS304-W": {
+    "salesVolume": 61.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S10S-40A X 20A-STS304-W": {
+    "salesVolume": 11.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-125A X 50A-STS304-W": {
+    "salesVolume": 25.0,
+    "salesFreq": 4.0
+  },
+  "45E(S)-S10S-150A-STS304-W": {
+    "salesVolume": 38.0,
+    "salesFreq": 8.0
+  },
+  "90E(L)-S40S-5\"-WP304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S20S-20A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S10S-50A-STS316L-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-250A X 150A-STS304-W": {
+    "salesVolume": 22.0,
+    "salesFreq": 4.0
+  },
+  "R(E)-S20S-100A X 65A-STS304-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 3.0
+  },
+  "CAP-S40S-15A-STS304-S": {
+    "salesVolume": 28.0,
+    "salesFreq": 4.0
+  },
+  "CAP-S10S-2-1/2\"-WP316L-S": {
+    "salesVolume": 42.0,
+    "salesFreq": 3.0
+  },
+  "CAP-S10S-125A-STS316L-S": {
+    "salesVolume": 30.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S40S-50A-STS304-W": {
+    "salesVolume": 50.0,
+    "salesFreq": 5.0
+  },
+  "90E(S)-S20S-200A-STS304-W": {
+    "salesVolume": 13.0,
+    "salesFreq": 4.0
+  },
+  "45E(L)-S40S-80A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S10S-32A X 25A-STS316L-W": {
+    "salesVolume": 39.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S20S-50A-STS304-S": {
+    "salesVolume": 19.0,
+    "salesFreq": 5.0
+  },
+  "T(S)-S10S-10\"-WP304-W": {
+    "salesVolume": 19.0,
+    "salesFreq": 7.0
+  },
+  "T(R)-S20S-32A X 25A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S40S-100A-STS304-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 7.0
+  },
+  "R(E)-S10S-50A X 40A-STS304-W": {
+    "salesVolume": 25.0,
+    "salesFreq": 8.0
+  },
+  "R(C)-S10S-250A X 200A-STS304-W": {
+    "salesVolume": 95.0,
+    "salesFreq": 15.0
+  },
+  "CAP-S20S-80A-STS304-S": {
+    "salesVolume": 31.0,
+    "salesFreq": 6.0
+  },
+  "CAP-S10S-100A-STS316L-S": {
+    "salesVolume": 91.0,
+    "salesFreq": 8.0
+  },
+  "90E(S)-S10S-90A-STS304-W": {
+    "salesVolume": 110.0,
+    "salesFreq": 7.0
+  },
+  "T(S)-S20S-80A-STS316L-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 5.0
+  },
+  "45E(L)-S10S-65A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S20S-300A-STS304-W": {
+    "salesVolume": 13.0,
+    "salesFreq": 4.0
+  },
+  "R(C)-S40S-100A X 80A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S10S-100A-STS304-S": {
+    "salesVolume": 17.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-300A X 250A-STS316L-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S10S-300A-STS316L-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S10S-150A-STS316L-W": {
+    "salesVolume": 79.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S10S-2-1/2\"-WP316L-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-2-1/2\" X 2\"-WP316L-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-200A X 65A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S10S-32A-STS304-S": {
+    "salesVolume": 8.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-100A-STS316L-S": {
+    "salesVolume": 8.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-4\" X 2-1/2\"-WP316L-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S80S-100A-STS316L-S": {
+    "salesVolume": 8.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S80S-100A-STS316L-S": {
+    "salesVolume": 8.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S10S-6\"-WP304-W": {
+    "salesVolume": 41.0,
+    "salesFreq": 17.0
+  },
+  "R(E)-S10S-125A X 100A-STS304-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 9.0
+  },
+  "90E(L)-S10S-12\"-WP304-W": {
+    "salesVolume": 27.0,
+    "salesFreq": 8.0
+  },
+  "45E(L)-S10S-250A-STS304-W": {
+    "salesVolume": 41.0,
+    "salesFreq": 11.0
+  },
+  "R(C)-S20S-200A X 150A-STS304-W": {
+    "salesVolume": 22.0,
+    "salesFreq": 6.0
+  },
+  "90E(L)-S10S-600A-STS304-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 5.0
+  },
+  "T(R)-S10S-150A X 100A-STS304-W": {
+    "salesVolume": 63.0,
+    "salesFreq": 16.0
+  },
+  "T(R)-S10S-200A X 150A-STS304-W": {
+    "salesVolume": 29.0,
+    "salesFreq": 13.0
+  },
+  "45E(S)-S10S-200A-STS316L-S": {
+    "salesVolume": 26.0,
+    "salesFreq": 6.0
+  },
+  "CAP-S20S-50A-STS304-S": {
+    "salesVolume": 30.0,
+    "salesFreq": 6.0
+  },
+  "R(C)-S40S-80A X 50A-STS304-W": {
+    "salesVolume": 17.0,
+    "salesFreq": 6.0
+  },
+  "T(R)-S10S-125A X 100A-STS304-W": {
+    "salesVolume": 28.0,
+    "salesFreq": 8.0
+  },
+  "45E(L)-S10S-350A-STS304-W": {
+    "salesVolume": 13.0,
+    "salesFreq": 6.0
+  },
+  "90E(L)-S40S-2-1/2\"-WP304L-S": {
+    "salesVolume": 21.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S10S-50A X 25A-STS316L-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-3\" X 2-1/2\"-WP304-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 4.0
+  },
+  "90E(S)-S10S-80A-STS316L-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-5\"-WP304-S": {
+    "salesVolume": 7.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-20A X 15A-STS316L-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-500A X 350A-STS304-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-200A X 125A-STS304-W": {
+    "salesVolume": 21.0,
+    "salesFreq": 7.0
+  },
+  "R(C)-S10S-250A X 100A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 3.0
+  },
+  "T(S)-S20S-200A-STS304-W": {
+    "salesVolume": 13.0,
+    "salesFreq": 8.0
+  },
+  "R(E)-S10S-200A X 100A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 5.0
+  },
+  "T(S)-S10S-65A-STS316L-W": {
+    "salesVolume": 11.0,
+    "salesFreq": 5.0
+  },
+  "T(R)-S10S-250A X 150A-STS304-W": {
+    "salesVolume": 33.0,
+    "salesFreq": 8.0
+  },
+  "90E(L)-S10S-200A-STS316L-W": {
+    "salesVolume": 34.0,
+    "salesFreq": 7.0
+  },
+  "R(E)-S10S-80A X 50A-STS304-W": {
+    "salesVolume": 31.0,
+    "salesFreq": 8.0
+  },
+  "R(E)-S10S-150A X 100A-STS304-W": {
+    "salesVolume": 23.0,
+    "salesFreq": 9.0
+  },
+  "90E(L)-S10S-450A-STS316L-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S80S-80A-STS304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-150A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S20S-150A-STS304-W": {
+    "salesVolume": 23.0,
+    "salesFreq": 8.0
+  },
+  "T(R)-S10S-150A X 100A-STS316L-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 3.0
+  },
+  "90E(S)-S10S-400A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S10S-20A-STS316L-W": {
+    "salesVolume": 118.0,
+    "salesFreq": 6.0
+  },
+  "45E(L)-S40S-25A-STS304-W": {
+    "salesVolume": 48.0,
+    "salesFreq": 5.0
+  },
+  "CAP-S10S-80A-STS316L-S": {
+    "salesVolume": 17.0,
+    "salesFreq": 3.0
+  },
+  "90E(S)-S20S-300A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-8\" X 4\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-65A X 32A-STS304-W": {
+    "salesVolume": 70.0,
+    "salesFreq": 9.0
+  },
+  "T(R)-S10S-250A X 200A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 4.0
+  },
+  "CAP-S10S-350A-STS316L-S": {
+    "salesVolume": 9.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S10S-600A-STS316L-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S20S-150A-STS316L-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S20S-125A X 50A-STS304-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S40S-50A X 25A-STS304-W": {
+    "salesVolume": 18.0,
+    "salesFreq": 4.0
+  },
+  "90E(S)-S10S-200A-STS316L-W": {
+    "salesVolume": 74.0,
+    "salesFreq": 8.0
+  },
+  "R(C)-S10S-200A X 150A-STS316L-W": {
+    "salesVolume": 18.0,
+    "salesFreq": 8.0
+  },
+  "90E(L)-S40S-100A-STS316L-W": {
+    "salesVolume": 42.0,
+    "salesFreq": 9.0
+  },
+  "45E(L)-S10S-25A-STS316L-W": {
+    "salesVolume": 41.0,
+    "salesFreq": 4.0
+  },
+  "R(C)-S40S-2-1/2\" X 2\"-WP304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 3.0
+  },
+  "90E(S)-S20S-65A-STS316L-W": {
+    "salesVolume": 11.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S40S-25A-STS316L-W": {
+    "salesVolume": 44.0,
+    "salesFreq": 5.0
+  },
+  "90E(S)-S40S-25A-STS316L-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S10S-80A X 40A-STS304-W": {
+    "salesVolume": 13.0,
+    "salesFreq": 5.0
+  },
+  "T(S)-S20S-65A-STS304-W": {
+    "salesVolume": 49.0,
+    "salesFreq": 11.0
+  },
+  "R(C)-S10S-350A X 200A-STS304-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 4.0
+  },
+  "90E(L)-S40S-200A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S10S-100A-STS316L-W": {
+    "salesVolume": 128.0,
+    "salesFreq": 5.0
+  },
+  "R(C)-S10S-80A X 50A-STS316L-W": {
+    "salesVolume": 34.0,
+    "salesFreq": 5.0
+  },
+  "CAP-S20S-40A-STS304-S": {
+    "salesVolume": 25.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-40A X 20A-STS304-W": {
+    "salesVolume": 127.0,
+    "salesFreq": 7.0
+  },
+  "R(E)-S10S-80A X 65A-STS304-W": {
+    "salesVolume": 29.0,
+    "salesFreq": 5.0
+  },
+  "90E(L)-S40S-1\"-WP304-S": {
+    "salesVolume": 44.0,
+    "salesFreq": 8.0
+  },
+  "45E(L)-S40S-1-1/2\"-WP304-S": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-32A X 15A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-2-1/2\" X 1\"-WP316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S80S-20A X 15A-STS316L-S": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S20S-40A X 25A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S10S-2\"-WP304L-S": {
+    "salesVolume": 115.0,
+    "salesFreq": 5.0
+  },
+  "R(C)-S10S-65A X 25A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-200A X 125A-STS304-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S10S-400A-STS304-W": {
+    "salesVolume": 21.0,
+    "salesFreq": 8.0
+  },
+  "90E(L)-S80S-65A-STS304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S20S-250A X 200A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 4.0
+  },
+  "T(S)-S20S-65A-STS316L-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 6.0
+  },
+  "T(S)-S20S-150A-STS316L-W": {
+    "salesVolume": 35.0,
+    "salesFreq": 5.0
+  },
+  "R(C)-S10S-25A X 20A-STS316L-W": {
+    "salesVolume": 44.0,
+    "salesFreq": 5.0
+  },
+  "R(C)-S10S-150A X 125A-STS304-W": {
+    "salesVolume": 28.0,
+    "salesFreq": 10.0
+  },
+  "45E(S)-S10S-200A-STS304-W": {
+    "salesVolume": 30.0,
+    "salesFreq": 7.0
+  },
+  "R(E)-S10S-125A X 80A-STS304-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 5.0
+  },
+  "90E(L)-S160-40A-STS304-S": {
+    "salesVolume": 14.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-90A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S20S-8\"-WP316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S40S-10\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S10S-100A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "45E(S)-S10S-250A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S10S-200A X 150A-STS316L-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S40S-150A-STS316L-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 3.0
+  },
+  "CAP-S20S-250A-STS304-S": {
+    "salesVolume": 8.0,
+    "salesFreq": 4.0
+  },
+  "90E(L)-S20S-50A-STS316L-W": {
+    "salesVolume": 141.0,
+    "salesFreq": 11.0
+  },
+  "90E(L)-S10S-2-1/2\"-WP304-W": {
+    "salesVolume": 59.0,
+    "salesFreq": 7.0
+  },
+  "90E(S)-S10S-32A-STS316L-W": {
+    "salesVolume": 84.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S20S-65A X 40A-STS304-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S10S-8\"-WP316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S20S-150A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-350A X 300A-STS304-W": {
+    "salesVolume": 42.0,
+    "salesFreq": 5.0
+  },
+  "R(C)-S10S-50A X 32A-STS304-W": {
+    "salesVolume": 86.0,
+    "salesFreq": 8.0
+  },
+  "T(R)-S10S-100A X 65A-STS304-W": {
+    "salesVolume": 265.0,
+    "salesFreq": 10.0
+  },
+  "R(C)-S10S-150A X 65A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-200A X 80A-STS304-W": {
+    "salesVolume": 14.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-200A X 100A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S160-15A-STS304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S160-32A-STS304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S80S-40A-STS304-S": {
+    "salesVolume": 9.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S10S-6\"-WP304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S20S-25A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-50A-STS316L-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-65A-STS316L-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-6\"-WP304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S20S-250A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "45E(S)-S10S-80A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S20S-300A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-65A X 50A-STS316L-W": {
+    "salesVolume": 129.0,
+    "salesFreq": 5.0
+  },
+  "R(C)-S10S-5\" X 4\"-WP304-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-12\" X 6\"-WP304-W": {
+    "salesVolume": 13.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S80S-40A-STS304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S80S-65A-STS304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S80S-65A-STS316L-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S10S-2\"-WP316L-S": {
+    "salesVolume": 43.0,
+    "salesFreq": 4.0
+  },
+  "90E(S)-S20S-10\"-WP304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S20S-40A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S10S-8\"-WP304-W": {
+    "salesVolume": 17.0,
+    "salesFreq": 8.0
+  },
+  "CAP-S10S-300A-STS304-S": {
+    "salesVolume": 21.0,
+    "salesFreq": 8.0
+  },
+  "90E(S)-S10S-450A-STS316L-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S10S-300A-STS316L-W": {
+    "salesVolume": 26.0,
+    "salesFreq": 6.0
+  },
+  "R(C)-S10S-90A X 32A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S80S-150A X 100A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S40S-150A X 100A-STS316L-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S10S-350A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 4.0
+  },
+  "90E(L)-S10S-500A-STS304-W": {
+    "salesVolume": 29.0,
+    "salesFreq": 5.0
+  },
+  "R(C)-S20S-80A X 65A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S10S-250A X 200A-STS316L-W": {
+    "salesVolume": 11.0,
+    "salesFreq": 3.0
+  },
+  "R(E)-S10S-100A X 65A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 3.0
+  },
+  "CAP-S20S-200A-STS304-S": {
+    "salesVolume": 7.0,
+    "salesFreq": 4.0
+  },
+  "90E(L)-S40S-3\"-WP304L-S": {
+    "salesVolume": 27.0,
+    "salesFreq": 4.0
+  },
+  "R(C)-S20S-250A X 200A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-80A X 20A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-150A X 125A-STS304-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 6.0
+  },
+  "T(R)-S10S-200A X 100A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-200A X 125A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-2-1/2\"-WP304-S": {
+    "salesVolume": 13.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S10S-5\"-WP304-W": {
+    "salesVolume": 469.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S10S-150A-STS304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S10S-125A-STS316L-W": {
+    "salesVolume": 11.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-5\" X 3\"-WP304-W": {
+    "salesVolume": 13.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S80S-150A-STS316L-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-300A X 250A-STS316L-W": {
+    "salesVolume": 34.0,
+    "salesFreq": 4.0
+  },
+  "90E(L)-S40S-125A-STS316L-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S20S-400A-STS304-W": {
+    "salesVolume": 20.0,
+    "salesFreq": 6.0
+  },
+  "90E(S)-S40S-80A-STS304-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S10S-250A-STS316L-W": {
+    "salesVolume": 17.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S40S-32A X 15A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-50A X 25A-STS304-W": {
+    "salesVolume": 113.0,
+    "salesFreq": 10.0
+  },
+  "T(S)-S40S-2-1/2\"-WP316L-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S10S-200A-STS316L-W": {
+    "salesVolume": 53.0,
+    "salesFreq": 6.0
+  },
+  "R(C)-S10S-50A X 40A-STS316L-W": {
+    "salesVolume": 115.0,
+    "salesFreq": 4.0
+  },
+  "R(C)-S10S-150A X 80A-STS316L-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-6\" X 3\"-WP304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S10S-400A-STS316L-S": {
+    "salesVolume": 11.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S20S-50A X 25A-STS304-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 3.0
+  },
+  "R(E)-S10S-100A X 50A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-150A X 50A-STS304-W": {
+    "salesVolume": 25.0,
+    "salesFreq": 7.0
+  },
+  "45E(L)-S80S-150A-STS304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S10S-450A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S20S-250A X 150A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S40S-6\" X 4\"-WP304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S20S-50A-STS316L-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 6.0
+  },
+  "T(R)-S10S-100A X 80A-STS316L-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 6.0
+  },
+  "R(C)-S10S-300A X 250A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 7.0
+  },
+  "R(E)-S10S-8\" X 6\"-WP304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 5.0
+  },
+  "90E(S)-S20S-50A-STS316L-W": {
+    "salesVolume": 40.0,
+    "salesFreq": 4.0
+  },
+  "CAP-S20S-125A-STS304-S": {
+    "salesVolume": 8.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S10S-50A X 15A-STS304-W": {
+    "salesVolume": 30.0,
+    "salesFreq": 5.0
+  },
+  "T(S)-S20S-15A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S20S-100A-STS304-W": {
+    "salesVolume": 68.0,
+    "salesFreq": 8.0
+  },
+  "R(E)-S10S-150A X 125A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-150A X 80A-STS304-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-300A X 150A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S10S-350A-STS304-S": {
+    "salesVolume": 11.0,
+    "salesFreq": 5.0
+  },
+  "45E(L)-S10S-400A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-300A X 250A-STS304-W": {
+    "salesVolume": 15.0,
+    "salesFreq": 4.0
+  },
+  "90E(L)-S40S-20A-STS304-S": {
+    "salesVolume": 26.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S20S-20A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S160-40A-STS316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S80S-65A-STS316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S20S-100A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-100A-STS304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S20S-125A-STS316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-8\"-WP304-W": {
+    "salesVolume": 24.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-250A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S40S-80A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S20S-250A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-15A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-3\"-WP304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S10S-8\"-WP316L-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S40S-300A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S40S-50A X 40A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-2-1/2\" X 2\"-WP304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-65A X 15A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S40S-80A X 40A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S40S-5\"-WP304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-125A X 80A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S40S-150A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S10S-6\"-WP304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S40S-150A X 100A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S40S-150A X 100A-STS316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S40S-250A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S40S-250A X 200A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-25A X 15A-STS316L-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S80S-50A X 32A-STS316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S80S-65A X 40A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-80A X 65A-STS304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-100A X 80A-STS304-S": {
+    "salesVolume": 6.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-100A X 80A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S20S-150A X 125A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S20S-150A X 100A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S40S-150A X 100A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-6\" X 3\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-300A X 200A-STS316L-W": {
+    "salesVolume": 37.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S20S-300A X 200A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S20S-50A X 32A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S20S-50A X 25A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S40S-2-1/2\" X 2\"-WP316L-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S20S-80A X 65A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-100A X 80A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S80S-8\" X 4\"-WP316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-450A X 400A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S40S-8\"-WP316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S10S-600A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S20S-80A X 50A-STS304-W": {
+    "salesVolume": 37.0,
+    "salesFreq": 9.0
+  },
+  "R(C)-S20S-100A X 50A-STS304-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 5.0
+  },
+  "CAP-S20S-100A-STS304-S": {
+    "salesVolume": 49.0,
+    "salesFreq": 5.0
+  },
+  "CAP-S40S-100A-STS304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-150A-STS304-W": {
+    "salesVolume": 34.0,
+    "salesFreq": 11.0
+  },
+  "T(R)-S10S-8\" X 6\"-WP304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S80S-200A X 100A-STS316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-80A X 40A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S20S-100A-STS304-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-50A X 20A-STS304-W": {
+    "salesVolume": 23.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S20S-20A-STS304-W": {
+    "salesVolume": 733.0,
+    "salesFreq": 10.0
+  },
+  "R(E)-S10S-80A X 40A-STS304-W": {
+    "salesVolume": 14.0,
+    "salesFreq": 5.0
+  },
+  "45E(S)-S10S-100A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-250A X 100A-STS304-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 5.0
+  },
+  "T(S)-S10S-400A-STS304-W": {
+    "salesVolume": 11.0,
+    "salesFreq": 5.0
+  },
+  "R(E)-S10S-250A X 200A-STS304-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S10S-350A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-300A X 250A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-300A X 150A-STS304-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 5.0
+  },
+  "CAP-S10S-500A-STS304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-40A-STS304-S": {
+    "salesVolume": 7.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S40S-65A-STS316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S20S-100A-STS316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S80S-150A-STS304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S80S-8\"-WP316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S10S-10\"-WP316L-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S10S-12\"-WP316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S10S-10\"-WP304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-25A-STS304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-50A-STS304-S": {
+    "salesVolume": 34.0,
+    "salesFreq": 3.0
+  },
+  "45E(L)-S40S-2\"-WP316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S20S-350A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S40S-40A X 20A-STS304-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S20S-50A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S20S-125A X 80A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S10S-6\" X 3\"-WP304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 3.0
+  },
+  "T(S)-S40S-8\"-WP304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S10S-8\"-WP304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S10S-600A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-32A X 15A-STS316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-40A X 20A-STS316L-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-50A X 32A-STS304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-50A X 25A-STS316L-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-3\" X 2-1/2\"-WP304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-80A X 50A-STS304-S": {
+    "salesVolume": 13.0,
+    "salesFreq": 4.0
+  },
+  "R(C)-S20S-80A X 25A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-4\" X 3\"-WP304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-100A X 50A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-4\" X 2\"-WP304-S": {
+    "salesVolume": 8.0,
+    "salesFreq": 4.0
+  },
+  "R(C)-S40S-100A X 40A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-6\" X 5\"-WP304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-8\" X 6\"-WP304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S10S-8\" X 3\"-WP316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-250A X 100A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-350A X 250A-STS316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-14\" X 10\"-WP304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-400A X 300A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S20S-100A X 80A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 3.0
+  },
+  "R(E)-S20S-300A X 150A-STS304-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-14\" X 12\"-WP304-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S80S-10\"-WP304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S40S-12\"-WP316L-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S40S-500A-STS304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-125A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 4.0
+  },
+  "90E(L)-S20S-125A-STS316L-W": {
+    "salesVolume": 29.0,
+    "salesFreq": 4.0
+  },
+  "90E(S)-S40S-150A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S10S-250A-STS316L-W": {
+    "salesVolume": 17.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S10S-500A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S20S-25A-STS316L-W": {
+    "salesVolume": 19.0,
+    "salesFreq": 4.0
+  },
+  "T(S)-S40S-100A-STS316L-W": {
+    "salesVolume": 20.0,
+    "salesFreq": 6.0
+  },
+  "R(C)-S40S-32A X 25A-STS304-W": {
+    "salesVolume": 70.0,
+    "salesFreq": 6.0
+  },
+  "R(C)-S40S-40A X 25A-STS304-W": {
+    "salesVolume": 33.0,
+    "salesFreq": 7.0
+  },
+  "R(C)-S20S-65A X 50A-STS316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-2-1/2\" X 2\"-WP316L-W": {
+    "salesVolume": 13.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S20S-300A X 250A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S40S-50A X 40A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 4.0
+  },
+  "R(E)-S10S-6\" X 4\"-WP304-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 5.0
+  },
+  "CAP-S40S-50A-STS304-S": {
+    "salesVolume": 15.0,
+    "salesFreq": 7.0
+  },
+  "R(C)-S40S-125A X 100A-STS316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-450A X 300A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-450A X 250A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-25A X 15A-STS304-W": {
+    "salesVolume": 11.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S20S-50A X 25A-STS304-W": {
+    "salesVolume": 92.0,
+    "salesFreq": 12.0
+  },
+  "R(C)-S20S-32A X 20A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-450A X 400A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-500A X 400A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S20S-125A-STS304-W": {
+    "salesVolume": 84.0,
+    "salesFreq": 13.0
+  },
+  "90E(S)-S10S-25A-STS316L-W": {
+    "salesVolume": 348.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S20S-25A X 20A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-40A X 32A-STS304-W": {
+    "salesVolume": 36.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S20S-40A X 25A-STS304-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S20S-25A-STS304-S": {
+    "salesVolume": 30.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S20S-80A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S40S-125A-STS304-S": {
+    "salesVolume": 8.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S20S-40A X 15A-STS304-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S20S-65A-STS304-S": {
+    "salesVolume": 28.0,
+    "salesFreq": 4.0
+  },
+  "90E(S)-S20S-125A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S10S-125A-STS316L-W": {
+    "salesVolume": 52.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S10S-32A-STS316L-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S40S-15A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-2-1/2\" X 2\"-WP304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S20S-250A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-50A X 40A-STS304-W": {
+    "salesVolume": 18.0,
+    "salesFreq": 3.0
+  },
+  "CAP-S10S-40A-STS316L-S": {
+    "salesVolume": 60.0,
+    "salesFreq": 4.0
+  },
+  "90E(S)-S20S-80A-STS316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-1-1/2\"-WP304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-2-1/2\"-WP304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S20S-125A-STS304-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 3.0
+  },
+  "T(S)-S10S-2-1/2\"-WP304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-25A X 15A-STS304-W": {
+    "salesVolume": 52.0,
+    "salesFreq": 7.0
+  },
+  "R(C)-S20S-40A X 15A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-80A X 65A-STS316L-W": {
+    "salesVolume": 28.0,
+    "salesFreq": 5.0
+  },
+  "CAP-S40S-65A-STS304-S": {
+    "salesVolume": 25.0,
+    "salesFreq": 5.0
+  },
+  "R(C)-S10S-32A X 20A-STS304-W": {
+    "salesVolume": 26.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-65A X 25A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-32A X 15A-STS304-W": {
+    "salesVolume": 15.0,
+    "salesFreq": 3.0
+  },
+  "R(E)-S10S-32A X 15A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-80A X 15A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-65A X 32A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-20A X 15A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-32A X 25A-STS304-W": {
+    "salesVolume": 21.0,
+    "salesFreq": 3.0
+  },
+  "R(E)-S10S-40A X 32A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-25A X 20A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-50A X 20A-STS304-W": {
+    "salesVolume": 14.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-100A X 32A-STS304-W": {
+    "salesVolume": 20.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-40A X 25A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-25A X 15A-STS304-W": {
+    "salesVolume": 29.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S10S-80A X 65A-STS304-W": {
+    "salesVolume": 17.0,
+    "salesFreq": 5.0
+  },
+  "T(R)-S10S-150A X 65A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-125A X 65A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S10S-150A X 50A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-250A X 125A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-250A X 125A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S10S-250A X 150A-STS304-W": {
+    "salesVolume": 11.0,
+    "salesFreq": 5.0
+  },
+  "R(E)-S10S-250A X 100A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-350A X 250A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-300A X 150A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S10S-450A-STS304-S": {
+    "salesVolume": 9.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-300A X 200A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-15A-STS304-S": {
+    "salesVolume": 138.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-15A-STS316L-W": {
+    "salesVolume": 44.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S80S-15A-STS316L-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S80S-20A-STS304-S": {
+    "salesVolume": 6.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S40S-20A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-20A-STS316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-25A-STS304-S": {
+    "salesVolume": 42.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S160-25A-STS304-S": {
+    "salesVolume": 12.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S20S-25A-STS316L-S": {
+    "salesVolume": 32.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-25A-STS316L-S": {
+    "salesVolume": 8.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S20S-32A-STS304-S": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-32A-STS304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S80S-32A-STS304-S": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-32A-STS316L-W": {
+    "salesVolume": 34.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S10S-32A-STS316L-S": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S20S-40A-STS316L-S": {
+    "salesVolume": 9.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S80S-50A-STS304-S": {
+    "salesVolume": 10.0,
+    "salesFreq": 6.0
+  },
+  "90E(L)-S20S-50A-STS316L-S": {
+    "salesVolume": 34.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S20S-2-1/2\"-WP304-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S10S-2-1/2\"-WP304-S": {
+    "salesVolume": 42.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-2-1/2\"-WP316L-S": {
+    "salesVolume": 300.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-80A-STS304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S80S-80A-STS304-S": {
+    "salesVolume": 7.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S80S-80A-STS316L-S": {
+    "salesVolume": 28.0,
+    "salesFreq": 4.0
+  },
+  "90E(L)-S10S-5\"-WP316L-S": {
+    "salesVolume": 52.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S20S-6\"-WP304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S80S-6\"-WP304-S": {
+    "salesVolume": 12.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-6\"-WP316L-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S10S-6\"-WP316L-S": {
+    "salesVolume": 9.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S20S-6\"-WP316L-S": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-6\"-WP316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-200A-STS304-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 4.0
+  },
+  "90E(L)-S20S-200A-STS316L-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-8\"-WP304-S": {
+    "salesVolume": 13.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S80S-8\"-WP304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-8\"-WP316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S10S-8\"-WP316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-8\"-WP316L-S": {
+    "salesVolume": 12.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-250A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-250A-STS304-S": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S20S-250A-STS316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-10\"-WP304-W": {
+    "salesVolume": 18.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-300A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S20S-12\"-WP304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S10S-12\"-WP304-S": {
+    "salesVolume": 28.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S20S-350A-STS316L-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S40S-400A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S20S-400A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S40S-400A-STS316L-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S10S-500A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S10S-25A-STS304-S": {
+    "salesVolume": 20.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S160-25A-STS316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S20S-32A-STS304-W": {
+    "salesVolume": 18.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S40S-32A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S10S-40A-STS304-S": {
+    "salesVolume": 30.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S40S-40A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S40S-40A-STS316L-S": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S80S-40A-STS316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S80S-50A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S10S-2-1/2\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S10S-100A-STS316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S10S-150A-STS304-S": {
+    "salesVolume": 13.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S10S-6\"-WP304-W": {
+    "salesVolume": 37.0,
+    "salesFreq": 5.0
+  },
+  "90E(S)-S80S-6\"-WP304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S10S-6\"-WP316L-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S40S-6\"-WP316L-S": {
+    "salesVolume": 18.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S10S-8\"-WP304-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 3.0
+  },
+  "90E(S)-S20S-8\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S40S-8\"-WP304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S40S-8\"-WP304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S10S-8\"-WP316L-W": {
+    "salesVolume": 53.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S40S-8\"-WP316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S40S-8\"-WP316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S10S-10\"-WP316L-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S10S-300A-STS316L-W": {
+    "salesVolume": 40.0,
+    "salesFreq": 3.0
+  },
+  "90E(S)-S10S-12\"-WP304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S10S-12\"-WP304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S10S-400A-STS316L-W": {
+    "salesVolume": 11.0,
+    "salesFreq": 2.0
+  },
+  "90E(S)-S10S-500A-STS304-W": {
+    "salesVolume": 11.0,
+    "salesFreq": 3.0
+  },
+  "45E(L)-S40S-15A-STS304-W": {
+    "salesVolume": 28.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S40S-15A-STS316L-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-1/2\"-WP304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-1/2\"-WP316L-S": {
+    "salesVolume": 20.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S160-1/2\"-WP316L-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-20A-STS304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-20A-STS316L-W": {
+    "salesVolume": 30.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-3/4\"-WP304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-3/4\"-WP304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S80S-3/4\"-WP304-S": {
+    "salesVolume": 8.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-25A-STS304-S": {
+    "salesVolume": 31.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S20S-25A-STS304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-25A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-25A-STS316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-1\"-WP304-W": {
+    "salesVolume": 15.0,
+    "salesFreq": 3.0
+  },
+  "45E(L)-S40S-1\"-WP304-S": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-1\"-WP316L-S": {
+    "salesVolume": 11.0,
+    "salesFreq": 3.0
+  },
+  "45E(L)-S40S-32A-STS304-W": {
+    "salesVolume": 36.0,
+    "salesFreq": 3.0
+  },
+  "45E(L)-S40S-1-1/4\"-WP304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-40A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S20S-40A-STS304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-40A-STS316L-S": {
+    "salesVolume": 24.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-1-1/2\"-WP304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-1-1/2\"-WP316L-S": {
+    "salesVolume": 15.0,
+    "salesFreq": 4.0
+  },
+  "45E(L)-S160-1-1/2\"-WP316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-2\"-WP316L-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 3.0
+  },
+  "45E(L)-S10S-65A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-2-1/2\"-WP316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-80A-STS304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-80A-STS316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-3\"-WP316L-W": {
+    "salesVolume": 27.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S40S-3\"-WP316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S20S-100A-STS316L-W": {
+    "salesVolume": 19.0,
+    "salesFreq": 4.0
+  },
+  "45E(L)-S40S-125A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-125A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S20S-125A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S10S-5\"-WP304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-5\"-WP316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S20S-150A-STS316L-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S80S-6\"-WP304-S": {
+    "salesVolume": 7.0,
+    "salesFreq": 4.0
+  },
+  "45E(L)-S10S-6\"-WP316L-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 4.0
+  },
+  "45E(L)-S40S-6\"-WP316L-S": {
+    "salesVolume": 10.0,
+    "salesFreq": 4.0
+  },
+  "45E(L)-S80S-6\"-WP316L-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-200A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S20S-200A-STS316L-W": {
+    "salesVolume": 17.0,
+    "salesFreq": 4.0
+  },
+  "45E(L)-S10S-8\"-WP304-W": {
+    "salesVolume": 14.0,
+    "salesFreq": 3.0
+  },
+  "45E(L)-S40S-8\"-WP304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S10S-8\"-WP304-S": {
+    "salesVolume": 71.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S40S-250A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 3.0
+  },
+  "45E(L)-S40S-250A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-10\"-WP304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 3.0
+  },
+  "45E(L)-S20S-10\"-WP304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-10\"-WP316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-12\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-12\"-WP316L-W": {
+    "salesVolume": 11.0,
+    "salesFreq": 4.0
+  },
+  "45E(L)-S10S-12\"-WP316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S20S-350A-STS316L-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "45E(L)-S10S-600A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S10S-600A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S40S-25A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S10S-25A-STS316L-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 2.0
+  },
+  "45E(S)-S40S-32A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 3.0
+  },
+  "45E(S)-S40S-40A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 2.0
+  },
+  "45E(S)-S20S-40A-STS316L-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S10S-50A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S20S-50A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 2.0
+  },
+  "45E(S)-S40S-50A-STS304-W": {
+    "salesVolume": 13.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S20S-50A-STS316L-W": {
+    "salesVolume": 35.0,
+    "salesFreq": 4.0
+  },
+  "45E(S)-S40S-50A-STS316L-W": {
+    "salesVolume": 13.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S10S-65A-STS304-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S40S-65A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S40S-65A-STS316L-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 2.0
+  },
+  "45E(S)-S10S-80A-STS304-W": {
+    "salesVolume": 40.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S20S-80A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 2.0
+  },
+  "45E(S)-S40S-125A-STS304-W": {
+    "salesVolume": 25.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S10S-125A-STS316L-W": {
+    "salesVolume": 24.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S20S-150A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S10S-6\"-WP316L-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 3.0
+  },
+  "45E(S)-S40S-8\"-WP304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S10S-8\"-WP316L-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 2.0
+  },
+  "45E(S)-S10S-300A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S10S-12\"-WP316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S10S-400A-STS316L-W": {
+    "salesVolume": 20.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S10S-450A-STS304-W": {
+    "salesVolume": 11.0,
+    "salesFreq": 2.0
+  },
+  "45E(S)-S10S-550A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S10S-15A-STS304-S": {
+    "salesVolume": 44.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S40S-15A-STS304-S": {
+    "salesVolume": 47.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S40S-15A-STS316L-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S80S-20A-STS304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S40S-20A X 15A-STS304-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S40S-20A X 15A-STS304-S": {
+    "salesVolume": 12.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S40S-20A X 15A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S80S-25A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S40S-25A-STS316L-W": {
+    "salesVolume": 25.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S20S-25A-STS316L-S": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S40S-25A X 20A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-25A X 20A-STS304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-25A X 20A-STS316L-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-25A X 15A-STS304-S": {
+    "salesVolume": 55.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S20S-25A X 15A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S10S-32A-STS304-S": {
+    "salesVolume": 20.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S10S-32A-STS316L-S": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-32A X 25A-STS316L-W": {
+    "salesVolume": 18.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S40S-32A X 20A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 3.0
+  },
+  "T(S)-S40S-40A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-40A X 25A-STS304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-40A X 20A-STS304-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S40S-40A X 15A-STS304-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S20S-50A-STS316L-S": {
+    "salesVolume": 9.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S20S-50A X 40A-STS304-W": {
+    "salesVolume": 18.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S80S-50A X 40A-STS316L-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-50A X 32A-STS316L-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S40S-50A X 25A-STS316L-W": {
+    "salesVolume": 25.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S20S-50A X 25A-STS316L-S": {
+    "salesVolume": 34.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S40S-50A X 25A-STS316L-S": {
+    "salesVolume": 7.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S40S-50A X 20A-STS304-W": {
+    "salesVolume": 13.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-50A X 20A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-50A X 15A-STS316L-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S10S-65A-STS304-S": {
+    "salesVolume": 15.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S80S-50A-STS316L-S": {
+    "salesVolume": 44.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S20S-2-1/2\"-WP304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S10S-2-1/2\"-WP304-S": {
+    "salesVolume": 12.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S40S-2-1/2\"-WP304-S": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S40S-2-1/2\"-WP316L-S": {
+    "salesVolume": 46.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-65A X 50A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S10S-65A X 50A-STS304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-65A X 50A-STS316L-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 3.0
+  },
+  "90E(L)-S10S-450A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S40S-25A-STS304-W": {
+    "salesVolume": 26.0,
+    "salesFreq": 5.0
+  },
+  "T(R)-S40S-2-1/2\" X 2\"-WP316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S40S-65A X 40A-STS304-S": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S40S-32A-STS304-W": {
+    "salesVolume": 35.0,
+    "salesFreq": 8.0
+  },
+  "T(R)-S20S-65A X 40A-STS316L-S": {
+    "salesVolume": 9.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S40S-2-1/2\" X 1\"-WP316L-S": {
+    "salesVolume": 13.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S40S-65A X 20A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S40S-2-1/2\" X 1/2\"-WP316L-S": {
+    "salesVolume": 45.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S10S-80A-STS304-S": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S80S-80A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S80S-80A-STS316L-S": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-80A X 65A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-3\" X 2-1/2\"-WP304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-80A X 50A-STS316L-W": {
+    "salesVolume": 46.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S40S-80A X 50A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-80A X 40A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-80A X 32A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-80A X 25A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-80A X 25A-STS316L-W": {
+    "salesVolume": 24.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-80A X 20A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "90E(S)-S10S-10\"-WP304-W": {
+    "salesVolume": 15.0,
+    "salesFreq": 4.0
+  },
+  "90E(S)-S10S-450A-STS304-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S40S-20A-STS304-W": {
+    "salesVolume": 70.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S40S-100A X 80A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-100A X 80A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-100A X 65A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S10S-4\" X 2-1/2\"-WP304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S20S-100A X 40A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-100A X 40A-STS316L-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 3.0
+  },
+  "45E(L)-S20S-80A-STS316L-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 3.0
+  },
+  "45E(L)-S40S-100A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S10S-5\"-WP304-W": {
+    "salesVolume": 25.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S20S-125A X 100A-STS304-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S20S-125A X 100A-STS316L-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S20S-125A X 80A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-125A X 80A-STS304-S": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-5\" X 2-1/2\"-WP304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-5\" X 2\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-125A X 40A-STS304-W": {
+    "salesVolume": 33.0,
+    "salesFreq": 2.0
+  },
+  "45E(L)-S20S-300A-STS304-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 3.0
+  },
+  "T(S)-S40S-150A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S80S-6\"-WP304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S40S-6\"-WP316L-W": {
+    "salesVolume": 20.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S10S-6\"-WP316L-S": {
+    "salesVolume": 7.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-150A X 125A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S40S-150A X 100A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-150A X 80A-STS316L-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-6\" X 3\"-WP316L-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-150A X 50A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "45E(S)-S10S-200A-STS316L-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "45E(S)-S10S-400A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S40S-20A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S20S-200A-STS316L-W": {
+    "salesVolume": 14.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S20S-200A X 150A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S20S-200A X 125A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S40S-25A X 15A-STS304-W": {
+    "salesVolume": 36.0,
+    "salesFreq": 4.0
+  },
+  "T(R)-S10S-8\" X 4\"-WP304-S": {
+    "salesVolume": 5.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-50A X 40A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S20S-250A X 200A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-10\" X 8\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-10\" X 6\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-10\" X 6\"-WP316L-W": {
+    "salesVolume": 15.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S10S-12\"-WP304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "T(S)-S40S-12\"-WP304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S20S-300A X 250A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S40S-12\" X 10\"-WP316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-300A X 200A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-300A X 125A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-350A X 300A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-50A X 25A-STS316L-W": {
+    "salesVolume": 30.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S20S-50A X 15A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-350A X 200A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-65A X 50A-STS316L-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-550A X 300A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-2-1/2\" X 1-1/2\"-WP304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-20A X 15A-STS304-W": {
+    "salesVolume": 26.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-20A X 15A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-20A X 15A-STS316L-W": {
+    "salesVolume": 23.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S20S-65A X 25A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-25A X 20A-STS304-W": {
+    "salesVolume": 155.0,
+    "salesFreq": 6.0
+  },
+  "R(C)-S80S-25A X 20A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S10S-100A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-25A X 15A-STS304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S20S-100A-STS316L-W": {
+    "salesVolume": 25.0,
+    "salesFreq": 7.0
+  },
+  "R(C)-S40S-32A X 20A-STS304-W": {
+    "salesVolume": 24.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S20S-32A X 15A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-100A X 80A-STS304-W": {
+    "salesVolume": 23.0,
+    "salesFreq": 6.0
+  },
+  "R(C)-S80S-40A X 32A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-40A X 32A-STS316L-W": {
+    "salesVolume": 40.0,
+    "salesFreq": 2.0
+  },
+  "T(R)-S10S-100A X 65A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-40A X 25A-STS304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S80S-40A X 25A-STS304-S": {
+    "salesVolume": 62.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-40A X 20A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-100A X 50A-STS316L-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-40A X 15A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S80S-40A X 15A-STS316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S20S-125A-STS304-W": {
+    "salesVolume": 23.0,
+    "salesFreq": 11.0
+  },
+  "R(C)-S20S-50A X 32A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S20S-150A X 100A-STS304-W": {
+    "salesVolume": 11.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S10S-50A X 32A-STS316L-W": {
+    "salesVolume": 57.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-150A X 40A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S20S-50A X 25A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S20S-50A X 25A-STS316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S80S-50A X 25A-STS316L-S": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-50A X 20A-STS316L-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-65A X 50A-STS304-S": {
+    "salesVolume": 13.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-65A X 50A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-65A X 50A-STS316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-2-1/2\" X 2\"-WP304-S": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-2-1/2\" X 2\"-WP316L-S": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-65A X 40A-STS304-W": {
+    "salesVolume": 12.0,
+    "salesFreq": 3.0
+  },
+  "T(R)-S10S-350A X 200A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-65A X 40A-STS316L-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-2-1/2\" X 1-1/2\"-WP304-S": {
+    "salesVolume": 9.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-2-1/2\" X 1-1/2\"-WP316L-S": {
+    "salesVolume": 13.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S80S-65A X 32A-STS316L-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S20S-65A X 25A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-2-1/2\" X 1\"-WP304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-80A X 65A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(R)-S10S-450A X 300A-STS304-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-3\" X 2-1/2\"-WP304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-80A X 50A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-20A X 15A-STS304-W": {
+    "salesVolume": 22.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-80A X 50A-STS316L-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-80A X 40A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S40S-80A X 40A-STS304-S": {
+    "salesVolume": 9.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S10S-25A X 15A-STS316L-W": {
+    "salesVolume": 20.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-80A X 40A-STS316L-S": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-90A X 40A-STS304-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-100A X 90A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-50A X 40A-STS316L-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-100A X 80A-STS304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-100A X 80A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S20S-50A X 20A-STS304-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-100A X 65A-STS316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-4\" X 2-1/2\"-WP304-W": {
+    "salesVolume": 9.0,
+    "salesFreq": 4.0
+  },
+  "R(C)-S20S-100A X 50A-STS304-S": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-2-1/2\" X 2\"-WP304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 3.0
+  },
+  "R(C)-S10S-100A X 40A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-100A X 40A-STS316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-125A X 100A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 5.0
+  },
+  "R(C)-S20S-125A X 80A-STS304-W": {
+    "salesVolume": 13.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-125A X 65A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-125A X 65A-STS304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-5\" X 2\"-WP316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-150A X 125A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-65A X 40A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S20S-150A X 100A-STS304-W": {
+    "salesVolume": 8.0,
+    "salesFreq": 5.0
+  },
+  "R(C)-S20S-6\" X 4\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-150A X 90A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-150A X 80A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-6\" X 3\"-WP316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-150A X 65A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-6\" X 2-1/2\"-WP304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-6\" X 2-1/2\"-WP316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-6\" X 2\"-WP304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-200A X 150A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-200A X 150A-STS316L-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S20S-200A X 150A-STS316L-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-8\" X 6\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S80S-8\" X 6\"-WP304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-8\" X 6\"-WP316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-200A X 125A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-200A X 100A-STS304-W": {
+    "salesVolume": 34.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-8\" X 4\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-8\" X 4\"-WP316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-2-1/2\" X 1-1/2\"-WP304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-10\" X 8\"-WP304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-10\" X 8\"-WP316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-250A X 150A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-10\" X 6\"-WP304-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 4.0
+  },
+  "R(C)-S10S-250A X 125A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-10\" X 4\"-WP304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-10\" X 4\"-WP304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-300A X 250A-STS316L-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-12\" X 10\"-WP316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-300A X 200A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S40S-300A X 200A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-12\" X 8\"-WP316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-12\" X 8\"-WP316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-350A X 250A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-14\" X 10\"-WP316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-350A X 200A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S40S-350A X 200A-STS304-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-14\" X 8\"-WP304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-400A X 350A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S20S-400A X 350A-STS304-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-400A X 300A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-16\" X 12\"-WP316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-16\" X 10\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S20S-80A X 50A-STS316L-W": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-500A X 400A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-600A X 500A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-25A X 15A-STS316L-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S20S-32A X 25A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S10S-40A X 25A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-40A X 25A-STS316L-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S10S-50A X 40A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 3.0
+  },
+  "R(E)-S20S-50A X 40A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S40S-50A X 40A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-50A X 32A-STS316L-S": {
+    "salesVolume": 10.0,
+    "salesFreq": 4.0
+  },
+  "R(E)-S10S-50A X 25A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S40S-50A X 20A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S20S-65A X 50A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-65A X 50A-STS304-S": {
+    "salesVolume": 9.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-2-1/2\" X 2\"-WP316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S20S-65A X 40A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S20S-65A X 40A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S40S-2-1/2\" X 1-1/2\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S20S-80A X 65A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S40S-80A X 65A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-80A X 65A-STS304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S40S-80A X 65A-STS316L-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S10S-3\" X 2-1/2\"-WP304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-3\" X 2-1/2\"-WP316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S40S-80A X 50A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S10S-80A X 50A-STS304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S20S-80A X 50A-STS304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S20S-80A X 50A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S20S-80A X 40A-STS316L-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S40S-80A X 40A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-80A X 32A-STS316L-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-80A X 25A-STS316L-W": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S40S-100A X 80A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S10S-100A X 80A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S20S-100A X 80A-STS316L-W": {
+    "salesVolume": 7.0,
+    "salesFreq": 3.0
+  },
+  "R(E)-S40S-100A X 65A-STS304-W": {
+    "salesVolume": 15.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-100A X 50A-STS304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S40S-100A X 50A-STS316L-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-5\" X 4\"-WP304-W": {
+    "salesVolume": 473.0,
+    "salesFreq": 3.0
+  },
+  "R(E)-S20S-125A X 80A-STS304-W": {
+    "salesVolume": 4.0,
+    "salesFreq": 4.0
+  },
+  "R(E)-S20S-150A X 125A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-6\" X 4\"-WP304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S40S-6\" X 4\"-WP316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S20S-150A X 80A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S10S-150A X 80A-STS304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-6\" X 3\"-WP304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 3.0
+  },
+  "R(E)-S10S-6\" X 3\"-WP304-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S20S-200A X 150A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-8\" X 6\"-WP316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-8\" X 4\"-WP304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S10S-10\" X 8\"-WP304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-10\" X 8\"-WP316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-12\" X 10\"-WP304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-12\" X 10\"-WP316L-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-12\" X 8\"-WP304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S10S-350A X 150A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S20S-350A X 150A-STS304-W": {
+    "salesVolume": 3.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-100A X 80A-STS304-W": {
+    "salesVolume": 16.0,
+    "salesFreq": 7.0
+  },
+  "R(E)-S20S-400A X 300A-STS304-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-450A X 300A-STS304-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "R(E)-S20S-500A X 400A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(E)-S10S-500A X 350A-STS304-W": {
+    "salesVolume": 6.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S20S-15A-STS304-S": {
+    "salesVolume": 120.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S10S-15A-STS316L-S": {
+    "salesVolume": 50.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-100A X 65A-STS304-W": {
+    "salesVolume": 52.0,
+    "salesFreq": 4.0
+  },
+  "CAP-S40S-20A-STS304-S": {
+    "salesVolume": 16.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S160-20A-STS304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-100A X 65A-STS316L-W": {
+    "salesVolume": 5.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S20S-100A X 50A-STS316L-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-150A X 125A-STS316L-W": {
+    "salesVolume": 14.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S20S-32A-STS304-S": {
+    "salesVolume": 30.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S40S-32A-STS316L-S": {
+    "salesVolume": 8.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S40S-40A-STS304-S": {
+    "salesVolume": 20.0,
+    "salesFreq": 5.0
+  },
+  "R(E)-S10S-350A X 300A-STS304-W": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S20S-20A-STS304-S": {
+    "salesVolume": 20.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S10S-20A-STS316L-S": {
+    "salesVolume": 66.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S10S-2-1/2\"-WP304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S40S-2-1/2\"-WP304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S20S-80A-STS316L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S40S-25A-STS304-S": {
+    "salesVolume": 14.0,
+    "salesFreq": 3.0
+  },
+  "CAP-S40S-100A-STS316L-S": {
+    "salesVolume": 3.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S10S-5\"-WP304-S": {
+    "salesVolume": 10.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S40S-5\"-WP304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S80S-6\"-WP304-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S80S-6\"-WP316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S10S-200A-STS316L-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 3.0
+  },
+  "CAP-S10S-8\"-WP304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S80S-8\"-WP316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S10S-10\"-WP304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S10S-10\"-WP316L-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S40S-10\"-WP316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S80S-12\"-WP304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S10S-12\"-WP316L-S": {
+    "salesVolume": 5.0,
+    "salesFreq": 2.0
+  },
+  "CAP-S40S-350A-STS304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S40S-400A-STS304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S20S-450A-STS304-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S10S-550A-STS304-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "CAP-S10S-2\"-WP304L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S10S-12\"-WP304L-S": {
+    "salesVolume": 1.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S10S-4\"-WP316L-S": {
+    "salesVolume": 36.0,
+    "salesFreq": 5.0
+  },
+  "T(S)-S40S-2-1/2\"-WP304L-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 2.0
+  },
+  "90E(L)-S10S-3\"-WP316L-S": {
+    "salesVolume": 156.0,
+    "salesFreq": 5.0
+  },
+  "90E(L)-S10S-3\"-WP304L-S": {
+    "salesVolume": 11.0,
+    "salesFreq": 2.0
+  },
+  "R(C)-S10S-4\" X 2\"-WP304L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "R(C)-S10S-3\" X 2\"-WP316L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S/10S-4\"-WP304L-S": {
+    "salesVolume": 4.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S/10S-3\"-WP304L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "90E(L)-S/40S-2\"-WP304L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  },
+  "T(S)-S/40S-1-1/2\"-WP304L-S": {
+    "salesVolume": 2.0,
+    "salesFreq": 1.0
+  }
+}
