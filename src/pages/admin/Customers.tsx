@@ -110,6 +110,8 @@ export default function Customers() {
                     <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-600 mr-2">지역 필터링:</span>
                         <select 
+                            title="지역 필터링"
+                            aria-label="지역 필터링"
                             value={selectedRegion}
                             onChange={(e) => setSelectedRegion(e.target.value)}
                             className="bg-white border text-slate-700 border-slate-300 rounded font-medium text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:border-indigo-500 shadow-sm"
