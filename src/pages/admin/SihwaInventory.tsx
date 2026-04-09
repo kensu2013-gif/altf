@@ -337,7 +337,17 @@ export default function SihwaInventory() {
 
         // Step 3: Run AI Rules for status computation
         const processedList = Object.values(comparisonMap).map(row => {
-            const safeStock = Math.ceil((row.salesVolume / 12) * 1.5);
+            let safeStock = Math.ceil((row.salesVolume / 12) * 1.5);
+            
+            // AI Filter Rules
+            const mat = (row.product.material || '').toUpperCase();
+            if (mat.startsWith('WP') || mat.includes('CARBON')) {
+                safeStock = 0; // WP/Carbon items don't need Sihwa stock
+            }
+            if (row.salesFreq < 5) {
+                safeStock = 0; // Low frequency items don't need Sihwa stock
+            }
+
             // REQUIREMENT 3: INCLUDE PENDING ORDERS as effective stock
             const effectiveStock = row.shQty + row.pendingOrderQty; 
             const deficit = safeStock - effectiveStock;
@@ -345,7 +355,7 @@ export default function SihwaInventory() {
             let statusCategory = 'IDLE'; 
             let statusLabel = '대기/데이터없음';
 
-            if (row.salesVolume > 0) {
+            if (row.salesVolume > 0 && safeStock > 0) {
                 if (effectiveStock <= 0) {
                     if (row.ysQty <= 0) {
                         statusCategory = 'CRITICAL';
@@ -540,12 +550,12 @@ export default function SihwaInventory() {
                                             <div className="bg-white border-t border-rose-100 overflow-x-auto">
                                                 {stats.critical.length > 0 ? (
                                                 <table className="w-full text-sm text-left whitespace-nowrap">
-                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100">
+                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none">
                                                         <tr>
-                                                            <th className="px-5 py-3">품목 코드</th>
-                                                            <th className="px-5 py-3 text-right">시화재고</th>
-                                                            <th className="px-5 py-3 text-right">대경재고</th>
-                                                            <th className="px-5 py-3">대기수량 (Pending)</th>
+                                                            <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                                            <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                                            <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                                            <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('pendingOrderQty')}>대기수량 (Pending) {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3">🚨 분석 근거 (명확성)</th>
                                                         </tr>
                                                     </thead>
@@ -584,13 +594,13 @@ export default function SihwaInventory() {
                                             <div className="bg-white border-t border-amber-100 overflow-x-auto">
                                                 {stats.warning.length > 0 ? (
                                                 <table className="w-full text-sm text-left">
-                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100">
+                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none">
                                                         <tr>
-                                                            <th className="px-5 py-3">품목 코드</th>
-                                                            <th className="px-5 py-3 text-right">시화(보유)</th>
-                                                            <th className="px-5 py-3 text-right">안전(목표)</th>
-                                                            <th className="px-5 py-3">입고 대기중</th>
-                                                            <th className="px-5 py-3">대경(매입가능)</th>
+                                                            <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                                            <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                                            <th className="px-5 py-3 text-right">안전재고(목표)</th>
+                                                            <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('pendingOrderQty')}>입고 대기중 {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                                            <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3">💡 분석 근거</th>
                                                         </tr>
                                                     </thead>
@@ -603,16 +613,17 @@ export default function SihwaInventory() {
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-indigo-600">
                                                                     {row.safeStock}
+                                                                    <div className="text-[10px] font-normal text-slate-400 mt-1">/ 총판매:{row.salesVolume}</div>
                                                                 </td>
                                                                 <td className="px-5 py-4 text-center font-bold text-slate-500">
                                                                     {row.pendingOrderQty > 0 ? <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">+{row.pendingOrderQty}</span> : '-'}
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-teal-600">
-                                                                    보유중 ({row.ysQty})
+                                                                    {row.ysQty}
                                                                 </td>
                                                                 <td className="px-5 py-4 text-xs font-medium text-slate-600 flex items-center gap-1.5 whitespace-nowrap">
                                                                     <Info className="w-3.5 h-3.5 text-amber-500"/>
-                                                                    실효재고 결핍: <span className="font-bold text-rose-500">-{row.deficit}개</span> (총매입 {row.salesFreq}회)
+                                                                    실효재고 결핍: <span className="font-bold text-rose-500">-{row.deficit}개</span> (연 판매 {row.salesFreq}회)
                                                                 </td>
                                                             </tr>
                                                         ))}
