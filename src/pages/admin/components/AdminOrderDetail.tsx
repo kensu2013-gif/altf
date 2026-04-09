@@ -54,8 +54,26 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         bizNo: cleanDefault(order.customerBizNo || customerInfo.bizNo),
         bizType: order.customerBizType || '',
         contactName: cleanDefault(order.customerContactName || customerInfo.contactName),
-        tel: cleanDefault(order.customerTel || customerInfo.tel)
+        tel: cleanDefault(order.customerTel || customerInfo.tel),
+        email: cleanDefault(order.customerEmail || (customerInfo as any).email || ''),
+        address: cleanDefault(order.customerAddress || (customerInfo as any).address || '')
     });
+
+    const [crmCustomers, setCrmCustomers] = useState<any[]>([]);
+    useEffect(() => {
+        fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
+            headers: {
+                'Content-Type': 'application/json',
+                ...(user?.id ? { 'x-requester-id': user.id } : {}),
+                ...(user?.role ? { 'x-requester-role': user.role } : {})
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.customers) setCrmCustomers(data.customers);
+        })
+        .catch(console.error);
+    }, [user]);
 
     const [poEndCustomer, setPoEndCustomer] = useState(order.poEndCustomer || order.customerName || '');
 
@@ -382,9 +400,24 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     const handlePoEndCustomerChange = (newCustomer: string) => {
         setPoEndCustomer(newCustomer);
-        const match = poNumber.match(/\d+$/);
-        const seq = match ? match[0] : poNumber;
+        const matchInfo = poNumber.match(/\d+$/);
+        const seq = matchInfo ? matchInfo[0] : poNumber;
         setEmailAttachmentName(`${seq} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${newCustomer.replace('(주)', '').trim() || '에스제이엔브이'}).pdf`);
+
+        // CRM Sync Check
+        const crmMatch = crmCustomers.find(c => c.companyName === newCustomer);
+        if (crmMatch) {
+            if (window.confirm(`CRM 데이터를 수신했습니다!\n[${crmMatch.companyName}]\n\n업체 주소가 아래와 맞습니까?\n${crmMatch.address}\n\n(확인 시 사업자번호, 주소, 담당자, 전화/이메일 정보가 덮어씌워집니다)`)) {
+                setEditableCustomerInfo(prev => ({
+                    ...prev,
+                    bizNo: crmMatch.businessNumber || prev.bizNo,
+                    address: crmMatch.address || prev.address,
+                    contactName: crmMatch.contactName || prev.contactName,
+                    email: crmMatch.email || prev.email,
+                    tel: crmMatch.phone || prev.tel
+                }));
+            }
+        }
     };
 
     // Calculation based on Selected Items
@@ -570,12 +603,12 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 address: '부산광역시 사상구 낙동대로1330번길, 67'
             },
             customer: {
-                // [MOD] Use Signup Info (linkedUser) specifically for Transaction Statement
+                // [MOD] Use CRM Info first for Transaction Statement, fallback to linkedUser
                 company_name: poEndCustomer || linkedUser?.companyName || order.customerName,
-                contact_name: "담당자님",
-                tel: linkedUser?.phone || customerInfo.tel,
-                email: linkedUser?.email || '',
-                address: linkedUser?.address || '',
+                contact_name: editableCustomerInfo.contactName || "담당자님",
+                tel: editableCustomerInfo.tel || linkedUser?.phone || customerInfo.tel,
+                email: editableCustomerInfo.email || linkedUser?.email || '',
+                address: editableCustomerInfo.address || linkedUser?.address || '',
                 memo: transactionTrackingNo ? `[제품송장 번호]: ${transactionTrackingNo}\n${shippingMemo}` : shippingMemo
             },
             items: selectedItems.map((item, idx) => {
@@ -664,11 +697,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             },
             customer: {
                 company_name: poEndCustomer || linkedUser?.companyName || order.customerName || '',
-                contact_name: "담당자님",
+                contact_name: editableCustomerInfo.contactName || "담당자님",
                 ...(includeDetails ? {
-                    tel: linkedUser?.phone || customerInfo.tel,
-                    email: linkedUser?.email || '',
-                    address: linkedUser?.address || '',
+                    tel: editableCustomerInfo.tel || linkedUser?.phone || customerInfo.tel,
+                    email: editableCustomerInfo.email || linkedUser?.email || '',
+                    address: editableCustomerInfo.address || linkedUser?.address || '',
                     memo: transactionTrackingNo ? `[제품송장 번호]: ${transactionTrackingNo}\\n${shippingMemo}` : shippingMemo
                 } : {})
             },
@@ -910,6 +943,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             customerBizType: editableCustomerInfo.bizType,
             customerContactName: editableCustomerInfo.contactName,
             customerTel: editableCustomerInfo.tel,
+            customerEmail: editableCustomerInfo.email,
+            customerAddress: editableCustomerInfo.address,
             memo: shippingMemo,
             items: enrichedItems,
             po_items: enrichedPoItems,
@@ -1509,7 +1544,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                             type="text"
                                             value={poEndCustomer}
                                             onChange={(e) => {
-                                                setPoEndCustomer(e.target.value);
+                                                handlePoEndCustomerChange(e.target.value);
                                                 if (!customerTouched) setCustomerTouched(true);
                                             }}
                                             className={`w-full font-bold text-slate-800 bg-transparent border-b hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1 ${!customerTouched ? 'border-transparent' : 'border-teal-400 border-dotted'}`}
@@ -1562,6 +1597,26 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                             onChange={(e) => setEditableCustomerInfo({ ...editableCustomerInfo, tel: e.target.value })}
                                             className="w-full font-mono text-slate-600 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1"
                                             placeholder="연락처(선택)"
+                                        />
+                                    </div>
+                                    <div>
+                                        <span className="block text-slate-400 text-xs mb-1"> 업무 이메일(Email) </span>
+                                        <input
+                                            type="text"
+                                            value={editableCustomerInfo.email}
+                                            onChange={(e) => setEditableCustomerInfo({ ...editableCustomerInfo, email: e.target.value })}
+                                            className="w-full font-mono text-slate-600 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1"
+                                            placeholder="이메일(선택)"
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <span className="block text-slate-400 text-xs mb-1"> 배송 주소(Address) </span>
+                                        <input
+                                            type="text"
+                                            value={editableCustomerInfo.address}
+                                            onChange={(e) => setEditableCustomerInfo({ ...editableCustomerInfo, address: e.target.value })}
+                                            className="w-full text-slate-600 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-500 outline-none transition-colors px-1 -ml-1"
+                                            placeholder="주소(선택)"
                                         />
                                     </div>
 

@@ -151,6 +151,8 @@ export interface Order {
     customerBizType?: string; // Editable
     customerContactName?: string; // Editable
     customerTel?: string; // Editable
+    customerEmail?: string; // Editable
+    customerAddress?: string; // Editable
     items: LineItem[];
     po_items?: LineItem[]; // [NEW] Supplier PO Items (Separated from Customer Items)
     totalAmount: number;
