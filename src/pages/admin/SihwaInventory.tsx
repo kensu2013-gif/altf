@@ -659,6 +659,8 @@ export default function SihwaInventory() {
                                                     <h2 className="font-bold">월별 시화재고 보충(매입) 누적</h2>
                                                 </div>
                                                 <select
+                                                    title="월 선택"
+                                                    aria-label="월 선택"
                                                     value={selectedMonth}
                                                     onChange={(e) => setSelectedMonth(e.target.value)}
                                                     className="bg-slate-700 border-none rounded text-sm py-1.5 px-3 text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none placeholder-white appearance-none"
