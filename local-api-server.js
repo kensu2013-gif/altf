@@ -837,6 +837,81 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // POST /api/customers (Create new)
+    if (req.method === 'POST' && url.pathname === '/api/customers') {
+        const requesterRole = req.headers['x-requester-role'];
+        if (requesterRole !== 'MASTER' && requesterRole !== 'admin') {
+            res.writeHead(403);
+            return res.end(JSON.stringify({ error: 'Forbidden' }));
+        }
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const newData = JSON.parse(body);
+                const newCustomer = {
+                    id: 'CRM-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+                    ...newData
+                };
+                db.customers = db.customers || [];
+                db.customers.unshift(newCustomer);
+                await saveData();
+                res.writeHead(201, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(newCustomer));
+            } catch(e) {
+                console.error('[API] Error creating customer:', e);
+                res.writeHead(500);
+                res.end(JSON.stringify({ error: 'Server Error' }));
+            }
+        });
+        return;
+    }
+
+    // POST /api/customers/action/purge
+    if (req.method === 'POST' && url.pathname === '/api/customers/action/purge') {
+        const requesterRole = req.headers['x-requester-role'];
+        if (requesterRole !== 'MASTER' && requesterRole !== 'admin') {
+            res.writeHead(403);
+            return res.end(JSON.stringify({ error: 'Forbidden' }));
+        }
+        try {
+            let list = db.customers || [];
+            const originalCount = list.length;
+            
+            // 1. Remove entries lacking essential info
+            list = list.filter(c => 
+                c.address && c.address.trim() !== '' &&
+                c.contactName && c.contactName.trim() !== '' &&
+                c.email && c.email.trim() !== '' &&
+                c.phone && c.phone.trim() !== ''
+            );
+
+            // 2. Remove duplicates based on businessNumber (Keep first occurrence)
+            const seenBizNos = new Set();
+            const deduplicated = [];
+            for (const c of list) {
+                if (c.businessNumber && c.businessNumber.trim() !== '') {
+                    if (seenBizNos.has(c.businessNumber)) {
+                        continue; // skip duplicate
+                    }
+                    seenBizNos.add(c.businessNumber);
+                }
+                deduplicated.push(c);
+            }
+            db.customers = deduplicated;
+            
+            await saveData();
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, originalCount, newCount: db.customers.length }));
+        } catch(e) {
+            console.error('[API] Error purging customers:', e);
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'Server Error' }));
+        }
+        return;
+    }
+
     // PATCH /api/customers/:id
     if (req.method === 'PATCH' && url.pathname.startsWith('/api/customers/')) {
         const requesterRole = req.headers['x-requester-role'];
