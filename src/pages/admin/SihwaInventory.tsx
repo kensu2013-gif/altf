@@ -261,8 +261,20 @@ export default function SihwaInventory() {
     }, [orders]);
 
     // CORE AI MERGED STOCK ANALYZER (Includes pending orders + actual asset prices)
+    interface AnalyzedItem {
+        product: Partial<Product> & { id: string; name?: string; stockStatus?: string };
+        shQty: number;
+        ysQty: number;
+        pendingOrderQty: number;
+        recentPurchasePrice: number;
+        recentPurchaseDate: string | null;
+        sellingPrice: number;
+        salesVolume: number;
+        salesFreq: number;
+    }
+
     const analyzedInventory = useMemo(() => {
-        const comparisonMap: Record<string, any> = {};
+        const comparisonMap: Record<string, AnalyzedItem> = {};
 
         inventory.forEach((item: Product) => {
             let shQty = 0;
