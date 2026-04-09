@@ -97,12 +97,12 @@ export default function Customers() {
         };
     }, [customersList]);
 
-    if (user?.role !== 'MASTER') {
+    if (user?.role !== 'MASTER' && user?.role?.toLowerCase() !== 'admin') {
         return (
             <div className="flex flex-col items-center justify-center h-full pt-20 text-slate-500">
                 <AlertTriangle className="w-16 h-16 text-rose-500 mb-4" />
                 <h1 className="text-2xl font-bold text-slate-800">접근 권한 없음</h1>
-                <p className="mt-2">알트에프 거래처(CRM) 원장 관리는 MASTER 권한만 접근할 수 있습니다.</p>
+                <p className="mt-2">알트에프 거래처(CRM) 원장 관리는 최고 관리자(MASTER) 권한만 접근할 수 있습니다.</p>
             </div>
         );
     }
