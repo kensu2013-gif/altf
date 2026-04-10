@@ -426,11 +426,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             setPoEndCustomer(c.companyName);
             setEditableCustomerInfo(prev => ({
                 ...prev,
-                bizNo: c.businessNumber || prev.bizNo,
-                address: c.address || prev.address,
-                contactName: c.contactName || c.ceo || prev.contactName,
-                email: c.email || prev.email,
-                tel: c.phone || prev.tel
+                bizNo: c.businessNumber || '',
+                address: c.address || '',
+                contactName: c.contactName || c.ceo || '',
+                email: c.email || '',
+                tel: c.phone || ''
             }));
             const matchInfo = poNumber.match(/\d+$/);
             const seq = matchInfo ? matchInfo[0] : poNumber;
@@ -439,7 +439,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             setPoEndCustomer(c.companyName);
             setEditableCustomerInfo(prev => ({ 
                 ...prev,
-                bizNo: c.businessNumber || prev.bizNo 
+                bizNo: c.businessNumber || '' 
             }));
             const matchInfo = poNumber.match(/\d+$/);
             const seq = matchInfo ? matchInfo[0] : poNumber;
@@ -458,7 +458,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     // Supplier Totals Calculation
     const { totalSupplierAmount, totalProfit } = selectedItems.reduce((acc, item) => {
-        const product = inventory.find(p => p.id === item.productId);
+        const product = findProduct({ productId: item.productId });
         const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? 0;
         const rate = item.supplierRate ?? 0;
 
@@ -640,7 +640,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 memo: transactionTrackingNo ? `[제품송장 번호]: ${transactionTrackingNo}\n${shippingMemo}` : shippingMemo
             },
             items: selectedItems.map((item, idx) => {
-                const product = inventory.find(p => p.id === item.productId);
+                const product = findProduct({ productId: item.productId });
                 return {
                     no: idx + 1,
                     item_name: item.name || '',
@@ -825,7 +825,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const handleSupplierPriceChange = (index: number, newPrice: number) => {
         const newItems = [...displayedItems];
         const item = newItems[index];
-        const product = inventory.find(p => p.id === item.productId);
+        const product = findProduct({ productId: item.productId });
         const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? 0;
 
         // If price is manually set, we set the supplierRate such that base * (100-rate)/100 = price
@@ -859,7 +859,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const handleDiscountChange = (index: number, discountRate: number) => {
         const newItems = [...displayedItems];
         const item = newItems[index];
-        const product = inventory.find(p => p.id === item.productId);
+        const product = findProduct({ productId: item.productId });
         const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
         if (basePrice === 0) return;
         const newPrice = Math.round(Math.round(basePrice * (1 - discountRate / 100)) / 10) * 10;
@@ -892,6 +892,34 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     const handleJustSave = async () => {
         persistCustomPrices();
+
+        // CRM 데이터 반영 (비동기)
+        if (poEndCustomer) {
+            const existingCrm = crmCustomers.find(c => c.companyName === poEndCustomer);
+            const crmPayload = {
+                companyName: poEndCustomer,
+                businessNumber: editableCustomerInfo.bizNo,
+                contactName: editableCustomerInfo.contactName,
+                phone: editableCustomerInfo.tel,
+                email: editableCustomerInfo.email,
+                address: editableCustomerInfo.address
+            };
+            
+            if (existingCrm && existingCrm.id) {
+                fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers/${existingCrm.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', ...(user?.role ? { 'x-requester-role': user.role } : {}) },
+                    body: JSON.stringify(crmPayload)
+                }).catch(console.error);
+            } else {
+                fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...(user?.role ? { 'x-requester-role': user.role } : {}) },
+                    body: JSON.stringify(crmPayload)
+                }).catch(console.error);
+            }
+        }
+
         const updateData: Partial<Order> = {
             totalAmount: totalWithCharges,
             adminResponse: {
@@ -899,7 +927,14 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 confirmedPrice: totalWithCharges,
                 additionalCharges: charges
             },
-            status: 'PROCESSING',
+            status: order.status === 'SUBMITTED' ? 'PROCESSING' : order.status,
+            customerName: poEndCustomer,
+            customerBizNo: editableCustomerInfo.bizNo,
+            customerBizType: editableCustomerInfo.bizType,
+            customerContactName: editableCustomerInfo.contactName,
+            customerTel: editableCustomerInfo.tel,
+            customerEmail: editableCustomerInfo.email,
+            customerAddress: editableCustomerInfo.address,
             supplierInfo: supplierInfo,
             buyerInfo: buyerInfo,
             poNumber: poNumber,
@@ -928,11 +963,39 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         }
 
         onUpdate(order.id, updateData);
-        alert('저장되었습니다.');
+        setTimeout(() => alert('저장되었습니다.'), 100);
     };
 
     const handleSave = async (extraUpdate: Partial<Order> = {}) => {
         persistCustomPrices();
+
+        // CRM 데이터 반영 (비동기)
+        if (poEndCustomer) {
+            const existingCrm = crmCustomers.find(c => c.companyName === poEndCustomer);
+            const crmPayload = {
+                companyName: poEndCustomer,
+                businessNumber: editableCustomerInfo.bizNo,
+                contactName: editableCustomerInfo.contactName,
+                phone: editableCustomerInfo.tel,
+                email: editableCustomerInfo.email,
+                address: editableCustomerInfo.address
+            };
+            
+            if (existingCrm && existingCrm.id) {
+                fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers/${existingCrm.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', ...(user?.role ? { 'x-requester-role': user.role } : {}) },
+                    body: JSON.stringify(crmPayload)
+                }).catch(console.error);
+            } else {
+                fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...(user?.role ? { 'x-requester-role': user.role } : {}) },
+                    body: JSON.stringify(crmPayload)
+                }).catch(console.error);
+            }
+        }
+
         const finalStatus = extraUpdate.status || (order.status === 'SUBMITTED' ? 'PROCESSING' : order.status);
 
         // Auto Save Preset if COMPLETED
@@ -1920,7 +1983,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 <button
                                                                     onClick={() => {
                                                                         const newItems = displayedItems.map(item => {
-                                                                            const product = inventory.find(p => p.id === item.productId);
+                                                                            const product = findProduct({ productId: item.productId });
                                                                             const productRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
                                                                             return { ...item, supplierRate: productRate };
                                                                         });
@@ -1967,7 +2030,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                             const val = Number(e.currentTarget.value);
                                                                             if (!isNaN(val)) {
                                                                                 const newItems = displayedItems.map(item => {
-                                                                                    const product = inventory.find(p => p.id === item.productId);
+                                                                                    const product = findProduct({ productId: item.productId });
                                                                                     // Calculate new price based on base price and bulk discount
                                                                                     const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
                                                                                     if (basePrice > 0) {
@@ -1990,7 +2053,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     onClick={() => {
                                                                         // Accept All: Reset discount to 0 and match base price
                                                                         const newItems = displayedItems.map(item => {
-                                                                            const product = inventory.find(p => p.id === item.productId);
+                                                                            const product = findProduct({ productId: item.productId });
                                                                             const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
                                                                             return {
                                                                                 ...item,
@@ -2200,7 +2263,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                             <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] text-indigo-300 pointer-events-none">% </span>
                                                                         </div>
                                                                         {(() => {
-                                                                            const product = inventory.find(p => p.id === item.productId);
+                                                                            const product = findProduct({ productId: item.productId });
                                                                             const mat = item.material?.toUpperCase() || product?.material?.toUpperCase() || '';
                                                                             const nm = item.name?.toUpperCase() || product?.name?.toUpperCase() || '';
 
@@ -2213,7 +2276,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                                         onClick={() => {
                                                                                             const newItems = [...displayedItems];
                                                                                             const targetItem = { ...newItems[idx] };
-                                                                                            const product = inventory.find(p => p.id === targetItem.productId);
+                                                                                            const product = findProduct({ productId: targetItem.productId });
                                                                                             const productBasePrice = product?.base_price ?? targetItem.base_price ?? product?.unitPrice ?? 0;
                                                                                             const rate = targetItem.supplierRate ?? 0;
 
