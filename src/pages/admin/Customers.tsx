@@ -27,6 +27,14 @@ const stripCorp = (name: string) => {
                .trim();
 };
 
+const isInvalidCustomer = (c: Customer) => {
+    const noAddr = !c.address || c.address.trim() === '';
+    const noContact = !c.contactName || c.contactName.trim() === '';
+    const noPhone = !c.phone || c.phone.trim() === '';
+    const noEmail = !c.email || c.email.trim() === '';
+    return noAddr && noContact && noPhone && noEmail;
+};
+
 export default function Customers() {
     const user = useStore(state => state.auth.user);
     const token = useStore(state => state.auth.token);
@@ -65,7 +73,7 @@ export default function Customers() {
             const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, { headers });
             if (res.ok) {
                 const data = await res.json();
-                setCustomersList(data.filter((c: Customer) => !c.isDeleted));
+                setCustomersList(data.filter((c: Customer) => !c.isDeleted && !isInvalidCustomer(c)));
             }
         } catch (e) {
             console.error(e);
@@ -83,7 +91,7 @@ export default function Customers() {
                 if (res.ok) {
                     const data = await res.json();
                     if (isMounted) {
-                        setCustomersList(data.filter((c: Customer) => !c.isDeleted));
+                        setCustomersList(data.filter((c: Customer) => !c.isDeleted && !isInvalidCustomer(c)));
                     }
                 }
                 
@@ -174,7 +182,11 @@ export default function Customers() {
                 });
                 if (res.ok) {
                     const saved = await res.json();
-                    setCustomersList(prev => prev.map(c => c.id === saved.id ? saved : c));
+                    if (!isInvalidCustomer(saved)) {
+                        setCustomersList(prev => prev.map(c => c.id === saved.id ? saved : c));
+                    } else {
+                        setCustomersList(prev => prev.filter(c => c.id !== saved.id));
+                    }
                     setIsModalOpen(false);
                 }
             } else {
@@ -186,7 +198,9 @@ export default function Customers() {
                 });
                 if (res.ok) {
                     const saved = await res.json();
-                    setCustomersList(prev => [saved, ...prev]);
+                    if (!isInvalidCustomer(saved)) {
+                        setCustomersList(prev => [saved, ...prev]);
+                    }
                     setIsModalOpen(false);
                 }
             }
