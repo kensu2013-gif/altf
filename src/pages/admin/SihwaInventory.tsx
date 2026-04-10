@@ -72,6 +72,8 @@ export default function SihwaInventory() {
         'WARNING': true
     });
 
+    const [selectedWarningIds, setSelectedWarningIds] = useState<Set<string>>(new Set());
+
     const [sortConfig, setSortConfig] = useState<{ 
         key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice', 
         direction: 'asc' | 'desc' 
@@ -86,6 +88,24 @@ export default function SihwaInventory() {
 
     const toggleGroup = (key: string) => {
         setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    const toggleWarningSelection = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setSelectedWarningIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleAllWarnings = () => {
+        if (selectedWarningIds.size === stats.warning.length) {
+            setSelectedWarningIds(new Set());
+        } else {
+            setSelectedWarningIds(new Set(stats.warning.map(w => w.product.id)));
+        }
     };
 
     // 1. Fetch History Data from the local-api-server
@@ -597,6 +617,8 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('pendingOrderQty')}>대기수량 (Pending) {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                                            <th className="px-5 py-3 text-right">매입단가</th>
+                                                            <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
                                                             <th className="px-5 py-3">🚨 분석 근거 (명확성)</th>
                                                         </tr>
                                                     </thead>
@@ -609,6 +631,8 @@ export default function SihwaInventory() {
                                                                 <td className="px-5 py-4 text-center font-bold text-slate-400">
                                                                     {row.pendingOrderQty > 0 ? <span className="text-indigo-600">+{row.pendingOrderQty} 대기중</span> : '없음'}
                                                                 </td>
+                                                                <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
+                                                                <td className="px-5 py-4 text-right font-black text-rose-600 bg-rose-50/10">{formatCur(row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1))}</td>
                                                                 <td className="px-5 py-4 text-xs font-medium text-slate-600 flex items-center gap-1.5">
                                                                     <Info className="w-3.5 h-3.5 text-rose-500"/>
                                                                     실효재고 <span className="font-bold text-rose-600">{row.effectiveStock}</span> &lt; 목표재고 <span className="font-bold text-indigo-600">{row.safeStock}</span> (연 {row.salesVolume}개 판매됨)
@@ -616,6 +640,15 @@ export default function SihwaInventory() {
                                                             </tr>
                                                         ))}
                                                     </tbody>
+                                                    <tfoot className="bg-rose-50/50 border-t-2 border-rose-200">
+                                                        <tr>
+                                                            <td colSpan={5} className="px-5 py-4 text-right font-bold text-slate-700">총 🚨필요예산 합계 (부족수량 기준):</td>
+                                                            <td className="px-5 py-4 text-right font-black text-rose-700 text-lg">
+                                                                {formatCur(stats.critical.reduce((sum, row) => sum + row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1), 0))} 원
+                                                            </td>
+                                                            <td></td>
+                                                        </tr>
+                                                    </tfoot>
                                                 </table>
                                                 ) : <div className="p-8 text-center text-slate-400">훌륭합니다! 매입처 결품리스크 항목이 없습니다.</div>}
                                             </div>
@@ -637,17 +670,36 @@ export default function SihwaInventory() {
                                                 <table className="w-full text-sm text-left">
                                                     <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none">
                                                         <tr>
+                                                            <th className="px-4 py-3 w-10 text-center">
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={stats.warning.length > 0 && selectedWarningIds.size === stats.warning.length}
+                                                                    onChange={toggleAllWarnings}
+                                                                    className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
+                                                                />
+                                                            </th>
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right">안전재고(목표)</th>
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('pendingOrderQty')}>입고 대기중 {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                                            <th className="px-5 py-3 text-right">매입단가</th>
+                                                            <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
                                                             <th className="px-5 py-3">💡 분석 근거</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100">
                                                         {stats.warning.map(row => (
-                                                            <tr key={row.product.id} className="hover:bg-slate-50">
+                                                            <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={(e) => toggleWarningSelection(row.product.id, e)}>
+                                                                <td className="px-4 py-4 text-center">
+                                                                    <input 
+                                                                        type="checkbox"
+                                                                        checked={selectedWarningIds.has(row.product.id)}
+                                                                        onChange={(e) => toggleWarningSelection(row.product.id, e as unknown as React.MouseEvent)}
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
+                                                                    />
+                                                                </td>
                                                                 <td className="px-5 py-4 font-mono font-bold text-slate-800">{row.product.id}</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-slate-600 bg-amber-50/10">
                                                                     {row.shQty}
@@ -662,6 +714,8 @@ export default function SihwaInventory() {
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-teal-600">
                                                                     {row.ysQty}
                                                                 </td>
+                                                                <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
+                                                                <td className="px-5 py-4 text-right font-black text-amber-700 bg-amber-50/30">{formatCur(row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1))}</td>
                                                                 <td className="px-5 py-4 text-xs font-medium text-slate-600 flex items-center gap-1.5 whitespace-nowrap">
                                                                     <Info className="w-3.5 h-3.5 text-amber-500"/>
                                                                     실효재고 결핍: <span className="font-bold text-rose-500">-{row.deficit}개</span> (연 판매 {row.salesFreq}회)
@@ -669,6 +723,17 @@ export default function SihwaInventory() {
                                                             </tr>
                                                         ))}
                                                     </tbody>
+                                                    <tfoot className="bg-amber-50/50 border-t-2 border-amber-200">
+                                                        <tr>
+                                                            <td colSpan={7} className="px-5 py-4 text-right font-bold text-slate-700">
+                                                                선택항목 <span className="text-amber-600 underline decoration-2">{selectedWarningIds.size}</span>건 예상 합계:
+                                                            </td>
+                                                            <td className="px-5 py-4 text-right font-black text-amber-700 text-lg">
+                                                                {formatCur(stats.warning.filter(w => selectedWarningIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1), 0))} 원
+                                                            </td>
+                                                            <td></td>
+                                                        </tr>
+                                                    </tfoot>
                                                 </table>
                                                 ) : <div className="p-8 text-center text-slate-400">발주가 필요한 품목이 없습니다. 시화재고 관리가 매우 이상적입니다!</div>}
                                             </div>
