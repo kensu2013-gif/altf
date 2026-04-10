@@ -861,7 +861,7 @@ const server = http.createServer(async (req, res) => {
     // GET /api/customers
     if (req.method === 'GET' && url.pathname === '/api/customers') {
         const requesterRole = req.headers['x-requester-role'];
-        if (requesterRole !== 'MASTER' && requesterRole !== 'admin') {
+        if (requesterRole !== 'MASTER' && requesterRole !== 'admin' && requesterRole !== 'manager' && requesterRole !== 'MANAGER') {
             res.writeHead(403);
             return res.end(JSON.stringify({ error: 'Forbidden' }));
         }
@@ -873,7 +873,7 @@ const server = http.createServer(async (req, res) => {
     // POST /api/customers (Create new)
     if (req.method === 'POST' && url.pathname === '/api/customers') {
         const requesterRole = req.headers['x-requester-role'];
-        if (requesterRole !== 'MASTER' && requesterRole !== 'admin') {
+        if (requesterRole !== 'MASTER' && requesterRole !== 'admin' && requesterRole !== 'manager' && requesterRole !== 'MANAGER') {
             res.writeHead(403);
             return res.end(JSON.stringify({ error: 'Forbidden' }));
         }
@@ -948,7 +948,7 @@ const server = http.createServer(async (req, res) => {
     // PATCH /api/customers/:id
     if (req.method === 'PATCH' && url.pathname.startsWith('/api/customers/')) {
         const requesterRole = req.headers['x-requester-role'];
-        if (requesterRole !== 'MASTER' && requesterRole !== 'admin') {
+        if (requesterRole !== 'MASTER' && requesterRole !== 'admin' && requesterRole !== 'manager' && requesterRole !== 'MANAGER') {
             res.writeHead(403);
             return res.end(JSON.stringify({ error: 'Forbidden' }));
         }
