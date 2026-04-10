@@ -103,7 +103,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         contactName: quote.customerInfo?.contactName ?? (customerUser?.contactName || ''),
         email: quote.customerInfo?.email ?? (customerUser?.email || ''), // Use ?? to allow empty string from previous save
         phone: quote.customerInfo?.phone ?? (customerUser?.phone || customerUser?.contactInfo?.phone || ''),
-        bizNo: customerUser?.bizNo || '',
+        bizNo: quote.customerInfo?.bizNo ?? (customerUser?.bizNo || ''),
         address: quote.customerInfo?.address ?? (customerUser?.address || ''),
         fax: customerUser?.fax || ''
     }));
@@ -477,6 +477,33 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         if (records.length > 0) saveCustomPrices(records);
     };
 
+    const syncCustomerToCRM = () => {
+        if (!customerInfo.companyName) return;
+        const existingCrm = crmCustomers.find(c => c.companyName === customerInfo.companyName);
+        const crmPayload = {
+            companyName: customerInfo.companyName,
+            businessNumber: customerInfo.bizNo,
+            contactName: customerInfo.contactName,
+            phone: customerInfo.phone,
+            email: customerInfo.email,
+            address: customerInfo.address
+        };
+        
+        if (existingCrm && existingCrm.id) {
+            fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers/${existingCrm.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', ...(user?.role ? { 'x-requester-role': user.role } : {}) },
+                body: JSON.stringify(crmPayload)
+            }).catch(console.error);
+        } else {
+            fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(user?.role ? { 'x-requester-role': user.role } : {}) },
+                body: JSON.stringify(crmPayload)
+            }).catch(console.error);
+        }
+    };
+
     const handleApplyCustomPrice = useCallback((index: number, record: CustomPriceRecord) => {
         setItems(prev => {
             const newItems = [...prev];
@@ -494,6 +521,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         if (!confirm('견적서를 회수(수정모드)하시겠습니까? 고객은 더 이상 답변서를 볼 수 없습니다.\n(상태가 답변작성중으로 변경됩니다)')) return;
 
         persistCustomPrices();
+        syncCustomerToCRM();
 
         // 1. Prepare Payload (Revert to PROCESSING)
         const updatePayload = {
@@ -524,6 +552,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         if (!confirm('견적서를 전송하시겠습니까? (상태가 답변완료로 변경됩니다)')) return;
 
         persistCustomPrices();
+        syncCustomerToCRM();
 
         // 1. Update User Info
         // Removed `updateUser` call to prevent overwriting the customer's base profile.
@@ -1269,6 +1298,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                 <Button
                                     onClick={async () => {
                                         persistCustomPrices();
+                                        syncCustomerToCRM();
 
                                         // 1. Upload Admin Attachments to S3
                                         const uploadedAttachments: { name: string, url: string }[] = quote.adminAttachments || [];
