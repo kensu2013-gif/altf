@@ -55,6 +55,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const [isOrderSubmitting, setIsOrderSubmitting] = useState(false);
     const [orderPayload, setOrderPayload] = useState<DocumentPayload | null>(null);
     const [isApiSubmitting, setIsApiSubmitting] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Local state for customer info
 
@@ -550,6 +551,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
     const handleSend = async () => {
         if (!confirm('견적서를 전송하시겠습니까? (상태가 답변완료로 변경됩니다)')) return;
+        setIsSaving(true);
 
         persistCustomPrices();
         syncCustomerToCRM();
@@ -605,6 +607,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         } catch (error) {
             console.error(error);
             alert('전송에 실패했습니다. (네트워크/서버 오류)');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -1297,8 +1301,10 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                             {quote.status !== 'COMPLETED' && (
                                 <Button
                                     onClick={async () => {
-                                        persistCustomPrices();
-                                        syncCustomerToCRM();
+                                        setIsSaving(true);
+                                        try {
+                                            persistCustomPrices();
+                                            syncCustomerToCRM();
 
                                         // 1. Upload Admin Attachments to S3
                                         const uploadedAttachments: { name: string, url: string }[] = quote.adminAttachments || [];
@@ -1331,25 +1337,30 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                 body: JSON.stringify(updatePayload)
                                             });
                                             if (!res.ok) throw new Error(`Server returned ${res.status}`);
-                                            alert('수정사항이 저장되었습니다.');
-                                        } catch (error) {
-                                            console.error(error);
-                                            alert('저장에 실패했습니다. (네트워크/서버 오류)');
+                                                alert('수정사항이 저장되었습니다.');
+                                            } catch (error) {
+                                                console.error(error);
+                                                alert('저장에 실패했습니다. (네트워크/서버 오류)');
+                                            } finally {
+                                                setIsSaving(false);
+                                            }
                                         }
                                     }}
-                                    className="bg-slate-800 hover:bg-slate-900 text-white gap-2"
+                                    disabled={isSaving}
+                                    className={`text-white gap-2 ${isSaving ? 'bg-slate-700 cursor-not-allowed opacity-80' : 'bg-slate-800 hover:bg-slate-900'}`}
                                 >
-                                    <FileText className="w-4 h-4" />
-                                    저장 (Save)
+                                    {isSaving ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <FileText className="w-4 h-4" />}
+                                    {isSaving ? '저장 중...' : '저장 (Save)'}
                                 </Button>
                             )}
 
                             <Button
                                 onClick={handleSend}
-                                className="bg-teal-600 hover:bg-teal-700 text-white shadow-lg shadow-teal-500/20 px-6 gap-2"
+                                disabled={isSaving}
+                                className={`text-white shadow-lg px-6 gap-2 ${isSaving ? 'bg-teal-700 cursor-not-allowed opacity-80' : 'bg-teal-600 hover:bg-teal-700 shadow-teal-500/20'}`}
                             >
-                                <Send className="w-4 h-4" />
-                                {quote.status === 'PROCESSED' ? '재전송 (Resend)' : '견적서 전송 (답변완료)'}
+                                {isSaving ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <Send className="w-4 h-4" />}
+                                {isSaving ? '전송 중...' : (quote.status === 'PROCESSED' ? '재전송 (Resend)' : '견적서 전송 (답변완료)')}
                             </Button>
                         </div>
                     </div>

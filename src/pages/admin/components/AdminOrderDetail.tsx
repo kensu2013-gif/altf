@@ -234,6 +234,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const [emailSubject, setEmailSubject] = useState(order.poNumber ? order.poTitle || defaultSubject : defaultSubject);
     const [emailAttachmentName, setEmailAttachmentName] = useState(order.poNumber ? defaultFileName : defaultFileName);
     const [isSendingWebhook, setIsSendingWebhook] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     const [buyerInfo, setBuyerInfo] = useState(() => {
         if (order.buyerInfo) return order.buyerInfo;
@@ -891,7 +892,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     };
 
     const handleJustSave = async () => {
-        persistCustomPrices();
+        setIsSaving(true);
+        try {
+            persistCustomPrices();
 
         // CRM 데이터 반영 (비동기)
         if (poEndCustomer) {
@@ -964,10 +967,15 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
         onUpdate(order.id, updateData);
         setTimeout(() => alert('저장되었습니다.'), 100);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleSave = async (extraUpdate: Partial<Order> = {}) => {
-        persistCustomPrices();
+        setIsSaving(true);
+        try {
+            persistCustomPrices();
 
         // CRM 데이터 반영 (비동기)
         if (poEndCustomer) {
@@ -1061,6 +1069,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
         onUpdate(order.id, updateData);
         onClose();
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleSupplierSave = async () => {
@@ -2821,16 +2832,27 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         </Button>
                         <Button
                             onClick={() => isSupplierMode ? handleSupplierSave() : handleSave()}
-                            disabled={isSendingWebhook}
-                            className={`shadow-lg px-6 ${isSupplierMode
-                                ? 'bg-red-600 hover:bg-red-700 shadow-red-500/20'
-                                : 'bg-teal-600 hover:bg-teal-700 shadow-teal-500/20'} text-white`}>
-                            {isSendingWebhook ? '처리중...' : (isSupplierMode ? '매입 발주서 저장/전송' : '주문 확정 및 답변 전송')}
+                            disabled={isSendingWebhook || isSaving}
+                            className={`shadow-lg px-6 text-white ${(isSendingWebhook || isSaving) ? 'opacity-80 cursor-not-allowed ' : ''}${isSupplierMode
+                                ? ((isSendingWebhook || isSaving) ? 'bg-red-700' : 'bg-red-600 hover:bg-red-700 shadow-red-500/20')
+                                : ((isSendingWebhook || isSaving) ? 'bg-teal-700' : 'bg-teal-600 hover:bg-teal-700 shadow-teal-500/20')}`}>
+                            {(isSendingWebhook || isSaving) ? (
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                                    <span>처리중...</span>
+                                </div>
+                            ) : (isSupplierMode ? '매입 발주서 저장/전송' : '주문 확정 및 답변 전송')}
                         </Button>
                         <Button
                             onClick={handleJustSave}
-                            className="bg-slate-800 text-white hover:bg-slate-900 shadow-lg px-4">
-                            저장(Save)
+                            disabled={isSaving}
+                            className={`text-white shadow-lg px-4 ${isSaving ? 'bg-slate-700 cursor-not-allowed opacity-80' : 'bg-slate-800 hover:bg-slate-900'}`}>
+                            {isSaving ? (
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                                    <span>저장 중...</span>
+                                </div>
+                            ) : '저장(Save)'}
                         </Button>
                     </div>
                 </div>
