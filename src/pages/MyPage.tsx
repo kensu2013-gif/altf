@@ -30,6 +30,8 @@ interface QuotationRecord {
         phone?: string;
         email?: string;
         address?: string;
+        bizNo?: string;
+        fax?: string;
     };
     status: 'DRAFT' | 'SUBMITTED' | 'PROCESSING' | 'PROCESSED' | 'COMPLETED';
     memo?: string;
