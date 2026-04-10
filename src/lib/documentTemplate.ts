@@ -315,11 +315,11 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                 <div class="box">
                     <h3>공급받는자 (Customer)</h3>
                     <div class="row"><span class="label">상호</span><span class="value">${customer.company_name || '-'}</span></div>
-                    ${customer.business_no ? `<div class="row"><span class="label">사업자번호</span><span class="value">${customer.business_no}</span></div>` : ''}
+                    ${customer.business_no && document_type !== 'QUOTATION' ? `<div class="row"><span class="label">사업자번호</span><span class="value">${customer.business_no}</span></div>` : ''}
                     <div class="row"><span class="label">담당자</span><span class="value">${customer.contact_name || '-'}</span></div>
                     ${customer.tel ? `<div class="row"><span class="label">연락처</span><span class="value">${customer.tel}</span></div>` : ''}
                     ${customer.email ? `<div class="row"><span class="label">이메일</span><span class="value">${customer.email}</span></div>` : ''}
-                    ${customer.address ? `<div class="row"><span class="label">주소</span><span class="value">${customer.address}</span></div>` : ''}
+                    ${customer.address && document_type !== 'QUOTATION' ? `<div class="row"><span class="label">주소</span><span class="value">${customer.address}</span></div>` : ''}
                     ${meta.end_customer ? `<div class="row"><span class="label" style="color: #6366f1; font-weight: 800;">요청고객사</span><span class="value" style="color: #6366f1; font-weight: 800;">${meta.end_customer}</span></div>` : ''}
                 </div>
             </div>

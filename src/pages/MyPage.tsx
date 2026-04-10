@@ -320,7 +320,8 @@ export default function MyPage() {
                 contact_name: deliveryInfo.contactName,
                 tel: deliveryInfo.contactPhone,
                 email: quote.customerInfo?.email || user?.email || '-',
-                address: `${deliveryInfo.method === 'FREIGHT' ? '[화물] ' : '[택배] '}${deliveryInfo.method === 'FREIGHT' ? deliveryInfo.branchName : deliveryInfo.address}`,
+                address: quote.customerInfo?.address || user?.address || '-', 
+                business_no: quote.customerInfo?.bizNo || user?.bizNo || '-',
                 memo: quote.adminResponse?.note // Pass generic note if needed
             },
             items: docItems,
