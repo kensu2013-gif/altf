@@ -673,6 +673,7 @@ export default function SihwaInventory() {
                                                             <th className="px-4 py-3 w-10 text-center">
                                                                 <input 
                                                                     type="checkbox" 
+                                                                    title="전체 선택"
                                                                     checked={stats.warning.length > 0 && selectedWarningIds.size === stats.warning.length}
                                                                     onChange={toggleAllWarnings}
                                                                     className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
@@ -694,6 +695,7 @@ export default function SihwaInventory() {
                                                                 <td className="px-4 py-4 text-center">
                                                                     <input 
                                                                         type="checkbox"
+                                                                        title="발주 항목 선택"
                                                                         checked={selectedWarningIds.has(row.product.id)}
                                                                         onChange={(e) => toggleWarningSelection(row.product.id, e as unknown as React.MouseEvent)}
                                                                         onClick={(e) => e.stopPropagation()}
