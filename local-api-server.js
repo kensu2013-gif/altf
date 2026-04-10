@@ -344,37 +344,62 @@ const server = http.createServer(async (req, res) => {
                         }
                     });
 
-                    const lastRecord = db.inventoryHistory.length > 0 ? db.inventoryHistory[db.inventoryHistory.length - 1] : null;
+                    const history = db.inventoryHistory;
+                    
+                    // Find today's record index and yesterday's baseline
+                    let todayRecordIndex = history.findIndex(h => h.date === today);
+                    
+                    // The baseline should be the stock BEFORE today. 
+                    // If today's record exists, the baseline is the one before it. 
+                    // If today's record doesn't exist, the baseline is the very last record.
+                    let baselineRecord = todayRecordIndex > 0 ? history[todayRecordIndex - 1] : 
+                                         (todayRecordIndex === -1 && history.length > 0 ? history[history.length - 1] : null);
 
-                    // If it's a new day, or the DB has no records, create today's snapshot
-                    if (!lastRecord || lastRecord.date !== today) {
+                    const diffAccumulator = [];
+
+                    if (baselineRecord && baselineRecord.stock) {
+                        for (const [id, data] of Object.entries(sihwaStockMap)) {
+                            const oldStock = baselineRecord.stock[id] ? baselineRecord.stock[id].stock : 0;
+                            const change = data.stock - oldStock;
+                            if (change !== 0) {
+                                diffAccumulator.push({ id, name: data.name, change, from: oldStock, to: data.stock });
+                            }
+                        }
+                        for (const [id, oldData] of Object.entries(baselineRecord.stock)) {
+                            if (sihwaStockMap[id] === undefined) {
+                                diffAccumulator.push({ id, name: oldData.name, change: -oldData.stock, from: oldData.stock, to: 0 });
+                            }
+                        }
+                    }
+
+                    if (todayRecordIndex !== -1) {
+                        // Update today's record dynamically
+                        const currentRecord = history[todayRecordIndex];
+                        const oldDiffStr = JSON.stringify(currentRecord.diff || []);
+                        const newDiffStr = JSON.stringify(diffAccumulator);
+                        
+                        currentRecord.stock = sihwaStockMap;
+                        currentRecord.diff = diffAccumulator;
+                        
+                        // Only save to S3 if the diff actually changed
+                        if (oldDiffStr !== newDiffStr) {
+                            await saveData();
+                            console.log(`[API] Updated intra-day inventory snapshot for ${today}. Diff count: ${diffAccumulator.length}`);
+                        }
+                    } else {
+                        // Create new day record
                         const newRecord = {
                             date: today,
                             stock: sihwaStockMap,
-                            diff: [] 
+                            diff: diffAccumulator
                         };
-
-                        if (lastRecord && lastRecord.stock) {
-                            for (const [id, data] of Object.entries(sihwaStockMap)) {
-                                const oldStock = lastRecord.stock[id] ? lastRecord.stock[id].stock : 0;
-                                const change = data.stock - oldStock;
-                                if (change !== 0) {
-                                    newRecord.diff.push({ id, name: data.name, change, from: oldStock, to: data.stock });
-                                }
-                            }
-                            for (const [id, oldData] of Object.entries(lastRecord.stock)) {
-                                if (sihwaStockMap[id] === undefined) {
-                                    newRecord.diff.push({ id, name: oldData.name, change: -oldData.stock, from: oldData.stock, to: 0 });
-                                }
-                            }
-                        }
-
-                        db.inventoryHistory.push(newRecord);
-                        if (db.inventoryHistory.length > 60) db.inventoryHistory.shift(); // Keep 2 months
+                        history.push(newRecord);
+                        if (history.length > 61) history.shift(); // Keep ~2 months
                         
                         await saveData();
-                        console.log(`[API] Generated inventory snapshot for ${today}. Diff count: ${newRecord.diff.length}`);
+                        console.log(`[API] Generated new daily inventory snapshot for ${today}. Diff count: ${newRecord.diff.length}`);
                     }
+
                 } catch (snapErr) {
                     console.error('[API] Error creating daily inventory snapshot:', snapErr);
                 }
