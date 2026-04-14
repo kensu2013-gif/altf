@@ -75,6 +75,7 @@ export default function SihwaInventory() {
 
     const [selectedWarningIds, setSelectedWarningIds] = useState<Set<string>>(new Set());
     const [expandedTrendItems, setExpandedTrendItems] = useState<Record<string, boolean>>({});
+    const [expandedDailyGroups, setExpandedDailyGroups] = useState<Record<string, boolean>>({});
 
     const [sortConfig, setSortConfig] = useState<{ 
         key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice', 
@@ -94,6 +95,10 @@ export default function SihwaInventory() {
 
     const toggleTrendItem = (key: string) => {
         setExpandedTrendItems(prev => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    const toggleDailyGroup = (date: string) => {
+        setExpandedDailyGroups(prev => ({ ...prev, [date]: !prev[date] }));
     };
 
     const toggleWarningSelection = (id: string, e: React.MouseEvent) => {
@@ -843,86 +848,126 @@ export default function SihwaInventory() {
                                                     <div className="p-8 text-center text-slate-400">최근 변동 이력이 없습니다.</div>
                                                 ) : (
                                                     <div className="p-0">
-                                                        {historyData.slice(-10).reverse().map((snap, idx) => (
-                                                            <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
-                                                                <h3 className="font-bold text-slate-800 mb-3 flex items-center justify-between">
-                                                                    <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono">{snap.date}</span>
-                                                                    <span className="text-slate-500 font-medium text-xs">변동 {snap.diff?.length || 0}건</span>
-                                                                </h3>
-                                                                {snap.diff && snap.diff.length > 0 ? (
-                                                                    <div className="grid grid-cols-1 gap-2">
-                                                                        {snap.diff.map((d, dIdx) => {
-                                                                            const rowKey = `${snap.date}-${d.id || d.name}-${dIdx}`;
-                                                                            const isExpanded = !!expandedTrendItems[rowKey];
-                                                                            const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
-                                                                            const sellingPrice = analysis ? analysis.sellingPrice : 0;
-                                                                            const purchasePrice = analysis ? analysis.recentPurchasePrice : 0;
-                                                                            
-                                                                            const valueStr = d.change < 0 
-                                                                                ? `매출 ${formatCur(Math.abs(d.change) * sellingPrice)}원` 
-                                                                                : `입고가치 ${formatCur(d.change * purchasePrice)}원`;
+                                                        {historyData.slice(-10).reverse().map((snap, idx) => {
+                                                            let dailyRevenue = 0;
+                                                            let dailyCost = 0;
+                                                            
+                                                            if (snap.diff) {
+                                                                snap.diff.forEach(d => {
+                                                                    const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
+                                                                    if (d.change < 0) {
+                                                                        dailyRevenue += Math.abs(d.change) * (analysis ? analysis.sellingPrice : 0);
+                                                                    } else if (d.change > 0) {
+                                                                        dailyCost += d.change * (analysis ? analysis.recentPurchasePrice : 0);
+                                                                    }
+                                                                });
+                                                            }
 
-                                                                            const finalId = d.id || d.name || '알수없음';
+                                                            const isGroupExpanded = expandedDailyGroups[snap.date] ?? (idx === 0);
 
-                                                                            return (
-                                                                                <div key={dIdx} className={`flex flex-col text-xs bg-slate-50 rounded border border-slate-100 border-l-4 ${d.change > 0 ? 'border-l-emerald-500' : 'border-l-rose-500'}`}>
-                                                                                    <div 
-                                                                                        className="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-100 transition-colors"
-                                                                                        onClick={() => toggleTrendItem(rowKey)}
-                                                                                    >
-                                                                                        <div className="flex flex-col flex-1 min-w-0 pr-2">
-                                                                                            <span className="font-bold text-slate-700 font-mono truncate" title={finalId}>{finalId}</span>
-                                                                                            {d.name && d.name !== finalId && <span className="text-[10px] text-slate-400 truncate">{d.name}</span>}
-                                                                                        </div>
-                                                                                        <div className="flex items-center gap-2 shrink-0">
-                                                                                            <div className="flex flex-col items-end">
-                                                                                                <div className="flex items-center gap-1">
-                                                                                                    <span className={`font-black font-mono w-10 text-right ${d.change > 0 ? 'text-teal-600' : 'text-rose-500'}`}>
-                                                                                                        {d.change > 0 ? '+' : ''}{d.change} 
-                                                                                                    </span>
-                                                                                                    {d.change < 0 ? (
-                                                                                                        <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded font-bold">출고/판매</span>
-                                                                                                    ) : (
-                                                                                                        <span className="text-[10px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded font-bold">입고됨</span>
-                                                                                                    )}
-                                                                                                </div>
-                                                                                                {(sellingPrice > 0 || purchasePrice > 0) && (
-                                                                                                    <span className={`text-[10px] font-bold mt-1 ${d.change < 0 ? 'text-indigo-600' : 'text-emerald-700'}`}>
-                                                                                                        {valueStr}
-                                                                                                    </span>
-                                                                                                )}
-                                                                                            </div>
-                                                                                            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                                                                        </div>
-                                                                                    </div>
-                                                                                    
-                                                                                    {isExpanded && analysis && (
-                                                                                        <div className="p-3 bg-white border-t border-slate-100 grid grid-cols-2 gap-4">
-                                                                                            <div className="flex flex-col gap-1">
-                                                                                                <span className="text-[10px] text-slate-400 font-bold">현재재고(시화)</span>
-                                                                                                <span className="text-sm font-black text-slate-700">{analysis.shQty} <span className="text-[10px] font-normal text-slate-500">개</span></span>
-                                                                                            </div>
-                                                                                            <div className="flex flex-col gap-1">
-                                                                                                <span className="text-[10px] text-slate-400 font-bold">안전재고(목표)</span>
-                                                                                                <span className="text-sm font-bold text-indigo-500">{analysis.safeStock} <span className="text-[10px] font-normal text-slate-500">개</span></span>
-                                                                                            </div>
-                                                                                            <div className="flex flex-col gap-1">
-                                                                                                <span className="text-[10px] text-slate-400 font-bold">매출단가(추정)</span>
-                                                                                                <span className="text-sm font-bold text-slate-700">{formatCur(analysis.sellingPrice)} <span className="text-[10px] font-normal text-slate-500">원</span></span>
-                                                                                            </div>
-                                                                                            <div className="flex flex-col gap-1">
-                                                                                                <span className="text-[10px] text-slate-400 font-bold">매입단가(최근)</span>
-                                                                                                <span className="text-sm font-bold text-slate-700">{formatCur(analysis.recentPurchasePrice)} <span className="text-[10px] font-normal text-slate-500">원</span></span>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    )}
+                                                            return (
+                                                                <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
+                                                                    <div className="flex flex-col gap-2 mb-3">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono font-bold hover:bg-slate-300 cursor-pointer transition-colors" onClick={() => toggleDailyGroup(snap.date)}>{snap.date}</span>
+                                                                            <span className="text-slate-500 font-medium text-xs">변동 {snap.diff?.length || 0}건</span>
+                                                                        </div>
+                                                                        
+                                                                        {(dailyRevenue > 0 || dailyCost > 0) && (
+                                                                            <div 
+                                                                                className="flex items-center gap-3 mt-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200 shadow-sm cursor-pointer hover:bg-slate-100 transition-colors"
+                                                                                onClick={() => toggleDailyGroup(snap.date)}
+                                                                            >
+                                                                                <div className="flex flex-col flex-1 pl-2 border-l-4 border-indigo-400">
+                                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-tight">총 일일매출(출고)</span>
+                                                                                    <span className="text-sm font-black text-indigo-700">₩{formatCur(dailyRevenue)}</span>
                                                                                 </div>
-                                                                            );
-                                                                        })}
+                                                                                <div className="w-[1px] h-8 bg-slate-200"></div>
+                                                                                <div className="flex flex-col flex-1 pl-2 border-l-4 border-emerald-400">
+                                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-tight">총 매입가치(입고)</span>
+                                                                                    <span className="text-sm font-black text-emerald-700">₩{formatCur(dailyCost)}</span>
+                                                                                </div>
+                                                                                <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isGroupExpanded ? 'rotate-180' : ''}`} />
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                ) : <p className="text-xs text-slate-400">변동 없음</p>}
-                                                            </div>
-                                                        ))}
+                                                                    {isGroupExpanded && (
+                                                                        snap.diff && snap.diff.length > 0 ? (
+                                                                            <div className="grid grid-cols-1 gap-2 mt-2">
+                                                                                {snap.diff.map((d, dIdx) => {
+                                                                                    const rowKey = `${snap.date}-${d.id || d.name}-${dIdx}`;
+                                                                                    const isExpanded = !!expandedTrendItems[rowKey];
+                                                                                    const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
+                                                                                    const sellingPrice = analysis ? analysis.sellingPrice : 0;
+                                                                                    const purchasePrice = analysis ? analysis.recentPurchasePrice : 0;
+                                                                                    
+                                                                                    const valueStr = d.change < 0 
+                                                                                        ? `매출 ${formatCur(Math.abs(d.change) * sellingPrice)}원` 
+                                                                                        : `입고가치 ${formatCur(d.change * purchasePrice)}원`;
+
+                                                                                    const finalId = d.id || d.name || '알수없음';
+
+                                                                                    return (
+                                                                                        <div key={dIdx} className={`flex flex-col text-xs bg-white rounded border border-slate-100 border-l-4 ${d.change > 0 ? 'border-l-emerald-500' : 'border-l-rose-500'}`}>
+                                                                                            <div 
+                                                                                                className="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-50 transition-colors"
+                                                                                                onClick={() => toggleTrendItem(rowKey)}
+                                                                                            >
+                                                                                                <div className="flex flex-col flex-1 min-w-0 pr-2">
+                                                                                                    <span className="font-bold text-slate-700 font-mono truncate" title={finalId}>{finalId}</span>
+                                                                                                    {d.name && d.name !== finalId && <span className="text-[10px] text-slate-400 truncate">{d.name}</span>}
+                                                                                                </div>
+                                                                                                <div className="flex items-center gap-2 shrink-0">
+                                                                                                    <div className="flex flex-col items-end">
+                                                                                                        <div className="flex items-center gap-1">
+                                                                                                            <span className={`font-black font-mono w-10 text-right ${d.change > 0 ? 'text-teal-600' : 'text-rose-500'}`}>
+                                                                                                                {d.change > 0 ? '+' : ''}{d.change} 
+                                                                                                            </span>
+                                                                                                            {d.change < 0 ? (
+                                                                                                                <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded font-bold">출고/판매</span>
+                                                                                                            ) : (
+                                                                                                                <span className="text-[10px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded font-bold">입고됨</span>
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                        {(sellingPrice > 0 || purchasePrice > 0) && (
+                                                                                                            <span className={`text-[10px] font-bold mt-1 ${d.change < 0 ? 'text-indigo-600' : 'text-emerald-700'}`}>
+                                                                                                                {valueStr}
+                                                                                                            </span>
+                                                                                                        )}
+                                                                                                    </div>
+                                                                                                    <ChevronDown className={`w-4 h-4 text-slate-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            
+                                                                                            {isExpanded && analysis && (
+                                                                                                <div className="p-3 bg-slate-50/50 border-t border-slate-100 grid grid-cols-2 gap-4">
+                                                                                                    <div className="flex flex-col gap-1">
+                                                                                                        <span className="text-[10px] text-slate-400 font-bold">현재재고(시화)</span>
+                                                                                                        <span className="text-sm font-black text-slate-700">{analysis.shQty} <span className="text-[10px] font-normal text-slate-500">개</span></span>
+                                                                                                    </div>
+                                                                                                    <div className="flex flex-col gap-1">
+                                                                                                        <span className="text-[10px] text-slate-400 font-bold">안전재고(목표)</span>
+                                                                                                        <span className="text-sm font-bold text-indigo-500">{analysis.safeStock} <span className="text-[10px] font-normal text-slate-500">개</span></span>
+                                                                                                    </div>
+                                                                                                    <div className="flex flex-col gap-1">
+                                                                                                        <span className="text-[10px] text-slate-400 font-bold">매출단가(추정)</span>
+                                                                                                        <span className="text-sm font-bold text-slate-700">{formatCur(analysis.sellingPrice)} <span className="text-[10px] font-normal text-slate-500">원</span></span>
+                                                                                                    </div>
+                                                                                                    <div className="flex flex-col gap-1">
+                                                                                                        <span className="text-[10px] text-slate-400 font-bold">매입단가(최근)</span>
+                                                                                                        <span className="text-sm font-bold text-slate-700">{formatCur(analysis.recentPurchasePrice)} <span className="text-[10px] font-normal text-slate-500">원</span></span>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        ) : <p className="text-xs text-slate-400 mt-2 px-1">상세 변동 내역이 없습니다.</p>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 )}
                                             </div>
