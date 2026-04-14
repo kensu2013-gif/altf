@@ -6,6 +6,7 @@ import { FileText, PackageX, Calendar, Search, Filter, MessageSquare, Send, X, T
 import { CalmPageShell } from '../../components/ui/CalmPageShell';
 import { PageTransition } from '../../components/ui/PageTransition';
 import { ManagerMultiSelect } from '../../components/ui/ManagerMultiSelect';
+import { useInventory } from '../../hooks/useInventory';
 
 interface PendingItem {
     orderId: string;
@@ -38,6 +39,7 @@ interface PendingOrderGroup {
 }
 
 export default function PendingOrders() {
+    const { inventory } = useInventory();
     const { orders, setOrders, updateOrder, users, fetchUsers } = useStore(useShallow((state) => ({
         orders: state.orders,
         setOrders: state.setOrders,
@@ -295,6 +297,61 @@ export default function PendingOrders() {
         return { type: 'NORMAL', text: '', color: 'text-slate-500', bg: '' };
     };
 
+    const handleExportSihwaInventoryCSV = () => {
+        if (pendingOrderGroups.length === 0) {
+            alert("다운로드할 데이터가 없습니다.");
+            return;
+        }
+
+        const headers = ['품목', '두께', '사이즈', '재질', '현재재고(시화)', '발주수량', '발주날짜', '입고예정일', '발주서번호'];
+        const csvRows = [headers.join(',')];
+
+        pendingOrderGroups.forEach(group => {
+            group.items.forEach(item => {
+                const specName = item.itemName || '';
+                const specThick = item.thickness || '';
+                const specSize = item.size || '';
+                const specMat = item.material || '';
+                
+                // Match inventory
+                const matchedInv = inventory?.find(i => 
+                    (i.name || '') === specName && 
+                    (i.thickness || '') === specThick && 
+                    (i.size || '') === specSize && 
+                    (i.material || '') === specMat
+                );
+
+                const currentStock = matchedInv?.locationStock?.['시화'] || 0;
+
+                const row = [
+                    `"${specName}"`,
+                    `"${specThick}"`,
+                    `"${specSize}"`,
+                    `"${specMat}"`,
+                    currentStock,
+                    item.quantity,
+                    `"${item.poDate}"`,
+                    `"${group.deliveryDate}"`,
+                    `"${item.poNumber}"`
+                ];
+                csvRows.push(row.join(','));
+            });
+        });
+
+        const csvString = csvRows.join('\n');
+        const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        link.setAttribute('href', url);
+        link.setAttribute('download', `시화재고_미결리스트_${dateStr}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const handleExportCSV = () => {
         if (pendingOrderGroups.length === 0) {
             alert("다운로드할 데이터가 없습니다.");
@@ -427,13 +484,22 @@ export default function PendingOrders() {
                         ))}
                     </select>
                 </div>
-                <div className="ml-auto">
+                <div className="ml-auto flex items-center gap-2">
+                    <button
+                        onClick={handleExportSihwaInventoryCSV}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
+                        title="관리자용 시화재고 포함 다운로드"
+                    >
+                        <Download className="w-4 h-4" />
+                        시화재고 비교
+                    </button>
                     <button
                         onClick={handleExportCSV}
                         className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
+                        title="기존 발주서 전체 내용 엑셀 다운로드"
                     >
                         <Download className="w-4 h-4" />
-                        엑셀 다운로드
+                        기본 엑셀
                     </button>
                 </div>
             </div>
