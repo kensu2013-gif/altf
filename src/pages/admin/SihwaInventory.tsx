@@ -13,7 +13,8 @@ import {
     ChevronDown,
     ChevronRight,
     Activity,
-    Info
+    Info,
+    Download
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Product } from '../../types';
@@ -515,6 +516,75 @@ export default function SihwaInventory() {
         };
     }, [analyzedInventory]);
 
+    const handleExportSihwaSummary = () => {
+        const headers = ['품목', '두께', '사이즈', '재질', '현재재고(시화)', '입고예정(미결결과)', '발주서번호(들)', '발주날짜(들)', '입고예정일'];
+        const csvRows = [headers.join(',')];
+
+        analyzedInventory.forEach(row => {
+            const specName = row.product.name || '';
+            const specThick = row.product.thickness || '';
+            const specSize = row.product.size || '';
+            const specMat = row.product.material || '';
+
+            // Extract all related pending orders for this specific item that were ordered for '서울재고'
+            let poNumbers: string[] = [];
+            let poDates: string[] = [];
+            let deliveryDates: string[] = [];
+
+            orders.forEach(order => {
+                if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
+                const targetCustomer = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
+                
+                if (targetCustomer.includes('서울재고')) {
+                    order.po_items?.forEach(poItem => {
+                        if (poItem.poSent && !poItem.transactionIssued) {
+                            if (
+                                poItem.name === specName &&
+                                (poItem.thickness || '') === specThick &&
+                                (poItem.size || '') === specSize &&
+                                (poItem.material || '') === specMat
+                            ) {
+                                if (order.poNumber && !poNumbers.includes(order.poNumber)) poNumbers.push(order.poNumber);
+                                const pDate = new Date(order.createdAt).toLocaleDateString();
+                                if (!poDates.includes(pDate)) poDates.push(pDate);
+                                const dDateStr = order.adminResponse?.deliveryDate || order.createdAt;
+                                const dDate = new Date(dDateStr).toLocaleDateString();
+                                if (!deliveryDates.includes(dDate)) deliveryDates.push(dDate);
+                            }
+                        }
+                    });
+                }
+            });
+
+            // User requirement: "기준은 재고data에서 시화재고만 따로 추려서..." => We can include all to give full visibility, or just those with stock or pending.
+            // Let's include everything in the analyzedInventory to act as the full baseline map.
+            const r = [
+                `"${specName}"`,
+                `"${specThick}"`,
+                `"${specSize}"`,
+                `"${specMat}"`,
+                row.shQty, // 현재고
+                row.pendingOrderQty, // 입고예정
+                `"${poNumbers.join(', ')}"`,
+                `"${poDates.join(', ')}"`,
+                `"${deliveryDates.join(', ')}"`
+            ];
+            csvRows.push(r.join(','));
+        });
+
+        const csvString = csvRows.join('\n');
+        const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        const dateStr = new Date().toISOString().split('T')[0];
+        link.setAttribute('href', url);
+        link.setAttribute('download', `시화재고_입고대기분석_${dateStr}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     if (user?.role === 'MANAGER') {
         return (
             <div className="flex flex-col items-center justify-center p-20 text-center pb-40">
@@ -564,6 +634,15 @@ export default function SihwaInventory() {
                     <p className="text-slate-500 text-[15px] mt-1 tracking-tight">
                         자산 가치 산정부터 입고대기 수량 및 일간 변동 트렌드를 종합 적용하여 최적의 사입 계획을 수립합니다.
                     </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                    <button 
+                        onClick={handleExportSihwaSummary} 
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-black text-white rounded-lg font-bold text-sm shadow-md transition-all active:scale-95 border border-slate-700"
+                    >
+                        <Download className="w-4 h-4" />
+                        현재고 + 입고예정(미결) 엑셀 다운로드
+                    </button>
                 </div>
             </div>
 
