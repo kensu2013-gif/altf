@@ -527,9 +527,9 @@ export default function SihwaInventory() {
             const specMat = row.product.material || '';
 
             // Extract all related pending orders for this specific item that were ordered for '서울재고'
-            let poNumbers: string[] = [];
-            let poDates: string[] = [];
-            let deliveryDates: string[] = [];
+            const poNumbers: string[] = [];
+            const poDates: string[] = [];
+            const deliveryDates: string[] = [];
 
             orders.forEach(order => {
                 if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
