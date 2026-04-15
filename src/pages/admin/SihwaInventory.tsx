@@ -825,7 +825,13 @@ export default function SihwaInventory() {
                                         <button onClick={() => toggleGroup('CRITICAL')} className="w-full flex items-center justify-between px-5 py-4 bg-rose-50 hover:bg-rose-100 transition-colors">
                                             <div className="flex items-center gap-3">
                                                 {expandedGroups['CRITICAL'] ? <ChevronDown className="w-5 h-5 text-rose-500"/> : <ChevronRight className="w-5 h-5 text-rose-500"/>}
-                                                <h3 className="font-bold text-rose-800 text-lg">🚨 선발주 요망 리스트 <span className="text-sm font-medium text-rose-500 ml-2">(대경매입처 동반 결품 위험)</span></h3>
+                                                <h3 className="font-bold text-rose-800 text-lg flex flex-wrap items-center gap-2">
+                                                    <span>🚨 선발주 요망 리스트</span>
+                                                    <span className="text-sm font-medium text-rose-500">(대경매입처 동반 결품 위험)</span>
+                                                    <span className="text-sm font-bold bg-rose-100/70 text-rose-700 px-2 py-0.5 rounded border border-rose-200 tracking-tight">
+                                                        [산출식: 현재고+대기=0 & 대경=0 & 연판매{'>'}100 & 빈도≥10 | 발주단위: 최소 10개]
+                                                    </span>
+                                                </h3>
                                             </div>
                                             <span className="bg-rose-200 text-rose-800 font-black px-3 py-1 rounded-full text-sm">{stats.critical.length}건</span>
                                         </button>
@@ -917,7 +923,13 @@ export default function SihwaInventory() {
                                         <button onClick={() => toggleGroup('WARNING')} className="w-full flex items-center justify-between px-5 py-4 bg-amber-50 hover:bg-amber-100 transition-colors">
                                             <div className="flex items-center gap-3">
                                                 {expandedGroups['WARNING'] ? <ChevronDown className="w-5 h-5 text-amber-600"/> : <ChevronRight className="w-5 h-5 text-amber-600"/>}
-                                                <h3 className="font-bold text-amber-800 text-lg">⚠️ 일반 발주 필요 <span className="text-sm font-medium text-amber-600 ml-2">(입고 대기물량을 고려해도 부족함)</span></h3>
+                                                <h3 className="font-bold text-amber-800 text-lg flex flex-wrap items-center gap-2">
+                                                    <span>⚠️ 일반 발주 필요</span>
+                                                    <span className="text-sm font-medium text-amber-600">(입고 대기물량을 고려해도 부족함)</span>
+                                                    <span className="text-sm font-bold bg-amber-100/70 text-amber-700 px-2 py-0.5 rounded border border-amber-200 tracking-tight">
+                                                        [산출식: 적정재고 미달분 보충 | 발주단위: 최소 100개 (Size≥100A는 최대 300캡)]
+                                                    </span>
+                                                </h3>
                                             </div>
                                             <span className="bg-amber-200 text-amber-800 font-black px-3 py-1 rounded-full text-sm">{stats.warning.length}건</span>
                                         </button>
@@ -1017,7 +1029,13 @@ export default function SihwaInventory() {
                                         <button onClick={() => toggleGroup('REGULAR')} className="w-full flex items-center justify-between px-5 py-4 bg-indigo-50 hover:bg-indigo-100 transition-colors">
                                             <div className="flex items-center gap-3">
                                                 {expandedGroups['REGULAR'] ? <ChevronDown className="w-5 h-5 text-indigo-600"/> : <ChevronRight className="w-5 h-5 text-indigo-600"/>}
-                                                <h3 className="font-bold text-indigo-800 text-lg">♻️ 정기 발주 예측 <span className="text-sm font-medium text-indigo-500 ml-2">(우량 품목 2개월분 선주문 권장)</span></h3>
+                                                <h3 className="font-bold text-indigo-800 text-lg flex flex-wrap items-center gap-2">
+                                                    <span>♻️ 정기 발주 예측</span>
+                                                    <span className="text-sm font-medium text-indigo-500">(우량 품목 2개월분 선주문 권장)</span>
+                                                    <span className="text-sm font-bold bg-indigo-100/70 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200 tracking-tight">
+                                                        [산출식: 빈도≥20 & 추천량=((연판매/6)-현재고) | 발주단위: 최소 500개 (Size≥100A는 최대 300캡)]
+                                                    </span>
+                                                </h3>
                                             </div>
                                             <span className="bg-indigo-200 text-indigo-800 font-black px-3 py-1 rounded-full text-sm">{stats.regular.length}건</span>
                                         </button>
