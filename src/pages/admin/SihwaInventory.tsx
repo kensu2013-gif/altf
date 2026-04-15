@@ -528,17 +528,18 @@ export default function SihwaInventory() {
     const handleCreateOrder = (selectedSet: Set<string>, listType: 'CRITICAL' | 'WARNING' | 'REGULAR') => {
         if (selectedSet.size === 0) return;
         
-        let listItems: any[] = [];
-        if (listType === 'CRITICAL') listItems = stats.critical;
-        else if (listType === 'WARNING') listItems = stats.warning;
-        else listItems = stats.regular;
+        const listItems = listType === 'CRITICAL' 
+            ? stats.critical 
+            : listType === 'WARNING' 
+                ? stats.warning 
+                : stats.regular;
 
         const itemsToAdd = listItems.filter(item => selectedSet.has(item.product.id));
 
         itemsToAdd.forEach(row => {
             let qty = 0;
             if (listType === 'REGULAR') {
-                qty = row.recommendedQty || 0;
+                qty = 'recommendedQty' in row ? (row as any).recommendedQty : 0;
             } else {
                 qty = row.deficit > 0 ? row.deficit : 0;
                 qty = Math.max(10, Math.ceil(qty / 10) * 10);
