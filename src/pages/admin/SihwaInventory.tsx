@@ -539,7 +539,7 @@ export default function SihwaInventory() {
         itemsToAdd.forEach(row => {
             let qty = 0;
             if (listType === 'REGULAR') {
-                qty = 'recommendedQty' in row ? (row as any).recommendedQty : 0;
+                qty = 'recommendedQty' in row ? (row as { recommendedQty?: number }).recommendedQty || 0 : 0;
             } else {
                 qty = row.deficit > 0 ? row.deficit : 0;
                 qty = Math.max(10, Math.ceil(qty / 10) * 10);
@@ -807,7 +807,7 @@ export default function SihwaInventory() {
                                                     <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none">
                                                         <tr>
                                                             <th className="px-5 py-3 w-12 text-center">
-                                                                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-600" 
+                                                                <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-600" 
                                                                     checked={stats.critical.length > 0 && selectedCriticalIds.size === stats.critical.length}
                                                                     onChange={(e) => {
                                                                         if (e.target.checked) setSelectedCriticalIds(new Set(stats.critical.map(r => r.product.id)));
@@ -828,7 +828,7 @@ export default function SihwaInventory() {
                                                         {stats.critical.map(row => (
                                                             <tr key={row.product.id} className="hover:bg-slate-50">
                                                                 <td className="px-5 py-4 text-center">
-                                                                    <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-600"
+                                                                    <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-600"
                                                                         checked={selectedCriticalIds.has(row.product.id)}
                                                                         onChange={(e) => {
                                                                             const newSet = new Set(selectedCriticalIds);
@@ -985,7 +985,7 @@ export default function SihwaInventory() {
                                                     <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none">
                                                         <tr>
                                                             <th className="px-5 py-3 w-12 text-center">
-                                                                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600" 
+                                                                <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600" 
                                                                     checked={stats.regular.length > 0 && selectedRegularIds.size === stats.regular.length}
                                                                     onChange={(e) => {
                                                                         if (e.target.checked) setSelectedRegularIds(new Set(stats.regular.map(r => r.product.id)));
@@ -1005,7 +1005,7 @@ export default function SihwaInventory() {
                                                         {stats.regular.map(row => (
                                                             <tr key={row.product.id} className="hover:bg-slate-50">
                                                                 <td className="px-5 py-4 text-center">
-                                                                    <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                                                                    <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
                                                                         checked={selectedRegularIds.has(row.product.id)}
                                                                         onChange={(e) => {
                                                                             const newSet = new Set(selectedRegularIds);
