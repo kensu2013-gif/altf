@@ -598,7 +598,7 @@ export default function SihwaInventory() {
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20">
             {/* AI Accuracy Confidence Metric */}
-            <div className="bg-gradient-to-r from-slate-800 to-indigo-900 rounded-2xl p-5 shadow-lg text-white flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-700/50">
+            <div className="bg-linear-to-r from-slate-800 to-indigo-900 rounded-2xl p-5 shadow-lg text-white flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-700/50">
                 <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-full border-4 border-teal-400 border-t-transparent animate-spin-slow flex items-center justify-center relative">
                         <div className="absolute inset-0 flex items-center justify-center text-sm font-black text-teal-400">76%</div>
@@ -649,7 +649,7 @@ export default function SihwaInventory() {
 
             {/* Smart Tableau Dashboard */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 xl:gap-6">
-                <div className="bg-gradient-to-br from-rose-500 to-red-600 rounded-2xl p-5 shadow-lg shadow-rose-200 text-white flex flex-col relative overflow-hidden group">
+                <div className="bg-linear-to-br from-rose-500 to-red-600 rounded-2xl p-5 shadow-lg shadow-rose-200 text-white flex flex-col relative overflow-hidden group">
                     <div className="absolute top-0 right-0 -mr-6 -mt-6 p-4 opacity-20 transform group-hover:scale-110 transition-transform duration-500">
                         <AlertTriangle className="w-32 h-32" />
                     </div>
@@ -658,7 +658,7 @@ export default function SihwaInventory() {
                     <p className="text-sm font-medium opacity-80 z-10 break-keep">시화 실효재고가 부족하고, 대경 재고도 바닥나 특별 관리가 필요한 초긴급 품목입니다.</p>
                 </div>
                 
-                <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl p-5 shadow-lg shadow-amber-200 text-white flex flex-col relative overflow-hidden group">
+                <div className="bg-linear-to-br from-amber-400 to-orange-500 rounded-2xl p-5 shadow-lg shadow-amber-200 text-white flex flex-col relative overflow-hidden group">
                     <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-20 transform group-hover:rotate-12 transition-transform duration-500">
                         <Box className="w-32 h-32" />
                     </div>
@@ -667,7 +667,7 @@ export default function SihwaInventory() {
                     <p className="text-sm font-medium opacity-80 z-10">대경 재고는 보유 중이나, 예정된 입고(Pending)를 합쳐도 안전 목표치에 미달된 품목입니다.</p>
                 </div>
 
-                <div className="bg-gradient-to-br from-slate-700 to-slate-900 rounded-2xl p-5 shadow-lg shadow-slate-300 text-white flex flex-col relative overflow-hidden group">
+                <div className="bg-linear-to-br from-slate-700 to-slate-900 rounded-2xl p-5 shadow-lg shadow-slate-300 text-white flex flex-col relative overflow-hidden group">
                     <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-10 transform group-hover:-translate-y-2 transition-transform duration-500">
                         <Activity className="w-32 h-32" />
                     </div>
@@ -870,8 +870,8 @@ export default function SihwaInventory() {
                             {/* TAB 2: TOTAL DASHBOARD AND DAILY TREND */}
                             {activeTab === 'TOTAL_DASHBOARD' && (
                                 <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-0">
-                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-fit">
                                             <div className="bg-slate-800 text-white px-5 py-4 flex items-center justify-between shrink-0">
                                                 <div className="flex items-center gap-2">
                                                     <CalendarDays className="w-5 h-5 text-indigo-400" />
@@ -969,7 +969,7 @@ export default function SihwaInventory() {
                                                                                     <span className="text-[10px] text-slate-500 font-bold tracking-tight">총 일일매출(출고)</span>
                                                                                     <span className="text-sm font-black text-indigo-700">₩{formatCur(dailyRevenue)}</span>
                                                                                 </div>
-                                                                                <div className="w-[1px] h-8 bg-slate-200"></div>
+                                                                                <div className="w-px h-8 bg-slate-200"></div>
                                                                                 <div className="flex flex-col flex-1 pl-2 border-l-4 border-emerald-400">
                                                                                     <span className="text-[10px] text-slate-500 font-bold tracking-tight">총 매입가치(입고)</span>
                                                                                     <span className="text-sm font-black text-emerald-700">₩{formatCur(dailyCost)}</span>
@@ -981,7 +981,11 @@ export default function SihwaInventory() {
                                                                     {isGroupExpanded && (
                                                                         snap.diff && snap.diff.length > 0 ? (
                                                                             <div className="grid grid-cols-1 gap-2 mt-2">
-                                                                                {snap.diff.map((d, dIdx) => {
+                                                                                {[...snap.diff].sort((a, b) => {
+                                                                                    const aiA = a.id ? analyzedInventory.find(ai => ai.product.id === a.id) : null;
+                                                                                    const aiB = b.id ? analyzedInventory.find(ai => ai.product.id === b.id) : null;
+                                                                                    return (aiB ? aiB.deficit : 0) - (aiA ? aiA.deficit : 0);
+                                                                                }).map((d, dIdx) => {
                                                                                     const rowKey = `${snap.date}-${d.id || d.name}-${dIdx}`;
                                                                                     const isExpanded = !!expandedTrendItems[rowKey];
                                                                                     const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
@@ -1022,6 +1026,11 @@ export default function SihwaInventory() {
                                                                                                 <div className="flex items-center gap-2 shrink-0">
                                                                                                     <div className="flex flex-col items-end gap-1">
                                                                                                         <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-[200px]">
+                                                                                                            {analysis && (
+                                                                                                                <div className="text-[10px] w-full text-right text-slate-500 group-hover:text-slate-700 transition-colors mt-0.5">
+                                                                                                                    현재고 <span className="font-bold text-slate-700">{analysis.shQty}</span> / 안전재고 <span className="font-bold text-slate-700">{analysis.safeStock}</span>
+                                                                                                                </div>
+                                                                                                            )}
                                                                                                             {valueChips.map((chip, i) => (
                                                                                                                 <div key={i} className={`flex flex-col items-end px-1.5 py-0.5 rounded ${chip.style}`}>
                                                                                                                     <span className="font-bold tracking-tight">{chip.label}</span>
@@ -1034,11 +1043,7 @@ export default function SihwaInventory() {
                                                                                                                 <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">임시 변동 (0)</span>
                                                                                                             )}
                                                                                                         </div>
-                                                                                                        {d.change !== 0 && (
-                                                                                                            <div className={`text-[10px] font-black w-full text-right ${d.change > 0 ? 'text-emerald-600' : 'text-indigo-500'}`}>
-                                                                                                                Net: {d.change > 0 ? '+' : ''}{d.change}개
-                                                                                                            </div>
-                                                                                                        )}
+
                                                                                                     </div>
                                                                                                     <ChevronDown className={`w-4 h-4 text-slate-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                                                                                 </div>
@@ -1090,7 +1095,7 @@ export default function SihwaInventory() {
                                                 <div className="grid grid-cols-1 divide-y divide-slate-100">
                                                     {(() => {
                                                         const topItems = [...analyzedInventory]
-                                                            .filter(item => item.recent30dSales > 0)
+                                                            .filter(item => item.recent30dSales > 0 && !item.product.id.startsWith('STUBEND') && item.sellingPrice > 0)
                                                             .sort((a, b) => b.recent30dSales - a.recent30dSales)
                                                             .slice(0, 50); // Get top 50
                                                             
@@ -1110,7 +1115,10 @@ export default function SihwaInventory() {
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex flex-col items-end shrink-0 pl-1">
-                                                                    <span className="font-black text-slate-700 text-sm">{item.recent30dSales} <span className="font-normal text-[10px] text-slate-400">개 판매</span></span>
+                                                                    <div className="flex items-center gap-1 justify-end">
+                                                                        <span className="text-[9px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-bold">{item.salesFreq}회발생</span>
+                                                                        <span className="font-black text-slate-700 text-sm drop-shadow-sm">{item.recent30dSales} <span className="font-normal text-[10px] text-slate-400">개</span></span>
+                                                                    </div>
                                                                     <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-[80px]" title={`기간누적매출 ${formatCur(item.recent30dSales * item.sellingPrice)}원`}>
                                                                         ₩{formatCur(item.recent30dSales * item.sellingPrice)}
                                                                     </span>
