@@ -414,15 +414,16 @@ export default function SihwaInventory() {
 
         // Step 3: Run AI Rules for status computation
         const processedList = Object.values(comparisonMap).map(row => {
-            let safeStock = Math.ceil((row.salesVolume / 12) * 1.5);
+            const rawSafeStock = Math.ceil((row.salesVolume / 12) * 1.5);
+            let safeStock = rawSafeStock > 0 ? Math.max(10, Math.round(rawSafeStock / 10) * 10) : 0;
             
             // AI Filter Rules
             const mat = (row.product.material || '').toUpperCase();
             if (mat.startsWith('WP') || mat.includes('CARBON')) {
                 safeStock = 0; // WP/Carbon items don't need Sihwa stock
             }
-            if (row.salesFreq < 5) {
-                safeStock = 0; // Low frequency items don't need Sihwa stock
+            if (row.salesFreq < 10) {
+                safeStock = 0; // Low frequency (<10) items excluded from re-order needs
             }
 
             // REQUIREMENT 3: INCLUDE PENDING ORDERS as effective stock
@@ -435,8 +436,14 @@ export default function SihwaInventory() {
             if (row.salesVolume > 0 && safeStock > 0) {
                 if (effectiveStock <= 0) {
                     if (row.ysQty <= 0) {
-                        statusCategory = 'CRITICAL';
-                        statusLabel = '🚨 선발주 (매입결품)';
+                        if (row.salesVolume >= 50) {
+                            statusCategory = 'CRITICAL';
+                            statusLabel = '🚨 선발주 (매입결품)';
+                        } else {
+                            // Exclude from urgent pre-order if volume < 50, demote to normal order
+                            statusCategory = 'WARNING';
+                            statusLabel = '⚠️ 일반 결품 (소량)';
+                        }
                     } else {
                         statusCategory = 'WARNING';
                         statusLabel = '⚠️ 결품 (단기조달요망)';
