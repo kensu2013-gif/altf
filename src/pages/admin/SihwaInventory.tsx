@@ -511,7 +511,7 @@ export default function SihwaInventory() {
         const regular = analyzedInventory
             .filter(r => r.statusCategory === 'SAFE' && r.salesFreq >= 20)
             .map(r => {
-                const rawRecommended = (r.salesVolume / 6) - r.shQty;
+                const rawRecommended = (r.salesVolume / 6) - r.effectiveStock;
                 const recommendedQty = rawRecommended > 0 ? Math.max(10, Math.ceil(rawRecommended / 10) * 10) : 0;
                 return { ...r, recommendedQty };
             })
