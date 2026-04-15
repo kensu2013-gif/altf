@@ -443,6 +443,13 @@ export default function SihwaInventory() {
                 safeStock = 0; // Low frequency (<10) items excluded from re-order needs
             }
 
+            // 부피에 따른 보관 한도 (100A 이상 최대 300개 캡)
+            const sizeStr = row.product.size || '';
+            const sizeNum = parseInt(sizeStr.replace(/[^0-9]/g, ''), 10);
+            if (!isNaN(sizeNum) && sizeNum >= 100) {
+                if (safeStock > 300) safeStock = 300;
+            }
+
             // REQUIREMENT 3: INCLUDE PENDING ORDERS as effective stock
             const effectiveStock = row.shQty + row.pendingOrderQty; 
             const deficit = safeStock - effectiveStock;
@@ -453,21 +460,21 @@ export default function SihwaInventory() {
             if (row.salesVolume > 0 && safeStock > 0) {
                 if (effectiveStock <= 0) {
                     if (row.ysQty <= 0) {
-                        if (row.salesVolume >= 50) {
+                        if (row.salesVolume > 100 && row.salesFreq >= 10) {
                             statusCategory = 'CRITICAL';
-                            statusLabel = '🚨 선발주 (매입결품)';
+                            statusLabel = '🚨 선발주 요망 (매입결품)';
                         } else {
-                            // Exclude from urgent pre-order if volume < 50, demote to normal order
+                            // Exclude from urgent pre-order if volume/freq not enough, demote to normal order
                             statusCategory = 'WARNING';
-                            statusLabel = '⚠️ 일반 결품 (소량)';
+                            statusLabel = '⚠️ 일반 발주 필요 (재고부족)';
                         }
                     } else {
                         statusCategory = 'WARNING';
-                        statusLabel = '⚠️ 결품 (단기조달요망)';
+                        statusLabel = '⚠️ 일반 발주 (대경재고 활용)';
                     }
                 } else if (effectiveStock < safeStock) {
                     statusCategory = 'WARNING';
-                    statusLabel = '⚠️ 안전재고 미달';
+                    statusLabel = '⚠️ 적정재고 미달 (재고부족)';
                 } else {
                     statusCategory = 'SAFE';
                     statusLabel = '✅ 적정 유지중';
@@ -519,7 +526,14 @@ export default function SihwaInventory() {
             .filter(r => r.statusCategory === 'SAFE' && r.salesFreq >= 20)
             .map(r => {
                 const rawRecommended = (r.salesVolume / 6) - r.effectiveStock;
-                const recommendedQty = rawRecommended > 0 ? Math.max(10, Math.ceil(rawRecommended / 10) * 10) : 0;
+                let recommendedQty = rawRecommended > 0 ? Math.max(500, Math.ceil(rawRecommended / 100) * 100) : 0;
+                
+                // 정기발주 시에도 부피 캡(Max 300) 고려
+                const sizeNum = parseInt((r.product.size || '').replace(/[^0-9]/g, ''), 10);
+                if (!isNaN(sizeNum) && sizeNum >= 100) {
+                    recommendedQty = recommendedQty > 0 ? Math.min(300, recommendedQty) : 0;
+                }
+                
                 return { ...r, recommendedQty };
             })
             .filter(r => r.recommendedQty > 0);
@@ -547,9 +561,18 @@ export default function SihwaInventory() {
             let qty = 0;
             if (listType === 'REGULAR') {
                 qty = 'recommendedQty' in row ? (row as { recommendedQty?: number }).recommendedQty || 0 : 0;
+            } else if (listType === 'WARNING') {
+                // 일반 발주 최소 단위 100 적용 (캡에 막히지 않는 한)
+                qty = row.deficit > 0 ? row.deficit : 0;
+                qty = Math.max(100, Math.ceil(qty / 10) * 10);
+                const sizeNum = parseInt((row.product.size || '').replace(/[^0-9]/g, ''), 10);
+                if (!isNaN(sizeNum) && sizeNum >= 100 && qty > 300) qty = 300;
             } else {
+                // 선발주 최소 단위 10 적용
                 qty = row.deficit > 0 ? row.deficit : 0;
                 qty = Math.max(10, Math.ceil(qty / 10) * 10);
+                const sizeNum = parseInt((row.product.size || '').replace(/[^0-9]/g, ''), 10);
+                if (!isNaN(sizeNum) && sizeNum >= 100 && qty > 300) qty = 300;
             }
             if (qty > 0) {
                 addItem({
@@ -732,16 +755,16 @@ export default function SihwaInventory() {
                     </div>
                     <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><AlertTriangle className="w-5 h-5"/>매입처 동반 결품 (선발주 요망)</h3>
                     <p className="text-4xl font-black mb-1 z-10">{stats.critical.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
-                    <p className="text-sm font-medium opacity-80 z-10 break-keep">시화 실효재고가 부족하고, 대경 재고도 바닥나 특별 관리가 필요한 초긴급 품목입니다.</p>
+                    <p className="text-sm font-medium opacity-80 z-10 break-keep">현재고 및 대경 재고가 바닥났으며, 연 판매량(100↑)이 많아 선발주 관리가 필요한 품목입니다.</p>
                 </div>
                 
                 <div className="bg-linear-to-br from-amber-400 to-orange-500 rounded-2xl p-5 shadow-lg shadow-amber-200 text-white flex flex-col relative overflow-hidden group">
                     <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-20 transform group-hover:rotate-12 transition-transform duration-500">
                         <Box className="w-32 h-32" />
                     </div>
-                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><Factory className="w-5 h-5"/>일반 보충 (안전재고 미달)</h3>
+                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><Factory className="w-5 h-5"/>일반 발주 필요 (적정재고 미달)</h3>
                     <p className="text-4xl font-black mb-1 z-10">{stats.warning.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
-                    <p className="text-sm font-medium opacity-80 z-10">대경 재고는 보유 중이나, 예정된 입고(Pending)를 합쳐도 안전 목표치에 미달된 품목입니다.</p>
+                    <p className="text-sm font-medium opacity-80 z-10">대경 재고를 통해 조달하거나 목표수량에 미달되어 일반발주(최소 100개)가 필요한 품목입니다.</p>
                 </div>
 
                 <div className="bg-linear-to-br from-slate-700 to-slate-900 rounded-2xl p-5 shadow-lg shadow-slate-300 text-white flex flex-col relative overflow-hidden group">
@@ -857,7 +880,7 @@ export default function SihwaInventory() {
                                                                     <div className="flex flex-col gap-0.5">
                                                                         <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
                                                                             <Info className="w-4 h-4 text-rose-500" />
-                                                                            실효재고 <span className="text-rose-600">{row.effectiveStock}</span>개 부족
+                                                                            적정재고 대비 <span className="text-rose-600">{row.deficit}</span>개 부족
                                                                         </div>
                                                                         <div className="text-xs text-slate-500 pl-5">
                                                                             연 {row.salesVolume}개 판매 / 목표 {row.safeStock}개
@@ -916,7 +939,7 @@ export default function SihwaInventory() {
                                                             </th>
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                                            <th className="px-5 py-3 text-right">안전재고(목표)</th>
+                                                            <th className="px-5 py-3 text-right">적정재고(목표)</th>
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('pendingOrderQty')}>입고 대기중 {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right">매입단가</th>
@@ -957,10 +980,10 @@ export default function SihwaInventory() {
                                                                     <div className="flex flex-col gap-0.5">
                                                                         <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
                                                                             <Info className="w-4 h-4 text-amber-500" />
-                                                                            실효결핍 <span className="text-rose-600">-{row.deficit}</span>개
+                                                                            재고부족 <span className="text-rose-600">-{row.deficit}</span>개
                                                                         </div>
                                                                         <div className="text-xs text-slate-500 pl-5">
-                                                                            연판매 {row.salesFreq}회 / 안전재고 {row.safeStock}개
+                                                                            연판매 {row.salesFreq}회 / 적정재고 {row.safeStock}개
                                                                         </div>
                                                                     </div>
                                                                 </td>
@@ -1245,7 +1268,7 @@ export default function SihwaInventory() {
                                                                                                         <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-[200px]">
                                                                                                             {analysis && (
                                                                                                                 <div className="text-[10px] w-full text-right text-slate-500 group-hover:text-slate-700 transition-colors mt-0.5">
-                                                                                                                    현재고 <span className="font-bold text-slate-700">{analysis.shQty}</span> / 안전재고 <span className="font-bold text-slate-700">{analysis.safeStock}</span>
+                                                                                                                    현재고 <span className="font-bold text-slate-700">{analysis.shQty}</span> / 적정재고 <span className="font-bold text-slate-700">{analysis.safeStock}</span>
                                                                                                                 </div>
                                                                                                             )}
                                                                                                             {valueChips.map((chip, i) => (
@@ -1273,7 +1296,7 @@ export default function SihwaInventory() {
                                                                                                         <span className="text-sm font-black text-slate-700">{analysis.shQty} <span className="text-[10px] font-normal text-slate-500">개</span></span>
                                                                                                     </div>
                                                                                                     <div className="flex flex-col gap-1">
-                                                                                                        <span className="text-[10px] text-slate-400 font-bold">안전재고(목표)</span>
+                                                                                                        <span className="text-[10px] text-slate-400 font-bold">적정재고(목표)</span>
                                                                                                         <span className="text-sm font-bold text-indigo-500">{analysis.safeStock} <span className="text-[10px] font-normal text-slate-500">개</span></span>
                                                                                                     </div>
                                                                                                     <div className="flex flex-col gap-1">
