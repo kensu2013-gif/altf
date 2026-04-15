@@ -71,7 +71,10 @@ export default function SihwaInventory() {
     const navigate = useNavigate();
     const { inventory, isLoading: invLoading } = useInventory();
     
-    const [historyData, setHistoryData] = useState<InventoryHistorySnapshot[]>([]);
+    const [historyData, setHistoryData] = useState<{
+        inventoryHistory: InventoryHistorySnapshot[];
+        daekyungHistory: InventoryHistorySnapshot[];
+    }>({ inventoryHistory: [], daekyungHistory: [] });
     const [historyLoading, setHistoryLoading] = useState(true);
     
     const [searchTerm, setSearchTerm] = useState('');
@@ -140,7 +143,11 @@ export default function SihwaInventory() {
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    setHistoryData(data);
+                    if (data.inventoryHistory) {
+                        setHistoryData(data);
+                    } else if (Array.isArray(data)) {
+                        setHistoryData({ inventoryHistory: data, daekyungHistory: [] });
+                    }
                 }
             } catch (err) {
                 console.error('Failed to fetch inventory history:', err);
@@ -326,14 +333,14 @@ export default function SihwaInventory() {
         const sevenDaysAgo = nowTime - (7 * 24 * 60 * 60 * 1000);
         
         const recentSalesMap: Record<string, { recent7d: number, recent30d: number }> = {};
-        historyData.forEach(snap => {
+        historyData.inventoryHistory.forEach((snap: InventoryHistorySnapshot) => {
             const snapDate = new Date(snap.date).getTime();
             if (isNaN(snapDate)) return;
             const isWithin7d = snapDate >= sevenDaysAgo;
             const isWithin30d = snapDate >= thirtyDaysAgo;
 
             if (isWithin30d && snap.diff) {
-                snap.diff.forEach(d => {
+                snap.diff.forEach((d: InventoryDiffItem) => {
                     if (d.change < 0) {
                         const absChg = Math.abs(d.change);
                         if (!recentSalesMap[d.id]) recentSalesMap[d.id] = { recent7d: 0, recent30d: 0 };
@@ -534,7 +541,7 @@ export default function SihwaInventory() {
                 ? stats.warning 
                 : stats.regular;
 
-        const itemsToAdd = listItems.filter(item => selectedSet.has(item.product.id));
+        const itemsToAdd = listItems.filter(item => selectedSet.has(item.product.id) && !(item as { canTransfer?: boolean }).canTransfer);
 
         itemsToAdd.forEach(row => {
             let qty = 0;
@@ -1039,7 +1046,7 @@ export default function SihwaInventory() {
                                                                     <ChevronRight className="w-4 h-4" />
                                                                 </button>
                                                             </td>
-                                                            <td colSpan={2} className="px-5 py-4 text-right font-bold text-slate-700">
+                                                            <td colSpan={3} className="px-5 py-4 text-right font-bold text-slate-700">
                                                                 선택항목 <span className="text-indigo-600 underline decoration-2">{selectedRegularIds.size}</span>건 예상 합계:
                                                             </td>
                                                             <td className="px-5 py-4 text-right font-black text-indigo-700 text-lg">
@@ -1113,16 +1120,16 @@ export default function SihwaInventory() {
                                             <div className="p-0 flex-1 h-[320px] overflow-y-auto">
                                                 {historyLoading ? (
                                                     <div className="p-8 text-center text-slate-400">불러오는 중입니다...</div>
-                                                ) : historyData.length === 0 ? (
+                                                ) : historyData.inventoryHistory.length === 0 ? (
                                                     <div className="p-8 text-center text-slate-400">최근 변동 이력이 없습니다.</div>
                                                 ) : (
                                                     <div className="p-0">
-                                                        {historyData.slice(-10).reverse().map((snap, idx) => {
+                                                        {historyData.inventoryHistory.slice(-10).reverse().map((snap: InventoryHistorySnapshot, idx: number) => {
                                                             let dailyRevenue = 0;
                                                             let dailyCost = 0;
                                                             
                                                             if (snap.diff) {
-                                                                snap.diff.forEach(d => {
+                                                                snap.diff.forEach((d: InventoryDiffItem) => {
                                                                     const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
                                                                     
                                                                     // Use cumulative sales if available, otherwise fallback to pure negative net change

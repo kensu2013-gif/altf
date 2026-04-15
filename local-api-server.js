@@ -36,6 +36,8 @@ async function loadData() {
             db.loginLogs = json.loginLogs || [];
             db.inventoryHistory = json.inventoryHistory || [];
             db.inventorySnapshot = json.inventorySnapshot || null; // Add snapshot support
+            db.daekyungSnapshot = json.daekyungSnapshot || null;
+            db.daekyungHistory = json.daekyungHistory || [];
             db.customers = json.customers || [];
             console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.loginLogs.length} logs, ${db.inventoryHistory.length} history, Snapshot exists: ${!!db.inventorySnapshot}`);
             
@@ -311,70 +313,80 @@ const server = http.createServer(async (req, res) => {
                     const kstDate = new Date(now + 9 * 60 * 60 * 1000); // KST
                     const today = kstDate.toISOString().slice(0, 10);
                     
+                    
                     const itemsArr = Array.isArray(inventoryData) ? inventoryData : (inventoryData.items || []);
                     const sihwaStockMap = {};
+                    const ysStockMap = {};
                     
                     itemsArr.forEach(item => {
-                        let stock = 0;
+                        let shStock = 0;
+                        let ysStock = 0;
                         let isSihwa = false;
 
                         if (item.locationStock) {
                             for (const [key, qty] of Object.entries(item.locationStock)) {
                                 if (key.includes('서울') || key.includes('시화')) {
-                                    stock += Number(qty);
+                                    shStock += Number(qty);
                                     isSihwa = true;
+                                }
+                                if (key.includes('양산')) {
+                                    ysStock += Number(qty);
                                 }
                             }
                         } else {
                             if ((item.location || '').includes('서울') || (item.location || '').includes('시화')) {
-                                stock += Number(item.ready_qty || item.currentStock || 0);
+                                shStock += Number(item.ready_qty || item.currentStock || 0);
                                 isSihwa = true;
                             }
+                            if ((item.location || '').includes('양산')) {
+                                ysStock += Number(item.ready_qty || item.currentStock || 0);
+                            }
                             if ((item.location1 || '').includes('서울') || (item.location1 || '').includes('시화')) {
-                                stock += Number(item.sh_qty || 0);
+                                shStock += Number(item.sh_qty || 0);
                                 isSihwa = true;
+                            }
+                            if ((item.location1 || '').includes('양산')) {
+                                ysStock += Number(item.sh_qty || 0);
                             }
                         }
 
-                        // Add even if stock is 0 but it's marked as Sihwa, to track drops to 0 accurately
-                        if (isSihwa) {
-                            const id = item.sku_key || item.id;
-                            if (id) {
-                                sihwaStockMap[id] = { name: item.item || item.name, stock };
-                            }
+                        const id = item.sku_key || item.id;
+                        if (id) {
+                            if (isSihwa) sihwaStockMap[id] = { name: item.item || item.name, stock: shStock };
+                            ysStockMap[id] = { name: item.item || item.name, stock: ysStock };
                         }
                     });
 
                     const history = db.inventoryHistory;
+                    const daekyungHistory = db.daekyungHistory || []; 
+                    db.daekyungHistory = daekyungHistory; // Ensure linked
                     
                     // The Perpetual State-Diffing Ledger Pattern
-                    if (!db.inventorySnapshot) {
-                        // First initialization ever
-                        db.inventorySnapshot = sihwaStockMap;
+                    if (!db.inventorySnapshot || !db.daekyungSnapshot) {
+                        if (!db.inventorySnapshot) db.inventorySnapshot = sihwaStockMap;
+                        if (!db.daekyungSnapshot) db.daekyungSnapshot = ysStockMap;
                         
-                        // Push an empty initial record if needed
-                        if (history.length === 0) {
-                            history.push({ date: today, diff: [] });
-                        }
+                        if (history.length === 0) history.push({ date: today, diff: [] });
+                        if (daekyungHistory.length === 0) daekyungHistory.push({ date: today, diff: [] });
+                        
                         await saveData();
-                        console.log(`[API] Initialized perpetual inventory snapshot ledger.`);
+                        console.log(`[API] Initialized perpetual inventory snapshot ledger for Sihwa & Daekyung.`);
                     } else {
-                        // Compare current incoming data directly against the last true absolute state (Snapshot)
+                        // SIHWA DIFF
                         const changesObj = {};
+                        const daekyungChangesObj = {};
                         
-                        // Helper to check valid prefixes according to user rules
                         const isValidItem = (name) => {
                             if (!name) return false;
                             const nameUpper = name.toUpperCase();
                             const isCompositeOrStubend = nameUpper.startsWith('COMPOSITE') || nameUpper.startsWith('STUBEND');
                             const validPrefixes = ['90', '45', 'R', 'T', 'CAP'];
-                            const hasValidPrefix = validPrefixes.some(prefix => nameUpper.startsWith(prefix));
-                            return !isCompositeOrStubend && hasValidPrefix;
+                            return !isCompositeOrStubend && validPrefixes.some(p => nameUpper.startsWith(p));
                         };
                         
+                        // Sihwa
                         for (const [id, data] of Object.entries(sihwaStockMap)) {
                             if (!isValidItem(data.name)) continue;
-
                             const oldRecord = db.inventorySnapshot[id];
                             const oldStock = oldRecord ? oldRecord.stock : 0;
                             if (oldStock !== data.stock) {
@@ -383,19 +395,31 @@ const server = http.createServer(async (req, res) => {
                         }
                         for (const [id, oldRecord] of Object.entries(db.inventorySnapshot)) {
                             if (!isValidItem(oldRecord.name)) continue;
-
                             if (sihwaStockMap[id] === undefined) {
                                 changesObj[id] = { name: oldRecord.name, change: -oldRecord.stock, from: oldRecord.stock, to: 0 };
                             }
                         }
+                        
+                        // Daekyung
+                        for (const [id, data] of Object.entries(ysStockMap)) {
+                            if (!isValidItem(data.name)) continue;
+                            const oldRecord = db.daekyungSnapshot[id];
+                            const oldStock = oldRecord ? oldRecord.stock : 0;
+                            if (oldStock !== data.stock) {
+                                daekyungChangesObj[id] = { name: data.name, change: data.stock - oldStock, from: oldStock, to: data.stock };
+                            }
+                        }
+                        for (const [id, oldRecord] of Object.entries(db.daekyungSnapshot)) {
+                            if (!isValidItem(oldRecord.name)) continue;
+                            if (ysStockMap[id] === undefined) {
+                                daekyungChangesObj[id] = { name: oldRecord.name, change: -oldRecord.stock, from: oldRecord.stock, to: 0 };
+                            }
+                        }
 
-                        // Always advance the snapshot to the latest state so tomorrow's baseline is perfectly accurate.
-                        // We do this even if no valid items changed, because non-valid items might have changed and we need the snapshot to reflect reality.
                         db.inventorySnapshot = sihwaStockMap;
-                        let needsSave = false;
-
+                        db.daekyungSnapshot = ysStockMap;
+                        
                         if (Object.keys(changesObj).length > 0) {
-                            // Find or create today's historical UI bucket
                             let todayRecord = history.find(h => h.date === today);
                             if (!todayRecord) {
                                 todayRecord = { date: today, diff: [] };
@@ -403,16 +427,12 @@ const server = http.createServer(async (req, res) => {
                                 if (history.length > 61) history.shift();
                             }
                             
-                            // Merge the detected asynchronous events deeply into today's UI bucket
                             for (const [id, changeData] of Object.entries(changesObj)) {
                                 const existingChange = todayRecord.diff.find(d => d.id === id);
-                                
-                                // Calculate intra-poll sales tracking
                                 const intraPollChange = changeData.change;
                                 const intraPollSales = intraPollChange < 0 ? Math.abs(intraPollChange) : 0;
 
                                 if (existingChange) {
-                                    // Accumulate sales for today dynamically
                                     existingChange.sales = (existingChange.sales || 0) + intraPollSales;
                                     existingChange.to = changeData.to; 
                                     existingChange.change = existingChange.to - existingChange.from; 
@@ -420,18 +440,37 @@ const server = http.createServer(async (req, res) => {
                                     todayRecord.diff.push({ id, ...changeData, sales: intraPollSales });
                                 }
                             }
-                            
-                            // Cleanup items that reversed completely back to their baseline and had 0 sales
                             todayRecord.diff = todayRecord.diff.filter(d => d.change !== 0 || (d.sales && d.sales > 0));
-                            needsSave = true;
+                        }
+                        
+                        if (Object.keys(daekyungChangesObj).length > 0) {
+                            let todayRecord = daekyungHistory.find(h => h.date === today);
+                            if (!todayRecord) {
+                                todayRecord = { date: today, diff: [] };
+                                daekyungHistory.push(todayRecord);
+                                if (daekyungHistory.length > 185) daekyungHistory.shift(); // keep 6 months
+                            }
                             
-                            console.log(`[API] Recorded ${Object.keys(changesObj).length} discrete inventory events into ${today} ledger.`);
+                            for (const [id, changeData] of Object.entries(daekyungChangesObj)) {
+                                const existingChange = todayRecord.diff.find(d => d.id === id);
+                                const intraPollChange = changeData.change;
+                                const intraPollSales = intraPollChange < 0 ? Math.abs(intraPollChange) : 0;
+
+                                if (existingChange) {
+                                    existingChange.sales = (existingChange.sales || 0) + intraPollSales;
+                                    existingChange.to = changeData.to; 
+                                    existingChange.change = existingChange.to - existingChange.from; 
+                                } else {
+                                    todayRecord.diff.push({ id, ...changeData, sales: intraPollSales });
+                                }
+                            }
+                            todayRecord.diff = todayRecord.diff.filter(d => d.change !== 0 || (d.sales && d.sales > 0));
                         }
 
-                        // Save if the snapshot advanced (or at minimum every day) - we've already done db.inventorySnapshot = sihwaStockMap
                         // Save even if changesObj is empty, because we updated the master snapshot!
                         await saveData();
                     }
+                    // REPLACED SECTION END
 
                 } catch (snapErr) {
                     console.error('[API] Error creating daily inventory snapshot:', snapErr);
@@ -770,7 +809,7 @@ const server = http.createServer(async (req, res) => {
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(db.inventoryHistory));
+        res.end(JSON.stringify({ inventoryHistory: db.inventoryHistory, daekyungHistory: db.daekyungHistory }));
         return;
     }
 
