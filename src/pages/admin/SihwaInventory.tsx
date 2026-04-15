@@ -845,7 +845,7 @@ export default function SihwaInventory() {
                                                                         }}
                                                                     />
                                                                 </td>
-                                                                <td className="px-5 py-4 font-mono font-bold text-slate-800">{row.product.id}</td>
+                                                                <td className="px-5 py-4 font-mono font-black text-slate-900 text-base">{row.product.id}</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-rose-600 bg-rose-50/30">0</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-slate-400">0</td>
                                                                 <td className="px-5 py-4 text-center font-bold text-slate-400">
@@ -930,8 +930,8 @@ export default function SihwaInventory() {
                                                                         className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
                                                                     />
                                                                 </td>
-                                                                <td className="px-5 py-4 font-mono font-bold text-slate-800">{row.product.id}</td>
-                                                                <td className="px-5 py-4 text-right font-black font-mono text-slate-600 bg-amber-50/10">
+                                                                <td className="px-5 py-4 font-mono font-black text-slate-900 text-base">{row.product.id}</td>
+                                                                <td className="px-5 py-4 text-right font-black font-mono text-amber-600 bg-amber-50 text-base">
                                                                     {row.shQty}
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-indigo-600">
@@ -939,10 +939,10 @@ export default function SihwaInventory() {
                                                                     <div className="text-[10px] font-normal text-slate-400 mt-1">/ 총판매:{row.salesVolume}</div>
                                                                 </td>
                                                                 <td className="px-5 py-4 text-center font-bold text-slate-500">
-                                                                    {row.pendingOrderQty > 0 ? <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">+{row.pendingOrderQty}</span> : '-'}
+                                                                    {row.pendingOrderQty > 0 ? <span className="text-blue-600 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md font-black shadow-sm">+{row.pendingOrderQty}</span> : <span className="text-slate-300">-</span>}
                                                                 </td>
-                                                                <td className="px-5 py-4 text-right font-black font-mono text-teal-600">
-                                                                    {row.ysQty}
+                                                                <td className="px-5 py-4 text-right">
+                                                                    <span className="px-2 py-1 bg-teal-50 text-teal-700 font-extrabold font-mono rounded-lg border border-teal-200 shadow-sm">{row.ysQty}</span>
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
                                                                 <td className="px-5 py-4 text-right font-black text-amber-700 bg-amber-50/30">{formatCur(row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1))}</td>
@@ -1022,8 +1022,8 @@ export default function SihwaInventory() {
                                                                         }}
                                                                     />
                                                                 </td>
-                                                                <td className="px-5 py-4 font-mono font-bold text-slate-800">{row.product.id}</td>
-                                                                <td className="px-5 py-4 text-right font-black font-mono text-slate-600 bg-indigo-50/10">{row.shQty}</td>
+                                                                <td className="px-5 py-4 font-mono font-black text-slate-900 text-base">{row.product.id}</td>
+                                                                <td className="px-5 py-4 text-right font-black font-mono text-indigo-600 bg-indigo-50 text-base">{row.shQty}</td>
                                                                 <td className="px-5 py-4 text-center text-xs font-medium text-slate-500">
                                                                     연 {row.salesFreq}회 판매 / 누적 {row.salesVolume}개
                                                                 </td>
