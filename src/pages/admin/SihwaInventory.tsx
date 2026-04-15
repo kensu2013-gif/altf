@@ -845,7 +845,7 @@ export default function SihwaInventory() {
                                                                         }}
                                                                     />
                                                                 </td>
-                                                                <td className="px-5 py-4 font-mono font-black text-slate-900 text-base">{row.product.id}</td>
+                                                                <td className="px-5 py-4 font-mono font-bold text-slate-900 text-sm">{row.product.id}</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-rose-600 bg-rose-50/30">0</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-slate-400">0</td>
                                                                 <td className="px-5 py-4 text-center font-bold text-slate-400">
@@ -853,9 +853,16 @@ export default function SihwaInventory() {
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
                                                                 <td className="px-5 py-4 text-right font-black text-rose-600 bg-rose-50/10">{formatCur(row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1))}</td>
-                                                                <td className="px-5 py-4 text-xs font-medium text-slate-600 flex items-center gap-1.5">
-                                                                    <Info className="w-3.5 h-3.5 text-rose-500"/>
-                                                                    실효재고 <span className="font-bold text-rose-600">{row.effectiveStock}</span> &lt; 목표재고 <span className="font-bold text-indigo-600">{row.safeStock}</span> (연 {row.salesVolume}개 판매됨)
+                                                                <td className="px-5 py-4">
+                                                                    <div className="flex flex-col gap-0.5">
+                                                                        <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                                                                            <Info className="w-4 h-4 text-rose-500" />
+                                                                            실효재고 <span className="text-rose-600">{row.effectiveStock}</span>개 부족
+                                                                        </div>
+                                                                        <div className="text-xs text-slate-500 pl-5">
+                                                                            연 {row.salesVolume}개 판매 / 목표 {row.safeStock}개
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                         ))}
@@ -895,7 +902,7 @@ export default function SihwaInventory() {
                                         {expandedGroups['WARNING'] && (
                                             <div className="bg-white border-t border-amber-100 overflow-x-auto">
                                                 {stats.warning.length > 0 ? (
-                                                <table className="w-full text-sm text-left">
+                                                <table className="w-full text-sm text-left whitespace-nowrap">
                                                     <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none">
                                                         <tr>
                                                             <th className="px-4 py-3 w-10 text-center">
@@ -930,7 +937,7 @@ export default function SihwaInventory() {
                                                                         className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
                                                                     />
                                                                 </td>
-                                                                <td className="px-5 py-4 font-mono font-black text-slate-900 text-base">{row.product.id}</td>
+                                                                <td className="px-5 py-4 font-mono font-bold text-slate-900 text-sm">{row.product.id}</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-amber-600 bg-amber-50 text-base">
                                                                     {row.shQty}
                                                                 </td>
@@ -946,9 +953,16 @@ export default function SihwaInventory() {
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
                                                                 <td className="px-5 py-4 text-right font-black text-amber-700 bg-amber-50/30">{formatCur(row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1))}</td>
-                                                                <td className="px-5 py-4 text-xs font-medium text-slate-600 flex items-center gap-1.5 whitespace-nowrap">
-                                                                    <Info className="w-3.5 h-3.5 text-amber-500"/>
-                                                                    실효재고 결핍: <span className="font-bold text-rose-500">-{row.deficit}개</span> (연 판매 {row.salesFreq}회)
+                                                                <td className="px-5 py-4">
+                                                                    <div className="flex flex-col gap-0.5">
+                                                                        <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                                                                            <Info className="w-4 h-4 text-amber-500" />
+                                                                            실효결핍 <span className="text-rose-600">-{row.deficit}</span>개
+                                                                        </div>
+                                                                        <div className="text-xs text-slate-500 pl-5">
+                                                                            연판매 {row.salesFreq}회 / 안전재고 {row.safeStock}개
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                         ))}
@@ -1022,7 +1036,7 @@ export default function SihwaInventory() {
                                                                         }}
                                                                     />
                                                                 </td>
-                                                                <td className="px-5 py-4 font-mono font-black text-slate-900 text-base">{row.product.id}</td>
+                                                                <td className="px-5 py-4 font-mono font-bold text-slate-900 text-sm">{row.product.id}</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-indigo-600 bg-indigo-50 text-base">{row.shQty}</td>
                                                                 <td className="px-5 py-4 text-center text-xs font-medium text-slate-500">
                                                                     연 {row.salesFreq}회 판매 / 누적 {row.salesVolume}개
@@ -1031,9 +1045,16 @@ export default function SihwaInventory() {
                                                                 <td className="px-5 py-4 text-right font-black text-indigo-600 bg-indigo-50/30">
                                                                     {row.recommendedQty}
                                                                 </td>
-                                                                <td className="px-5 py-4 text-xs font-medium text-slate-600 flex items-center gap-1.5">
-                                                                    <Activity className="w-3.5 h-3.5 text-indigo-500"/>
-                                                                    월평균 <span className="font-bold">{Math.round(row.salesVolume / 12)}개</span> 소요 / <span className="text-indigo-600 font-bold">2개월분</span> 권장
+                                                                <td className="px-5 py-4">
+                                                                    <div className="flex flex-col gap-0.5">
+                                                                        <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                                                                            <Activity className="w-4 h-4 text-indigo-500" />
+                                                                            2개월분 <span className="text-indigo-600">{row.recommendedQty}</span>개 권장
+                                                                        </div>
+                                                                        <div className="text-xs text-slate-500 pl-5">
+                                                                            월평균 {Math.round(row.salesVolume / 12)}개 소요
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                         ))}
