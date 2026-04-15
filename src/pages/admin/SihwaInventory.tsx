@@ -17,6 +17,7 @@ import {
     Download
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
+import { useNavigate } from 'react-router-dom';
 import type { Product } from '../../types';
 import salesHistoryRaw from '../../data/sales_history.json';
 
@@ -62,7 +63,12 @@ interface InventoryHistorySnapshot {
 }
 
 export default function SihwaInventory() {
-    const { orders, user } = useStore(useShallow(state => ({ orders: state.orders, user: state.auth.user })));
+    const { orders, user, addItem } = useStore(useShallow(state => ({ 
+        orders: state.orders, 
+        user: state.auth.user,
+        addItem: state.addItem
+    })));
+    const navigate = useNavigate();
     const { inventory, isLoading: invLoading } = useInventory();
     
     const [historyData, setHistoryData] = useState<InventoryHistorySnapshot[]>([]);
@@ -72,10 +78,14 @@ export default function SihwaInventory() {
     const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE'>('AI_SUMMARY');
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
         'CRITICAL': true,
-        'WARNING': true
+        'WARNING': true,
+        'REGULAR': true
     });
 
+    const [selectedCriticalIds, setSelectedCriticalIds] = useState<Set<string>>(new Set());
     const [selectedWarningIds, setSelectedWarningIds] = useState<Set<string>>(new Set());
+    const [selectedRegularIds, setSelectedRegularIds] = useState<Set<string>>(new Set());
+    
     const [expandedTrendItems, setExpandedTrendItems] = useState<Record<string, boolean>>({});
     const [expandedDailyGroups, setExpandedDailyGroups] = useState<Record<string, boolean>>({});
 
@@ -498,12 +508,64 @@ export default function SihwaInventory() {
 
     // Aggregate stats and Asset Valuation totals
     const stats = useMemo(() => {
+        const regular = analyzedInventory
+            .filter(r => r.statusCategory === 'SAFE' && r.salesFreq >= 20)
+            .map(r => {
+                const rawRecommended = (r.salesVolume / 6) - r.shQty;
+                const recommendedQty = rawRecommended > 0 ? Math.max(10, Math.ceil(rawRecommended / 10) * 10) : 0;
+                return { ...r, recommendedQty };
+            })
+            .filter(r => r.recommendedQty > 0);
+
         return {
             critical: analyzedInventory.filter(r => r.statusCategory === 'CRITICAL'),
             warning: analyzedInventory.filter(r => r.statusCategory === 'WARNING'),
-            safeActive: analyzedInventory.filter(r => r.statusCategory === 'SAFE' && r.salesFreq > 10)
+            safeActive: analyzedInventory.filter(r => r.statusCategory === 'SAFE' && r.salesFreq > 10),
+            regular
         };
     }, [analyzedInventory]);
+
+    const handleCreateOrder = (selectedSet: Set<string>, listType: 'CRITICAL' | 'WARNING' | 'REGULAR') => {
+        if (selectedSet.size === 0) return;
+        
+        let listItems: any[] = [];
+        if (listType === 'CRITICAL') listItems = stats.critical;
+        else if (listType === 'WARNING') listItems = stats.warning;
+        else listItems = stats.regular;
+
+        const itemsToAdd = listItems.filter(item => selectedSet.has(item.product.id));
+
+        itemsToAdd.forEach(row => {
+            let qty = 0;
+            if (listType === 'REGULAR') {
+                qty = row.recommendedQty || 0;
+            } else {
+                qty = row.deficit > 0 ? row.deficit : 0;
+                qty = Math.max(10, Math.ceil(qty / 10) * 10);
+            }
+            if (qty > 0) {
+                addItem({
+                    id: crypto.randomUUID(),
+                    productId: row.product.id,
+                    name: row.product.name || '',
+                    thickness: row.product.thickness || '',
+                    size: row.product.size || '',
+                    material: row.product.material || '',
+                    quantity: qty,
+                    unitPrice: row.recentPurchasePrice > 0 ? row.recentPurchasePrice : row.sellingPrice,
+                    amount: (row.recentPurchasePrice > 0 ? row.recentPurchasePrice : row.sellingPrice) * qty,
+                    note: `[시화 발주] ${listType === 'REGULAR' ? '정기보충' : '결품보충'}`,
+                    isVerified: false
+                });
+            }
+        });
+        
+        if (listType === 'CRITICAL') setSelectedCriticalIds(new Set());
+        else if (listType === 'WARNING') setSelectedWarningIds(new Set());
+        else setSelectedRegularIds(new Set());
+        
+        navigate('/cart');
+    };
 
     const totalsMap = useMemo(() => {
         let totalCurrentStockValue = 0;
@@ -743,6 +805,15 @@ export default function SihwaInventory() {
                                                 <table className="w-full text-sm text-left whitespace-nowrap">
                                                     <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none">
                                                         <tr>
+                                                            <th className="px-5 py-3 w-12 text-center">
+                                                                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-600" 
+                                                                    checked={stats.critical.length > 0 && selectedCriticalIds.size === stats.critical.length}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) setSelectedCriticalIds(new Set(stats.critical.map(r => r.product.id)));
+                                                                        else setSelectedCriticalIds(new Set());
+                                                                    }}
+                                                                />
+                                                            </th>
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
@@ -755,6 +826,17 @@ export default function SihwaInventory() {
                                                     <tbody className="divide-y divide-slate-100">
                                                         {stats.critical.map(row => (
                                                             <tr key={row.product.id} className="hover:bg-slate-50">
+                                                                <td className="px-5 py-4 text-center">
+                                                                    <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-600"
+                                                                        checked={selectedCriticalIds.has(row.product.id)}
+                                                                        onChange={(e) => {
+                                                                            const newSet = new Set(selectedCriticalIds);
+                                                                            if (e.target.checked) newSet.add(row.product.id);
+                                                                            else newSet.delete(row.product.id);
+                                                                            setSelectedCriticalIds(newSet);
+                                                                        }}
+                                                                    />
+                                                                </td>
                                                                 <td className="px-5 py-4 font-mono font-bold text-slate-800">{row.product.id}</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-rose-600 bg-rose-50/30">0</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-slate-400">0</td>
@@ -772,9 +854,17 @@ export default function SihwaInventory() {
                                                     </tbody>
                                                     <tfoot className="bg-rose-50/50 border-t-2 border-rose-200">
                                                         <tr>
-                                                            <td colSpan={5} className="px-5 py-4 text-right font-bold text-slate-700">총 🚨필요예산 합계 (부족수량 기준):</td>
+                                                            <td colSpan={2} className="px-5 py-4">
+                                                                <button onClick={() => handleCreateOrder(selectedCriticalIds, 'CRITICAL')} disabled={selectedCriticalIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedCriticalIds.size > 0 ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                                                                    <span>선택 품목 발주서 만들기 ({selectedCriticalIds.size}건)</span>
+                                                                    <ChevronRight className="w-4 h-4" />
+                                                                </button>
+                                                            </td>
+                                                            <td colSpan={4} className="px-5 py-4 text-right font-bold text-slate-700">
+                                                                선택항목 <span className="text-rose-600 underline decoration-2">{selectedCriticalIds.size}</span>건 예상 합계:
+                                                            </td>
                                                             <td className="px-5 py-4 text-right font-black text-rose-700 text-lg">
-                                                                {formatCur(stats.critical.reduce((sum, row) => sum + row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1), 0))} 원
+                                                                {formatCur(stats.critical.filter(w => selectedCriticalIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1), 0))} 원
                                                             </td>
                                                             <td></td>
                                                         </tr>
@@ -857,7 +947,13 @@ export default function SihwaInventory() {
                                                     </tbody>
                                                     <tfoot className="bg-amber-50/50 border-t-2 border-amber-200">
                                                         <tr>
-                                                            <td colSpan={7} className="px-5 py-4 text-right font-bold text-slate-700">
+                                                            <td colSpan={3} className="px-5 py-4">
+                                                                <button onClick={() => handleCreateOrder(selectedWarningIds, 'WARNING')} disabled={selectedWarningIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedWarningIds.size > 0 ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                                                                    <span>선택 품목 발주서 만들기 ({selectedWarningIds.size}건)</span>
+                                                                    <ChevronRight className="w-4 h-4" />
+                                                                </button>
+                                                            </td>
+                                                            <td colSpan={4} className="px-5 py-4 text-right font-bold text-slate-700">
                                                                 선택항목 <span className="text-amber-600 underline decoration-2">{selectedWarningIds.size}</span>건 예상 합계:
                                                             </td>
                                                             <td className="px-5 py-4 text-right font-black text-amber-700 text-lg">
@@ -868,6 +964,91 @@ export default function SihwaInventory() {
                                                     </tfoot>
                                                 </table>
                                                 ) : <div className="p-8 text-center text-slate-400">발주가 필요한 품목이 없습니다. 시화재고 관리가 매우 이상적입니다!</div>}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="border border-indigo-200 rounded-xl overflow-hidden shadow-sm mt-6">
+                                        <button onClick={() => toggleGroup('REGULAR')} className="w-full flex items-center justify-between px-5 py-4 bg-indigo-50 hover:bg-indigo-100 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                {expandedGroups['REGULAR'] ? <ChevronDown className="w-5 h-5 text-indigo-600"/> : <ChevronRight className="w-5 h-5 text-indigo-600"/>}
+                                                <h3 className="font-bold text-indigo-800 text-lg">♻️ 정기 발주 예측 <span className="text-sm font-medium text-indigo-500 ml-2">(우량 품목 2개월분 선주문 권장)</span></h3>
+                                            </div>
+                                            <span className="bg-indigo-200 text-indigo-800 font-black px-3 py-1 rounded-full text-sm">{stats.regular.length}건</span>
+                                        </button>
+                                        
+                                        {expandedGroups['REGULAR'] && (
+                                            <div className="bg-white border-t border-indigo-100 overflow-x-auto">
+                                                {stats.regular.length > 0 ? (
+                                                <table className="w-full text-sm text-left whitespace-nowrap">
+                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none">
+                                                        <tr>
+                                                            <th className="px-5 py-3 w-12 text-center">
+                                                                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600" 
+                                                                    checked={stats.regular.length > 0 && selectedRegularIds.size === stats.regular.length}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) setSelectedRegularIds(new Set(stats.regular.map(r => r.product.id)));
+                                                                        else setSelectedRegularIds(new Set());
+                                                                    }}
+                                                                />
+                                                            </th>
+                                                            <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                                            <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                                            <th className="px-5 py-3 text-center">판매/보충 이력</th>
+                                                            <th className="px-5 py-3 text-right">매입단가</th>
+                                                            <th className="px-5 py-3 text-right w-40">추천 발주량</th>
+                                                            <th className="px-5 py-3">💡 분석 근거</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {stats.regular.map(row => (
+                                                            <tr key={row.product.id} className="hover:bg-slate-50">
+                                                                <td className="px-5 py-4 text-center">
+                                                                    <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                                                                        checked={selectedRegularIds.has(row.product.id)}
+                                                                        onChange={(e) => {
+                                                                            const newSet = new Set(selectedRegularIds);
+                                                                            if (e.target.checked) newSet.add(row.product.id);
+                                                                            else newSet.delete(row.product.id);
+                                                                            setSelectedRegularIds(newSet);
+                                                                        }}
+                                                                    />
+                                                                </td>
+                                                                <td className="px-5 py-4 font-mono font-bold text-slate-800">{row.product.id}</td>
+                                                                <td className="px-5 py-4 text-right font-black font-mono text-slate-600 bg-indigo-50/10">{row.shQty}</td>
+                                                                <td className="px-5 py-4 text-center text-xs font-medium text-slate-500">
+                                                                    연 {row.salesFreq}회 판매 / 누적 {row.salesVolume}개
+                                                                </td>
+                                                                <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
+                                                                <td className="px-5 py-4 text-right font-black text-indigo-600 bg-indigo-50/30">
+                                                                    {row.recommendedQty}
+                                                                </td>
+                                                                <td className="px-5 py-4 text-xs font-medium text-slate-600 flex items-center gap-1.5">
+                                                                    <Activity className="w-3.5 h-3.5 text-indigo-500"/>
+                                                                    월평균 <span className="font-bold">{Math.round(row.salesVolume / 12)}개</span> 소요 / <span className="text-indigo-600 font-bold">2개월분</span> 권장
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                    <tfoot className="bg-indigo-50/50 border-t-2 border-indigo-200">
+                                                        <tr>
+                                                            <td colSpan={3} className="px-5 py-4">
+                                                                <button onClick={() => handleCreateOrder(selectedRegularIds, 'REGULAR')} disabled={selectedRegularIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedRegularIds.size > 0 ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                                                                    <span>선택 품목 발주서 만들기 ({selectedRegularIds.size}건)</span>
+                                                                    <ChevronRight className="w-4 h-4" />
+                                                                </button>
+                                                            </td>
+                                                            <td colSpan={2} className="px-5 py-4 text-right font-bold text-slate-700">
+                                                                선택항목 <span className="text-indigo-600 underline decoration-2">{selectedRegularIds.size}</span>건 예상 합계:
+                                                            </td>
+                                                            <td className="px-5 py-4 text-right font-black text-indigo-700 text-lg">
+                                                                {formatCur(stats.regular.filter(w => selectedRegularIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.recommendedQty || 0), 0))} 원
+                                                            </td>
+                                                            <td></td>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                                ) : <div className="p-8 text-center text-slate-400">우량 품목들이 현재 모두 충분한 재고량을 안전하게 확보하고 있습니다!</div>}
                                             </div>
                                         )}
                                     </div>
