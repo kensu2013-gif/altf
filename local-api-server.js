@@ -362,7 +362,19 @@ const server = http.createServer(async (req, res) => {
                         // Compare current incoming data directly against the last true absolute state (Snapshot)
                         const changesObj = {};
                         
+                        // Helper to check valid prefixes according to user rules
+                        const isValidItem = (name) => {
+                            if (!name) return false;
+                            const nameUpper = name.toUpperCase();
+                            const isCompositeOrStubend = nameUpper.startsWith('COMPOSITE') || nameUpper.startsWith('STUBEND');
+                            const validPrefixes = ['90', '45', 'R', 'T', 'CAP'];
+                            const hasValidPrefix = validPrefixes.some(prefix => nameUpper.startsWith(prefix));
+                            return !isCompositeOrStubend && hasValidPrefix;
+                        };
+                        
                         for (const [id, data] of Object.entries(sihwaStockMap)) {
+                            if (!isValidItem(data.name)) continue;
+
                             const oldRecord = db.inventorySnapshot[id];
                             const oldStock = oldRecord ? oldRecord.stock : 0;
                             if (oldStock !== data.stock) {
@@ -370,10 +382,17 @@ const server = http.createServer(async (req, res) => {
                             }
                         }
                         for (const [id, oldRecord] of Object.entries(db.inventorySnapshot)) {
+                            if (!isValidItem(oldRecord.name)) continue;
+
                             if (sihwaStockMap[id] === undefined) {
                                 changesObj[id] = { name: oldRecord.name, change: -oldRecord.stock, from: oldRecord.stock, to: 0 };
                             }
                         }
+
+                        // Always advance the snapshot to the latest state so tomorrow's baseline is perfectly accurate.
+                        // We do this even if no valid items changed, because non-valid items might have changed and we need the snapshot to reflect reality.
+                        db.inventorySnapshot = sihwaStockMap;
+                        let needsSave = false;
 
                         if (Object.keys(changesObj).length > 0) {
                             // Find or create today's historical UI bucket
@@ -387,25 +406,31 @@ const server = http.createServer(async (req, res) => {
                             // Merge the detected asynchronous events deeply into today's UI bucket
                             for (const [id, changeData] of Object.entries(changesObj)) {
                                 const existingChange = todayRecord.diff.find(d => d.id === id);
+                                
+                                // Calculate intra-poll sales tracking
+                                const intraPollChange = changeData.change;
+                                const intraPollSales = intraPollChange < 0 ? Math.abs(intraPollChange) : 0;
+
                                 if (existingChange) {
-                                    // Item changed again today! Update its destination state and re-calculate cumulative day's change.
+                                    // Accumulate sales for today dynamically
+                                    existingChange.sales = (existingChange.sales || 0) + intraPollSales;
                                     existingChange.to = changeData.to; 
                                     existingChange.change = existingChange.to - existingChange.from; 
                                 } else {
-                                    // First time this item changed today
-                                    todayRecord.diff.push({ id, ...changeData });
+                                    todayRecord.diff.push({ id, ...changeData, sales: intraPollSales });
                                 }
                             }
                             
-                            // Cleanup items that reversed completely back to their 0 delta state
-                            todayRecord.diff = todayRecord.diff.filter(d => d.change !== 0);
-                            
-                            // Securely advance the master snapshot to the new baseline
-                            db.inventorySnapshot = sihwaStockMap;
-                            await saveData();
+                            // Cleanup items that reversed completely back to their baseline and had 0 sales
+                            todayRecord.diff = todayRecord.diff.filter(d => d.change !== 0 || (d.sales && d.sales > 0));
+                            needsSave = true;
                             
                             console.log(`[API] Recorded ${Object.keys(changesObj).length} discrete inventory events into ${today} ledger.`);
                         }
+
+                        // Save if the snapshot advanced (or at minimum every day) - we've already done db.inventorySnapshot = sihwaStockMap
+                        // Save even if changesObj is empty, because we updated the master snapshot!
+                        await saveData();
                     }
 
                 } catch (snapErr) {

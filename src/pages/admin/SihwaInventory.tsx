@@ -52,6 +52,7 @@ interface InventoryDiffItem {
     from: number;
     to: number;
     change: number;
+    sales?: number;
 }
 
 interface InventoryHistorySnapshot {
@@ -934,10 +935,17 @@ export default function SihwaInventory() {
                                                             if (snap.diff) {
                                                                 snap.diff.forEach(d => {
                                                                     const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
-                                                                    if (d.change < 0) {
-                                                                        dailyRevenue += Math.abs(d.change) * (analysis ? analysis.sellingPrice : 0);
-                                                                    } else if (d.change > 0) {
-                                                                        dailyCost += d.change * (analysis ? analysis.recentPurchasePrice : 0);
+                                                                    
+                                                                    // Use cumulative sales if available, otherwise fallback to pure negative net change
+                                                                    const effectiveSales = d.sales !== undefined ? d.sales : (d.change < 0 ? Math.abs(d.change) : 0);
+                                                                    if (effectiveSales > 0) {
+                                                                        dailyRevenue += effectiveSales * (analysis ? analysis.sellingPrice : 0);
+                                                                    }
+                                                                    
+                                                                    // Compute true net restocking (overcoming sales deficits)
+                                                                    const effectiveRestock = d.change + effectiveSales;
+                                                                    if (effectiveRestock > 0) {
+                                                                        dailyCost += effectiveRestock * (analysis ? analysis.recentPurchasePrice : 0);
                                                                     }
                                                                 });
                                                             }
@@ -980,14 +988,29 @@ export default function SihwaInventory() {
                                                                                     const sellingPrice = analysis ? analysis.sellingPrice : 0;
                                                                                     const purchasePrice = analysis ? analysis.recentPurchasePrice : 0;
                                                                                     
-                                                                                    const valueStr = d.change < 0 
-                                                                                        ? `매출 ${formatCur(Math.abs(d.change) * sellingPrice)}원` 
-                                                                                        : `입고가치 ${formatCur(d.change * purchasePrice)}원`;
+                                                                                    const effectiveSales = d.sales !== undefined ? d.sales : (d.change < 0 ? Math.abs(d.change) : 0);
+                                                                                    const effectiveRestock = d.change + effectiveSales;
+                                                                                    
+                                                                                    const valueChips = [];
+                                                                                    if (effectiveSales > 0) {
+                                                                                        valueChips.push({
+                                                                                            label: `출고/판매 ${effectiveSales}개`,
+                                                                                            amt: `매출 ${formatCur(effectiveSales * sellingPrice)}원`,
+                                                                                            style: 'text-indigo-600 bg-indigo-50 border border-indigo-200'
+                                                                                        });
+                                                                                    }
+                                                                                    if (effectiveRestock > 0) {
+                                                                                        valueChips.push({
+                                                                                            label: `입고 ${effectiveRestock}개`,
+                                                                                            amt: `가치 ${formatCur(effectiveRestock * purchasePrice)}원`,
+                                                                                            style: 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                                                                                        });
+                                                                                    }
 
                                                                                     const finalId = d.id || d.name || '알수없음';
 
                                                                                     return (
-                                                                                        <div key={dIdx} className={`flex flex-col text-xs bg-white rounded border border-slate-100 border-l-4 ${d.change > 0 ? 'border-l-emerald-500' : 'border-l-rose-500'}`}>
+                                                                                        <div key={dIdx} className={`flex flex-col text-xs bg-white rounded border border-slate-100 border-l-4 ${d.change > 0 ? 'border-l-emerald-500' : 'border-l-indigo-500'}`}>
                                                                                             <div 
                                                                                                 className="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-50 transition-colors"
                                                                                                 onClick={() => toggleTrendItem(rowKey)}
@@ -997,21 +1020,24 @@ export default function SihwaInventory() {
                                                                                                     {d.name && d.name !== finalId && <span className="text-[10px] text-slate-400 truncate">{d.name}</span>}
                                                                                                 </div>
                                                                                                 <div className="flex items-center gap-2 shrink-0">
-                                                                                                    <div className="flex flex-col items-end">
-                                                                                                        <div className="flex items-center gap-1">
-                                                                                                            <span className={`font-black font-mono w-10 text-right ${d.change > 0 ? 'text-teal-600' : 'text-rose-500'}`}>
-                                                                                                                {d.change > 0 ? '+' : ''}{d.change} 
-                                                                                                            </span>
-                                                                                                            {d.change < 0 ? (
-                                                                                                                <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded font-bold">출고/판매</span>
-                                                                                                            ) : (
-                                                                                                                <span className="text-[10px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded font-bold">입고됨</span>
+                                                                                                    <div className="flex flex-col items-end gap-1">
+                                                                                                        <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-[200px]">
+                                                                                                            {valueChips.map((chip, i) => (
+                                                                                                                <div key={i} className={`flex flex-col items-end px-1.5 py-0.5 rounded ${chip.style}`}>
+                                                                                                                    <span className="font-bold tracking-tight">{chip.label}</span>
+                                                                                                                    {(sellingPrice > 0 || purchasePrice > 0) && (
+                                                                                                                        <span className="text-[9px] opacity-80">{chip.amt}</span>
+                                                                                                                    )}
+                                                                                                                </div>
+                                                                                                            ))}
+                                                                                                            {valueChips.length === 0 && d.change === 0 && (
+                                                                                                                <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">임시 변동 (0)</span>
                                                                                                             )}
                                                                                                         </div>
-                                                                                                        {(sellingPrice > 0 || purchasePrice > 0) && (
-                                                                                                            <span className={`text-[10px] font-bold mt-1 ${d.change < 0 ? 'text-indigo-600' : 'text-emerald-700'}`}>
-                                                                                                                {valueStr}
-                                                                                                            </span>
+                                                                                                        {d.change !== 0 && (
+                                                                                                            <div className={`text-[10px] font-black w-full text-right ${d.change > 0 ? 'text-emerald-600' : 'text-indigo-500'}`}>
+                                                                                                                Net: {d.change > 0 ? '+' : ''}{d.change}개
+                                                                                                            </div>
                                                                                                         )}
                                                                                                     </div>
                                                                                                     <ChevronDown className={`w-4 h-4 text-slate-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
