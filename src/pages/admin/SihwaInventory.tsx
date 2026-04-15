@@ -797,7 +797,7 @@ export default function SihwaInventory() {
                             
                             {/* TAB 1: AI SUMMARY (Accordion) */}
                             {activeTab === 'AI_SUMMARY' && (
-                                <div className="space-y-4 max-w-6xl mx-auto pb-8 p-4 md:p-0">
+                                <div className="space-y-4 w-full pb-8 p-4 md:p-0">
                                     <div className="border border-rose-200 rounded-xl overflow-hidden shadow-sm">
                                         <button onClick={() => toggleGroup('CRITICAL')} className="w-full flex items-center justify-between px-5 py-4 bg-rose-50 hover:bg-rose-100 transition-colors">
                                             <div className="flex items-center gap-3">
@@ -1086,7 +1086,7 @@ export default function SihwaInventory() {
 
                             {/* TAB 2: TOTAL DASHBOARD AND DAILY TREND */}
                             {activeTab === 'TOTAL_DASHBOARD' && (
-                                <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-0">
+                                <div className="space-y-6 w-full p-4 md:p-0">
                                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                                         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-fit">
                                             <div className="bg-slate-800 text-white px-5 py-4 flex items-center justify-between shrink-0">
