@@ -1089,7 +1089,7 @@ export default function SihwaInventory() {
                         <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                             <div
                             className="h-full rounded-full transition-all"
-                            style={{ width: `${pct}%`, background: colors[grade] }}
+                            {...{ style: { width: `${pct}%`, background: colors[grade] } }}
                             />
                         </div>
                         <span className="text-xs font-mono text-slate-500 w-10 text-right shrink-0">
