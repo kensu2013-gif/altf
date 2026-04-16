@@ -38,6 +38,51 @@ const calculateSellingPrice = (id: string, basePrice: number): number => {
     return basePrice;
 };
 
+// ── 재고 회전율 기준 상수 ──────────────────────────────
+const WORKING_DAYS = 250;      // 연간 영업일수
+const LEAD_TIME = 5;           // 리드타임 (대경 → 시화, 영업일 기준)
+const Z_VALUE = 1.645;         // 목표 서비스율 95% (데이터 충분하면 2.33 = 99%로 상향)
+
+// 회전율 등급 기준
+const TURNOVER_THRESHOLDS = {
+  S: 12,   // 월 1회 이상 소진 — 즉시발주 우선
+  A: 6,    // 2개월 이내 소진 — 정기발주 (2개월치)
+  B: 3,    // 4개월 이내 소진 — 분기 발주
+  C: 1,    // 연 1회 이상 소진 — 반기 발주
+  // C 미만 = D등급: 과잉재고 경고
+} as const;
+
+// 회전등급별 목표재고 산출 배수 (연판매 ÷ 이 숫자 = 목표재고)
+const TARGET_STOCK_DIVISOR: Record<string, number> = {
+  S: 8,   // 연판매 ÷ 8  = 약 1.5개월치 목표 (빠르게 소진되므로 자주 소량 보충)
+  A: 6,   // 연판매 ÷ 6  = 약 2개월치 목표
+  B: 4,   // 연판매 ÷ 4  = 약 3개월치 목표
+  C: 2,   // 연판매 ÷ 2  = 약 6개월치 목표
+  D: 0,   // 발주 중단 — 기존 재고 소진 우선
+  N: 0,   // 판매 없음 — 제외
+};
+
+// 재고 회전율 등급 반환
+function getTurnoverGrade(rate: number, salesVolume: number) {
+  if (salesVolume === 0) return 'N';
+  if (rate >= TURNOVER_THRESHOLDS.S) return 'S';
+  if (rate >= TURNOVER_THRESHOLDS.A) return 'A';
+  if (rate >= TURNOVER_THRESHOLDS.B) return 'B';
+  if (rate >= TURNOVER_THRESHOLDS.C) return 'C';
+  return 'D';
+}
+
+// 회전율 기반 재고 상태 반환
+function getStockStatusByTurnover(currentStock: number, targetStock: number, daysOnHand: number, grade: string) {
+  if (grade === 'N') return 'DEAD';
+  if (currentStock === 0) return 'CRITICAL';
+  if (daysOnHand <= LEAD_TIME * 2) return 'CRITICAL';
+  if (currentStock < targetStock * 0.5) return 'LOW';
+  if (currentStock <= targetStock * 1.3) return 'OPTIMAL';
+  if (daysOnHand > 365) return 'DEAD';
+  return 'EXCESS';
+}
+
 // Helper: Calculate Fallback Purchase Price based on item rules
 const calculateFallbackPurchasePrice = (id: string, basePrice: number): number => {
     const upperId = id.toUpperCase();
@@ -94,11 +139,11 @@ export default function SihwaInventory() {
     const [expandedDailyGroups, setExpandedDailyGroups] = useState<Record<string, boolean>>({});
 
     const [sortConfig, setSortConfig] = useState<{ 
-        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice', 
+        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand', 
         direction: 'asc' | 'desc' 
     }>({ key: 'deficit', direction: 'desc' });
 
-    const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice') => {
+    const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand') => {
         setSortConfig(prev => ({
             key,
             direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
@@ -330,7 +375,13 @@ export default function SihwaInventory() {
         marketShare: number;
         strategicGrade: StrategicGrade;
         volumeNegoFlag: boolean;
-        turnoverRatio: number;
+        turnoverRate: number;
+        turnoverGrade: 'S' | 'A' | 'B' | 'C' | 'D' | 'N';
+        daysOnHand: number;
+        dailyAvgSales: number;
+        reorderPoint: number;
+        targetStockByTurnover: number;
+        stockStatusByTurnover: 'CRITICAL' | 'LOW' | 'OPTIMAL' | 'EXCESS' | 'DEAD';
     }
 
     const analyzedInventory = useMemo(() => {
@@ -407,7 +458,13 @@ export default function SihwaInventory() {
                     marketShare,
                     strategicGrade: getStrategicGrade(salesData.salesVolume, compData.compSales, marketShare),
                     volumeNegoFlag: false,
-                    turnoverRatio: parseFloat((salesData.salesVolume / Math.max(shQty, 1)).toFixed(2))
+                    turnoverRate: 0,
+                    turnoverGrade: 'N',
+                    daysOnHand: 0,
+                    dailyAvgSales: 0,
+                    reorderPoint: 0,
+                    targetStockByTurnover: 0,
+                    stockStatusByTurnover: 'DEAD'
                 };
             }
         });
@@ -452,7 +509,13 @@ export default function SihwaInventory() {
                         marketShare,
                         strategicGrade: getStrategicGrade(salesData.salesVolume, compData.compSales, marketShare),
                         volumeNegoFlag: false,
-                        turnoverRatio: parseFloat((salesData.salesVolume / Math.max(0, 1)).toFixed(2))
+                        turnoverRate: 0,
+                        turnoverGrade: 'N',
+                        daysOnHand: 0,
+                        dailyAvgSales: 0,
+                        reorderPoint: 0,
+                        targetStockByTurnover: 0,
+                        stockStatusByTurnover: 'DEAD'
                     };
                 } else {
                     comparisonMap[id].pendingOrderQty += addQty;
@@ -463,14 +526,11 @@ export default function SihwaInventory() {
         // Step 3: Run AI Rules for status computation
         const processedList = Object.values(comparisonMap).map(row => {
             // 통계 기반 안전재고 (σ)
-            const LEAD_TIME_DAYS = 5;
-            const Z_VALUE = 1.645;
-            const WORKING_DAYS = 250;
             const dailyAvg = row.salesVolume / WORKING_DAYS;
             
             const cvEstimate = row.salesFreq >= 100 ? 0.20 : row.salesFreq >= 50 ? 0.30 : row.salesFreq >= 20 ? 0.40 : 0.50;
             const sigma = dailyAvg * cvEstimate;
-            const safetyStockSigma = Math.ceil(Z_VALUE * sigma * Math.sqrt(LEAD_TIME_DAYS));
+            const safetyStockSigma = Math.ceil(Z_VALUE * sigma * Math.sqrt(LEAD_TIME));
             
             let safeStock = safetyStockSigma + Math.ceil(dailyAvg * 14);
             safeStock = safeStock > 0 ? Math.max(10, Math.round(safeStock / 10) * 10) : 0;
@@ -533,13 +593,51 @@ export default function SihwaInventory() {
                  statusLabel = '✅ 미활동 보유품';
             }
 
+            // ★ 재고 회전율 산출
+            const dailyAvgSales = row.salesVolume > 0 ? row.salesVolume / WORKING_DAYS : 0;
+            const avgStock = row.shQty > 0 ? row.shQty : (row.salesVolume > 0 ? row.salesVolume / 12 : 0);
+            const turnoverRate = avgStock > 0 ? parseFloat((row.salesVolume / avgStock).toFixed(2)) : 0;
+            const turnoverGrade = getTurnoverGrade(turnoverRate, row.salesVolume) as AnalyzedItem['turnoverGrade'];
+            
+            const daysOnHand = dailyAvgSales > 0 && row.shQty > 0
+                ? parseFloat((row.shQty / dailyAvgSales).toFixed(1))
+                : row.shQty > 0 ? 9999 
+                : 0;
+
+            const r_cvEstimate = row.salesFreq >= 100 ? 0.20 : row.salesFreq >= 50 ? 0.30 : row.salesFreq >= 20 ? 0.40 : 0.50;
+            const r_sigma = dailyAvgSales * r_cvEstimate;
+            const safetyStockROP = Math.ceil(Z_VALUE * r_sigma * Math.sqrt(LEAD_TIME));
+            const reorderPoint = Math.ceil(dailyAvgSales * LEAD_TIME + safetyStockROP);
+
+            const divisor = TARGET_STOCK_DIVISOR[turnoverGrade] || 0;
+            let targetStockByTurnover = divisor > 0 ? Math.ceil(row.salesVolume / divisor / 10) * 10 : 0;
+
+            if (!isNaN(sizeNum)) {
+                if (sizeNum >= 400) targetStockByTurnover = Math.min(targetStockByTurnover, 30);
+                else if (sizeNum >= 300) targetStockByTurnover = Math.min(targetStockByTurnover, 50);
+                else if (sizeNum >= 200) targetStockByTurnover = Math.min(targetStockByTurnover, 80);
+                else if (sizeNum >= 150) targetStockByTurnover = Math.min(targetStockByTurnover, 150);
+                else if (sizeNum >= 100) targetStockByTurnover = Math.min(targetStockByTurnover, 300);
+            }
+
+            const stockStatusByTurnover = getStockStatusByTurnover(
+                row.shQty, targetStockByTurnover, daysOnHand, turnoverGrade
+            ) as AnalyzedItem['stockStatusByTurnover'];
+
             return {
                 ...row,
                 safeStock,
                 deficit: deficit > 0 ? deficit : 0,
                 effectiveStock,
                 statusCategory,
-                statusLabel
+                statusLabel,
+                turnoverRate,
+                turnoverGrade,
+                daysOnHand,
+                dailyAvgSales,
+                reorderPoint,
+                targetStockByTurnover,
+                stockStatusByTurnover
             };
         });
 
@@ -564,6 +662,8 @@ export default function SihwaInventory() {
                 case 'ysQty': return (a.ysQty - b.ysQty) * dir;
                 case 'pendingOrderQty': return (a.pendingOrderQty - b.pendingOrderQty) * dir;
                 case 'recentPurchasePrice': return (a.recentPurchasePrice - b.recentPurchasePrice) * dir;
+                case 'turnoverRate': return (a.turnoverRate - b.turnoverRate) * dir;
+                case 'daysOnHand': return (a.daysOnHand - b.daysOnHand) * dir;
                 default: return 0; // Fallback
             }
         });
@@ -958,23 +1058,65 @@ export default function SihwaInventory() {
                 </p>
             </div>
 
-            {/* 재고 회전율 우수 요약 */}
+            {/* 회전율 분포 요약 */}
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                <h3 className="font-bold text-slate-600 text-sm mb-2">🔄 재고 회전율 (Turnover)</h3>
-                <div className="flex flex-col gap-1 text-[10px] lg:text-xs">
-                <div className="flex justify-between">
-                    <span className="text-emerald-600 font-bold">초고속 (연 12회전 이상)</span>
-                    <span className="font-black">{analyzedInventory.filter(r=>r.turnoverRatio >= 12 && r.salesVolume > 0).length}건</span>
+                <h3 className="font-bold text-slate-600 text-sm mb-3 flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-purple-500" />
+                    재고 회전율 분포
+                </h3>
+                <div className="space-y-1.5">
+                    {(['S','A','B','C','D'] as const).map(grade => {
+                    const count = analyzedInventory.filter(r =>
+                        r.turnoverGrade === grade && r.shQty > 0
+                    ).length;
+                    const total = analyzedInventory.filter(r => r.shQty > 0).length;
+                    const pct = total > 0 ? Math.round(count / total * 100) : 0;
+                    const labels: Record<string, string> = {
+                        S: 'S급 초고속 (12회+)',
+                        A: 'A급 고속 (6~12회)',
+                        B: 'B급 보통 (3~6회)',
+                        C: 'C급 저속 (1~3회)',
+                        D: 'D급 과잉위험 (1회미만)',
+                    };
+                    const colors: Record<string, string> = {
+                        S: '#7F77DD', A: '#639922', B: '#BA7517', C: '#378ADD', D: '#E24B4A'
+                    };
+                    return (
+                        <div key={grade} className="flex items-center gap-2">
+                        <span className="text-xs font-bold w-28 text-slate-600 shrink-0">
+                            {labels[grade]}
+                        </span>
+                        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${pct}%`, background: colors[grade] }}
+                            />
+                        </div>
+                        <span className="text-xs font-mono text-slate-500 w-10 text-right shrink-0">
+                            {count}개
+                        </span>
+                        </div>
+                    );
+                    })}
                 </div>
-                <div className="flex justify-between">
-                    <span className="text-indigo-600 font-bold">양호 (연 6~12회전)</span>
-                    <span className="font-black">{analyzedInventory.filter(r=>r.turnoverRatio >= 6 && r.turnoverRatio < 12 && r.salesVolume > 0).length}건</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-slate-500 font-bold">정체 (연 6회전 미만)</span>
-                    <span className="font-black">{analyzedInventory.filter(r=>r.turnoverRatio > 0 && r.turnoverRatio < 6 && r.salesVolume > 0).length}건</span>
-                </div>
-                </div>
+
+                {/* 즉시 발주 필요 (잔여 10일 이하) */}
+                {(() => {
+                    const urgent = analyzedInventory.filter(
+                    r => r.shQty > 0 && r.daysOnHand <= 10 && r.daysOnHand < 9999 && r.salesVolume > 0
+                    );
+                    return urgent.length > 0 ? (
+                    <div className="mt-3 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 text-xs">
+                        <span className="text-rose-700 font-bold">
+                        잔여 10일 이하 {urgent.length}개 품목 — 즉시 발주 필요
+                        </span>
+                        <div className="text-rose-500 mt-0.5 break-keep">
+                        {urgent.slice(0, 3).map(r => r.product.id).join(', ')}
+                        {urgent.length > 3 ? ` 외 ${urgent.length - 3}건` : ''}
+                        </div>
+                    </div>
+                    ) : null;
+                })()}
             </div>
 
             </div>
@@ -1060,7 +1202,8 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 text-right">매입단가</th>
                                                             <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
                                                             <th className="px-5 py-3 text-right">경쟁사 연판매</th>
-                                                            <th className="px-5 py-3 text-right border-r border-slate-200">재고회전율(연)</th>
+                                                            <th className="px-5 py-3 text-center">회전율</th>
+                                                            <th className="px-5 py-3 text-right">잔여일수</th>
                                                             <th className="px-5 py-3">🚨 분석 근거 (명확성)</th>
                                                         </tr>
                                                     </thead>
@@ -1091,11 +1234,44 @@ export default function SihwaInventory() {
                                                                         <span>{row.compSales.toLocaleString()}</span>
                                                                     ) : <span className="text-slate-200">—</span>}
                                                                 </td>
-                                                                <td className="px-5 py-4 text-right border-r border-slate-100/50">
-                                                                    <div className="flex flex-col items-end gap-0.5">
-                                                                        <span className="font-bold text-sm text-slate-700">{row.turnoverRatio} 회</span>
-                                                                        <span className="text-[10px] text-slate-400">/ {row.salesFreq}회 주문</span>
+                                                                <td className="px-5 py-4 text-center border-l border-slate-100">
+                                                                    <div className="flex flex-col items-center gap-1">
+                                                                        <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                                                                            row.turnoverGrade === 'S' ? 'bg-purple-100 text-purple-700' :
+                                                                            row.turnoverGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                                            row.turnoverGrade === 'B' ? 'bg-amber-100 text-amber-700' :
+                                                                            row.turnoverGrade === 'C' ? 'bg-blue-100 text-blue-600' :
+                                                                            row.turnoverGrade === 'D' ? 'bg-rose-100 text-rose-600' :
+                                                                            'bg-slate-100 text-slate-400'
+                                                                        }`}>
+                                                                            {row.turnoverGrade === 'S' ? 'S급' :
+                                                                            row.turnoverGrade === 'A' ? 'A급' :
+                                                                            row.turnoverGrade === 'B' ? 'B급' :
+                                                                            row.turnoverGrade === 'C' ? 'C급' :
+                                                                            row.turnoverGrade === 'D' ? 'D급' : '—'}
+                                                                        </span>
+                                                                        <span className="text-xs font-mono text-slate-500">
+                                                                            {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '—'}
+                                                                        </span>
                                                                     </div>
+                                                                </td>
+                                                                <td className="px-5 py-4 text-right border-r border-slate-100/50">
+                                                                    {row.daysOnHand > 0 ? (
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                        <span className={`font-black text-sm ${
+                                                                            row.daysOnHand <= 10  ? 'text-rose-600' :
+                                                                            row.daysOnHand <= 30  ? 'text-amber-500' :
+                                                                            row.daysOnHand <= 90  ? 'text-slate-700' :
+                                                                            row.daysOnHand > 365  ? 'text-slate-400' :
+                                                                            'text-emerald-600'
+                                                                        }`}>
+                                                                            {row.daysOnHand === 9999 ? '∞' : `${Math.round(row.daysOnHand)}일`}
+                                                                        </span>
+                                                                        {row.daysOnHand <= 5 * 2 && row.daysOnHand !== 9999 && (
+                                                                            <span className="text-[10px] text-rose-500 font-bold">즉시발주!</span>
+                                                                        )}
+                                                                        </div>
+                                                                    ) : <span className="text-rose-500 font-bold text-sm">0일</span>}
                                                                 </td>
                                                                 <td className="px-5 py-4">
                                                                     <div className="flex flex-col gap-0.5">
@@ -1105,6 +1281,15 @@ export default function SihwaInventory() {
                                                                         </div>
                                                                         <div className="text-xs text-slate-500 pl-5">
                                                                             연 {row.salesVolume}개 판매 / 목표 {row.safeStock}개
+                                                                        </div>
+                                                                        <div className="text-xs text-slate-400 pl-5">
+                                                                            ROP: {row.reorderPoint}개 도달 시 발주 | 목표적정: {row.targetStockByTurnover}개
+                                                                            {row.stockStatusByTurnover === 'EXCESS' && (
+                                                                                <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.targetStockByTurnover}개 초과]</span>
+                                                                            )}
+                                                                            {row.stockStatusByTurnover === 'DEAD' && (
+                                                                                <span className="text-slate-400 ml-1">[사장재고 의심 — 소진 후 재평가]</span>
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                 </td>
@@ -1184,7 +1369,8 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 text-right">매입단가</th>
                                                             <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
                                                             <th className="px-5 py-3 text-right">경쟁사 연판매</th>
-                                                            <th className="px-5 py-3 text-right border-r border-slate-200">재고회전율(연)</th>
+                                                            <th className="px-5 py-3 text-center">회전율</th>
+                                                            <th className="px-5 py-3 text-right">잔여일수</th>
                                                             <th className="px-5 py-3">💡 분석 근거</th>
                                                         </tr>
                                                     </thead>
@@ -1222,11 +1408,44 @@ export default function SihwaInventory() {
                                                                         <span>{row.compSales.toLocaleString()}</span>
                                                                     ) : <span className="text-slate-200">—</span>}
                                                                 </td>
-                                                                <td className="px-5 py-4 text-right border-r border-slate-100/50">
-                                                                    <div className="flex flex-col items-end gap-0.5">
-                                                                        <span className="font-bold text-sm text-slate-700">{row.turnoverRatio} 회</span>
-                                                                        <span className="text-[10px] text-slate-400">/ {row.salesFreq}회 주문</span>
+                                                                <td className="px-5 py-4 text-center border-l border-slate-100">
+                                                                    <div className="flex flex-col items-center gap-1">
+                                                                        <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                                                                            row.turnoverGrade === 'S' ? 'bg-purple-100 text-purple-700' :
+                                                                            row.turnoverGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                                            row.turnoverGrade === 'B' ? 'bg-amber-100 text-amber-700' :
+                                                                            row.turnoverGrade === 'C' ? 'bg-blue-100 text-blue-600' :
+                                                                            row.turnoverGrade === 'D' ? 'bg-rose-100 text-rose-600' :
+                                                                            'bg-slate-100 text-slate-400'
+                                                                        }`}>
+                                                                            {row.turnoverGrade === 'S' ? 'S급' :
+                                                                            row.turnoverGrade === 'A' ? 'A급' :
+                                                                            row.turnoverGrade === 'B' ? 'B급' :
+                                                                            row.turnoverGrade === 'C' ? 'C급' :
+                                                                            row.turnoverGrade === 'D' ? 'D급' : '—'}
+                                                                        </span>
+                                                                        <span className="text-xs font-mono text-slate-500">
+                                                                            {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '—'}
+                                                                        </span>
                                                                     </div>
+                                                                </td>
+                                                                <td className="px-5 py-4 text-right border-r border-slate-100/50">
+                                                                    {row.daysOnHand > 0 ? (
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                        <span className={`font-black text-sm ${
+                                                                            row.daysOnHand <= 10  ? 'text-rose-600' :
+                                                                            row.daysOnHand <= 30  ? 'text-amber-500' :
+                                                                            row.daysOnHand <= 90  ? 'text-slate-700' :
+                                                                            row.daysOnHand > 365  ? 'text-slate-400' :
+                                                                            'text-emerald-600'
+                                                                        }`}>
+                                                                            {row.daysOnHand === 9999 ? '∞' : `${Math.round(row.daysOnHand)}일`}
+                                                                        </span>
+                                                                        {row.daysOnHand <= 5 * 2 && row.daysOnHand !== 9999 && (
+                                                                            <span className="text-[10px] text-rose-500 font-bold">즉시발주!</span>
+                                                                        )}
+                                                                        </div>
+                                                                    ) : <span className="text-rose-500 font-bold text-sm">0일</span>}
                                                                 </td>
                                                                 <td className="px-5 py-4">
                                                                     <div className="flex flex-col gap-0.5">
@@ -1236,6 +1455,15 @@ export default function SihwaInventory() {
                                                                         </div>
                                                                         <div className="text-xs text-slate-500 pl-5">
                                                                             연판매 {row.salesFreq}회 / 적정재고 {row.safeStock}개
+                                                                        </div>
+                                                                        <div className="text-xs text-slate-400 pl-5">
+                                                                            ROP: {row.reorderPoint}개 도달 시 발주 | 목표적정: {row.targetStockByTurnover}개
+                                                                            {row.stockStatusByTurnover === 'EXCESS' && (
+                                                                                <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.targetStockByTurnover}개 초과]</span>
+                                                                            )}
+                                                                            {row.stockStatusByTurnover === 'DEAD' && (
+                                                                                <span className="text-slate-400 ml-1">[사장재고 의심 — 소진 후 재평가]</span>
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                 </td>
@@ -1663,7 +1891,9 @@ export default function SihwaInventory() {
                                             <th className="px-4 py-3 text-center">전략등급</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-amber-700" onClick={() => handleSort('salesVolume')}>우리 누적출고 {sortConfig.key==='salesVolume' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right text-slate-500">경쟁사 출고</th>
-                                            <th className="px-4 py-3 text-right border-r border-slate-200">재고회전율</th>
+                                            <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('turnoverRate')}>회전율 {sortConfig.key==='turnoverRate' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('daysOnHand')}>잔여일 {sortConfig.key==='daysOnHand' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                            <th className="px-4 py-3 text-right">발주점(ROP)</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-indigo-700" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-600" onClick={() => handleSort('pendingOrderQty')}>입고 대기(+Pending) {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-500 font-black" onClick={() => handleSort('deficit')}>보충 필요분(Deficit) {sortConfig.key==='deficit' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
@@ -1675,7 +1905,7 @@ export default function SihwaInventory() {
                                         {/* Show Summary row first */}
                                         <tr className="bg-indigo-50/50 font-bold border-b-2 border-indigo-200">
                                             <td colSpan={2} className="px-4 py-3 text-slate-700">총 자산 합계(STUBEND제외)</td>
-                                            <td colSpan={3} className="px-4 py-3 text-right"></td>
+                                            <td colSpan={5} className="px-4 py-3 text-right"></td>
                                             <td className="px-4 py-3 text-right text-indigo-700">{formatCur(totalsMap.totalCurrentStockCost)} 원</td>
                                             <td className="px-4 py-3 text-right text-rose-600">추가예정 (+{formatCur(totalsMap.totalPendingPurchaseValue)}원)</td>
                                             <td colSpan={3}></td>
@@ -1694,11 +1924,41 @@ export default function SihwaInventory() {
                                                 <td className="px-4 py-2 text-right text-slate-400 font-mono text-xs">
                                                     {row.compSales > 0 ? row.compSales.toLocaleString() : '—'}
                                                 </td>
-                                                <td className="px-4 py-2 text-right border-r border-slate-100/50">
-                                                    <div className="flex flex-col items-end gap-0.5">
-                                                        <span className="font-bold text-sm text-slate-700">{row.turnoverRatio} 회</span>
-                                                        <span className="text-[10px] text-slate-400">/ {row.salesFreq}회 주문</span>
+                                                {/* 회전율 */}
+                                                <td className="px-4 py-2 text-center">
+                                                {row.turnoverGrade !== 'N' ? (
+                                                    <div className="flex flex-col items-center">
+                                                    <span className={`text-[10px] font-black px-1.5 rounded ${
+                                                        row.turnoverGrade === 'S' ? 'bg-purple-100 text-purple-700' :
+                                                        row.turnoverGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                        row.turnoverGrade === 'B' ? 'bg-amber-100 text-amber-700' :
+                                                        row.turnoverGrade === 'C' ? 'bg-blue-100 text-blue-600' :
+                                                        'bg-rose-100 text-rose-500'
+                                                    }`}>{row.turnoverGrade}급</span>
+                                                    <span className="text-[10px] font-mono text-slate-400 mt-0.5">
+                                                        {row.turnoverRate > 0 ? `${row.turnoverRate}x` : ''}
+                                                    </span>
                                                     </div>
+                                                ) : <span className="text-slate-200">—</span>}
+                                                </td>
+
+                                                {/* 잔여가능일수 */}
+                                                <td className="px-4 py-2 text-right font-mono text-xs">
+                                                <span className={
+                                                    row.daysOnHand <= 10  ? 'text-rose-600 font-bold' :
+                                                    row.daysOnHand <= 30  ? 'text-amber-500 font-bold' :
+                                                    row.daysOnHand > 365  ? 'text-slate-300' :
+                                                    'text-slate-600'
+                                                }>
+                                                    {row.shQty === 0 ? '0일' :
+                                                    row.daysOnHand === 9999 ? '∞' :
+                                                    `${Math.round(row.daysOnHand)}일`}
+                                                </span>
+                                                </td>
+
+                                                {/* 발주점 */}
+                                                <td className="px-4 py-2 text-right font-mono text-xs text-indigo-500">
+                                                {row.reorderPoint > 0 ? `≤${row.reorderPoint}개` : '—'}
                                                 </td>
                                                 <td className="px-4 py-2 text-right font-black font-mono text-indigo-600 bg-indigo-50/20">
                                                     {row.shQty}
