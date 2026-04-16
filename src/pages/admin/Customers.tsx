@@ -410,8 +410,8 @@ export default function Customers() {
         const results = Object.keys(clusterMap).map(k => {
             const allItems = Object.entries(clusterMap[k].items);
             
-            const topMarginItems = [...allItems]
-                .sort((a,b) => (b[1].amount - b[1].cost) - (a[1].amount - a[1].cost))
+            const topRevenueItems = [...allItems]
+                .sort((a,b) => b[1].amount - a[1].amount)
                 .slice(0, 5);
                 
             const topVolumeItems = [...allItems]
@@ -421,7 +421,7 @@ export default function Customers() {
             return {
                 clusterName: k,
                 ...clusterMap[k],
-                topMarginItems,
+                topRevenueItems,
                 topVolumeItems,
             };
         }).sort((a,b) => b.totalAmount - a.totalAmount);
@@ -773,36 +773,36 @@ export default function Customers() {
                                     </div>
                                     
                                     <div className="p-5 flex flex-col flex-1 gap-6 bg-slate-50/50">
-                                        {/* High Margin Items */}
+                                        {/* High Revenue Items */}
                                         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                                             <h4 className="text-[12px] font-black text-indigo-700 mb-3 uppercase tracking-widest flex items-center justify-between border-b border-slate-100 pb-2">
-                                                <span>🏆 주력 매입 추천 (순마진 랭킹)</span>
-                                                <span className="text-slate-400 font-bold">기준: 남긴이윤액</span>
+                                                <span>🏆 주력 매입 추천 (매출액 랭킹)</span>
+                                                <span className="text-slate-400 font-bold">기준: 누적 매출액</span>
                                             </h4>
                                             <ul className="space-y-3">
-                                                {cluster.topMarginItems.map(([itemKey, stats], i) => {
+                                                {cluster.topRevenueItems.map(([itemKey, stats], i) => {
                                                     const itemMargin = stats.amount - stats.cost;
                                                     const mPct = stats.amount > 0 ? (itemMargin / stats.amount) * 100 : 0;
                                                     return (
-                                                        <li key={`margin-${itemKey}`} className="flex flex-col text-[12px] bg-slate-50 rounded-lg p-2.5 border border-slate-100">
+                                                        <li key={`rev-${itemKey}`} className="flex flex-col text-[12px] bg-slate-50 rounded-lg p-2.5 border border-slate-100">
                                                             <div className="flex justify-between items-start mb-2">
                                                                 <span className="font-bold text-slate-800 flex items-start gap-2 leading-tight pr-2">
                                                                     <span className="w-5 h-5 rounded-md bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-black shrink-0">{i+1}</span>
                                                                     <span className="mt-0.5">{itemKey}</span>
                                                                 </span>
                                                                 <div className="text-right">
-                                                                    <div className="font-black text-indigo-600 whitespace-nowrap">+{itemMargin.toLocaleString()}원</div>
-                                                                    <div className="text-[10px] font-bold text-indigo-400 mt-0.5">총 {stats.qty.toLocaleString()}개 / {stats.count.toLocaleString()}회 공급</div>
+                                                                    <div className="font-black text-indigo-600 whitespace-nowrap">₩{stats.amount.toLocaleString()}</div>
+                                                                    <div className="text-[10px] font-bold text-indigo-400 mt-0.5">총 {stats.qty.toLocaleString()}개 / {stats.count.toLocaleString()}회 출고</div>
                                                                 </div>
                                                             </div>
                                                             <div className="flex justify-between items-center text-[11px] text-slate-500 bg-white px-2 py-1.5 rounded border border-slate-100">
-                                                                <span>건당 평균마진: {stats.qty > 0 ? Math.round(itemMargin/stats.qty).toLocaleString() : 0}원</span>
-                                                                <span className="font-black text-slate-600">이익률 {mPct.toFixed(1)}%</span>
+                                                                <span>추정 마진: {itemMargin > 0 ? itemMargin.toLocaleString() : 0}원</span>
+                                                                <span className={`font-black ${itemMargin <= 0 ? 'text-slate-400' : 'text-slate-600'}`}>이익률 {mPct.toFixed(1)}%</span>
                                                             </div>
                                                         </li>
                                                     );
                                                 })}
-                                                {cluster.topMarginItems.length === 0 && <li className="text-center text-xs text-slate-400 py-4 font-bold">집계할 데이터가 없습니다.</li>}
+                                                {cluster.topRevenueItems.length === 0 && <li className="text-center text-xs text-slate-400 py-4 font-bold">집계할 데이터가 없습니다.</li>}
                                             </ul>
                                         </div>
 
