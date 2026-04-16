@@ -680,7 +680,10 @@ export default function SihwaInventory() {
                 const rawRecommended = r.targetStockByTurnover - r.effectiveStock;
                 let recommendedQty = 0;
                 
-                if (rawRecommended > 0) {
+                // 대경 창고에 이미 500개 이상 대량 스탁이 있다면 굳이 시화에 벌크로 미리 들여놓을 필요 없음
+                if (r.ysQty >= 500) {
+                    recommendedQty = 0;
+                } else if (rawRecommended > 0) {
                     recommendedQty = Math.ceil(rawRecommended / 10) * 10;
                     if (recommendedQty < 50) {
                          recommendedQty = Math.max(50, Math.ceil(rawRecommended / 10) * 10);
@@ -1559,8 +1562,10 @@ export default function SihwaInventory() {
                                                                 />
                                                             </th>
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                                            <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('safeStock')}>적정재고(목표) {sortConfig.key==='safeStock' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-center">판매/보충 이력</th>
+                                                            <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition text-center" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right">매입단가</th>
                                                             <th className="px-5 py-3 text-right w-40">추천 발주량</th>
                                                             <th className="px-5 py-3">💡 분석 근거</th>
@@ -1581,9 +1586,13 @@ export default function SihwaInventory() {
                                                                     />
                                                                 </td>
                                                                 <td className="px-5 py-4 font-mono font-bold text-slate-900 text-sm">{row.product.id}</td>
+                                                                <td className="px-5 py-4 text-right font-mono text-indigo-500 text-sm">{row.targetStockByTurnover}</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-indigo-600 bg-indigo-50 text-base">{row.shQty}</td>
                                                                 <td className="px-5 py-4 text-center text-xs font-medium text-slate-500">
                                                                     연 {row.salesFreq}회 판매 / 누적 {row.salesVolume}개
+                                                                </td>
+                                                                <td className="px-5 py-4 text-center font-bold font-mono text-slate-500">
+                                                                    {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty}</span> : <span className="text-rose-400">0</span>}
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
                                                                 <td className="px-5 py-4 text-right font-black text-indigo-600 bg-indigo-50/30">
@@ -1605,13 +1614,13 @@ export default function SihwaInventory() {
                                                     </tbody>
                                                     <tfoot className="bg-indigo-50/50 border-t-2 border-indigo-200">
                                                         <tr>
-                                                            <td colSpan={3} className="px-5 py-4">
+                                                            <td colSpan={5} className="px-5 py-4">
                                                                 <button onClick={() => handleCreateOrder(selectedRegularIds, 'REGULAR')} disabled={selectedRegularIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedRegularIds.size > 0 ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
                                                                     <span>선택 품목 발주서 만들기 ({selectedRegularIds.size}건)</span>
                                                                     <ChevronRight className="w-4 h-4" />
                                                                 </button>
                                                             </td>
-                                                            <td colSpan={3} className="px-5 py-4 text-right font-bold text-slate-700">
+                                                            <td colSpan={2} className="px-5 py-4 text-right font-bold text-slate-700">
                                                                 선택항목 <span className="text-indigo-600 underline decoration-2">{selectedRegularIds.size}</span>건 예상 합계:
                                                             </td>
                                                             <td className="px-5 py-4 text-right font-black text-indigo-700 text-lg">
