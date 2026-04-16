@@ -708,7 +708,7 @@ export default function SihwaInventory() {
         };
     }, [analyzedInventory]);
 
-    const handleCreateOrder = (selectedSet: Set<string>, listType: 'CRITICAL' | 'WARNING' | 'REGULAR') => {
+    const processOrderSet = (selectedSet: Set<string>, listType: 'CRITICAL' | 'WARNING' | 'REGULAR') => {
         if (selectedSet.size === 0) return;
         
         const listItems = listType === 'CRITICAL' 
@@ -756,7 +756,17 @@ export default function SihwaInventory() {
         if (listType === 'CRITICAL') setSelectedCriticalIds(new Set());
         else if (listType === 'WARNING') setSelectedWarningIds(new Set());
         else setSelectedRegularIds(new Set());
-        
+    };
+
+    const handleCreateOrder = (selectedSet: Set<string>, listType: 'CRITICAL' | 'WARNING' | 'REGULAR') => {
+        processOrderSet(selectedSet, listType);
+        navigate('/cart');
+    };
+
+    const handleCreateGlobalOrder = () => {
+        if (selectedCriticalIds.size > 0) processOrderSet(selectedCriticalIds, 'CRITICAL');
+        if (selectedWarningIds.size > 0) processOrderSet(selectedWarningIds, 'WARNING');
+        if (selectedRegularIds.size > 0) processOrderSet(selectedRegularIds, 'REGULAR');
         navigate('/cart');
     };
 
@@ -1988,6 +1998,34 @@ export default function SihwaInventory() {
                     )}
                 </div>
             </div>
+            </div>
+            
+            {/* 전역 통합 발주 플로팅 바 (Total Global Order Action Bar) */}
+            {(() => {
+                const totalSelectedCount = selectedCriticalIds.size + selectedWarningIds.size + selectedRegularIds.size;
+                if (totalSelectedCount > 0) {
+                    return (
+                        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 p-2 sm:px-6 sm:py-4 rounded-xl sm:rounded-full shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-8 z-50 animate-in slide-in-from-bottom">
+                            <div className="flex flex-col items-center sm:items-start text-white">
+                                <span className="font-extrabold text-sm sm:text-base">
+                                    총 <span className="text-emerald-400">{totalSelectedCount}</span>개 품목 일괄 선택됨
+                                </span>
+                                <span className="text-xs text-slate-400 font-medium">
+                                    (선발주 {selectedCriticalIds.size}건 / 일반보충 {selectedWarningIds.size}건 / 정기 {selectedRegularIds.size}건)
+                                </span>
+                            </div>
+                            <button 
+                                onClick={handleCreateGlobalOrder} 
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-6 py-2.5 rounded-lg sm:rounded-full flex items-center gap-2 transition-all w-full sm:w-auto justify-center shadow-lg hover:shadow-emerald-500/50"
+                            >
+                                <ShoppingCart className="w-5 h-5"/>
+                                선택 항목 모두 발주서 만들기
+                            </button>
+                        </div>
+                    );
+                }
+                return null;
+            })()}
             
         </div>
     );
