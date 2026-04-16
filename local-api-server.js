@@ -429,18 +429,15 @@ const server = http.createServer(async (req, res) => {
                             
                             for (const [id, changeData] of Object.entries(changesObj)) {
                                 const existingChange = todayRecord.diff.find(d => d.id === id);
-                                const intraPollChange = changeData.change;
-                                const intraPollSales = intraPollChange < 0 ? Math.abs(intraPollChange) : 0;
 
                                 if (existingChange) {
-                                    existingChange.sales = (existingChange.sales || 0) + intraPollSales;
                                     existingChange.to = changeData.to; 
                                     existingChange.change = existingChange.to - existingChange.from; 
                                 } else {
-                                    todayRecord.diff.push({ id, ...changeData, sales: intraPollSales });
+                                    todayRecord.diff.push({ id, ...changeData });
                                 }
                             }
-                            todayRecord.diff = todayRecord.diff.filter(d => d.change !== 0 || (d.sales && d.sales > 0));
+                            todayRecord.diff = todayRecord.diff.filter(d => d.change !== 0);
                         }
                         
                         if (Object.keys(daekyungChangesObj).length > 0) {
@@ -453,18 +450,15 @@ const server = http.createServer(async (req, res) => {
                             
                             for (const [id, changeData] of Object.entries(daekyungChangesObj)) {
                                 const existingChange = todayRecord.diff.find(d => d.id === id);
-                                const intraPollChange = changeData.change;
-                                const intraPollSales = intraPollChange < 0 ? Math.abs(intraPollChange) : 0;
 
                                 if (existingChange) {
-                                    existingChange.sales = (existingChange.sales || 0) + intraPollSales;
                                     existingChange.to = changeData.to; 
                                     existingChange.change = existingChange.to - existingChange.from; 
                                 } else {
-                                    todayRecord.diff.push({ id, ...changeData, sales: intraPollSales });
+                                    todayRecord.diff.push({ id, ...changeData });
                                 }
                             }
-                            todayRecord.diff = todayRecord.diff.filter(d => d.change !== 0 || (d.sales && d.sales > 0));
+                            todayRecord.diff = todayRecord.diff.filter(d => d.change !== 0);
                         }
 
                         // Save even if changesObj is empty, because we updated the master snapshot!
