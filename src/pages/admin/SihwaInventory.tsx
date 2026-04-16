@@ -20,7 +20,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
 import type { Product, LineItem } from '../../types';
 import salesHistoryRaw from '../../data/sales_history.json';
-import { COMPETITOR_DATA, getStrategicGrade, type StrategicGrade, gradeColorClass, gradeLabel, shareColorClass, shareBarClass } from '../../../competitorData';
+import { COMPETITOR_DATA, getStrategicGrade, type StrategicGrade, gradeColorClass, gradeLabel } from '../../../competitorData';
 
 const salesHistory = salesHistoryRaw as Record<string, { salesVolume: number, salesFreq: number }>;
 
@@ -330,6 +330,7 @@ export default function SihwaInventory() {
         marketShare: number;
         strategicGrade: StrategicGrade;
         volumeNegoFlag: boolean;
+        turnoverRatio: number;
     }
 
     const analyzedInventory = useMemo(() => {
@@ -405,7 +406,8 @@ export default function SihwaInventory() {
                     marketTotal,
                     marketShare,
                     strategicGrade: getStrategicGrade(salesData.salesVolume, compData.compSales, marketShare),
-                    volumeNegoFlag: false
+                    volumeNegoFlag: false,
+                    turnoverRatio: parseFloat((salesData.salesVolume / Math.max(shQty, 1)).toFixed(2))
                 };
             }
         });
@@ -449,7 +451,8 @@ export default function SihwaInventory() {
                         marketTotal,
                         marketShare,
                         strategicGrade: getStrategicGrade(salesData.salesVolume, compData.compSales, marketShare),
-                        volumeNegoFlag: false
+                        volumeNegoFlag: false,
+                        turnoverRatio: parseFloat((salesData.salesVolume / Math.max(0, 1)).toFixed(2))
                     };
                 } else {
                     comparisonMap[id].pendingOrderQty += addQty;
@@ -697,8 +700,10 @@ export default function SihwaInventory() {
                 if (!id) return;
                 const qty = Number(item.quantity ?? item.qty ?? 0);
                 
-                // Income (+) vs Outcome (-)
-                const change = isSihwaIncoming ? qty : -qty;
+                // 시화재고에서 +는 '서울재고/시화' 발주분만 연산되어야 함
+                // 주문관리의 일반 출고(-)는 시화재고에서 직접 차감되지 않음
+                if (!isSihwaIncoming) return;
+                const change = qty;
                 
                 map[dateKey][id] = (map[dateKey][id] || 0) + change;
             });
@@ -931,13 +936,13 @@ export default function SihwaInventory() {
 
             {/* 경쟁사 대비 공략 필요 품목 */}
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                <h3 className="font-bold text-slate-600 text-sm mb-2">📊 경쟁사 우위 주력품목</h3>
+                <h3 className="font-bold text-slate-600 text-sm mb-2">📊 단가 우위 주력품목 (경쟁사 다수 판매)</h3>
                 <p className="text-2xl font-black text-rose-600">
                 {stats.A2items.length}
                 <span className="text-sm font-normal text-slate-400 ml-1">품목</span>
                 </p>
                 <p className="text-[10px] lg:text-xs text-slate-400 mt-1 break-keep">
-                시장합계 1만개 이상이지만 우리 점유율 35% 미만인 품목
+                시장합계 1만개 이상 규모 품목 (당사 주력 공략 대상)
                 </p>
             </div>
 
@@ -953,21 +958,21 @@ export default function SihwaInventory() {
                 </p>
             </div>
 
-            {/* 시장 점유율 현황 요약 */}
+            {/* 재고 회전율 우수 요약 */}
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                <h3 className="font-bold text-slate-600 text-sm mb-2">🎯 전략 등급 요약</h3>
+                <h3 className="font-bold text-slate-600 text-sm mb-2">🔄 재고 회전율 (Turnover)</h3>
                 <div className="flex flex-col gap-1 text-[10px] lg:text-xs">
                 <div className="flex justify-between">
-                    <span className="text-emerald-600 font-bold">수성(50%+)</span>
-                    <span className="font-black">{analyzedInventory.filter(r=>r.marketShare>=50&&r.marketTotal>0).length}건</span>
+                    <span className="text-emerald-600 font-bold">초고속 (연 12회전 이상)</span>
+                    <span className="font-black">{analyzedInventory.filter(r=>r.turnoverRatio >= 12 && r.salesVolume > 0).length}건</span>
                 </div>
                 <div className="flex justify-between">
-                    <span className="text-amber-600 font-bold">경합(35~49%)</span>
-                    <span className="font-black">{analyzedInventory.filter(r=>r.marketShare>=35&&r.marketShare<50&&r.marketTotal>0).length}건</span>
+                    <span className="text-indigo-600 font-bold">양호 (연 6~12회전)</span>
+                    <span className="font-black">{analyzedInventory.filter(r=>r.turnoverRatio >= 6 && r.turnoverRatio < 12 && r.salesVolume > 0).length}건</span>
                 </div>
                 <div className="flex justify-between">
-                    <span className="text-rose-500 font-bold">공략필요(&lt;35%)</span>
-                    <span className="font-black">{analyzedInventory.filter(r=>r.marketShare>0&&r.marketShare<35&&r.marketTotal>0).length}건</span>
+                    <span className="text-slate-500 font-bold">정체 (연 6회전 미만)</span>
+                    <span className="font-black">{analyzedInventory.filter(r=>r.turnoverRatio > 0 && r.turnoverRatio < 6 && r.salesVolume > 0).length}건</span>
                 </div>
                 </div>
             </div>
@@ -1055,7 +1060,7 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 text-right">매입단가</th>
                                                             <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
                                                             <th className="px-5 py-3 text-right">경쟁사 연판매</th>
-                                                            <th className="px-5 py-3 text-right border-r border-slate-200">우리 점유율</th>
+                                                            <th className="px-5 py-3 text-right border-r border-slate-200">재고회전율(연)</th>
                                                             <th className="px-5 py-3">🚨 분석 근거 (명확성)</th>
                                                         </tr>
                                                     </thead>
@@ -1087,17 +1092,10 @@ export default function SihwaInventory() {
                                                                     ) : <span className="text-slate-200">—</span>}
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right border-r border-slate-100/50">
-                                                                    {row.marketTotal > 0 ? (
-                                                                        <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className={`font-bold text-sm ${shareColorClass(row.marketShare)}`}>{row.marketShare}%</span>
-                                                                            <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                                                                <div
-                                                                                    className={`h-full rounded-full ${shareBarClass(row.marketShare)}`}
-                                                                                    {...{ style: { width: `${Math.min(row.marketShare, 100)}%` } }}
-                                                                                />
-                                                                            </div>
-                                                                        </div>
-                                                                    ) : <span className="text-slate-200 text-xs text-right">데이터없음</span>}
+                                                                    <div className="flex flex-col items-end gap-0.5">
+                                                                        <span className="font-bold text-sm text-slate-700">{row.turnoverRatio} 회</span>
+                                                                        <span className="text-[10px] text-slate-400">/ {row.salesFreq}회 주문</span>
+                                                                    </div>
                                                                 </td>
                                                                 <td className="px-5 py-4">
                                                                     <div className="flex flex-col gap-0.5">
@@ -1186,7 +1184,7 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 text-right">매입단가</th>
                                                             <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
                                                             <th className="px-5 py-3 text-right">경쟁사 연판매</th>
-                                                            <th className="px-5 py-3 text-right border-r border-slate-200">우리 점유율</th>
+                                                            <th className="px-5 py-3 text-right border-r border-slate-200">재고회전율(연)</th>
                                                             <th className="px-5 py-3">💡 분석 근거</th>
                                                         </tr>
                                                     </thead>
@@ -1225,17 +1223,10 @@ export default function SihwaInventory() {
                                                                     ) : <span className="text-slate-200">—</span>}
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right border-r border-slate-100/50">
-                                                                    {row.marketTotal > 0 ? (
-                                                                        <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className={`font-bold text-sm ${shareColorClass(row.marketShare)}`}>{row.marketShare}%</span>
-                                                                            <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                                                                <div
-                                                                                    className={`h-full rounded-full ${shareBarClass(row.marketShare)}`}
-                                                                                    {...{ style: { width: `${Math.min(row.marketShare, 100)}%` } }}
-                                                                                />
-                                                                            </div>
-                                                                        </div>
-                                                                    ) : <span className="text-slate-200 text-xs text-right">데이터없음</span>}
+                                                                    <div className="flex flex-col items-end gap-0.5">
+                                                                        <span className="font-bold text-sm text-slate-700">{row.turnoverRatio} 회</span>
+                                                                        <span className="text-[10px] text-slate-400">/ {row.salesFreq}회 주문</span>
+                                                                    </div>
                                                                 </td>
                                                                 <td className="px-5 py-4">
                                                                     <div className="flex flex-col gap-0.5">
@@ -1672,7 +1663,7 @@ export default function SihwaInventory() {
                                             <th className="px-4 py-3 text-center">전략등급</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-amber-700" onClick={() => handleSort('salesVolume')}>우리 누적출고 {sortConfig.key==='salesVolume' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right text-slate-500">경쟁사 출고</th>
-                                            <th className="px-4 py-3 text-right border-r border-slate-200">시장 점유율</th>
+                                            <th className="px-4 py-3 text-right border-r border-slate-200">재고회전율</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-indigo-700" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-600" onClick={() => handleSort('pendingOrderQty')}>입고 대기(+Pending) {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-500 font-black" onClick={() => handleSort('deficit')}>보충 필요분(Deficit) {sortConfig.key==='deficit' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
@@ -1704,9 +1695,10 @@ export default function SihwaInventory() {
                                                     {row.compSales > 0 ? row.compSales.toLocaleString() : '—'}
                                                 </td>
                                                 <td className="px-4 py-2 text-right border-r border-slate-100/50">
-                                                    {row.marketTotal > 0 ? (
-                                                        <span className={`font-bold text-sm ${shareColorClass(row.marketShare)}`}>{row.marketShare}%</span>
-                                                    ) : <span className="text-slate-200 text-xs">분석불가</span>}
+                                                    <div className="flex flex-col items-end gap-0.5">
+                                                        <span className="font-bold text-sm text-slate-700">{row.turnoverRatio} 회</span>
+                                                        <span className="text-[10px] text-slate-400">/ {row.salesFreq}회 주문</span>
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-2 text-right font-black font-mono text-indigo-600 bg-indigo-50/20">
                                                     {row.shQty}
