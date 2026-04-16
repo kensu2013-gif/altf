@@ -736,17 +736,23 @@ export default function SihwaInventory() {
             if (listType === 'REGULAR') {
                 qty = 'recommendedQty' in row ? (row as { recommendedQty?: number }).recommendedQty || 0 : 0;
             } else if (listType === 'WARNING') {
-                // 일반 발주 최소 단위 100 적용 (캡에 막히지 않는 한)
-                qty = row.deficit > 0 ? row.deficit : 0;
+                const targetQty = row.targetStockByTurnover - (row.shQty + row.pendingOrderQty);
+                qty = targetQty > 0 ? targetQty : (row.deficit > 0 ? row.deficit : 0);
                 qty = Math.max(100, Math.ceil(qty / 10) * 10);
                 const sizeNum = parseInt((row.product.size || '').replace(/[^0-9]/g, ''), 10);
-                if (!isNaN(sizeNum) && sizeNum >= 100 && qty > 300) qty = 300;
+                if (!isNaN(sizeNum) && sizeNum >= 100) {
+                    const dynamicCap = Math.max(300, Math.ceil(row.salesVolume / 4));
+                    qty = qty > 0 ? Math.min(dynamicCap, qty) : 0;
+                }
             } else {
-                // 선발주 최소 단위 10 적용
-                qty = row.deficit > 0 ? row.deficit : 0;
+                const targetQty = row.targetStockByTurnover - (row.shQty + row.pendingOrderQty);
+                qty = targetQty > 0 ? targetQty : (row.deficit > 0 ? row.deficit : 0);
                 qty = Math.max(10, Math.ceil(qty / 10) * 10);
                 const sizeNum = parseInt((row.product.size || '').replace(/[^0-9]/g, ''), 10);
-                if (!isNaN(sizeNum) && sizeNum >= 100 && qty > 300) qty = 300;
+                if (!isNaN(sizeNum) && sizeNum >= 100) {
+                    const dynamicCap = Math.max(300, Math.ceil(row.salesVolume / 4));
+                    qty = qty > 0 ? Math.min(dynamicCap, qty) : 0;
+                }
             }
             if (qty > 0) {
                 addItem({
@@ -1199,7 +1205,7 @@ export default function SihwaInventory() {
                                                     <span>🚨 선발주 요망 리스트</span>
                                                     <span className="text-sm font-medium text-rose-500">(대경매입처 동반 결품 위험)</span>
                                                     <span className="text-sm font-bold bg-rose-100/70 text-rose-700 px-2 py-0.5 rounded border border-rose-200 tracking-tight">
-                                                        [산출식: 현재고+대기=0 & 대경=0 & 연판매{'>'}100 & 빈도≥10 | 발주단위: 최소 10개]
+                                                        [산출식: 현재고+대기=0 & 대경=0 & 연판매{'>'}100 & 빈도≥10 | 발주단위: 전략목표치 기준 (판매량 비례 동적 캡)]
                                                     </span>
                                                 </h3>
                                             </div>
@@ -1365,7 +1371,7 @@ export default function SihwaInventory() {
                                                     <span>⚠️ 일반 발주 필요</span>
                                                     <span className="text-sm font-medium text-amber-600">(입고 대기물량을 고려해도 부족함)</span>
                                                     <span className="text-sm font-bold bg-amber-100/70 text-amber-700 px-2 py-0.5 rounded border border-amber-200 tracking-tight">
-                                                        [산출식: 적정재고 미달분 보충 | 발주단위: 최소 100개 (Size≥100A는 최대 300캡)]
+                                                        [산출식: 전략목표재고 미달분 보충 | 발주단위: 최소 100개 (판매량 비례 동적 캡)]
                                                     </span>
                                                 </h3>
                                             </div>
