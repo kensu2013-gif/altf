@@ -139,11 +139,11 @@ export default function SihwaInventory() {
     const [expandedDailyGroups, setExpandedDailyGroups] = useState<Record<string, boolean>>({});
 
     const [sortConfig, setSortConfig] = useState<{ 
-        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand', 
+        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock', 
         direction: 'asc' | 'desc' 
     }>({ key: 'deficit', direction: 'desc' });
 
-    const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand') => {
+    const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock') => {
         setSortConfig(prev => ({
             key,
             direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
@@ -664,6 +664,7 @@ export default function SihwaInventory() {
                 case 'recentPurchasePrice': return (a.recentPurchasePrice - b.recentPurchasePrice) * dir;
                 case 'turnoverRate': return (a.turnoverRate - b.turnoverRate) * dir;
                 case 'daysOnHand': return (a.daysOnHand - b.daysOnHand) * dir;
+                case 'safeStock': return (a.safeStock - b.safeStock) * dir;
                 default: return 0; // Fallback
             }
         });
@@ -1110,9 +1111,12 @@ export default function SihwaInventory() {
                         <span className="text-rose-700 font-bold">
                         잔여 10일 이하 {urgent.length}개 품목 — 즉시 발주 필요
                         </span>
-                        <div className="text-rose-500 mt-0.5 break-keep">
-                        {urgent.slice(0, 3).map(r => r.product.id).join(', ')}
-                        {urgent.length > 3 ? ` 외 ${urgent.length - 3}건` : ''}
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                            {urgent.map(r => (
+                                <span key={r.product.id} className="bg-white text-rose-600 px-1.5 py-0.5 rounded shadow-sm border border-rose-100 font-mono text-[10px] font-bold">
+                                    {r.product.id}
+                                </span>
+                            ))}
                         </div>
                     </div>
                     ) : null;
@@ -1363,14 +1367,14 @@ export default function SihwaInventory() {
                                                             </th>
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                                            <th className="px-5 py-3 text-right">적정재고(목표)</th>
+                                                            <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('safeStock')}>적정재고(목표) {sortConfig.key==='safeStock' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('pendingOrderQty')}>입고 대기중 {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right">매입단가</th>
                                                             <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
                                                             <th className="px-5 py-3 text-right">경쟁사 연판매</th>
-                                                            <th className="px-5 py-3 text-center">회전율</th>
-                                                            <th className="px-5 py-3 text-right">잔여일수</th>
+                                                            <th className="px-5 py-3 text-center cursor-pointer hover:bg-slate-200" onClick={() => handleSort('turnoverRate')}>회전율 {sortConfig.key==='turnoverRate' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                                            <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => handleSort('daysOnHand')}>잔여일수 {sortConfig.key==='daysOnHand' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3">💡 분석 근거</th>
                                                         </tr>
                                                     </thead>
