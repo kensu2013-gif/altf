@@ -258,7 +258,7 @@ export default function Customers() {
 
     // Analytics Engine
     const analytics = useMemo(() => {
-        const regionMap: Record<string, { totalAmount: number; totalQty: number; items: Record<string, {qty: number; amount: number}>; missingCustomers: Set<string> }> = {};
+        const regionMap: Record<string, { totalAmount: number; totalQty: number; items: Record<string, {qty: number; amount: number}>; missingCustomers: Map<string, string> }> = {};
         
         orders.forEach(o => {
             if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN') return;
@@ -273,10 +273,13 @@ export default function Customers() {
             const region = customer?.region || 'CRM 미등록/예외';
             
             if (!regionMap[region]) {
-                regionMap[region] = { totalAmount: 0, totalQty: 0, items: {}, missingCustomers: new Set() };
+                regionMap[region] = { totalAmount: 0, totalQty: 0, items: {}, missingCustomers: new Map() };
             }
-            if (!customer) {
-                regionMap[region].missingCustomers.add(o.customerName);
+            if (!customer && cleanOrderName) {
+                const existing = regionMap[region].missingCustomers.get(cleanOrderName);
+                if (!existing || (!existing.includes('(주)') && o.customerName.includes('(주)'))) {
+                    regionMap[region].missingCustomers.set(cleanOrderName, o.customerName);
+                }
             }
 
             regionMap[region].totalAmount += o.totalAmount;
@@ -306,7 +309,7 @@ export default function Customers() {
                 ...regionMap[k],
                 topItems: allItems.slice(0, 10), // For dashboard compact view
                 allItems, // Store all for modal
-                missingArray: Array.from(regionMap[k].missingCustomers)
+                missingArray: Array.from(regionMap[k].missingCustomers.values())
             };
         }).sort((a,b) => b.totalQty - a.totalQty);
 
