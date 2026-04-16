@@ -1998,8 +1998,7 @@ export default function SihwaInventory() {
                     )}
                 </div>
             </div>
-            </div>
-            
+
             {/* 전역 통합 발주 플로팅 바 (Total Global Order Action Bar) */}
             {(() => {
                 const totalSelectedCount = selectedCriticalIds.size + selectedWarningIds.size + selectedRegularIds.size;
