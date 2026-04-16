@@ -675,14 +675,22 @@ export default function SihwaInventory() {
     const stats = useMemo(() => {
         const regular = analyzedInventory
             .filter(r => r.statusCategory === 'SAFE' && r.salesFreq >= 20)
+            .filter(r => !(r.product.material || '').toLowerCase().startsWith('wp'))
             .map(r => {
-                const rawRecommended = (r.salesVolume / 6) - r.effectiveStock;
-                let recommendedQty = rawRecommended > 0 ? Math.max(500, Math.ceil(rawRecommended / 100) * 100) : 0;
+                const rawRecommended = r.targetStockByTurnover - r.effectiveStock;
+                let recommendedQty = 0;
                 
-                // 정기발주 시에도 부피 캡(Max 300) 고려
+                if (rawRecommended > 0) {
+                    recommendedQty = Math.ceil(rawRecommended / 10) * 10;
+                    if (recommendedQty < 50) {
+                         recommendedQty = Math.max(50, Math.ceil(rawRecommended / 10) * 10);
+                    }
+                }
+                
                 const sizeNum = parseInt((r.product.size || '').replace(/[^0-9]/g, ''), 10);
                 if (!isNaN(sizeNum) && sizeNum >= 100) {
-                    recommendedQty = recommendedQty > 0 ? Math.min(300, recommendedQty) : 0;
+                    const dynamicCap = Math.max(300, Math.ceil(r.salesVolume / 4));
+                    recommendedQty = recommendedQty > 0 ? Math.min(dynamicCap, recommendedQty) : 0;
                 }
                 
                 return { ...r, recommendedQty };
@@ -1585,10 +1593,10 @@ export default function SihwaInventory() {
                                                                     <div className="flex flex-col gap-0.5">
                                                                         <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
                                                                             <Activity className="w-4 h-4 text-indigo-500" />
-                                                                            2개월분 <span className="text-indigo-600">{row.recommendedQty}</span>개 권장
+                                                                            전략 목표치 <span className="text-indigo-600">{row.recommendedQty}</span>개 권장
                                                                         </div>
                                                                         <div className="text-xs text-slate-500 pl-5">
-                                                                            월평균 {Math.round(row.salesVolume / 12)}개 소요
+                                                                            월평균 {Math.round(row.salesVolume / 12)}개 소요 (회전율 기반)
                                                                         </div>
                                                                     </div>
                                                                 </td>
