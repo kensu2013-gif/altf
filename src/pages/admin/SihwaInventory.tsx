@@ -958,16 +958,7 @@ export default function SihwaInventory() {
                         </p>
                     </div>
                 </div>
-                <div className="flex flex-col gap-2 bg-black/20 p-3 rounded-xl border border-white/10 md:w-64">
-                    <div className="flex justify-between text-xs font-bold text-slate-300">
-                        <span>현재 데이터 연동률</span>
-                        <span className="text-white">76% / 100%</span>
-                    </div>
-                    <div className="h-2 w-full bg-slate-700 rounded-full overflow-hidden">
-                        <div className="h-full bg-teal-400 w-[76%] rounded-full shadow-[0_0_10px_rgba(45,212,191,0.5)]"></div>
-                    </div>
-                    <span className="text-[10px] text-right text-slate-400">CRM 연동 + 웹 주문 활성화 대기중</span>
-                </div>
+
             </div>
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1022,70 +1013,7 @@ export default function SihwaInventory() {
             </div>
 
             {/* ★ 신규: 전략 인사이트 카드 행 */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            
-            {/* 자산 목표 달성률 */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                <h3 className="font-bold text-slate-600 text-sm flex items-center gap-2 mb-2">
-                <TrendingUp className="w-4 h-4 text-indigo-500" />
-                시화재고 자산 목표
-                </h3>
-                <p className="text-xl lg:text-2xl font-black text-slate-800 truncate">
-                {formatCur(stats.totalAssetCost)}
-                <span className="text-sm font-normal text-slate-400 ml-1">원</span>
-                </p>
-                {/* 진행바: 목표 2.5억 ~ 3억 */}
-                <div className="mt-2">
-                <div className="flex justify-between text-[10px] lg:text-xs text-slate-400 mb-1">
-                    <span>0</span><span>목표 2.5억</span><span>3억</span>
-                </div>
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden relative">
-                    <div className="h-full bg-slate-200 absolute" {...{ style: { left: '83.3%', width: '16.7%' } }} />
-                    <div
-                    className={`h-full rounded-full transition-all ${
-                        stats.totalAssetCost >= 250_000_000 && stats.totalAssetCost <= 300_000_000
-                        ? 'bg-emerald-500' : stats.totalAssetCost < 250_000_000
-                        ? 'bg-amber-400' : 'bg-rose-400'
-                    }`}
-                    {...{ style: { width: `${Math.min((stats.totalAssetCost / 300_000_000) * 100, 100)}%` } }}
-                    />
-                </div>
-                <p className={`text-[10px] lg:text-xs mt-1 font-bold truncate ${
-                    stats.totalAssetCost >= 250_000_000 && stats.totalAssetCost <= 300_000_000
-                    ? 'text-emerald-600' : 'text-amber-600'
-                }`}>
-                    {stats.totalAssetCost >= 250_000_000 && stats.totalAssetCost <= 300_000_000
-                    ? '✅ 목표 범위 내'
-                    : stats.totalAssetCost < 250_000_000
-                    ? `△ ${formatCur(250_000_000 - stats.totalAssetCost)}원 부족`
-                    : `▲ ${formatCur(stats.totalAssetCost - 300_000_000)}원 초과`}
-                </p>
-                </div>
-            </div>
-
-            {/* 경쟁사 대비 공략 필요 품목 */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                <h3 className="font-bold text-slate-600 text-sm mb-2">📊 단가 우위 주력품목 (경쟁사 다수 판매)</h3>
-                <p className="text-2xl font-black text-rose-600">
-                {stats.A2items.length}
-                <span className="text-sm font-normal text-slate-400 ml-1">품목</span>
-                </p>
-                <p className="text-[10px] lg:text-xs text-slate-400 mt-1 break-keep">
-                시장합계 1만개 이상 규모 품목 (당사 주력 공략 대상)
-                </p>
-            </div>
-
-            {/* 볼륨 네고 대상 */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                <h3 className="font-bold text-slate-600 text-sm mb-2">💰 볼륨네고 묶음 대상</h3>
-                <p className="text-2xl font-black text-indigo-600">
-                {stats.needsVolumeNego.length}
-                <span className="text-sm font-normal text-slate-400 ml-1">품목</span>
-                </p>
-                <p className="text-[10px] lg:text-xs text-slate-400 mt-1 break-keep">
-                단품 부족분 × 매입단가 ≥ 2천만원 → 대경 볼륨 네고 가능
-                </p>
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 
             {/* 회전율 분포 요약 */}
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
@@ -1129,26 +1057,7 @@ export default function SihwaInventory() {
                     })}
                 </div>
 
-                {/* 즉시 발주 필요 (잔여 10일 이하) */}
-                {(() => {
-                    const urgent = analyzedInventory.filter(
-                    r => r.shQty > 0 && r.daysOnHand <= 10 && r.daysOnHand < 9999 && r.salesVolume > 0
-                    );
-                    return urgent.length > 0 ? (
-                    <div className="mt-3 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 text-xs">
-                        <span className="text-rose-700 font-bold">
-                        잔여 10일 이하 {urgent.length}개 품목 — 즉시 발주 필요
-                        </span>
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                            {urgent.map(r => (
-                                <span key={r.product.id} className="bg-white text-rose-600 px-1.5 py-0.5 rounded shadow-sm border border-rose-100 font-mono text-[10px] font-bold">
-                                    {r.product.id}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                    ) : null;
-                })()}
+
             </div>
 
             </div>
@@ -2027,15 +1936,27 @@ export default function SihwaInventory() {
             {(() => {
                 const totalSelectedCount = selectedCriticalIds.size + selectedWarningIds.size + selectedRegularIds.size;
                 if (totalSelectedCount > 0) {
+                    const expectedTotal = 
+                        stats.critical.filter(w => selectedCriticalIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1), 0) +
+                        stats.warning.filter(w => selectedWarningIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1), 0) +
+                        stats.regular.filter(w => selectedRegularIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.recommendedQty || 0), 0);
+
                     return (
                         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 p-2 sm:px-6 sm:py-4 rounded-xl sm:rounded-full shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-8 z-50 animate-in slide-in-from-bottom">
                             <div className="flex flex-col items-center sm:items-start text-white">
                                 <span className="font-extrabold text-sm sm:text-base">
                                     총 <span className="text-emerald-400">{totalSelectedCount}</span>개 품목 일괄 선택됨
                                 </span>
-                                <span className="text-xs text-slate-400 font-medium">
-                                    (선발주 {selectedCriticalIds.size}건 / 일반보충 {selectedWarningIds.size}건 / 정기 {selectedRegularIds.size}건)
-                                </span>
+                                <div className="flex flex-col sm:flex-row items-center sm:items-baseline gap-1 sm:gap-3">
+                                    <span className="text-xs text-slate-400 font-medium">
+                                        (선발주 {selectedCriticalIds.size}건 / 일반보충 {selectedWarningIds.size}건 / 정기 {selectedRegularIds.size}건)
+                                    </span>
+                                    {expectedTotal > 0 && (
+                                        <span className="text-emerald-300 font-bold text-[13px] bg-emerald-900/50 px-2.5 py-0.5 rounded border border-emerald-800/50 mt-1 sm:mt-0">
+                                            매입예상합계: {formatCur(expectedTotal)} 원
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                             <button 
                                 onClick={handleCreateGlobalOrder} 
