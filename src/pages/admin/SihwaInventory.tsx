@@ -18,8 +18,9 @@ import {
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
-import type { Product } from '../../types';
+import type { Product, LineItem } from '../../types';
 import salesHistoryRaw from '../../data/sales_history.json';
+import { COMPETITOR_DATA, getStrategicGrade, type StrategicGrade, gradeColorClass, gradeLabel, shareColorClass, shareBarClass } from '../../../competitorData';
 
 const salesHistory = salesHistoryRaw as Record<string, { salesVolume: number, salesFreq: number }>;
 
@@ -323,6 +324,12 @@ export default function SihwaInventory() {
         salesFreq: number;
         recent7dSales: number;
         recent30dSales: number;
+        compSales: number;
+        compFreq: number;
+        marketTotal: number;
+        marketShare: number;
+        strategicGrade: StrategicGrade;
+        volumeNegoFlag: boolean;
     }
 
     const analyzedInventory = useMemo(() => {
@@ -371,12 +378,16 @@ export default function SihwaInventory() {
             }
 
             const salesData = salesHistory[item.id] || { salesVolume: 0, salesFreq: 0 };
+            const compData = COMPETITOR_DATA[item.id] || { compSales: 0, compFreq: 0 };
+            const marketTotal = salesData.salesVolume + compData.compSales;
+            const marketShare = marketTotal > 0 ? parseFloat(((salesData.salesVolume / marketTotal) * 100).toFixed(1)) : 0;
+            
             const basePrice = item.base_price ?? item.unitPrice ?? 0;
             const recentInfo = recentSeoulPurchaseInfoMap[item.id];
             const recentSales = recentSalesMap[item.id] || { recent7d: 0, recent30d: 0 };
             
             // Populate items (if it has stock or sales data, we analyze it)
-            if (shQty > 0 || ysQty > 0 || salesData.salesVolume > 0 || recentSales.recent30d > 0) {
+            if (shQty > 0 || ysQty > 0 || salesData.salesVolume > 0 || recentSales.recent30d > 0 || compData.compSales > 0) {
                 comparisonMap[item.id] = {
                     product: item,
                     shQty,
@@ -388,7 +399,13 @@ export default function SihwaInventory() {
                     salesVolume: salesData.salesVolume,
                     salesFreq: salesData.salesFreq,
                     recent7dSales: recentSales.recent7d,
-                    recent30dSales: recentSales.recent30d
+                    recent30dSales: recentSales.recent30d,
+                    compSales: compData.compSales,
+                    compFreq: compData.compFreq,
+                    marketTotal,
+                    marketShare,
+                    strategicGrade: getStrategicGrade(salesData.salesVolume, compData.compSales, marketShare),
+                    volumeNegoFlag: false
                 };
             }
         });
@@ -410,6 +427,11 @@ export default function SihwaInventory() {
                     const finalSellingPrice = calculateSellingPrice(id, rawBasePrice);
                     const recentInfo = recentSeoulPurchaseInfoMap[id];
                     
+                    const salesData = salesHistory[id] || { salesVolume: 0, salesFreq: 0 };
+                    const compData = COMPETITOR_DATA[id] || { compSales: 0, compFreq: 0 };
+                    const marketTotal = salesData.salesVolume + compData.compSales;
+                    const marketShare = marketTotal > 0 ? parseFloat(((salesData.salesVolume / marketTotal) * 100).toFixed(1)) : 0;
+                    
                     comparisonMap[id] = {
                         product: product || { id, name: item.name || item.item_name || '미등록 상품', stockStatus: 'OUT_OF_STOCK' },
                         shQty: 0,
@@ -418,10 +440,16 @@ export default function SihwaInventory() {
                         recentPurchasePrice: recentInfo ? recentInfo.price : calculateFallbackPurchasePrice(id, rawBasePrice),
                         recentPurchaseDate: recentInfo ? recentInfo.date : null,
                         sellingPrice: finalSellingPrice,
-                        salesVolume: 0,
-                        salesFreq: 0,
+                        salesVolume: salesData.salesVolume,
+                        salesFreq: salesData.salesFreq,
                         recent7dSales: 0,
-                        recent30dSales: 0
+                        recent30dSales: 0,
+                        compSales: compData.compSales,
+                        compFreq: compData.compFreq,
+                        marketTotal,
+                        marketShare,
+                        strategicGrade: getStrategicGrade(salesData.salesVolume, compData.compSales, marketShare),
+                        volumeNegoFlag: false
                     };
                 } else {
                     comparisonMap[id].pendingOrderQty += addQty;
@@ -431,23 +459,41 @@ export default function SihwaInventory() {
 
         // Step 3: Run AI Rules for status computation
         const processedList = Object.values(comparisonMap).map(row => {
-            const rawSafeStock = Math.ceil((row.salesVolume / 12) * 1.5);
-            let safeStock = rawSafeStock > 0 ? Math.max(10, Math.round(rawSafeStock / 10) * 10) : 0;
+            // 통계 기반 안전재고 (σ)
+            const LEAD_TIME_DAYS = 5;
+            const Z_VALUE = 1.645;
+            const WORKING_DAYS = 250;
+            const dailyAvg = row.salesVolume / WORKING_DAYS;
+            
+            const cvEstimate = row.salesFreq >= 100 ? 0.20 : row.salesFreq >= 50 ? 0.30 : row.salesFreq >= 20 ? 0.40 : 0.50;
+            const sigma = dailyAvg * cvEstimate;
+            const safetyStockSigma = Math.ceil(Z_VALUE * sigma * Math.sqrt(LEAD_TIME_DAYS));
+            
+            let safeStock = safetyStockSigma + Math.ceil(dailyAvg * 14);
+            safeStock = safeStock > 0 ? Math.max(10, Math.round(safeStock / 10) * 10) : 0;
             
             // AI Filter Rules
             const mat = (row.product.material || '').toUpperCase();
             if (mat.startsWith('WP') || mat.includes('CARBON')) {
-                safeStock = 0; // WP/Carbon items don't need Sihwa stock
+                if (row.salesVolume < 200 || row.salesFreq < 10) {
+                    safeStock = 0;
+                } else {
+                    safeStock = Math.min(safeStock, 50); // WP는 최대 50개 캡
+                }
             }
             if (row.salesFreq < 10) {
-                safeStock = 0; // Low frequency (<10) items excluded from re-order needs
+                safeStock = 0;
             }
 
-            // 부피에 따른 보관 한도 (100A 이상 최대 300개 캡)
+            // 부피 제약 다단화
             const sizeStr = row.product.size || '';
             const sizeNum = parseInt(sizeStr.replace(/[^0-9]/g, ''), 10);
-            if (!isNaN(sizeNum) && sizeNum >= 100) {
-                if (safeStock > 300) safeStock = 300;
+            if (!isNaN(sizeNum)) {
+                if (sizeNum >= 400) { if (safeStock > 30)  safeStock = 30; }
+                else if (sizeNum >= 300) { if (safeStock > 50)  safeStock = 50; }
+                else if (sizeNum >= 200) { if (safeStock > 80)  safeStock = 80; }
+                else if (sizeNum >= 150) { if (safeStock > 150) safeStock = 150; }
+                else if (sizeNum >= 100) { if (safeStock > 300) safeStock = 300; }
             }
 
             // REQUIREMENT 3: INCLUDE PENDING ORDERS as effective stock
@@ -538,11 +584,23 @@ export default function SihwaInventory() {
             })
             .filter(r => r.recommendedQty > 0);
 
+        // ★ 신규: 전략등급별 집계
+        const A2items = analyzedInventory.filter(r => r.strategicGrade === 'A2' && r.marketShare < 35);
+        const needsVolumeNego = analyzedInventory.filter(r =>
+            r.deficit > 0 && r.recentPurchasePrice * r.deficit >= 20_000_000
+        );
+        const totalAssetCost = analyzedInventory
+            .filter(r => !r.product.id.toLowerCase().includes('stubend'))
+            .reduce((sum, r) => sum + r.shQty * r.recentPurchasePrice, 0);
+
         return {
             critical: analyzedInventory.filter(r => r.statusCategory === 'CRITICAL'),
             warning: analyzedInventory.filter(r => r.statusCategory === 'WARNING'),
             safeActive: analyzedInventory.filter(r => r.statusCategory === 'SAFE' && r.salesFreq > 10),
-            regular
+            regular,
+            A2items,
+            needsVolumeNego,
+            totalAssetCost
         };
     }, [analyzedInventory]);
 
@@ -616,6 +674,37 @@ export default function SihwaInventory() {
             totalPendingPurchaseValue
         };
     }, [analyzedInventory]);
+
+    const dailyOrderDiffMap = useMemo(() => {
+        const map: Record<string, Record<string, number>> = {}; 
+        orders.forEach(order => {
+            if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
+            if (order.status !== 'COMPLETED') return; 
+            
+            const dateStr = order.adminResponse?.deliveryDate || order.createdAt;
+            const dateKey = new Date(dateStr).toISOString().split('T')[0];
+            
+            if (!map[dateKey]) map[dateKey] = {};
+            
+            const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
+            const isSihwaIncoming = customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화');
+            
+            const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
+            if (!items) return;
+
+            items.forEach((item: LineItem) => {
+                const id = item.productId || item.item_id;
+                if (!id) return;
+                const qty = Number(item.quantity ?? item.qty ?? 0);
+                
+                // Income (+) vs Outcome (-)
+                const change = isSihwaIncoming ? qty : -qty;
+                
+                map[dateKey][id] = (map[dateKey][id] || 0) + change;
+            });
+        });
+        return map;
+    }, [orders]);
 
     const handleExportSihwaSummary = () => {
         const headers = ['품목', '두께', '사이즈', '재질', '현재재고(시화)', '입고예정(미결결과)', '발주서번호(들)', '발주날짜(들)', '입고예정일'];
@@ -701,7 +790,28 @@ export default function SihwaInventory() {
             <div className="bg-linear-to-r from-slate-800 to-indigo-900 rounded-2xl p-5 shadow-lg text-white flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-700/50">
                 <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-full border-4 border-teal-400 border-t-transparent animate-spin-slow flex items-center justify-center relative">
-                        <div className="absolute inset-0 flex items-center justify-center text-sm font-black text-teal-400">76%</div>
+                        {(() => {
+                            const hasCompData = analyzedInventory.filter(r => r.compSales > 0).length;
+                            const compDataScore = Math.min(20, Math.round((hasCompData / Math.max(analyzedInventory.length, 1)) * 20 * 5));
+                            const historyScore = historyData.inventoryHistory.length >= 30 ? 20
+                                             : historyData.inventoryHistory.length >= 7  ? 12
+                                             : historyData.inventoryHistory.length >= 1  ? 6 : 0;
+                            const freqScore = analyzedInventory.filter(r => r.salesFreq >= 20).length > 50 ? 20 : 10;
+                            const safeStockScore = (() => {
+                                const total = analyzedInventory.filter(r => r.safeStock > 0).length;
+                                const ok = analyzedInventory.filter(r => r.safeStock > 0 && r.effectiveStock >= r.safeStock).length;
+                                return total > 0 ? Math.round((ok / total) * 20) : 0;
+                            })();
+                            const assetScore = stats.totalAssetCost >= 250_000_000 && stats.totalAssetCost <= 300_000_000 ? 20
+                                           : stats.totalAssetCost >= 200_000_000 ? 12 : 5;
+                            const totalScore = compDataScore + historyScore + freqScore + safeStockScore + assetScore;
+
+                            return (
+                                <div className="absolute inset-0 flex items-center justify-center text-sm font-black text-teal-400">
+                                    {totalScore}%
+                                </div>
+                            );
+                        })()}
                     </div>
                     <div>
                         <h2 className="text-xl font-black text-white flex items-center gap-2">
@@ -775,6 +885,93 @@ export default function SihwaInventory() {
                     <p className="text-3xl font-black mb-1 z-10">{formatCur(totalsMap.totalCurrentStockCost)} <span className="text-[16px] font-bold opacity-80 tracking-normal">원</span></p>
                     <p className="text-sm font-medium opacity-80 z-10">현재 보유 중인 시화재고 전체의 실매입 추정 자산가치입니다 (Stubend 제외)</p>
                 </div>
+            </div>
+
+            {/* ★ 신규: 전략 인사이트 카드 행 */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            
+            {/* 자산 목표 달성률 */}
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                <h3 className="font-bold text-slate-600 text-sm flex items-center gap-2 mb-2">
+                <TrendingUp className="w-4 h-4 text-indigo-500" />
+                시화재고 자산 목표
+                </h3>
+                <p className="text-xl lg:text-2xl font-black text-slate-800 truncate">
+                {formatCur(stats.totalAssetCost)}
+                <span className="text-sm font-normal text-slate-400 ml-1">원</span>
+                </p>
+                {/* 진행바: 목표 2.5억 ~ 3억 */}
+                <div className="mt-2">
+                <div className="flex justify-between text-[10px] lg:text-xs text-slate-400 mb-1">
+                    <span>0</span><span>목표 2.5억</span><span>3억</span>
+                </div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden relative">
+                    <div className="h-full bg-slate-200 absolute" {...{ style: { left: '83.3%', width: '16.7%' } }} />
+                    <div
+                    className={`h-full rounded-full transition-all ${
+                        stats.totalAssetCost >= 250_000_000 && stats.totalAssetCost <= 300_000_000
+                        ? 'bg-emerald-500' : stats.totalAssetCost < 250_000_000
+                        ? 'bg-amber-400' : 'bg-rose-400'
+                    }`}
+                    {...{ style: { width: `${Math.min((stats.totalAssetCost / 300_000_000) * 100, 100)}%` } }}
+                    />
+                </div>
+                <p className={`text-[10px] lg:text-xs mt-1 font-bold truncate ${
+                    stats.totalAssetCost >= 250_000_000 && stats.totalAssetCost <= 300_000_000
+                    ? 'text-emerald-600' : 'text-amber-600'
+                }`}>
+                    {stats.totalAssetCost >= 250_000_000 && stats.totalAssetCost <= 300_000_000
+                    ? '✅ 목표 범위 내'
+                    : stats.totalAssetCost < 250_000_000
+                    ? `△ ${formatCur(250_000_000 - stats.totalAssetCost)}원 부족`
+                    : `▲ ${formatCur(stats.totalAssetCost - 300_000_000)}원 초과`}
+                </p>
+                </div>
+            </div>
+
+            {/* 경쟁사 대비 공략 필요 품목 */}
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                <h3 className="font-bold text-slate-600 text-sm mb-2">📊 경쟁사 우위 주력품목</h3>
+                <p className="text-2xl font-black text-rose-600">
+                {stats.A2items.length}
+                <span className="text-sm font-normal text-slate-400 ml-1">품목</span>
+                </p>
+                <p className="text-[10px] lg:text-xs text-slate-400 mt-1 break-keep">
+                시장합계 1만개 이상이지만 우리 점유율 35% 미만인 품목
+                </p>
+            </div>
+
+            {/* 볼륨 네고 대상 */}
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                <h3 className="font-bold text-slate-600 text-sm mb-2">💰 볼륨네고 묶음 대상</h3>
+                <p className="text-2xl font-black text-indigo-600">
+                {stats.needsVolumeNego.length}
+                <span className="text-sm font-normal text-slate-400 ml-1">품목</span>
+                </p>
+                <p className="text-[10px] lg:text-xs text-slate-400 mt-1 break-keep">
+                단품 부족분 × 매입단가 ≥ 2천만원 → 대경 볼륨 네고 가능
+                </p>
+            </div>
+
+            {/* 시장 점유율 현황 요약 */}
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                <h3 className="font-bold text-slate-600 text-sm mb-2">🎯 전략 등급 요약</h3>
+                <div className="flex flex-col gap-1 text-[10px] lg:text-xs">
+                <div className="flex justify-between">
+                    <span className="text-emerald-600 font-bold">수성(50%+)</span>
+                    <span className="font-black">{analyzedInventory.filter(r=>r.marketShare>=50&&r.marketTotal>0).length}건</span>
+                </div>
+                <div className="flex justify-between">
+                    <span className="text-amber-600 font-bold">경합(35~49%)</span>
+                    <span className="font-black">{analyzedInventory.filter(r=>r.marketShare>=35&&r.marketShare<50&&r.marketTotal>0).length}건</span>
+                </div>
+                <div className="flex justify-between">
+                    <span className="text-rose-500 font-bold">공략필요(&lt;35%)</span>
+                    <span className="font-black">{analyzedInventory.filter(r=>r.marketShare>0&&r.marketShare<35&&r.marketTotal>0).length}건</span>
+                </div>
+                </div>
+            </div>
+
             </div>
 
             {/* Smart Table Settings & Filters */}
@@ -857,6 +1054,8 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('pendingOrderQty')}>대기수량 (Pending) {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right">매입단가</th>
                                                             <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
+                                                            <th className="px-5 py-3 text-right">경쟁사 연판매</th>
+                                                            <th className="px-5 py-3 text-right border-r border-slate-200">우리 점유율</th>
                                                             <th className="px-5 py-3">🚨 분석 근거 (명확성)</th>
                                                         </tr>
                                                     </thead>
@@ -882,6 +1081,24 @@ export default function SihwaInventory() {
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
                                                                 <td className="px-5 py-4 text-right font-black text-rose-600 bg-rose-50/10">{formatCur(row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1))}</td>
+                                                                <td className="px-5 py-4 text-right font-mono text-slate-400 text-xs">
+                                                                    {row.compSales > 0 ? (
+                                                                        <span>{row.compSales.toLocaleString()}</span>
+                                                                    ) : <span className="text-slate-200">—</span>}
+                                                                </td>
+                                                                <td className="px-5 py-4 text-right border-r border-slate-100/50">
+                                                                    {row.marketTotal > 0 ? (
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className={`font-bold text-sm ${shareColorClass(row.marketShare)}`}>{row.marketShare}%</span>
+                                                                            <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                                                <div
+                                                                                    className={`h-full rounded-full ${shareBarClass(row.marketShare)}`}
+                                                                                    {...{ style: { width: `${Math.min(row.marketShare, 100)}%` } }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : <span className="text-slate-200 text-xs text-right">데이터없음</span>}
+                                                                </td>
                                                                 <td className="px-5 py-4">
                                                                     <div className="flex flex-col gap-0.5">
                                                                         <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
@@ -904,7 +1121,19 @@ export default function SihwaInventory() {
                                                                     <ChevronRight className="w-4 h-4" />
                                                                 </button>
                                                             </td>
-                                                            <td colSpan={4} className="px-5 py-4 text-right font-bold text-slate-700">
+                                                            <td colSpan={6} className="px-5 py-4 text-right font-bold text-slate-700 relative">
+                                                                {(() => {
+                                                                    const selectedItems = stats.critical.filter(item => selectedCriticalIds.has(item.product.id));
+                                                                    const negoEligibleCount = selectedItems.filter(item => (item.recentPurchasePrice * (item.deficit>0?item.deficit:1)) >= 20_000_000).length;
+                                                                    if (negoEligibleCount > 0) {
+                                                                        return (
+                                                                            <div className="absolute top-3 left-0 bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-md shadow-lg flex items-center gap-1.5 animate-bounce z-10 whitespace-nowrap">
+                                                                                🎉 단품 2천만원 이상 {negoEligibleCount}종! (대경 볼륨 네고)
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                    return null;
+                                                                })()}
                                                                 선택항목 <span className="text-rose-600 underline decoration-2">{selectedCriticalIds.size}</span>건 예상 합계:
                                                             </td>
                                                             <td className="px-5 py-4 text-right font-black text-rose-700 text-lg">
@@ -956,6 +1185,8 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right">매입단가</th>
                                                             <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
+                                                            <th className="px-5 py-3 text-right">경쟁사 연판매</th>
+                                                            <th className="px-5 py-3 text-right border-r border-slate-200">우리 점유율</th>
                                                             <th className="px-5 py-3">💡 분석 근거</th>
                                                         </tr>
                                                     </thead>
@@ -988,6 +1219,24 @@ export default function SihwaInventory() {
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
                                                                 <td className="px-5 py-4 text-right font-black text-amber-700 bg-amber-50/30">{formatCur(row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1))}</td>
+                                                                <td className="px-5 py-4 text-right font-mono text-slate-400 text-xs">
+                                                                    {row.compSales > 0 ? (
+                                                                        <span>{row.compSales.toLocaleString()}</span>
+                                                                    ) : <span className="text-slate-200">—</span>}
+                                                                </td>
+                                                                <td className="px-5 py-4 text-right border-r border-slate-100/50">
+                                                                    {row.marketTotal > 0 ? (
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className={`font-bold text-sm ${shareColorClass(row.marketShare)}`}>{row.marketShare}%</span>
+                                                                            <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                                                <div
+                                                                                    className={`h-full rounded-full ${shareBarClass(row.marketShare)}`}
+                                                                                    {...{ style: { width: `${Math.min(row.marketShare, 100)}%` } }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : <span className="text-slate-200 text-xs text-right">데이터없음</span>}
+                                                                </td>
                                                                 <td className="px-5 py-4">
                                                                     <div className="flex flex-col gap-0.5">
                                                                         <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
@@ -1010,7 +1259,19 @@ export default function SihwaInventory() {
                                                                     <ChevronRight className="w-4 h-4" />
                                                                 </button>
                                                             </td>
-                                                            <td colSpan={4} className="px-5 py-4 text-right font-bold text-slate-700">
+                                                            <td colSpan={6} className="px-5 py-4 text-right font-bold text-slate-700 relative">
+                                                                {(() => {
+                                                                    const selectedItems = stats.warning.filter(item => selectedWarningIds.has(item.product.id));
+                                                                    const negoEligibleCount = selectedItems.filter(item => (item.recentPurchasePrice * (item.deficit>0?item.deficit:1)) >= 20_000_000).length;
+                                                                    if (negoEligibleCount > 0) {
+                                                                        return (
+                                                                            <div className="absolute top-3 left-0 bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-md shadow-lg flex items-center gap-1.5 animate-bounce z-10 whitespace-nowrap">
+                                                                                🎉 단품 2천만원 이상 {negoEligibleCount}종! (대경 볼륨 네고)
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                    return null;
+                                                                })()}
                                                                 선택항목 <span className="text-amber-600 underline decoration-2">{selectedWarningIds.size}</span>건 예상 합계:
                                                             </td>
                                                             <td className="px-5 py-4 text-right font-black text-amber-700 text-lg">
@@ -1192,16 +1453,21 @@ export default function SihwaInventory() {
                                                             
                                                             if (snap.diff) {
                                                                 snap.diff.forEach((d: InventoryDiffItem) => {
+                                                                    const orderImpact = dailyOrderDiffMap[snap.date]?.[d.id] || 0;
+                                                                    const pureManualChange = d.change - orderImpact;
+
+                                                                    if (pureManualChange === 0) return; // Skip if accounted for by orders
+
                                                                     const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
                                                                     
                                                                     // Use cumulative sales if available, otherwise fallback to pure negative net change
-                                                                    const effectiveSales = d.sales !== undefined ? d.sales : (d.change < 0 ? Math.abs(d.change) : 0);
+                                                                    const effectiveSales = d.sales !== undefined ? d.sales : (pureManualChange < 0 ? Math.abs(pureManualChange) : 0);
                                                                     if (effectiveSales > 0) {
                                                                         dailyRevenue += effectiveSales * (analysis ? analysis.sellingPrice : 0);
                                                                     }
                                                                     
                                                                     // Compute true net restocking (overcoming sales deficits)
-                                                                    const effectiveRestock = d.change + effectiveSales;
+                                                                    const effectiveRestock = pureManualChange + effectiveSales;
                                                                     if (effectiveRestock > 0) {
                                                                         dailyCost += effectiveRestock * (analysis ? analysis.recentPurchasePrice : 0);
                                                                     }
@@ -1210,13 +1476,15 @@ export default function SihwaInventory() {
 
                                                             const isGroupExpanded = expandedDailyGroups[snap.date] ?? (idx === 0);
 
-                                                            return (
-                                                                <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
-                                                                    <div className="flex flex-col gap-2 mb-3">
-                                                                        <div className="flex items-center justify-between">
-                                                                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono font-bold hover:bg-slate-300 cursor-pointer transition-colors" onClick={() => toggleDailyGroup(snap.date)}>{snap.date}</span>
-                                                                            <span className="text-slate-500 font-medium text-xs">변동 {snap.diff?.length || 0}건</span>
-                                                                        </div>
+                                                                            const validDiffs = snap.diff?.filter(d => (d.change - (dailyOrderDiffMap[snap.date]?.[d.id] || 0)) !== 0) || [];
+
+                                                                            return (
+                                                                                <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
+                                                                                    <div className="flex flex-col gap-2 mb-3">
+                                                                                        <div className="flex items-center justify-between">
+                                                                                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono font-bold hover:bg-slate-300 cursor-pointer transition-colors" onClick={() => toggleDailyGroup(snap.date)}>{snap.date}</span>
+                                                                                            <span className="text-slate-500 font-medium text-xs">수기 변동 {validDiffs.length}건</span>
+                                                                                        </div>
                                                                         
                                                                         {(dailyRevenue > 0 || dailyCost > 0) && (
                                                                             <div 
@@ -1224,12 +1492,12 @@ export default function SihwaInventory() {
                                                                                 onClick={() => toggleDailyGroup(snap.date)}
                                                                             >
                                                                                 <div className="flex flex-col flex-1 pl-2 border-l-4 border-indigo-400">
-                                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-tight">총 일일매출(출고)</span>
+                                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-tight">수기 출고/오차액</span>
                                                                                     <span className="text-sm font-black text-indigo-700">₩{formatCur(dailyRevenue)}</span>
                                                                                 </div>
                                                                                 <div className="w-px h-8 bg-slate-200"></div>
                                                                                 <div className="flex flex-col flex-1 pl-2 border-l-4 border-emerald-400">
-                                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-tight">총 매입가치(입고)</span>
+                                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-tight">수기 입고/자산증가</span>
                                                                                     <span className="text-sm font-black text-emerald-700">₩{formatCur(dailyCost)}</span>
                                                                                 </div>
                                                                                 <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isGroupExpanded ? 'rotate-180' : ''}`} />
@@ -1237,33 +1505,36 @@ export default function SihwaInventory() {
                                                                         )}
                                                                     </div>
                                                                     {isGroupExpanded && (
-                                                                        snap.diff && snap.diff.length > 0 ? (
+                                                                        validDiffs.length > 0 ? (
                                                                             <div className="grid grid-cols-1 gap-2 mt-2">
-                                                                                {[...snap.diff].sort((a, b) => {
+                                                                                {[...validDiffs].sort((a, b) => {
                                                                                     const aiA = a.id ? analyzedInventory.find(ai => ai.product.id === a.id) : null;
                                                                                     const aiB = b.id ? analyzedInventory.find(ai => ai.product.id === b.id) : null;
                                                                                     return (aiB ? aiB.deficit : 0) - (aiA ? aiA.deficit : 0);
                                                                                 }).map((d, dIdx) => {
                                                                                     const rowKey = `${snap.date}-${d.id || d.name}-${dIdx}`;
+                                                                                    const orderImpact = dailyOrderDiffMap[snap.date]?.[d.id] || 0;
+                                                                                    const pureManualChange = d.change - orderImpact;
+
                                                                                     const isExpanded = !!expandedTrendItems[rowKey];
                                                                                     const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
                                                                                     const sellingPrice = analysis ? analysis.sellingPrice : 0;
                                                                                     const purchasePrice = analysis ? analysis.recentPurchasePrice : 0;
                                                                                     
-                                                                                    const effectiveSales = d.sales !== undefined ? d.sales : (d.change < 0 ? Math.abs(d.change) : 0);
-                                                                                    const effectiveRestock = d.change + effectiveSales;
+                                                                                    const effectiveSales = d.sales !== undefined ? d.sales : (pureManualChange < 0 ? Math.abs(pureManualChange) : 0);
+                                                                                    const effectiveRestock = pureManualChange + effectiveSales;
                                                                                     
                                                                                     const valueChips = [];
                                                                                     if (effectiveSales > 0) {
                                                                                         valueChips.push({
-                                                                                            label: `출고/판매 ${effectiveSales}개`,
+                                                                                            label: `수기출고/로스 ${effectiveSales}개`,
                                                                                             amt: `매출 ${formatCur(effectiveSales * sellingPrice)}원`,
                                                                                             style: 'text-indigo-600 bg-indigo-50 border border-indigo-200'
                                                                                         });
                                                                                     }
                                                                                     if (effectiveRestock > 0) {
                                                                                         valueChips.push({
-                                                                                            label: `입고 ${effectiveRestock}개`,
+                                                                                            label: `수기입고 ${effectiveRestock}개`,
                                                                                             amt: `가치 ${formatCur(effectiveRestock * purchasePrice)}원`,
                                                                                             style: 'text-emerald-700 bg-emerald-50 border border-emerald-200'
                                                                                         });
@@ -1272,7 +1543,7 @@ export default function SihwaInventory() {
                                                                                     const finalId = d.id || d.name || '알수없음';
 
                                                                                     return (
-                                                                                        <div key={dIdx} className={`flex flex-col text-xs bg-white rounded border border-slate-100 border-l-4 ${d.change > 0 ? 'border-l-emerald-500' : 'border-l-indigo-500'}`}>
+                                                                                        <div key={dIdx} className={`flex flex-col text-xs bg-white rounded border border-slate-100 border-l-4 ${pureManualChange > 0 ? 'border-l-emerald-500' : 'border-l-rose-500'}`}>
                                                                                             <div 
                                                                                                 className="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-50 transition-colors"
                                                                                                 onClick={() => toggleTrendItem(rowKey)}
@@ -1297,7 +1568,7 @@ export default function SihwaInventory() {
                                                                                                                     )}
                                                                                                                 </div>
                                                                                                             ))}
-                                                                                                            {valueChips.length === 0 && d.change === 0 && (
+                                                                                                            {valueChips.length === 0 && pureManualChange === 0 && (
                                                                                                                 <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">임시 변동 (0)</span>
                                                                                                             )}
                                                                                                         </div>
@@ -1331,7 +1602,7 @@ export default function SihwaInventory() {
                                                                                     );
                                                                                 })}
                                                                             </div>
-                                                                        ) : <p className="text-xs text-slate-400 mt-2 px-1">상세 변동 내역이 없습니다.</p>
+                                                                        ) : <p className="text-xs text-slate-400 mt-2 px-1">주문 외 순수 수기 변동 내역이 없습니다.</p>
                                                                     )}
                                                                 </div>
                                                             );
@@ -1398,7 +1669,10 @@ export default function SihwaInventory() {
                                     <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none">
                                         <tr>
                                             <th className="px-4 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 ID {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-amber-700" onClick={() => handleSort('salesVolume')}>1년 누적 출고 {sortConfig.key==='salesVolume' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                            <th className="px-4 py-3 text-center">전략등급</th>
+                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-amber-700" onClick={() => handleSort('salesVolume')}>우리 누적출고 {sortConfig.key==='salesVolume' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                            <th className="px-4 py-3 text-right text-slate-500">경쟁사 출고</th>
+                                            <th className="px-4 py-3 text-right border-r border-slate-200">시장 점유율</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-indigo-700" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-600" onClick={() => handleSort('pendingOrderQty')}>입고 대기(+Pending) {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-500 font-black" onClick={() => handleSort('deficit')}>보충 필요분(Deficit) {sortConfig.key==='deficit' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
@@ -1409,8 +1683,8 @@ export default function SihwaInventory() {
                                     <tbody className="divide-y divide-slate-100">
                                         {/* Show Summary row first */}
                                         <tr className="bg-indigo-50/50 font-bold border-b-2 border-indigo-200">
-                                            <td className="px-4 py-3 text-slate-700">총 자산 합계(STUBEND제외)</td>
-                                            <td className="px-4 py-3 text-right"></td>
+                                            <td colSpan={2} className="px-4 py-3 text-slate-700">총 자산 합계(STUBEND제외)</td>
+                                            <td colSpan={3} className="px-4 py-3 text-right"></td>
                                             <td className="px-4 py-3 text-right text-indigo-700">{formatCur(totalsMap.totalCurrentStockCost)} 원</td>
                                             <td className="px-4 py-3 text-right text-rose-600">추가예정 (+{formatCur(totalsMap.totalPendingPurchaseValue)}원)</td>
                                             <td colSpan={3}></td>
@@ -1418,10 +1692,21 @@ export default function SihwaInventory() {
                                         {analyzedInventory.slice(0, 500).map(row => (
                                             <tr key={row.product.id} className="hover:bg-slate-50 group">
                                                 <td className="px-4 py-2 font-mono font-bold text-slate-700">{row.product.id}</td>
+                                                <td className="px-4 py-2 text-center">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-black ${gradeColorClass(row.strategicGrade)}`} title={gradeLabel(row.strategicGrade)}>{row.strategicGrade}</span>
+                                                </td>
                                                 <td className="px-4 py-2 text-right text-slate-600">
                                                     {row.salesVolume > 0 ? (
                                                         <span><span className="font-bold text-slate-800">{row.salesVolume}</span> <span className="text-[10px] text-slate-500">({row.salesFreq}회)</span></span>
                                                     ) : '-'}
+                                                </td>
+                                                <td className="px-4 py-2 text-right text-slate-400 font-mono text-xs">
+                                                    {row.compSales > 0 ? row.compSales.toLocaleString() : '—'}
+                                                </td>
+                                                <td className="px-4 py-2 text-right border-r border-slate-100/50">
+                                                    {row.marketTotal > 0 ? (
+                                                        <span className={`font-bold text-sm ${shareColorClass(row.marketShare)}`}>{row.marketShare}%</span>
+                                                    ) : <span className="text-slate-200 text-xs">분석불가</span>}
                                                 </td>
                                                 <td className="px-4 py-2 text-right font-black font-mono text-indigo-600 bg-indigo-50/20">
                                                     {row.shQty}
