@@ -14,7 +14,8 @@ import {
     ChevronRight,
     Activity,
     Info,
-    Download
+    Download,
+    ShoppingCart
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
