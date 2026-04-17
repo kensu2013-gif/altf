@@ -983,14 +983,14 @@ export default function SihwaInventory() {
             </div>
 
             {/* Smart Tableau Dashboard */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 xl:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 xl:gap-5">
                 <div className="bg-linear-to-br from-rose-500 to-red-600 rounded-2xl p-5 shadow-lg shadow-rose-200 text-white flex flex-col relative overflow-hidden group">
                     <div className="absolute top-0 right-0 -mr-6 -mt-6 p-4 opacity-20 transform group-hover:scale-110 transition-transform duration-500">
                         <AlertTriangle className="w-32 h-32" />
                     </div>
                     <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><AlertTriangle className="w-5 h-5"/>매입처 동반 결품 (선발주 요망)</h3>
                     <p className="text-4xl font-black mb-1 z-10">{stats.critical.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
-                    <p className="text-sm font-medium opacity-80 z-10 break-keep">현재고 및 대경 재고가 바닥났으며, 연 판매량(100↑)이 많아 선발주 관리가 필요한 품목입니다.</p>
+                    <p className="text-sm font-medium opacity-80 z-10 break-keep mt-auto">현재고 및 대경 재고가 바닥났으며, 연 판매량(100↑)이 많아 선발주 관리가 필요한 품목입니다.</p>
                 </div>
                 
                 <div className="bg-linear-to-br from-amber-400 to-orange-500 rounded-2xl p-5 shadow-lg shadow-amber-200 text-white flex flex-col relative overflow-hidden group">
@@ -999,7 +999,7 @@ export default function SihwaInventory() {
                     </div>
                     <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><Factory className="w-5 h-5"/>일반 발주 필요 (적정재고 미달)</h3>
                     <p className="text-4xl font-black mb-1 z-10">{stats.warning.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
-                    <p className="text-sm font-medium opacity-80 z-10">대경 재고를 통해 조달하거나 목표수량에 미달되어 일반발주(최소 100개)가 필요한 품목입니다.</p>
+                    <p className="text-sm font-medium opacity-80 z-10 mt-auto">대경 재고를 통해 조달하거나 목표수량에 미달되어 일반발주(최소 100개)가 필요한 품목입니다.</p>
                 </div>
 
                 <div className="bg-linear-to-br from-slate-700 to-slate-900 rounded-2xl p-5 shadow-lg shadow-slate-300 text-white flex flex-col relative overflow-hidden group">
@@ -1008,58 +1008,53 @@ export default function SihwaInventory() {
                     </div>
                     <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><TrendingUp className="w-5 h-5"/>매입 실적가 기준 기초 자산</h3>
                     <p className="text-3xl font-black mb-1 z-10">{formatCur(totalsMap.totalCurrentStockCost)} <span className="text-[16px] font-bold opacity-80 tracking-normal">원</span></p>
-                    <p className="text-sm font-medium opacity-80 z-10">현재 보유 중인 시화재고 전체의 실매입 추정 자산가치입니다 (Stubend 제외)</p>
-                </div>
-            </div>
-
-            {/* ★ 신규: 전략 인사이트 카드 행 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-
-            {/* 회전율 분포 요약 */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                <h3 className="font-bold text-slate-600 text-sm mb-3 flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-purple-500" />
-                    재고 회전율 분포
-                </h3>
-                <div className="space-y-1.5">
-                    {(['S','A','B','C','D'] as const).map(grade => {
-                    const count = analyzedInventory.filter(r =>
-                        r.turnoverGrade === grade && r.shQty > 0
-                    ).length;
-                    const total = analyzedInventory.filter(r => r.shQty > 0).length;
-                    const pct = total > 0 ? Math.round(count / total * 100) : 0;
-                    const labels: Record<string, string> = {
-                        S: 'S급 초고속 (12회+)',
-                        A: 'A급 고속 (6~12회)',
-                        B: 'B급 보통 (3~6회)',
-                        C: 'C급 저속 (1~3회)',
-                        D: 'D급 과잉위험 (1회미만)',
-                    };
-                    const colors: Record<string, string> = {
-                        S: '#7F77DD', A: '#639922', B: '#BA7517', C: '#378ADD', D: '#E24B4A'
-                    };
-                    return (
-                        <div key={grade} className="flex items-center gap-2">
-                        <span className="text-xs font-bold w-28 text-slate-600 shrink-0">
-                            {labels[grade]}
-                        </span>
-                        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                            className="h-full rounded-full transition-all"
-                            {...{ style: { width: `${pct}%`, background: colors[grade] } }}
-                            />
-                        </div>
-                        <span className="text-xs font-mono text-slate-500 w-10 text-right shrink-0">
-                            {count}개
-                        </span>
-                        </div>
-                    );
-                    })}
+                    <p className="text-sm font-medium opacity-80 z-10 mt-auto">현재 보유 중인 시화재고 전체의 실매입 추정 자산가치입니다 (Stubend 제외)</p>
                 </div>
 
-
-            </div>
-
+                {/* 회전율 분포 요약 */}
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-2 z-10 opacity-90">
+                        <Activity className="w-5 h-5 text-purple-500" />
+                        재고 회전율 분포
+                    </h3>
+                    <p className="text-4xl font-black text-slate-800 mb-2 invisible h-0">0</p>
+                    
+                    <div className="space-y-2 mt-auto">
+                        {(['S','A','B','C','D'] as const).map(grade => {
+                        const count = analyzedInventory.filter(r =>
+                            r.turnoverGrade === grade && r.shQty > 0
+                        ).length;
+                        const total = analyzedInventory.filter(r => r.shQty > 0).length;
+                        const pct = total > 0 ? Math.round(count / total * 100) : 0;
+                        const labels: Record<string, string> = {
+                            S: 'S급 초고속',
+                            A: 'A급 고속',
+                            B: 'B급 보통',
+                            C: 'C급 저속',
+                            D: 'D급 과잉위험',
+                        };
+                        const colors: Record<string, string> = {
+                            S: '#7F77DD', A: '#639922', B: '#BA7517', C: '#378ADD', D: '#E24B4A'
+                        };
+                        return (
+                            <div key={grade} className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold w-16 text-slate-600 shrink-0">
+                                {labels[grade]}
+                            </span>
+                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                className="h-full rounded-full transition-all"
+                                {...{ style: { width: `${pct}%`, background: colors[grade] } }}
+                                />
+                            </div>
+                            <span className="text-[11px] font-bold text-slate-500 w-8 text-right shrink-0">
+                                {count}개
+                            </span>
+                            </div>
+                        );
+                        })}
+                    </div>
+                </div>
             </div>
 
             {/* Smart Table Settings & Filters */}

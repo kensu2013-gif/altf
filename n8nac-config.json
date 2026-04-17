@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "activeInstanceId": "legacy-default-project",
+  "instances": [
+    {
+      "id": "legacy-default-project",
+      "name": "Default instance",
+      "host": "https://kensu2000.app.n8n.cloud",
+      "syncFolder": "workflows",
+      "projectId": "vQm3qZzFnXO1I2JI",
+      "projectName": "Personal",
+      "instanceIdentifier": "kensu2000_cloud_hyunjin_c",
+      "workflowDir": "workflows/kensu2000_cloud_hyunjin_c/personal",
+      "verification": {
+        "status": "verified",
+        "normalizedHost": "https://kensu2000.app.n8n.cloud",
+        "userId": "3bbc4379-64dd-4154-87dd-46a3888fc1ae",
+        "userName": "Hyunjin cho",
+        "userEmail": "kensu2013@gmail.com",
+        "lastCheckedAt": "2026-04-16T02:55:54.090Z"
+      }
+    }
+  ],
+  "host": "https://kensu2000.app.n8n.cloud",
+  "syncFolder": "workflows",
+  "projectId": "vQm3qZzFnXO1I2JI",
+  "projectName": "Personal",
+  "instanceIdentifier": "kensu2000_cloud_hyunjin_c",
+  "workflowDir": "workflows/kensu2000_cloud_hyunjin_c/personal"
+}

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Users, MapPin, Building2, TrendingUp, Search, Contact, Activity, AlertTriangle, Trash2, Edit2, Plus, BarChart2, AlertCircle } from 'lucide-react';
+import { Users, MapPin, Building2, TrendingUp, Search, Contact, Activity, AlertTriangle, Trash2, Edit2, Plus, BarChart2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useInventory } from '../../hooks/useInventory';
 import type { Product } from '../../types';
@@ -44,6 +44,7 @@ export default function Customers() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
     const [activeTab, setActiveTab] = useState<'MASTER' | 'ANALYTICS' | 'BI_ANALYTICS'>('MASTER');
+    const [analyticsSortBy, setAnalyticsSortBy] = useState<'qty' | 'amount' | 'margin'>('qty');
     
     // Inventory mapped for cost inference
     const { inventory } = useInventory();
@@ -258,11 +259,15 @@ export default function Customers() {
 
     // Analytics Engine
     const analytics = useMemo(() => {
-        const regionMap: Record<string, { totalAmount: number; totalQty: number; items: Record<string, {qty: number; amount: number}>; missingCustomers: Map<string, string> }> = {};
+        const regionMap: Record<string, { totalAmount: number; totalCost: number; totalQty: number; items: Record<string, {qty: number; amount: number; cost: number}>; missingCustomers: Map<string, string> }> = {};
         
         orders.forEach(o => {
-            if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN') return;
-            if ((o.customerName || '').includes('서울재고')) return;
+            const oExt = o as typeof o & { isDeleted?: boolean; poEndCustomer?: string; payload?: { customer?: { company_name?: string } } };
+            if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN' || oExt.isDeleted) return;
+
+            // Exclude ALL internal stock orders (e.g. 서울재고)
+            const fullCustomerName = (oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || '').toLowerCase();
+            if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
             
             const cleanOrderName = stripCorp(o.customerName);
             const customer = customersList.find(c => {
@@ -273,7 +278,7 @@ export default function Customers() {
             const region = customer?.region || 'CRM 미등록/예외';
             
             if (!regionMap[region]) {
-                regionMap[region] = { totalAmount: 0, totalQty: 0, items: {}, missingCustomers: new Map() };
+                regionMap[region] = { totalAmount: 0, totalCost: 0, totalQty: 0, items: {}, missingCustomers: new Map() };
             }
             if (!customer && cleanOrderName) {
                 const existing = regionMap[region].missingCustomers.get(cleanOrderName);
@@ -282,39 +287,79 @@ export default function Customers() {
                 }
             }
 
-            regionMap[region].totalAmount += o.totalAmount;
-            
             o.items?.forEach(item => {
-                const itemKey = `${item.name}-${item.thickness}-${item.size}`;
+                const itemExt = item as typeof item & { item_id?: string, supplierPriceOverride?: number, isDeleted?: boolean, material?: string };
+                if (itemExt.isDeleted) return; 
+
                 const quantity = item.quantity || 0;
+                if (quantity <= 0) return;
                 const unitPrice = item.unitPrice || 0;
 
+                const id = itemExt.productId || itemExt.item_id || '';
+                const product = inventoryMap.get(id);
+
+                const materialInfo = product?.material || itemExt.material || '';
+                const matString = materialInfo ? `[${materialInfo}] ` : '';
+                const itemKey = `${matString}${item.name}-${item.thickness}-${item.size}`;
+                
+                const basePrice = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
+                
+                let costPrice = unitPrice; 
+                if (itemExt.supplierPriceOverride && itemExt.supplierPriceOverride > 0) {
+                    costPrice = itemExt.supplierPriceOverride;
+                } else if (item.supplierRate !== undefined && item.supplierRate > 0) {
+                    costPrice = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
+                } else if (product) {
+                    const rate = product.rate_act2 || product.rate_act || 0;
+                    if (rate > 0) {
+                        costPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+                    }
+                }
+
+                const itemAmount = quantity * unitPrice;
+                const itemCost = quantity * costPrice;
+
                 regionMap[region].totalQty += quantity;
+                regionMap[region].totalAmount += itemAmount;
+                regionMap[region].totalCost += itemCost;
                 
                 if (!regionMap[region].items[itemKey]) {
-                    regionMap[region].items[itemKey] = {qty: 0, amount: 0};
+                    regionMap[region].items[itemKey] = {qty: 0, amount: 0, cost: 0};
                 }
                 regionMap[region].items[itemKey].qty += quantity;
-                regionMap[region].items[itemKey].amount += (quantity * unitPrice);
+                regionMap[region].items[itemKey].amount += itemAmount;
+                regionMap[region].items[itemKey].cost += itemCost;
             });
         });
 
         // Convert to sorted array
-        const results = Object.keys(regionMap).map(k => {
-            const allItems = Object.entries(regionMap[k].items)
-                .sort((a,b) => b[1].qty - a[1].qty);
+        const results = Object.keys(regionMap)
+            .filter(k => k !== 'CRM 미등록/예외')
+            .map(k => {
+                let allItems = Object.entries(regionMap[k].items);
+                if (analyticsSortBy === 'amount') {
+                    allItems = allItems.sort((a,b) => b[1].amount - a[1].amount);
+                } else if (analyticsSortBy === 'margin') {
+                    allItems = allItems.sort((a,b) => (b[1].amount - b[1].cost) - (a[1].amount - a[1].cost));
+                } else {
+                    allItems = allItems.sort((a,b) => b[1].qty - a[1].qty);
+                }
                 
-            return {
-                region: k,
-                ...regionMap[k],
-                topItems: allItems.slice(0, 10), // For dashboard compact view
-                allItems, // Store all for modal
-                missingArray: Array.from(regionMap[k].missingCustomers.values())
-            };
-        }).sort((a,b) => b.totalQty - a.totalQty);
+                return {
+                    region: k,
+                    ...regionMap[k],
+                    topItems: allItems.slice(0, 10), // For dashboard compact view
+                    allItems, // Store all for modal
+                    missingArray: Array.from(regionMap[k].missingCustomers.values())
+                };
+            }).sort((a,b) => {
+                if (analyticsSortBy === 'amount') return b.totalAmount - a.totalAmount;
+                if (analyticsSortBy === 'margin') return (b.totalAmount - b.totalCost) - (a.totalAmount - a.totalCost);
+                return b.totalQty - a.totalQty;
+            });
 
         return results;
-    }, [orders, customersList]);
+    }, [orders, customersList, inventoryMap, analyticsSortBy]);
 
     // Strategic BI Analytics Engine
     const biAnalytics = useMemo(() => {
@@ -646,22 +691,38 @@ export default function Customers() {
 
             {activeTab === 'ANALYTICS' && (
                 <div className="space-y-6">
-                    <div>
-                        <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-                            <BarChart2 className="w-7 h-7 text-indigo-600" />
-                            판매 배관 지역 점유율 (CRM Cross Analytics)
-                        </h1>
-                        <p className="text-slate-500 text-[15px] mt-1 tracking-tight">
-                            접수된 주문건의 상호명을 CRM 고객 명부와 크로스체크하여 "어느 지역으로 어떤 자재가 집중되고 있는지"를 분석합니다.
-                        </p>
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                        <div>
+                            <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
+                                <BarChart2 className="w-7 h-7 text-indigo-600" />
+                                판매 배관 지역 점유율 (CRM Cross Analytics)
+                            </h1>
+                            <p className="text-slate-500 text-[15px] mt-1 tracking-tight">
+                                접수된 주문건의 상호명을 CRM 고객 명부와 크로스체크하여 "어느 지역으로 어떤 자재가 집중되고 있는지"를 분석합니다.
+                            </p>
+                        </div>
+                        <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-inner">
+                            <button 
+                                onClick={() => setAnalyticsSortBy('qty')}
+                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${analyticsSortBy === 'qty' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >수량 많은순</button>
+                            <button 
+                                onClick={() => setAnalyticsSortBy('amount')}
+                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${analyticsSortBy === 'amount' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >매출액 많은순</button>
+                            <button 
+                                onClick={() => setAnalyticsSortBy('margin')}
+                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${analyticsSortBy === 'margin' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >순이익 높은순</button>
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                         {analytics.map((reg) => (
-                            <div key={reg.region} className={`rounded-xl border flex flex-col h-full ${reg.region === 'CRM 미등록/예외' ? 'bg-amber-50/50 border-amber-200 shadow-sm' : 'bg-white border-slate-200 shadow-sm'} overflow-hidden`}>
-                                <div className={`px-4 py-3 flex items-center justify-between border-b ${reg.region === 'CRM 미등록/예외' ? 'border-amber-100 bg-amber-50' : 'border-slate-100 bg-slate-50/80'}`}>
+                            <div key={reg.region} className={`rounded-xl border flex flex-col h-full bg-white border-slate-200 shadow-sm overflow-hidden`}>
+                                <div className={`px-4 py-3 flex items-center justify-between border-b border-slate-100 bg-slate-50/80`}>
                                     <h3 className="font-bold flex items-center gap-1.5 text-base truncate">
-                                        {reg.region === 'CRM 미등록/예외' ? <AlertCircle className="w-4 h-4 text-amber-500"/> : <MapPin className="w-4 h-4 text-indigo-500"/>}
+                                        <MapPin className="w-4 h-4 text-indigo-500"/>
                                         {reg.region} 
                                     </h3>
                                     <span className="text-[10px] font-bold text-slate-500 bg-white border px-1.5 py-0.5 rounded shadow-sm shrink-0">배관 총 {reg.totalQty.toLocaleString()}개 유통</span>
@@ -675,7 +736,9 @@ export default function Customers() {
                                     <div className="flex-1">
                                         <h4 className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider flex justify-between items-center">
                                             Top 베스트셀러 배관
-                                            <span className="text-slate-300 font-normal">기준: 판매량</span>
+                                            <span className="text-slate-400 font-normal">
+                                                {analyticsSortBy === 'qty' ? '기준: 판매량' : analyticsSortBy === 'amount' ? '기준: 누적 매출' : '기준: 순이익'}
+                                            </span>
                                         </h4>
                                         <ul className="space-y-1.5">
                                             {reg.topItems.map(([itemKey, stats], i) => (
@@ -690,6 +753,9 @@ export default function Customers() {
                                                     <div className="flex items-center justify-end gap-2 text-[9px] text-slate-400">
                                                         <span>평균단가: {stats.qty > 0 ? Math.round(stats.amount/stats.qty).toLocaleString() : 0}원</span>
                                                         <span className="text-slate-500 font-bold">매출: {stats.amount.toLocaleString()}원</span>
+                                                        {analyticsSortBy === 'margin' && (
+                                                            <span className="text-emerald-600 font-bold">수익: {(stats.amount - stats.cost).toLocaleString()}원</span>
+                                                        )}
                                                     </div>
                                                 </li>
                                             ))}
@@ -697,27 +763,7 @@ export default function Customers() {
                                         </ul>
                                     </div>
 
-                                    {reg.region === 'CRM 미등록/예외' && reg.missingArray.length > 0 && (
-                                        <div className="bg-amber-100/50 rounded flex-col p-2.5 border border-amber-200 mt-2">
-                                            <h4 className="text-[10px] font-bold text-amber-700 mb-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3"/> CRM 등재 요망 상호명</h4>
-                                            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto custom-scrollbar pr-1">
-                                                {reg.missingArray.map(m => (
-                                                    <button 
-                                                        key={m} 
-                                                        onClick={() => {
-                                                            setEditingCustomer({ companyName: m, region: '경기도' });
-                                                            setActiveTab('MASTER');
-                                                            setIsModalOpen(true);
-                                                        }}
-                                                        className="text-[9px] font-bold bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded hover:bg-amber-500 hover:text-white transition-colors text-left truncate max-w-[120px]"
-                                                        title={`${m} - 클릭하여 즉시 CRM 추가하기`}
-                                                    >
-                                                        {m} +
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
+
 
                                     {reg.allItems.length > 10 && (
                                         <button 
