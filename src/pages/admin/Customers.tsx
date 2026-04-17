@@ -312,13 +312,13 @@ export default function Customers() {
                 
                 const basePrice = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
                 
-                let costPrice = unitPrice; 
+                let costPrice = Math.round((unitPrice * 0.9) / 10) * 10; // Default: assume at least 10% margin if unknown
                 if (itemExt.supplierPriceOverride && itemExt.supplierPriceOverride > 0) {
                     costPrice = itemExt.supplierPriceOverride;
                 } else if (item.supplierRate !== undefined && item.supplierRate > 0) {
                     costPrice = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
                 } else if (product) {
-                    const rate = product.rate_act2 || product.rate_act || 0;
+                    const rate = product.rate_act2 || product.rate_act || product.rate_pct || 0;
                     if (rate > 0) {
                         costPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
                     }
@@ -361,6 +361,13 @@ export default function Customers() {
                     missingArray: Array.from(regionMap[k].missingCustomers.values())
                 };
             }).sort((a,b) => {
+                const REGION_ORDER = ['경기도', '경상도', '전라도', '충청도'];
+                const idxA = REGION_ORDER.indexOf(a.region);
+                const idxB = REGION_ORDER.indexOf(b.region);
+                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                if (idxA !== -1) return -1;
+                if (idxB !== -1) return 1;
+                
                 if (analyticsSortBy === 'amount') return b.totalAmount - a.totalAmount;
                 if (analyticsSortBy === 'margin') return (b.totalAmount - b.totalCost) - (a.totalAmount - a.totalCost);
                 return b.totalQty - a.totalQty;
@@ -429,15 +436,14 @@ export default function Customers() {
 
                 const basePrice = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
                 
-                let costPrice = unitPrice; // Fallback to 0 margin
+                let costPrice = Math.round((unitPrice * 0.9) / 10) * 10; // Fallback to 10% generic margin
                 
                 if (itemExt.supplierPriceOverride && itemExt.supplierPriceOverride > 0) {
                     costPrice = itemExt.supplierPriceOverride;
                 } else if (item.supplierRate !== undefined && item.supplierRate > 0) {
                     costPrice = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
                 } else if (product) {
-                    // Try to infer from inventory record (ONLY trust actual active rates, NOT generic rate_pct)
-                    const rate = product.rate_act2 || product.rate_act || 0;
+                    const rate = product.rate_act2 || product.rate_act || product.rate_pct || 0;
                     if (rate > 0) {
                         costPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
                     }
