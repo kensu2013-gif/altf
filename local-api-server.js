@@ -122,6 +122,48 @@ let inventoryCache = {
 };
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+const sendJsonResponse = (req, res, statusCode, data) => {
+    try {
+        const raw = JSON.stringify(data);
+        const acceptEncoding = req.headers['accept-encoding'] || '';
+        if (acceptEncoding.includes('gzip') && raw.length > 2048) {
+            zlib.gzip(raw, (err, result) => {
+                if (err) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Compression error' }));
+                } else {
+                    res.writeHead(statusCode, {
+                        'Content-Type': 'application/json',
+                        'Content-Encoding': 'gzip'
+                    });
+                    res.end(result);
+                }
+            });
+        } else {
+            res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+            res.end(raw);
+        }
+    } catch(e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'JSON parse error' }));
+    }
+};
+
+const getAuthenticatedSession = (req) => {
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        if (token && activeSessions.has(token)) {
+            const session = activeSessions.get(token);
+            if (Date.now() - session.lastSeen <= SESSION_TIMEOUT_MS) {
+                session.lastSeen = Date.now();
+                return session;
+            }
+        }
+    }
+    return null;
+};
+
 const server = http.createServer(async (req, res) => {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -755,8 +797,8 @@ const server = http.createServer(async (req, res) => {
 
     // GET /api/admin/active-users
     if (req.method === 'GET' && url.pathname === '/api/admin/active-users') {
-        const requesterRole = req.headers['x-requester-role'];
-        if (requesterRole !== 'MASTER' && requesterRole !== 'admin') {
+        const session = getAuthenticatedSession(req);
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin')) {
             res.writeHead(403);
             res.end(JSON.stringify({ error: 'Forbidden' }));
             return;
@@ -765,21 +807,20 @@ const server = http.createServer(async (req, res) => {
         const now = Date.now();
         const activeList = [];
 
-        for (const [token, session] of activeSessions.entries()) {
-            if (now - session.lastSeen <= SESSION_TIMEOUT_MS) {
-                activeList.push(session);
+        for (const [token, s] of activeSessions.entries()) {
+            if (now - s.lastSeen <= SESSION_TIMEOUT_MS) {
+                activeList.push(s);
             }
         }
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(activeList));
+        sendJsonResponse(req, res, 200, activeList);
         return;
     }
 
     // GET /api/admin/login-logs
     if (req.method === 'GET' && url.pathname === '/api/admin/login-logs') {
-        const requesterRole = req.headers['x-requester-role'];
-        if (requesterRole !== 'MASTER' && requesterRole !== 'admin') {
+        const session = getAuthenticatedSession(req);
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin')) {
             res.writeHead(403);
             res.end(JSON.stringify({ error: 'Forbidden' }));
             return;
@@ -788,22 +829,20 @@ const server = http.createServer(async (req, res) => {
         // Return the last 200 logs, sorted by descending timestamp
         const logs = [...db.loginLogs].sort((a, b) => b.timestamp - a.timestamp).slice(0, 200);
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(logs));
+        sendJsonResponse(req, res, 200, logs);
         return;
     }
 
     // GET /api/admin/inventory-history
     if (req.method === 'GET' && url.pathname === '/api/admin/inventory-history') {
-        const requesterRole = req.headers['x-requester-role'];
-        if (requesterRole !== 'MASTER' && requesterRole !== 'admin') {
+        const session = getAuthenticatedSession(req);
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin')) {
             res.writeHead(403);
             res.end(JSON.stringify({ error: 'Forbidden' }));
             return;
         }
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ inventoryHistory: db.inventoryHistory, daekyungHistory: db.daekyungHistory }));
+        sendJsonResponse(req, res, 200, { inventoryHistory: db.inventoryHistory, daekyungHistory: db.daekyungHistory });
         return;
     }
 
@@ -918,13 +957,12 @@ const server = http.createServer(async (req, res) => {
     // --- CUSTOMERS (CRM) APIs ---
     // GET /api/customers
     if (req.method === 'GET' && url.pathname === '/api/customers') {
-        const requesterRole = req.headers['x-requester-role'];
-        if (requesterRole !== 'MASTER' && requesterRole !== 'admin' && requesterRole !== 'manager' && requesterRole !== 'MANAGER') {
+        const session = getAuthenticatedSession(req);
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
             res.writeHead(403);
             return res.end(JSON.stringify({ error: 'Forbidden' }));
         }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(db.customers || []));
+        sendJsonResponse(req, res, 200, db.customers || []);
         return;
     }
 
@@ -1086,21 +1124,28 @@ const server = http.createServer(async (req, res) => {
     // GET /api/my/quotations
     if (req.method === 'GET' && url.pathname === '/api/my/quotations') {
         const userId = url.searchParams.get('userId');
-        const requesterId = req.headers['x-requester-id'];
-        const requesterRole = req.headers['x-requester-role'];
-
+        const session = getAuthenticatedSession(req);
+        
         // 1. Customer Mode: specific userId requested
         if (userId) {
+            // Must be the same user or an admin
+            if (!session || (session.userId !== userId && session.role !== 'MASTER' && session.role !== 'admin')) {
+                res.writeHead(403);
+                res.end(JSON.stringify({ error: 'Forbidden' }));
+                return;
+            }
             const userQuotes = db.quotations.filter(q => q.userId === userId);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(userQuotes));
+            sendJsonResponse(req, res, 200, userQuotes);
             return;
         }
 
         // 2. Admin Mode: Return All
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(db.quotations));
-
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin')) {
+            res.writeHead(403);
+            res.end(JSON.stringify({ error: 'Forbidden' }));
+            return;
+        }
+        sendJsonResponse(req, res, 200, db.quotations);
         return;
     }
 
@@ -1179,20 +1224,27 @@ const server = http.createServer(async (req, res) => {
     // GET /api/my/orders
     if (req.method === 'GET' && url.pathname === '/api/my/orders') {
         const userId = url.searchParams.get('userId');
-        const requesterId = req.headers['x-requester-id'];
-        const requesterRole = req.headers['x-requester-role'];
+        const session = getAuthenticatedSession(req);
 
         if (userId) {
+            // Must be the same user or an admin
+            if (!session || (session.userId !== userId && session.role !== 'MASTER' && session.role !== 'admin')) {
+                res.writeHead(403);
+                res.end(JSON.stringify({ error: 'Forbidden' }));
+                return;
+            }
             const userOrders = db.orders.filter(o => o.userId === userId || (o.customer && o.customer.email === userId));
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(userOrders));
+            sendJsonResponse(req, res, 200, userOrders);
             return;
         }
 
         // Admin Mode: Return All
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(db.orders));
-
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin')) {
+            res.writeHead(403);
+            res.end(JSON.stringify({ error: 'Forbidden' }));
+            return;
+        }
+        sendJsonResponse(req, res, 200, db.orders);
         return;
     }
 
