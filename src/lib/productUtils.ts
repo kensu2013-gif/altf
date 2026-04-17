@@ -191,22 +191,19 @@ export function getSharedMaterialColor(m: string): string {
     if (m.includes('32205') || m.includes('S32205')) return "bg-purple-50 border-purple-200 text-purple-700 ring-1 ring-inset ring-purple-200";
     if (m.includes('SPP') || m.includes('CS') || m.includes('SPWG')) return "bg-slate-100 border-slate-300 text-slate-700 ring-1 ring-inset ring-slate-300";
 
-    const isWP = m.includes('WP');
-
-    if (m.includes('316L')) {
-        return isWP 
-            ? "bg-rose-600 border-rose-700 text-white ring-1 ring-inset ring-rose-700" 
-            : "bg-rose-50 border-rose-200 text-rose-700 ring-1 ring-inset ring-rose-200";
+    // 316 Series ('316L' or '316/L' or '316')
+    if (m.includes('316')) {
+        return "bg-rose-50 border-rose-200 text-rose-700 ring-1 ring-inset ring-rose-200";
     }
-    if (m.includes('304L')) {
-        return isWP 
-            ? "bg-emerald-600 border-emerald-700 text-white ring-1 ring-inset ring-emerald-700"
-            : "bg-emerald-50 border-emerald-200 text-emerald-700 ring-1 ring-inset ring-emerald-200";
+    
+    // 304L Series ('304L' or '304/L')
+    if (m.includes('304L') || m.includes('304/L')) {
+        return "bg-emerald-50 border-emerald-200 text-emerald-700 ring-1 ring-inset ring-emerald-200";
     }
+    
+    // 304 Series ('304')
     if (m.includes('304')) {
-        return isWP 
-            ? "bg-amber-500 border-amber-600 text-white ring-1 ring-inset ring-amber-600"
-            : "bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-inset ring-amber-200";
+        return "bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-inset ring-amber-200";
     }
 
     return "bg-teal-50 border-teal-200 text-teal-700 ring-1 ring-inset ring-teal-200";
