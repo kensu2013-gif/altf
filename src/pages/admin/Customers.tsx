@@ -35,13 +35,9 @@ const isInvalidCustomer = (c: Customer) => {
     return noAddr && noContact && noPhone && noEmail;
 };
 
-const getMaterialColor = (m: string) => {
-    if (!m) return "";
-    if (m.includes('316L')) return "bg-rose-50 border-rose-200 text-rose-700 ring-1 ring-inset ring-rose-200";
-    if (m.includes('304L')) return "bg-emerald-50 border-emerald-200 text-emerald-700 ring-1 ring-inset ring-emerald-200";
-    if (m.includes('304')) return "bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-inset ring-amber-200";
-    return "bg-teal-50 border-teal-200 text-teal-700 ring-1 ring-inset ring-teal-200";
-};
+import { getSharedMaterialColor } from '../../lib/productUtils';
+
+const getMaterialColor = getSharedMaterialColor;
 
 export default function Customers() {
     const user = useStore(state => state.auth.user);

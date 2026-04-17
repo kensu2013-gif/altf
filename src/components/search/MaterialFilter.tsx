@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { cn } from '../../lib/utils';
 import { ChevronDown, ChevronUp, Check, Layers, RotateCcw } from 'lucide-react';
-import { getValidMaterialsForSystem } from '../../lib/productUtils';
+import { getValidMaterialsForSystem, getSharedMaterialColor } from '../../lib/productUtils';
 import type { StandardSystem } from '../../lib/productUtils';
 
 interface MaterialFilterProps {
@@ -67,16 +67,10 @@ export function MaterialFilter({ selectedMaterials, onToggleMaterial, productNam
                     {options.map(mat => {
                         const isSelected = selectedMaterials.includes(mat);
 
-                        // Helper for color coding (Light Theme Variants)
+                        // Helper for color coding (Using Shared)
                         const getMaterialColor = (m: string) => {
                             if (!isSelected) return "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50";
-
-                            if (m.includes('316L')) return "bg-rose-50 border-rose-200 text-rose-700 ring-1 ring-rose-200";
-                            if (m.includes('304L')) return "bg-emerald-50 border-emerald-200 text-emerald-700 ring-1 ring-emerald-200";
-                            if (m.includes('304')) return "bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200";
-
-                            // Default for others
-                            return "bg-teal-50 border-teal-200 text-teal-700 ring-1 ring-teal-200";
+                            return getSharedMaterialColor(m);
                         };
 
                         const getIndicatorColor = (m: string) => {
@@ -120,10 +114,7 @@ export function MaterialFilter({ selectedMaterials, onToggleMaterial, productNam
             {!isAdvanced && selectedMaterials.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
                     {selectedMaterials.map(mat => {
-                        let colorClass = "bg-teal-50 text-teal-700 border-teal-200";
-                        if (mat.includes('316L')) colorClass = "bg-rose-50 text-rose-700 border-rose-200";
-                        else if (mat.includes('304L')) colorClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                        else if (mat.includes('304')) colorClass = "bg-amber-50 text-amber-700 border-amber-200";
+                        const colorClass = getSharedMaterialColor(mat);
 
                         return (
                             <span key={mat} className={cn("text-[10px] px-2 py-0.5 rounded-full border font-medium", colorClass)}>
