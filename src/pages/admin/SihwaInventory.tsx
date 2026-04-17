@@ -192,10 +192,10 @@ export default function SihwaInventory() {
                     const data = await res.json();
                     const ignoreDates = ['2026-04-14', '2026-04-15', '2026-04-16'];
                     if (data.inventoryHistory) {
-                        const filteredHistory = data.inventoryHistory.filter((h: any) => !ignoreDates.includes(h.date));
+                        const filteredHistory = data.inventoryHistory.filter((h: { date: string }) => !ignoreDates.includes(h.date));
                         setHistoryData({ ...data, inventoryHistory: filteredHistory });
                     } else if (Array.isArray(data)) {
-                        const filteredHistory = data.filter((h: any) => !ignoreDates.includes(h.date));
+                        const filteredHistory = data.filter((h: { date: string }) => !ignoreDates.includes(h.date));
                         setHistoryData({ inventoryHistory: filteredHistory, daekyungHistory: [] });
                     }
                 }
