@@ -190,10 +190,13 @@ export default function SihwaInventory() {
                 });
                 if (res.ok) {
                     const data = await res.json();
+                    const ignoreDates = ['2026-04-14', '2026-04-15', '2026-04-16'];
                     if (data.inventoryHistory) {
-                        setHistoryData(data);
+                        const filteredHistory = data.inventoryHistory.filter((h: any) => !ignoreDates.includes(h.date));
+                        setHistoryData({ ...data, inventoryHistory: filteredHistory });
                     } else if (Array.isArray(data)) {
-                        setHistoryData({ inventoryHistory: data, daekyungHistory: [] });
+                        const filteredHistory = data.filter((h: any) => !ignoreDates.includes(h.date));
+                        setHistoryData({ inventoryHistory: filteredHistory, daekyungHistory: [] });
                     }
                 }
             } catch (err) {
@@ -1652,13 +1655,13 @@ export default function SihwaInventory() {
                                                                                 className="flex items-center gap-3 mt-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200 shadow-sm cursor-pointer hover:bg-slate-100 transition-colors"
                                                                                 onClick={() => toggleDailyGroup(snap.date)}
                                                                             >
-                                                                                <div className="flex flex-col flex-1 pl-2 border-l-4 border-indigo-400">
-                                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-tight">수기 출고/오차액</span>
-                                                                                    <span className="text-sm font-black text-indigo-700">₩{formatCur(dailyRevenue)}</span>
+                                                                                <div className="flex flex-col flex-1 pl-2 border-l-4 border-blue-400">
+                                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-tight">출고액</span>
+                                                                                    <span className="text-sm font-black text-blue-700">₩{formatCur(dailyRevenue)}</span>
                                                                                 </div>
                                                                                 <div className="w-px h-8 bg-slate-200"></div>
                                                                                 <div className="flex flex-col flex-1 pl-2 border-l-4 border-emerald-400">
-                                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-tight">수기 입고/자산증가</span>
+                                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-tight">입고액</span>
                                                                                     <span className="text-sm font-black text-emerald-700">₩{formatCur(dailyCost)}</span>
                                                                                 </div>
                                                                                 <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isGroupExpanded ? 'rotate-180' : ''}`} />
@@ -1688,15 +1691,15 @@ export default function SihwaInventory() {
                                                                                     const valueChips = [];
                                                                                     if (effectiveSales > 0) {
                                                                                         valueChips.push({
-                                                                                            label: `수기출고/로스 ${effectiveSales}개`,
-                                                                                            amt: `매출 ${formatCur(effectiveSales * sellingPrice)}원`,
-                                                                                            style: 'text-indigo-600 bg-indigo-50 border border-indigo-200'
+                                                                                            label: `출고수량 ${effectiveSales}개`,
+                                                                                            amt: `출고액 ${formatCur(effectiveSales * sellingPrice)}원`,
+                                                                                            style: 'text-blue-700 bg-blue-50 border border-blue-200'
                                                                                         });
                                                                                     }
                                                                                     if (effectiveRestock > 0) {
                                                                                         valueChips.push({
-                                                                                            label: `수기입고 ${effectiveRestock}개`,
-                                                                                            amt: `가치 ${formatCur(effectiveRestock * purchasePrice)}원`,
+                                                                                            label: `입고수량 ${effectiveRestock}개`,
+                                                                                            amt: `입고액 ${formatCur(effectiveRestock * purchasePrice)}원`,
                                                                                             style: 'text-emerald-700 bg-emerald-50 border border-emerald-200'
                                                                                         });
                                                                                     }
@@ -1704,7 +1707,7 @@ export default function SihwaInventory() {
                                                                                     const finalId = d.id || d.name || '알수없음';
 
                                                                                     return (
-                                                                                        <div key={dIdx} className={`flex flex-col text-xs bg-white rounded border border-slate-100 border-l-4 ${pureManualChange > 0 ? 'border-l-emerald-500' : 'border-l-rose-500'}`}>
+                                                                                        <div key={dIdx} className={`flex flex-col text-xs bg-white rounded border border-slate-100 border-l-4 ${pureManualChange > 0 ? 'border-l-emerald-500' : 'border-l-blue-500'}`}>
                                                                                             <div 
                                                                                                 className="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-50 transition-colors"
                                                                                                 onClick={() => toggleTrendItem(rowKey)}
