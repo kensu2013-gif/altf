@@ -1129,7 +1129,7 @@ const server = http.createServer(async (req, res) => {
         // 1. Customer Mode: specific userId requested
         if (userId) {
             // Must be the same user or an admin
-            if (!session || (session.userId !== userId && session.role !== 'MASTER' && session.role !== 'admin')) {
+            if (!session || (session.userId !== userId && session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
                 res.writeHead(403);
                 res.end(JSON.stringify({ error: 'Forbidden' }));
                 return;
@@ -1140,7 +1140,7 @@ const server = http.createServer(async (req, res) => {
         }
 
         // 2. Admin Mode: Return All
-        if (!session || (session.role !== 'MASTER' && session.role !== 'admin')) {
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
             res.writeHead(403);
             res.end(JSON.stringify({ error: 'Forbidden' }));
             return;
@@ -1228,7 +1228,7 @@ const server = http.createServer(async (req, res) => {
 
         if (userId) {
             // Must be the same user or an admin
-            if (!session || (session.userId !== userId && session.role !== 'MASTER' && session.role !== 'admin')) {
+            if (!session || (session.userId !== userId && session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
                 res.writeHead(403);
                 res.end(JSON.stringify({ error: 'Forbidden' }));
                 return;
@@ -1239,7 +1239,7 @@ const server = http.createServer(async (req, res) => {
         }
 
         // Admin Mode: Return All
-        if (!session || (session.role !== 'MASTER' && session.role !== 'admin')) {
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
             res.writeHead(403);
             res.end(JSON.stringify({ error: 'Forbidden' }));
             return;
