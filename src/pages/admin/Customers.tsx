@@ -35,6 +35,14 @@ const isInvalidCustomer = (c: Customer) => {
     return noAddr && noContact && noPhone && noEmail;
 };
 
+const getMaterialColor = (m: string) => {
+    if (!m) return "";
+    if (m.includes('316L')) return "bg-rose-50 border-rose-200 text-rose-700 ring-1 ring-inset ring-rose-200";
+    if (m.includes('304L')) return "bg-emerald-50 border-emerald-200 text-emerald-700 ring-1 ring-inset ring-emerald-200";
+    if (m.includes('304')) return "bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-inset ring-amber-200";
+    return "bg-teal-50 border-teal-200 text-teal-700 ring-1 ring-inset ring-teal-200";
+};
+
 export default function Customers() {
     const user = useStore(state => state.auth.user);
     const token = useStore(state => state.auth.token);
@@ -63,7 +71,7 @@ export default function Customers() {
         region: string;
         totalQty: number;
         totalAmount: number;
-        allItems: [string, {qty: number; amount: number}][];
+        allItems: [string, {qty: number; amount: number; cost: number; material: string}][];
     } | null>(null);
 
     const fetchCustomers = async () => {
@@ -259,7 +267,7 @@ export default function Customers() {
 
     // Analytics Engine
     const analytics = useMemo(() => {
-        const regionMap: Record<string, { totalAmount: number; totalCost: number; totalQty: number; items: Record<string, {qty: number; amount: number; cost: number}>; missingCustomers: Map<string, string> }> = {};
+        const regionMap: Record<string, { totalAmount: number; totalCost: number; totalQty: number; items: Record<string, {qty: number; amount: number; cost: number; material: string}>; missingCustomers: Map<string, string> }> = {};
         
         orders.forEach(o => {
             const oExt = o as typeof o & { isDeleted?: boolean; poEndCustomer?: string; payload?: { customer?: { company_name?: string } } };
@@ -299,8 +307,8 @@ export default function Customers() {
                 const product = inventoryMap.get(id);
 
                 const materialInfo = product?.material || itemExt.material || '';
-                const matString = materialInfo ? `[${materialInfo}] ` : '';
-                const itemKey = `${matString}${item.name}-${item.thickness}-${item.size}`;
+                const matString = materialInfo ? `-${materialInfo}` : '';
+                const itemKey = `${item.name}-${item.thickness}-${item.size}${matString}`;
                 
                 const basePrice = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
                 
@@ -324,7 +332,7 @@ export default function Customers() {
                 regionMap[region].totalCost += itemCost;
                 
                 if (!regionMap[region].items[itemKey]) {
-                    regionMap[region].items[itemKey] = {qty: 0, amount: 0, cost: 0};
+                    regionMap[region].items[itemKey] = {qty: 0, amount: 0, cost: 0, material: materialInfo};
                 }
                 regionMap[region].items[itemKey].qty += quantity;
                 regionMap[region].items[itemKey].amount += itemAmount;
@@ -746,7 +754,14 @@ export default function Customers() {
                                                     <div className="flex items-center justify-between mb-1">
                                                         <span className="font-bold text-slate-700 flex items-center gap-1.5 truncate">
                                                             <span className="w-4 h-4 rounded bg-slate-200 text-slate-500 flex items-center justify-center text-[9px] font-bold shrink-0">{i+1}</span>
-                                                            <span className="truncate" title={itemKey}>{itemKey}</span>
+                                                            <span className="truncate" title={itemKey}>
+                                                                {stats.material && itemKey.endsWith(`-${stats.material}`) ? itemKey.slice(0, -(stats.material.length + 1)) : itemKey}
+                                                            </span>
+                                                            {stats.material && (
+                                                                <span className={`px-1.5 py-0.5 text-[9px] border rounded transition-all font-bold shrink-0 ${getMaterialColor(stats.material)}`}>
+                                                                    {stats.material}
+                                                                </span>
+                                                            )}
                                                         </span>
                                                         <span className="font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded shrink-0">{stats.qty.toLocaleString()}개</span>
                                                     </div>
@@ -1005,7 +1020,14 @@ export default function Customers() {
                                                     {idx + 1}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 font-bold text-slate-700">{itemKey}</td>
+                                            <td className="px-4 py-3 font-bold text-slate-700 flex items-center gap-1.5">
+                                                <span>{stats.material && itemKey.endsWith(`-${stats.material}`) ? itemKey.slice(0, -(stats.material.length + 1)) : itemKey}</span>
+                                                {stats.material && (
+                                                    <span className={`px-1.5 py-0.5 text-[9px] border rounded transition-all font-bold shrink-0 ${getMaterialColor(stats.material)}`}>
+                                                        {stats.material}
+                                                    </span>
+                                                )}
+                                            </td>
                                             <td className="px-4 py-3 text-right text-slate-500 fontFamily-mono text-xs">
                                                 {stats.qty > 0 ? Math.round(stats.amount/stats.qty).toLocaleString() : 0}원
                                             </td>
