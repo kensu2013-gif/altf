@@ -47,7 +47,7 @@ export default function Customers() {
     const [customersList, setCustomersList] = useState<Customer[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
-    const [activeTab, setActiveTab] = useState<'MASTER' | 'ANALYTICS' | 'BI_ANALYTICS'>('MASTER');
+    const [activeTab, setActiveTab] = useState<'MASTER' | 'ANALYTICS' | 'COMPANY_ANALYTICS' | 'BI_ANALYTICS' | 'STRATEGY_ANALYTICS'>('MASTER');
     const [analyticsSortBy, setAnalyticsSortBy] = useState<'qty' | 'amount' | 'margin'>('qty');
     
     // Inventory mapped for cost inference
@@ -484,6 +484,219 @@ export default function Customers() {
         return results;
     }, [orders, customersList, inventoryMap]);
 
+    // 1. Company Analytics Engine (지역/거래처별 판매분석)
+    const companyAnalytics = useMemo(() => {
+        const regionMap: Record<string, {
+            region: string;
+            totalQty: number;
+            totalAmount: number;
+            companies: Record<string, {
+                companyName: string;
+                totalQty: number;
+                totalAmount: number;
+                totalCost: number;
+                items: Record<string, {qty: number, amount: number, cost: number, material: string}>;
+            }>
+        }> = {};
+
+        orders.forEach(o => {
+            const oExt = o as typeof o & { isDeleted?: boolean; poEndCustomer?: string; payload?: { customer?: { company_name?: string } } };
+            if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN' || oExt.isDeleted) return;
+
+            const fullCustomerName = (oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || '').toLowerCase();
+            if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
+            
+            const cleanOrderName = stripCorp(o.customerName);
+            const customer = customersList.find(c => {
+                const cleanCrm = stripCorp(c.companyName);
+                if (!cleanOrderName || !cleanCrm) return false;
+                return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
+            });
+            const region = customer?.region || '미분류/기타';
+            const companyName = customer?.companyName || o.customerName || '미확인 업체';
+
+            if (!regionMap[region]) {
+                regionMap[region] = { region, totalQty: 0, totalAmount: 0, companies: {} };
+            }
+            if (!regionMap[region].companies[companyName]) {
+                regionMap[region].companies[companyName] = { companyName, totalQty: 0, totalAmount: 0, totalCost: 0, items: {} };
+            }
+
+            o.items?.forEach(item => {
+                const itemExt = item as typeof item & { item_id?: string, isDeleted?: boolean, material?: string };
+                if (itemExt.isDeleted) return;
+
+                const quantity = item.quantity || 0;
+                if (quantity <= 0) return;
+                const unitPrice = item.unitPrice || 0;
+
+                const id = itemExt.productId || itemExt.item_id || '';
+                const product = inventoryMap.get(id);
+
+                const materialInfo = product?.material || itemExt.material || '';
+                const matString = materialInfo ? `-${materialInfo}` : '';
+                const itemKey = `${item.name}-${item.thickness}-${item.size}${matString}`;
+                
+                const basePrice = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
+                let costPrice = Math.round((unitPrice * 0.9) / 10) * 10;
+                if (item.supplierRate !== undefined && item.supplierRate > 0) {
+                    costPrice = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
+                }
+
+                const itemAmount = quantity * unitPrice;
+                const itemCost = quantity * costPrice;
+
+                regionMap[region].totalQty += quantity;
+                regionMap[region].totalAmount += itemAmount;
+                
+                const comp = regionMap[region].companies[companyName];
+                comp.totalQty += quantity;
+                comp.totalAmount += itemAmount;
+                comp.totalCost += itemCost;
+                
+                if (!comp.items[itemKey]) {
+                    comp.items[itemKey] = {qty: 0, amount: 0, cost: 0, material: materialInfo};
+                }
+                comp.items[itemKey].qty += quantity;
+                comp.items[itemKey].amount += itemAmount;
+                comp.items[itemKey].cost += itemCost;
+            });
+        });
+
+        return Object.values(regionMap).map(r => {
+            const sortedCompanies = Object.values(r.companies).map(c => {
+                const allItems = Object.entries(c.items);
+                let sortedItems = allItems;
+                if (analyticsSortBy === 'amount') {
+                    sortedItems = sortedItems.sort((a,b) => b[1].amount - a[1].amount);
+                } else if (analyticsSortBy === 'margin') {
+                    sortedItems = sortedItems.sort((a,b) => (b[1].amount - b[1].cost) - (a[1].amount - a[1].cost));
+                } else {
+                    sortedItems = sortedItems.sort((a,b) => b[1].qty - a[1].qty);
+                }
+                return { ...c, topItems: sortedItems.slice(0, 3) };
+            }).sort((a, b) => {
+                if (analyticsSortBy === 'amount') return b.totalAmount - a.totalAmount;
+                if (analyticsSortBy === 'margin') return (b.totalAmount - b.totalCost) - (a.totalAmount - a.totalCost);
+                return b.totalQty - a.totalQty;
+            });
+            return { ...r, sortedCompanies };
+        }).sort((a, b) => {
+            const REGION_ORDER = ['경기도', '경상도', '전라도', '충청도'];
+            const idxA = REGION_ORDER.indexOf(a.region);
+            const idxB = REGION_ORDER.indexOf(b.region);
+            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+            if (idxA !== -1) return -1;
+            if (idxB !== -1) return 1;
+            return b.totalAmount - a.totalAmount;
+        });
+    }, [orders, customersList, inventoryMap, analyticsSortBy]);
+
+    // 2. Strategy Analytics Engine (심화 BI 업체별 전략 분석)
+    const strategyAnalytics = useMemo(() => {
+        const now = new Date();
+        const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+        const sixtyDaysAgo = new Date(now.getTime() - (60 * 24 * 60 * 60 * 1000));
+
+        const compMap: Record<string, {
+            companyName: string;
+            region: string;
+            recentAmount: number;
+            previousAmount: number;
+            recentQty: number;
+            previousQty: number;
+            totalAmount: number;
+            lastOrderDate: Date | null;
+            firstOrderDate: Date | null;
+        }> = {};
+
+        orders.forEach(o => {
+            const oExt = o as typeof o & { isDeleted?: boolean; poEndCustomer?: string; payload?: { customer?: { company_name?: string } } };
+            if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN' || oExt.isDeleted) return;
+
+            const fullCustomerName = (oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || '').toLowerCase();
+            if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
+            
+            const cleanOrderName = stripCorp(o.customerName);
+            const customer = customersList.find(c => {
+                const cleanCrm = stripCorp(c.companyName);
+                if (!cleanOrderName || !cleanCrm) return false;
+                return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
+            });
+            const companyName = customer?.companyName || o.customerName || '미확인 업체';
+            const region = customer?.region || '미분류';
+
+            if (!compMap[companyName]) {
+                compMap[companyName] = { 
+                    companyName, region, recentAmount: 0, previousAmount: 0, 
+                    recentQty: 0, previousQty: 0, totalAmount: 0,
+                    lastOrderDate: null, firstOrderDate: null
+                };
+            }
+
+            const orderDate = new Date(o.createdAt || new Date());
+            const comp = compMap[companyName];
+
+            if (!comp.lastOrderDate || orderDate > comp.lastOrderDate) comp.lastOrderDate = orderDate;
+            if (!comp.firstOrderDate || orderDate < comp.firstOrderDate) comp.firstOrderDate = orderDate;
+
+            let orderAmount = 0;
+            let orderQty = 0;
+            o.items?.forEach(i => {
+                orderAmount += (i.quantity || 0) * (i.unitPrice || 0);
+                orderQty += (i.quantity || 0);
+            });
+
+            comp.totalAmount += orderAmount;
+            if (orderDate >= thirtyDaysAgo) {
+                comp.recentAmount += orderAmount;
+                comp.recentQty += orderQty;
+            } else if (orderDate >= sixtyDaysAgo && orderDate < thirtyDaysAgo) {
+                comp.previousAmount += orderAmount;
+                comp.previousQty += orderQty;
+            }
+        });
+
+        // Determine Status
+        return Object.values(compMap)
+            .filter(c => c.totalAmount > 0)
+            .map(c => {
+                let status: 'NEW' | 'GROWTH' | 'STABLE' | 'CHURN_RISK' | 'DORMANT' = 'STABLE';
+                let action = '안정적 거래 유지 중. 추가 취급품목 제안 가능';
+
+                if (c.firstOrderDate && c.firstOrderDate >= thirtyDaysAgo) {
+                    status = 'NEW';
+                    action = '신규 유입 - 온보딩 케어 및 정기 발주 유도';
+                } else if (!c.lastOrderDate || c.lastOrderDate < sixtyDaysAgo) {
+                    status = 'DORMANT';
+                    action = '장기 미발주 - 프로모션 및 단가 할인 재제안';
+                } else if (c.recentAmount === 0 && c.previousAmount > 0) {
+                    status = 'CHURN_RISK';
+                    action = '이탈 징후 🚨 - 최근 한달 무발주. 긴급 컨택 요망 (불만 체크)';
+                } else if (c.recentAmount > 0 && c.previousAmount > 0 && c.recentAmount < c.previousAmount * 0.5) {
+                    status = 'CHURN_RISK';
+                    action = '매출 급감 🚨 - 전월 대비 발주 반토막. 경쟁사 유입 의심';
+                } else if (c.recentAmount >= c.previousAmount * 1.2) {
+                    status = 'GROWTH';
+                    action = '매출 성장 📈 - 우수 고객 혜택 안내 및 점유율 굳히기';
+                }
+
+                // Growth rate
+                let growthRate = 0;
+                if (c.previousAmount > 0) {
+                    growthRate = ((c.recentAmount - c.previousAmount) / c.previousAmount) * 100;
+                } else if (c.recentAmount > 0) {
+                    growthRate = 100; // Infinity treated as 100% just for display context if prev is 0
+                }
+
+                return { ...c, status, action, growthRate };
+            }).sort((a,b) => {
+                // sort by totalAmount descending by default
+                return b.totalAmount - a.totalAmount;
+            });
+
+    }, [orders, customersList]);
+
     const totalBiRevenue = useMemo(() => {
         return biAnalytics.reduce((acc, c) => acc + c.totalAmount, 0);
     }, [biAnalytics]);
@@ -514,14 +727,28 @@ export default function Customers() {
                     className={`px-5 py-2.5 rounded-t-lg font-bold transition-all ${activeTab === 'ANALYTICS' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
                 >
                     <BarChart2 className="w-4 h-4 inline mr-2"/>
-                    지역/품목별 실판매 분석 (Analytics)
+                    지역/품목별 실판매 분석
+                </button>
+                <button 
+                    onClick={() => setActiveTab('COMPANY_ANALYTICS')}
+                    className={`px-5 py-2.5 rounded-t-lg font-bold transition-all ${activeTab === 'COMPANY_ANALYTICS' ? 'bg-amber-500 text-white shadow-md' : 'text-slate-500 hover:bg-amber-50 hover:text-amber-600'}`}
+                >
+                    <BarChart2 className="w-4 h-4 inline mr-2"/>
+                    지역/거래처별 판매분석
                 </button>
                 <button 
                     onClick={() => setActiveTab('BI_ANALYTICS')}
                     className={`px-5 py-2.5 rounded-t-lg font-bold transition-all flex items-center gap-1.5 ${activeTab === 'BI_ANALYTICS' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-500 hover:bg-rose-50 hover:text-rose-600'}`}
                 >
                     <TrendingUp className="w-4 h-4"/>
-                    심화 BI 마진/허브 분석 (Strategy)
+                    단순 마진/허브 분석
+                </button>
+                <button 
+                    onClick={() => setActiveTab('STRATEGY_ANALYTICS')}
+                    className={`px-5 py-2.5 rounded-t-lg font-bold transition-all flex items-center gap-1.5 ${activeTab === 'STRATEGY_ANALYTICS' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-500 hover:bg-sky-50 hover:text-sky-600'}`}
+                >
+                    <TrendingUp className="w-4 h-4"/>
+                    심화 BI 업체별 전략 분석
                 </button>
             </div>
 
@@ -795,6 +1022,148 @@ export default function Customers() {
                             </div>
                         ))}
                         {analytics.length === 0 && (
+                            <div className="col-span-full py-20 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
+                                분석할 발주 이력이 아직 없습니다.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* NEW COMPANY ANALYTICS TAB */}
+            {activeTab === 'COMPANY_ANALYTICS' && (
+                <div className="space-y-6">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                        <div>
+                            <h1 className="text-2xl font-black text-amber-600 flex items-center gap-2">
+                                <BarChart2 className="w-7 h-7 text-amber-500" />
+                                지역/거래처별 판매분석 (Company Analytics)
+                            </h1>
+                            <p className="text-slate-500 text-[15px] mt-1 tracking-tight">
+                                권역별 우수 업체를 한눈에 파악하고 각 거래처의 주력 취급 품목 랭킹을 추적합니다.
+                            </p>
+                        </div>
+                        <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-inner">
+                            <button 
+                                onClick={() => setAnalyticsSortBy('qty')}
+                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${analyticsSortBy === 'qty' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >수량 많은순</button>
+                            <button 
+                                onClick={() => setAnalyticsSortBy('amount')}
+                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${analyticsSortBy === 'amount' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >매출액 많은순</button>
+                            <button 
+                                onClick={() => setAnalyticsSortBy('margin')}
+                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${analyticsSortBy === 'margin' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >순이익 높은순</button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        {companyAnalytics.map((reg) => (
+                            <div key={`comp-reg-${reg.region}`} className="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <MapPin className="w-5 h-5 text-indigo-600"/>
+                                    <h2 className="text-lg font-black text-slate-800">{reg.region}</h2>
+                                    <span className="text-xs font-bold text-slate-500 bg-white border px-2 py-0.5 rounded shadow-sm">그룹 누적: ₩{reg.totalAmount.toLocaleString()}</span>
+                                </div>
+                                <div className="space-y-4">
+                                    {reg.sortedCompanies.map((comp, i) => (
+                                        <div key={comp.companyName} className="bg-white border text-left border-slate-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all">
+                                            <div className="flex justify-between items-center mb-2 pb-2 border-b border-dashed border-slate-100">
+                                                <div className="font-bold text-slate-800 text-[15px] flex items-center gap-2">
+                                                    <span className="w-5 h-5 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs">{i+1}</span>
+                                                    {comp.companyName}
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-[13px] font-black text-indigo-600">₩{comp.totalAmount.toLocaleString()}</div>
+                                                    <div className="text-[10px] text-slate-400 font-bold">{comp.totalQty.toLocaleString()}개 발주</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2 text-[10px]">
+                                                {comp.topItems.map(([itemKey, stats]) => (
+                                                    <div key={itemKey} className="bg-slate-50 border border-slate-100 px-2 py-1 rounded text-slate-600 flex-1 truncate" title={itemKey}>
+                                                        <span className="font-bold">{stats.material && itemKey.endsWith(`-${stats.material}`) ? itemKey.slice(0, -(stats.material.length + 1)) : itemKey}</span>
+                                                        {stats.material && <span className={`ml-1 px-1 rounded text-[8px] ${getMaterialColor(stats.material)}`}>{stats.material}</span>}
+                                                        <div className="mt-0.5 text-indigo-400 font-bold">{stats.qty}개 (₩{stats.amount.toLocaleString()})</div>
+                                                    </div>
+                                                ))}
+                                                {comp.topItems.length === 0 && <span className="text-slate-400">품목 정보 없음</span>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {reg.sortedCompanies.length === 0 && <div className="text-center text-slate-400 text-sm py-4">거래처 데이터가 없습니다.</div>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* NEW STRATEGY ANALYTICS TAB */}
+            {activeTab === 'STRATEGY_ANALYTICS' && (
+                <div className="space-y-6">
+                    <div>
+                        <h1 className="text-2xl font-black text-sky-600 flex items-center gap-2">
+                            <TrendingUp className="w-7 h-7 text-sky-500" />
+                            심화 BI 업체별 전략 분석 (Strategic Action)
+                        </h1>
+                        <p className="text-slate-500 text-[15px] mt-1 tracking-tight">
+                            최근 30일과 이전 30~60일의 매출 증감 추이를 비교하여 업체의 활동 상태를 진단하고 영업 대응 전략을 제안합니다.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                        {strategyAnalytics.map((comp) => {
+                            const isAlert = comp.status === 'CHURN_RISK';
+                            const isGood = comp.status === 'GROWTH' || comp.status === 'NEW';
+                            return (
+                                <div key={comp.companyName} className={`rounded-xl border bg-white shadow-sm overflow-hidden flex flex-col ${isAlert ? 'border-rose-300 ring-1 ring-rose-100' : isGood ? 'border-indigo-200' : 'border-slate-200'}`}>
+                                    <div className="p-4 border-b border-slate-100 flex justify-between items-start">
+                                        <div>
+                                            <h3 className="font-bold text-slate-800 text-[15px] mb-1">{comp.companyName}</h3>
+                                            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">{comp.region}</span>
+                                        </div>
+                                        <div>
+                                            {comp.status === 'NEW' && <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">🆕 신규 유입</span>}
+                                            {comp.status === 'GROWTH' && <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">📈 매출 급등</span>}
+                                            {comp.status === 'STABLE' && <span className="text-[10px] font-black bg-slate-100 text-slate-600 px-2 py-1 rounded-full">⚖️ 안정 유지</span>}
+                                            {comp.status === 'CHURN_RISK' && <span className="text-[10px] font-black bg-rose-100 text-rose-700 px-2 py-1 rounded-full shadow-sm animate-pulse">🚨 이탈 점검</span>}
+                                            {comp.status === 'DORMANT' && <span className="text-[10px] font-black bg-amber-100 text-amber-700 px-2 py-1 rounded-full">💤 장기 휴면</span>}
+                                        </div>
+                                    </div>
+                                    <div className="p-4 grid grid-cols-2 gap-4 flex-1">
+                                        <div className="bg-slate-50 p-2 rounded border border-slate-100">
+                                            <div className="text-[10px] text-slate-400 font-bold mb-1">최근 30일 매출</div>
+                                            <div className="font-black text-slate-800">₩{comp.recentAmount.toLocaleString()}</div>
+                                            <div className="text-[10px] text-slate-500 mt-1">{comp.recentQty.toLocaleString()}개</div>
+                                        </div>
+                                        <div className="bg-slate-50 p-2 rounded border border-slate-100">
+                                            <div className="text-[10px] text-slate-400 font-bold mb-1">이전 30일 매출 (비교군)</div>
+                                            <div className="font-black text-slate-600">₩{comp.previousAmount.toLocaleString()}</div>
+                                            <div className="text-[10px] text-slate-500 mt-1">{comp.previousQty.toLocaleString()}개</div>
+                                        </div>
+                                        <div className="col-span-2 flex items-center justify-between text-[11px] font-bold pb-2 border-b border-dashed border-slate-200">
+                                            <span className="text-slate-500">증감 추이:</span>
+                                            <span className={`${comp.growthRate > 0 ? 'text-emerald-500' : comp.growthRate < 0 ? 'text-rose-500' : 'text-slate-400'}`}>
+                                                {comp.growthRate > 0 ? '▲' : comp.growthRate < 0 ? '▼' : '-'} 
+                                                {Math.abs(comp.growthRate).toFixed(1)}%
+                                            </span>
+                                        </div>
+                                        <div className="col-span-2 pt-1">
+                                            <div className="text-[10px] font-bold text-slate-400 mb-1 flex items-center gap-1">
+                                                <Activity className="w-3 h-3" />
+                                                [AI 영업 대응 제안]
+                                            </div>
+                                            <div className={`text-[12px] font-bold leading-snug p-2 rounded whitespace-pre-wrap ${isAlert ? 'bg-rose-50 text-rose-700 border border-rose-100' : isGood ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-50 text-slate-600 border border-slate-100'}`}>
+                                                {comp.action}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {strategyAnalytics.length === 0 && (
                             <div className="col-span-full py-20 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
                                 분석할 발주 이력이 아직 없습니다.
                             </div>
