@@ -52,6 +52,8 @@ export default function Customers() {
     const [expandedStrategyGroups, setExpandedStrategyGroups] = useState<Record<string, boolean>>({
         CHURN_RISK: true, GROWTH: true, STABLE: false, NEW: true, DORMANT: false
     });
+    const [strategyPeriod, setStrategyPeriod] = useState<30 | 90 | 180 | 365>(30);
+    const [strategySearchTerm, setStrategySearchTerm] = useState('');
     
     // Inventory mapped for cost inference
     const { inventory } = useInventory();
@@ -598,8 +600,8 @@ export default function Customers() {
     // 2. Strategy Analytics Engine (심화 BI 업체별 전략 분석)
     const strategyAnalytics = useMemo(() => {
         const now = new Date();
-        const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
-        const sixtyDaysAgo = new Date(now.getTime() - (60 * 24 * 60 * 60 * 1000));
+        const recentDaysAgo = new Date(now.getTime() - (strategyPeriod * 24 * 60 * 60 * 1000));
+        const previousDaysAgo = new Date(now.getTime() - (strategyPeriod * 2 * 24 * 60 * 60 * 1000));
 
         const compMap: Record<string, {
             companyName: string;
@@ -651,10 +653,10 @@ export default function Customers() {
             });
 
             comp.totalAmount += orderAmount;
-            if (orderDate >= thirtyDaysAgo) {
+            if (orderDate >= recentDaysAgo) {
                 comp.recentAmount += orderAmount;
                 comp.recentQty += orderQty;
-            } else if (orderDate >= sixtyDaysAgo && orderDate < thirtyDaysAgo) {
+            } else if (orderDate >= previousDaysAgo && orderDate < recentDaysAgo) {
                 comp.previousAmount += orderAmount;
                 comp.previousQty += orderQty;
             }
@@ -667,19 +669,22 @@ export default function Customers() {
                 let status: 'NEW' | 'GROWTH' | 'STABLE' | 'CHURN_RISK' | 'DORMANT' = 'STABLE';
                 let action = '안정적 거래 유지 중. 추가 취급품목 제안 가능';
 
-                if (c.firstOrderDate && c.firstOrderDate >= thirtyDaysAgo) {
+                // To prevent noise from tiny orders (e.g. comparing 50,000 to 100,000), set a minimum threshold
+                const MIN_THRESHOLD = 500000;
+
+                if (c.firstOrderDate && c.firstOrderDate >= recentDaysAgo) {
                     status = 'NEW';
                     action = '신규 유입 - 온보딩 케어 및 정기 발주 유도';
-                } else if (!c.lastOrderDate || c.lastOrderDate < sixtyDaysAgo) {
+                } else if (!c.lastOrderDate || c.lastOrderDate < previousDaysAgo) {
                     status = 'DORMANT';
                     action = '장기 미발주 - 프로모션 및 단가 할인 재제안';
-                } else if (c.recentAmount === 0 && c.previousAmount > 0) {
+                } else if (c.recentAmount === 0 && c.previousAmount > MIN_THRESHOLD) {
                     status = 'CHURN_RISK';
-                    action = '이탈 징후 🚨 - 최근 한달 무발주. 긴급 컨택 요망 (불만 체크)';
-                } else if (c.recentAmount > 0 && c.previousAmount > 0 && c.recentAmount < c.previousAmount * 0.5) {
+                    action = `이탈 징후 🚨 - 최근 ${strategyPeriod}일 무발주. 긴급 컨택 요망`;
+                } else if (c.recentAmount > 0 && c.previousAmount > MIN_THRESHOLD && c.recentAmount <= c.previousAmount * 0.5) {
                     status = 'CHURN_RISK';
-                    action = '매출 급감 🚨 - 전월 대비 발주 반토막. 경쟁사 유입 의심';
-                } else if (c.recentAmount >= c.previousAmount * 1.2) {
+                    action = `매출 급감 🚨 - 이전 동기 대비 발주 반토막. 경쟁사 유입 의심`;
+                } else if (c.recentAmount >= c.previousAmount * 1.3 && c.previousAmount > MIN_THRESHOLD) {
                     status = 'GROWTH';
                     action = '매출 성장 📈 - 우수 고객 혜택 안내 및 점유율 굳히기';
                 }
@@ -1106,20 +1111,49 @@ export default function Customers() {
             {/* NEW STRATEGY ANALYTICS TAB */}
             {activeTab === 'STRATEGY_ANALYTICS' && (
                 <div className="space-y-6">
-                    <div>
-                        <h1 className="text-2xl font-black text-sky-600 flex items-center gap-2">
-                            <TrendingUp className="w-7 h-7 text-sky-500" />
-                            심화 BI 업체별 전략 분석 (Strategic Action)
-                        </h1>
-                        <p className="text-slate-500 text-[15px] mt-1 tracking-tight">
-                            최근 30일과 이전 30~60일의 매출 증감 추이를 비교하여 업체의 활동 상태를 진단하고 영업 대응 전략을 제안합니다.
-                        </p>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-2xl font-black text-sky-600 flex items-center gap-2">
+                                <TrendingUp className="w-7 h-7 text-sky-500" />
+                                심화 BI 업체별 전략 분석 (Strategic Action)
+                            </h1>
+                            <p className="text-slate-500 text-[15px] mt-1 tracking-tight">
+                                선택된 기간명(예: 최근 {strategyPeriod}일 vs 이전 동기)의 매출 증감 추이를 비교하여 업체의 활동 상태를 진단합니다.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <select
+                                value={strategyPeriod}
+                                onChange={(e) => setStrategyPeriod(Number(e.target.value) as any)}
+                                className="bg-white border text-slate-700 border-slate-300 rounded font-bold text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:border-sky-500 shadow-sm"
+                            >
+                                <option value={30}>1개월 비교 (단기 추세)</option>
+                                <option value={90}>3개월 비교 (분기 안정성)</option>
+                                <option value={180}>6개월 비교 (반기 추세)</option>
+                                <option value={365}>1년 비교 (장기 동향)</option>
+                            </select>
+
+                            <div className="flex items-center gap-2 w-full md:w-auto relative">
+                                <Search className="w-4 h-4 absolute left-3 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="상호명 검색..."
+                                    value={strategySearchTerm}
+                                    onChange={e => setStrategySearchTerm(e.target.value)}
+                                    className="bg-white border pl-9 text-slate-700 border-slate-300 rounded font-medium text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:border-sky-500 w-full md:w-64 shadow-inner"
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     <div className="space-y-10">
                         {
                             (['CHURN_RISK', 'GROWTH', 'STABLE', 'NEW', 'DORMANT'] as const).map((statusKey) => {
-                                const companiesInGroup = strategyAnalytics.filter(c => c.status === statusKey);
+                                const searchRegex = new RegExp(strategySearchTerm.replace(/ /g, ''), 'i');
+                                const companiesInGroup = strategyAnalytics.filter(c => 
+                                    c.status === statusKey &&
+                                    (strategySearchTerm === '' || searchRegex.test(c.companyName.replace(/ /g, '')))
+                                );
                                 if (companiesInGroup.length === 0) return null;
 
                                 let groupTitle = '';
