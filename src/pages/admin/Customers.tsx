@@ -1125,7 +1125,7 @@ export default function Customers() {
                             <select
                                 title="전략 분석 기간 선택"
                                 value={strategyPeriod}
-                                onChange={(e) => setStrategyPeriod(Number(e.target.value) as any)}
+                                onChange={(e) => setStrategyPeriod(Number(e.target.value) as 30 | 90 | 180 | 365)}
                                 className="bg-white border text-slate-700 border-slate-300 rounded font-bold text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:border-sky-500 shadow-sm"
                             >
                                 <option value={30}>1개월 비교 (단기 추세)</option>
