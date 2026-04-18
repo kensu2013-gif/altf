@@ -436,9 +436,9 @@ export const useStore = create<AppState>()(
                         const { user, token } = await res.json();
 
 
-                        // MFA Check for MASTER
-                        // Ensure we catch 'MASTER', 'admin' and potentially 'MANAGER' if needed later
-                        if (user.role === 'MASTER' || user.role === 'admin') {
+                        // MFA Check for admin (disabled for MASTER/MANAGER as per request)
+                        // Ensure we catch 'admin'
+                        if (user.role === 'admin') {
                             set({
                                 auth: { ...get().auth, pendingAdminUser: user, token: token || null }
                             });

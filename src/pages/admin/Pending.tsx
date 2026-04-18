@@ -79,6 +79,8 @@ export default function PendingOrders() {
         const headers: Record<string, string> = {
             'Content-Type': 'application/json'
         };
+        const token = useStore.getState().auth.token;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
         if (user.id) headers['x-requester-id'] = user.id;
         if (user.role) headers['x-requester-role'] = user.role;
 
@@ -439,9 +441,9 @@ export default function PendingOrders() {
             </div>
 
             <PageTransition>
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] custom-scrollbar">
-                        <table className="w-full min-w-[1000px] text-sm text-left">
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden text-sm">
+                    <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] custom-scrollbar pb-4">
+                        <table className="w-full min-w-[1000px] text-left">
                             <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 whitespace-nowrap sticky top-0 z-10">
                                 <tr>
                                     <th scope="col" className="px-5 py-3 font-bold w-[13%] min-w-[120px]">고객명 (Customer)</th>

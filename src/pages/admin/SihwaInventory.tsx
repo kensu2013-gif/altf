@@ -185,8 +185,12 @@ export default function SihwaInventory() {
     useEffect(() => {
         const fetchHistory = async () => {
             try {
+                const token = useStore.getState().auth.token;
+                const headers: Record<string, string> = { 'x-requester-role': 'admin' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
                 const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/admin/inventory-history', {
-                    headers: { 'x-requester-role': 'admin' }
+                    headers
                 });
                 if (res.ok) {
                     const data = await res.json();
@@ -216,6 +220,8 @@ export default function SihwaInventory() {
         const headers: Record<string, string> = {
             'Content-Type': 'application/json'
         };
+        const token = useStore.getState().auth.token;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
         if (user.id) headers['x-requester-id'] = user.id;
         if (user.role) headers['x-requester-role'] = user.role;
 
@@ -1120,7 +1126,7 @@ export default function SihwaInventory() {
                                         </button>
                                         
                                         {expandedGroups['CRITICAL'] && (
-                                            <div className="bg-white border-t border-rose-100 overflow-x-auto">
+                                            <div className="bg-white border-t border-rose-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
                                                 {stats.critical.length > 0 ? (
                                                 <table className="w-full text-sm text-left whitespace-nowrap">
                                                     <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none">
@@ -1286,7 +1292,7 @@ export default function SihwaInventory() {
                                         </button>
                                         
                                         {expandedGroups['WARNING'] && (
-                                            <div className="bg-white border-t border-amber-100 overflow-x-auto">
+                                            <div className="bg-white border-t border-amber-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
                                                 {stats.warning.length > 0 ? (
                                                 <table className="w-full text-sm text-left whitespace-nowrap">
                                                     <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none">
@@ -1460,7 +1466,7 @@ export default function SihwaInventory() {
                                         </button>
                                         
                                         {expandedGroups['REGULAR'] && (
-                                            <div className="bg-white border-t border-indigo-100 overflow-x-auto">
+                                            <div className="bg-white border-t border-indigo-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
                                                 {stats.regular.length > 0 ? (
                                                 <table className="w-full text-sm text-left whitespace-nowrap">
                                                     <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none">

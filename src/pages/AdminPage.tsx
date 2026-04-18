@@ -45,6 +45,8 @@ export default function AdminPage() {
         const headers: Record<string, string> = {
             'Content-Type': 'application/json'
         };
+        const token = useStore.getState().auth.token;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
         if (user.id) headers['x-requester-id'] = user.id;
         if (user.role) headers['x-requester-role'] = user.role;
 
