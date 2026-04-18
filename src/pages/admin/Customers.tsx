@@ -1113,58 +1113,111 @@ export default function Customers() {
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                        {strategyAnalytics.map((comp) => {
-                            const isAlert = comp.status === 'CHURN_RISK';
-                            const isGood = comp.status === 'GROWTH' || comp.status === 'NEW';
-                            return (
-                                <div key={comp.companyName} className={`rounded-xl border bg-white shadow-sm overflow-hidden flex flex-col ${isAlert ? 'border-rose-300 ring-1 ring-rose-100' : isGood ? 'border-indigo-200' : 'border-slate-200'}`}>
-                                    <div className="p-4 border-b border-slate-100 flex justify-between items-start">
-                                        <div>
-                                            <h3 className="font-bold text-slate-800 text-[15px] mb-1">{comp.companyName}</h3>
-                                            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">{comp.region}</span>
-                                        </div>
-                                        <div>
-                                            {comp.status === 'NEW' && <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">🆕 신규 유입</span>}
-                                            {comp.status === 'GROWTH' && <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">📈 매출 급등</span>}
-                                            {comp.status === 'STABLE' && <span className="text-[10px] font-black bg-slate-100 text-slate-600 px-2 py-1 rounded-full">⚖️ 안정 유지</span>}
-                                            {comp.status === 'CHURN_RISK' && <span className="text-[10px] font-black bg-rose-100 text-rose-700 px-2 py-1 rounded-full shadow-sm animate-pulse">🚨 이탈 점검</span>}
-                                            {comp.status === 'DORMANT' && <span className="text-[10px] font-black bg-amber-100 text-amber-700 px-2 py-1 rounded-full">💤 장기 휴면</span>}
-                                        </div>
-                                    </div>
-                                    <div className="p-4 grid grid-cols-2 gap-4 flex-1">
-                                        <div className="bg-slate-50 p-2 rounded border border-slate-100">
-                                            <div className="text-[10px] text-slate-400 font-bold mb-1">최근 30일 매출</div>
-                                            <div className="font-black text-slate-800">₩{comp.recentAmount.toLocaleString()}</div>
-                                            <div className="text-[10px] text-slate-500 mt-1">{comp.recentQty.toLocaleString()}개</div>
-                                        </div>
-                                        <div className="bg-slate-50 p-2 rounded border border-slate-100">
-                                            <div className="text-[10px] text-slate-400 font-bold mb-1">이전 30일 매출 (비교군)</div>
-                                            <div className="font-black text-slate-600">₩{comp.previousAmount.toLocaleString()}</div>
-                                            <div className="text-[10px] text-slate-500 mt-1">{comp.previousQty.toLocaleString()}개</div>
-                                        </div>
-                                        <div className="col-span-2 flex items-center justify-between text-[11px] font-bold pb-2 border-b border-dashed border-slate-200">
-                                            <span className="text-slate-500">증감 추이:</span>
-                                            <span className={`${comp.growthRate > 0 ? 'text-emerald-500' : comp.growthRate < 0 ? 'text-rose-500' : 'text-slate-400'}`}>
-                                                {comp.growthRate > 0 ? '▲' : comp.growthRate < 0 ? '▼' : '-'} 
-                                                {Math.abs(comp.growthRate).toFixed(1)}%
-                                            </span>
-                                        </div>
-                                        <div className="col-span-2 pt-1">
-                                            <div className="text-[10px] font-bold text-slate-400 mb-1 flex items-center gap-1">
-                                                <Activity className="w-3 h-3" />
-                                                [AI 영업 대응 제안]
-                                            </div>
-                                            <div className={`text-[12px] font-bold leading-snug p-2 rounded whitespace-pre-wrap ${isAlert ? 'bg-rose-50 text-rose-700 border border-rose-100' : isGood ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-50 text-slate-600 border border-slate-100'}`}>
-                                                {comp.action}
+                    <div className="space-y-10">
+                        {
+                            (['CHURN_RISK', 'GROWTH', 'STABLE', 'NEW', 'DORMANT'] as const).map((statusKey) => {
+                                const companiesInGroup = strategyAnalytics.filter(c => c.status === statusKey);
+                                if (companiesInGroup.length === 0) return null;
+
+                                let groupTitle = '';
+                                let groupColor = '';
+                                let groupIcon = null;
+
+                                if (statusKey === 'CHURN_RISK') {
+                                    groupTitle = '이탈 징후 및 매출 급감 위험군';
+                                    groupColor = 'text-rose-700 bg-rose-50 border-rose-200';
+                                    groupIcon = '🚨';
+                                } else if (statusKey === 'GROWTH') {
+                                    groupTitle = '매출 급등 및 우수 성장군';
+                                    groupColor = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+                                    groupIcon = '📈';
+                                } else if (statusKey === 'STABLE') {
+                                    groupTitle = '안정적 거래 유지 업체';
+                                    groupColor = 'text-slate-700 bg-slate-50 border-slate-200';
+                                    groupIcon = '⚖️';
+                                } else if (statusKey === 'NEW') {
+                                    groupTitle = '신규 유입 (온보딩 및 초기 관리)';
+                                    groupColor = 'text-indigo-700 bg-indigo-50 border-indigo-200';
+                                    groupIcon = '🆕';
+                                } else if (statusKey === 'DORMANT') {
+                                    groupTitle = '장기 휴면 (재컨택 요망)';
+                                    groupColor = 'text-amber-700 bg-amber-50 border-amber-200';
+                                    groupIcon = '💤';
+                                }
+
+                                return (
+                                    <div key={statusKey} className="space-y-4">
+                                        <div className={`flex items-center justify-between p-3 rounded-lg border shadow-sm ${groupColor}`}>
+                                            <h2 className="text-lg font-black flex items-center gap-2 tracking-tight">
+                                                <span>{groupIcon}</span>
+                                                {groupTitle}
+                                            </h2>
+                                            <div className="font-bold bg-white/70 px-3 py-1 rounded-full shadow-inner text-sm">
+                                                총 {companiesInGroup.length}개 업체
                                             </div>
                                         </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                            {companiesInGroup.map((comp) => {
+                                                const isAlert = comp.status === 'CHURN_RISK';
+                                                const isGood = comp.status === 'GROWTH' || comp.status === 'NEW';
+                                                return (
+                                                    <div key={comp.companyName} className={`rounded-xl border bg-white shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow ${isAlert ? 'border-rose-300 ring-2 ring-rose-100 hover:ring-rose-200' : isGood ? 'border-emerald-200 ring-1 ring-emerald-50' : 'border-slate-200'}`}>
+                                                        <div className={`p-4 border-b flex justify-between items-start ${isAlert ? 'bg-rose-50/30' : isGood ? 'bg-emerald-50/30' : 'bg-slate-50/30'}`}>
+                                                            <div>
+                                                                <h3 className="font-black text-slate-800 text-[16px] mb-1.5">{comp.companyName}</h3>
+                                                                <span className="text-[10px] bg-slate-100 border border-slate-200 text-slate-500 px-2 py-0.5 rounded-full font-bold">{comp.region}</span>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <div className="text-[10px] font-bold text-slate-400 mb-0.5">총 누적 매출</div>
+                                                                <div className="text-sm font-black text-slate-700">₩{comp.totalAmount.toLocaleString()}</div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="p-5 grid grid-cols-2 gap-4 flex-1">
+                                                            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                                                <div className="text-[10px] text-slate-400 font-bold mb-1 flex justify-between">
+                                                                    <span>최근 30일 매출</span>
+                                                                    <span className="text-indigo-400">{comp.recentQty.toLocaleString()}개</span>
+                                                                </div>
+                                                                <div className="font-black text-slate-800 text-[15px]">₩{comp.recentAmount.toLocaleString()}</div>
+                                                            </div>
+                                                            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                                                <div className="text-[10px] text-slate-400 font-bold mb-1 flex justify-between">
+                                                                    <span>이전 30일 매출</span>
+                                                                    <span className="text-slate-400">{comp.previousQty.toLocaleString()}개</span>
+                                                                </div>
+                                                                <div className="font-black text-slate-600 text-[15px]">₩{comp.previousAmount.toLocaleString()}</div>
+                                                            </div>
+                                                            
+                                                            <div className="col-span-2 flex items-center justify-between text-xs font-bold pt-2 pb-3 border-b border-dashed border-slate-200">
+                                                                <span className="text-slate-500">증감 추이 분석:</span>
+                                                                <span className={`px-2 py-1 rounded-full ${comp.growthRate > 0 ? 'bg-emerald-100 text-emerald-700' : comp.growthRate < 0 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                                    {comp.growthRate > 0 ? '▲' : comp.growthRate < 0 ? '▼' : '-'} 
+                                                                    {' '}{Math.abs(comp.growthRate).toFixed(1)}%
+                                                                </span>
+                                                            </div>
+
+                                                            <div className="col-span-2 pt-1">
+                                                                <div className="text-[10px] font-bold text-slate-400 mb-1.5 flex items-center gap-1">
+                                                                    <Activity className="w-3.5 h-3.5" />
+                                                                    [AI 영업 대응 전략 가이드]
+                                                                </div>
+                                                                <div className={`text-[12px] font-bold leading-snug p-2.5 rounded whitespace-pre-wrap shadow-inner ${isAlert ? 'bg-rose-50 text-rose-700 border border-rose-100' : isGood ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-50 text-slate-600 border border-slate-100'}`}>
+                                                                    {comp.action}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            })
+                        }
+
                         {strategyAnalytics.length === 0 && (
-                            <div className="col-span-full py-20 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
+                            <div className="py-20 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
                                 분석할 발주 이력이 아직 없습니다.
                             </div>
                         )}
