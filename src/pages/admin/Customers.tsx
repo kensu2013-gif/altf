@@ -703,7 +703,7 @@ export default function Customers() {
                 return b.totalAmount - a.totalAmount;
             });
 
-    }, [orders, customersList]);
+    }, [orders, customersList, strategyPeriod]);
 
     const totalBiRevenue = useMemo(() => {
         return biAnalytics.reduce((acc, c) => acc + c.totalAmount, 0);
