@@ -619,20 +619,20 @@ export default function AdminPage() {
                         </div >
                     </div >
 
-                    {/* Detail Modal/Panel */}
-                    {
-                        selectedOrder && (
-                            <AdminOrderDetail
-                                order={selectedOrder}
-                                onClose={() => setSelectedOrder(null)}
-                                onUpdate={updateOrder}
-                                initialMode={detailInitialMode} // [MOD] Pass Initial Mode
-                            />
-                        )
-                    }
-
                 </div >
             </PageTransition >
+
+            {/* Detail Modal/Panel - Moved outside PageTransition to fix fixed/transform layout bug */}
+            {
+                selectedOrder && (
+                    <AdminOrderDetail
+                        order={selectedOrder}
+                        onClose={() => setSelectedOrder(null)}
+                        onUpdate={updateOrder}
+                        initialMode={detailInitialMode} // [MOD] Pass Initial Mode
+                    />
+                )
+            }
         </CalmPageShell >
     );
 }

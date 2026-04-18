@@ -1,4 +1,5 @@
 import { useState, memo, useMemo, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { Order, LineItem, Product, User as UserType } from '../../../types';
 // import { generateSku } from '../../../lib/sku'; // REMOVED: Managed in useInventoryIndex
 import { useStore } from '../../../store/useStore';
@@ -1210,8 +1211,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         }
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
+    return createPortal(
+        <div className="fixed inset-0 z-[100] flex justify-end pointer-events-none">
             {/* Backdrop */}
 
 
@@ -2896,6 +2897,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     />
                 )
             }
-        </div>
+        </div>,
+        document.body
     );
 });

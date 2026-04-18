@@ -4,6 +4,7 @@ import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plu
 import { Button } from '../../../components/ui/Button';
 import { formatCurrency } from '../../../lib/utils';
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore, type DeliveryInfo, type CustomPriceRecord } from '../../../store/useStore';
 import { renderDocumentHTML } from '../../../lib/documentTemplate';
 
@@ -715,9 +716,9 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         }
     };
 
-    return (
+    return createPortal(
         <>
-            <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
+            <div className="fixed inset-0 z-[100] flex justify-end pointer-events-none">
                 <div className="w-full xl:max-w-[95%] h-full bg-white shadow-2xl pointer-events-auto flex flex-col animate-in slide-in-from-right duration-300">
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
                     <div className="space-y-6">
@@ -1374,7 +1375,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                     isSubmitting={isApiSubmitting}
                 />
             )}
-        </>
-
+        </>,
+        document.body
     );
 }
