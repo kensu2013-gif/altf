@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Users, MapPin, Building2, TrendingUp, Search, Contact, Activity, AlertTriangle, Trash2, Edit2, Plus, BarChart2 } from 'lucide-react';
+import { Users, MapPin, Building2, TrendingUp, Search, Contact, Activity, AlertTriangle, Trash2, Edit2, Plus, BarChart2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useInventory } from '../../hooks/useInventory';
 import type { Product } from '../../types';
@@ -49,6 +49,9 @@ export default function Customers() {
     const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
     const [activeTab, setActiveTab] = useState<'MASTER' | 'ANALYTICS' | 'COMPANY_ANALYTICS' | 'BI_ANALYTICS' | 'STRATEGY_ANALYTICS'>('MASTER');
     const [analyticsSortBy, setAnalyticsSortBy] = useState<'qty' | 'amount' | 'margin'>('qty');
+    const [expandedStrategyGroups, setExpandedStrategyGroups] = useState<Record<string, boolean>>({
+        CHURN_RISK: true, GROWTH: true, STABLE: false, NEW: true, DORMANT: false
+    });
     
     // Inventory mapped for cost inference
     const { inventory } = useInventory();
@@ -1145,64 +1148,69 @@ export default function Customers() {
                                     groupIcon = '💤';
                                 }
 
-                                return (
-                                    <div key={statusKey} className="space-y-4">
-                                        <div className={`flex items-center justify-between p-3 rounded-lg border shadow-sm ${groupColor}`}>
-                                            <h2 className="text-lg font-black flex items-center gap-2 tracking-tight">
-                                                <span>{groupIcon}</span>
-                                                {groupTitle}
-                                            </h2>
-                                            <div className="font-bold bg-white/70 px-3 py-1 rounded-full shadow-inner text-sm">
-                                                총 {companiesInGroup.length}개 업체
-                                            </div>
-                                        </div>
+                                const isExpanded = expandedStrategyGroups[statusKey] !== false;
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                return (
+                                    <div key={statusKey} className="space-y-3">
+                                        <button 
+                                            onClick={() => setExpandedStrategyGroups(prev => ({ ...prev, [statusKey]: !isExpanded }))}
+                                            className={`w-full flex items-center justify-between p-2.5 rounded-lg border shadow-sm transition-all hover:brightness-95 ${groupColor}`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <h2 className="text-base font-black flex items-center gap-1.5 tracking-tight">
+                                                    <span>{groupIcon}</span>
+                                                    {groupTitle}
+                                                </h2>
+                                                <div className="font-bold bg-white/70 px-2 py-0.5 rounded shadow-inner text-[11px]">
+                                                    총 {companiesInGroup.length}개 
+                                                </div>
+                                            </div>
+                                            <div className="p-1 rounded bg-white/50 text-slate-600">
+                                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                            </div>
+                                        </button>
+
+                                        {isExpanded && (
+                                        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
                                             {companiesInGroup.map((comp) => {
                                                 const isAlert = comp.status === 'CHURN_RISK';
                                                 const isGood = comp.status === 'GROWTH' || comp.status === 'NEW';
                                                 return (
                                                     <div key={comp.companyName} className={`rounded-xl border bg-white shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow ${isAlert ? 'border-rose-300 ring-2 ring-rose-100 hover:ring-rose-200' : isGood ? 'border-emerald-200 ring-1 ring-emerald-50' : 'border-slate-200'}`}>
-                                                        <div className={`p-4 border-b flex justify-between items-start ${isAlert ? 'bg-rose-50/30' : isGood ? 'bg-emerald-50/30' : 'bg-slate-50/30'}`}>
-                                                            <div>
-                                                                <h3 className="font-black text-slate-800 text-[16px] mb-1.5">{comp.companyName}</h3>
-                                                                <span className="text-[10px] bg-slate-100 border border-slate-200 text-slate-500 px-2 py-0.5 rounded-full font-bold">{comp.region}</span>
+                                                        <div className={`px-3 py-2 border-b flex justify-between items-center ${isAlert ? 'bg-rose-50/30' : isGood ? 'bg-emerald-50/30' : 'bg-slate-50/30'}`}>
+                                                            <div className="truncate pr-2">
+                                                                <h3 className="font-black text-slate-800 text-[13px] truncate">{comp.companyName}</h3>
                                                             </div>
-                                                            <div className="text-right">
-                                                                <div className="text-[10px] font-bold text-slate-400 mb-0.5">총 누적 매출</div>
-                                                                <div className="text-sm font-black text-slate-700">₩{comp.totalAmount.toLocaleString()}</div>
+                                                            <div className="text-right shrink-0">
+                                                                <div className="text-[11px] font-black text-slate-700 font-mono">₩{(Math.round(comp.totalAmount / 10000)).toLocaleString()}만</div>
                                                             </div>
                                                         </div>
-                                                        <div className="p-5 grid grid-cols-2 gap-4 flex-1">
-                                                            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                                                <div className="text-[10px] text-slate-400 font-bold mb-1 flex justify-between">
-                                                                    <span>최근 30일 매출</span>
-                                                                    <span className="text-indigo-400">{comp.recentQty.toLocaleString()}개</span>
+                                                        <div className="p-3 grid grid-cols-2 gap-2 flex-1 relative">
+                                                            <div className="bg-slate-50 p-1.5 rounded border border-slate-100 flex flex-col justify-center">
+                                                                <div className="text-[9px] text-slate-400 font-bold flex justify-between">
+                                                                    <span>최근30</span>
+                                                                    <span className="text-indigo-400">{comp.recentQty}건</span>
                                                                 </div>
-                                                                <div className="font-black text-slate-800 text-[15px]">₩{comp.recentAmount.toLocaleString()}</div>
+                                                                <div className="font-black text-slate-800 text-[12px] font-mono leading-none mt-0.5">{(Math.round(comp.recentAmount / 10000)).toLocaleString()}만</div>
                                                             </div>
-                                                            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                                                <div className="text-[10px] text-slate-400 font-bold mb-1 flex justify-between">
-                                                                    <span>이전 30일 매출</span>
-                                                                    <span className="text-slate-400">{comp.previousQty.toLocaleString()}개</span>
+                                                            <div className="bg-slate-50 p-1.5 rounded border border-slate-100 flex flex-col justify-center">
+                                                                <div className="text-[9px] text-slate-400 font-bold flex justify-between">
+                                                                    <span>이전30</span>
+                                                                    <span className="text-slate-400">{comp.previousQty}건</span>
                                                                 </div>
-                                                                <div className="font-black text-slate-600 text-[15px]">₩{comp.previousAmount.toLocaleString()}</div>
+                                                                <div className="font-black text-slate-600 text-[12px] font-mono leading-none mt-0.5">{(Math.round(comp.previousAmount / 10000)).toLocaleString()}만</div>
                                                             </div>
                                                             
-                                                            <div className="col-span-2 flex items-center justify-between text-xs font-bold pt-2 pb-3 border-b border-dashed border-slate-200">
-                                                                <span className="text-slate-500">증감 추이 분석:</span>
-                                                                <span className={`px-2 py-1 rounded-full ${comp.growthRate > 0 ? 'bg-emerald-100 text-emerald-700' : comp.growthRate < 0 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                            <div className="col-span-2 flex items-center justify-between text-[10px] font-bold pt-1 pb-1">
+                                                                <span className="text-slate-400">증감추세:</span>
+                                                                <span className={`px-1.5 py-0.5 rounded shadow-xs ${comp.growthRate > 0 ? 'bg-emerald-100/80 text-emerald-700' : comp.growthRate < 0 ? 'bg-rose-100/80 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>
                                                                     {comp.growthRate > 0 ? '▲' : comp.growthRate < 0 ? '▼' : '-'} 
-                                                                    {' '}{Math.abs(comp.growthRate).toFixed(1)}%
+                                                                    {' '}{Math.abs(comp.growthRate).toFixed(0)}%
                                                                 </span>
                                                             </div>
 
-                                                            <div className="col-span-2 pt-1">
-                                                                <div className="text-[10px] font-bold text-slate-400 mb-1.5 flex items-center gap-1">
-                                                                    <Activity className="w-3.5 h-3.5" />
-                                                                    [AI 영업 대응 전략 가이드]
-                                                                </div>
-                                                                <div className={`text-[12px] font-bold leading-snug p-2.5 rounded whitespace-pre-wrap shadow-inner ${isAlert ? 'bg-rose-50 text-rose-700 border border-rose-100' : isGood ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-50 text-slate-600 border border-slate-100'}`}>
+                                                            <div className="col-span-2">
+                                                                <div className={`text-[10px] tracking-tight font-bold leading-[1.2] p-1.5 rounded shadow-inner ${isAlert ? 'bg-rose-50/50 text-rose-600 border border-rose-100' : isGood ? 'bg-emerald-50/50 text-emerald-600 border border-emerald-100' : 'bg-slate-50/50 text-slate-500 border border-slate-100'}`}>
                                                                     {comp.action}
                                                                 </div>
                                                             </div>
@@ -1211,6 +1219,7 @@ export default function Customers() {
                                                 );
                                             })}
                                         </div>
+                                        )}
                                     </div>
                                 );
                             })
