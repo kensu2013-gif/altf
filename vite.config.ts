@@ -31,13 +31,14 @@ export default defineConfig({
   server: {
     allowedHosts: true,
     proxy: {
-      /*
       '/api/inventory': {
-        target: 'https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/public/inventory',
+        target: 'http://localhost:3001',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/inventory/, ''),
       },
-      */
+      '/api/admin': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
       '/api/quote': {
         target: 'https://altf-api.onrender.com',
         changeOrigin: true,

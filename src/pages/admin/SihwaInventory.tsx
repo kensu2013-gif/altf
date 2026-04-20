@@ -823,7 +823,10 @@ export default function SihwaInventory() {
             if (order.status !== 'COMPLETED') return; 
             
             const dateStr = order.adminResponse?.deliveryDate || order.createdAt;
-            const dateKey = new Date(dateStr).toISOString().split('T')[0];
+            // Parse order dates as KST to match backend snapshot dates
+            const dt = new Date(dateStr);
+            const kstDt = new Date(dt.getTime() + 9 * 60 * 60 * 1000);
+            const dateKey = kstDt.toISOString().split('T')[0];
             
             if (!map[dateKey]) map[dateKey] = {};
             
@@ -1621,23 +1624,24 @@ export default function SihwaInventory() {
                                                             let dailyRevenue = 0;
                                                             let dailyCost = 0;
                                                             
+                                                            let validCount = 0;
                                                             if (snap.diff) {
                                                                 snap.diff.forEach((d: InventoryDiffItem) => {
                                                                     const orderImpact = dailyOrderDiffMap[snap.date]?.[d.id] || 0;
                                                                     const pureManualChange = d.change - orderImpact;
-
-                                                                    if (pureManualChange === 0) return; // Skip if accounted for by orders
+                                                                    
+                                                                    if (pureManualChange !== 0) validCount++;
 
                                                                     const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
                                                                     
-                                                                    // Use cumulative sales if available, otherwise fallback to pure negative net change
-                                                                    const effectiveSales = d.sales !== undefined ? d.sales : (pureManualChange < 0 ? Math.abs(pureManualChange) : 0);
+                                                                    // Use actual physical change `d.change` for revenue and cost
+                                                                    const physicalChange = d.change;
+                                                                    const effectiveSales = d.sales !== undefined ? d.sales : (physicalChange < 0 ? Math.abs(physicalChange) : 0);
                                                                     if (effectiveSales > 0) {
                                                                         dailyRevenue += effectiveSales * (analysis ? analysis.sellingPrice : 0);
                                                                     }
                                                                     
-                                                                    // Compute true net restocking (overcoming sales deficits)
-                                                                    const effectiveRestock = pureManualChange + effectiveSales;
+                                                                    const effectiveRestock = physicalChange + effectiveSales;
                                                                     if (effectiveRestock > 0) {
                                                                         dailyCost += effectiveRestock * (analysis ? analysis.recentPurchasePrice : 0);
                                                                     }
@@ -1646,14 +1650,14 @@ export default function SihwaInventory() {
 
                                                             const isGroupExpanded = expandedDailyGroups[snap.date] ?? (idx === 0);
 
-                                                                            const validDiffs = snap.diff?.filter(d => (d.change - (dailyOrderDiffMap[snap.date]?.[d.id] || 0)) !== 0) || [];
+                                                                            const itemsToRender = snap.diff || [];
 
                                                                             return (
                                                                                 <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
                                                                                     <div className="flex flex-col gap-2 mb-3">
                                                                                         <div className="flex items-center justify-between">
                                                                                             <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono font-bold hover:bg-slate-300 cursor-pointer transition-colors" onClick={() => toggleDailyGroup(snap.date)}>{snap.date}</span>
-                                                                                            <span className="text-slate-500 font-medium text-xs">수기 변동 {validDiffs.length}건</span>
+                                                                                            <span className="text-slate-500 font-medium text-xs">총 변동 {itemsToRender.length}건 <span className="text-rose-500 ml-1 font-bold">{validCount > 0 ? `(순수 수기 ${validCount}건)` : ''}</span></span>
                                                                                         </div>
                                                                         
                                                                         {(dailyRevenue > 0 || dailyCost > 0) && (
@@ -1675,9 +1679,9 @@ export default function SihwaInventory() {
                                                                         )}
                                                                     </div>
                                                                     {isGroupExpanded && (
-                                                                        validDiffs.length > 0 ? (
+                                                                        itemsToRender.length > 0 ? (
                                                                             <div className="grid grid-cols-1 gap-2 mt-2">
-                                                                                {[...validDiffs].sort((a, b) => {
+                                                                                {[...itemsToRender].sort((a, b) => {
                                                                                     const aiA = a.id ? analyzedInventory.find(ai => ai.product.id === a.id) : null;
                                                                                     const aiB = b.id ? analyzedInventory.find(ai => ai.product.id === b.id) : null;
                                                                                     return (aiB ? aiB.deficit : 0) - (aiA ? aiA.deficit : 0);
@@ -1691,8 +1695,9 @@ export default function SihwaInventory() {
                                                                                     const sellingPrice = analysis ? analysis.sellingPrice : 0;
                                                                                     const purchasePrice = analysis ? analysis.recentPurchasePrice : 0;
                                                                                     
-                                                                                    const effectiveSales = d.sales !== undefined ? d.sales : (pureManualChange < 0 ? Math.abs(pureManualChange) : 0);
-                                                                                    const effectiveRestock = pureManualChange + effectiveSales;
+                                                                                    const physicalChange = d.change;
+                                                                                    const effectiveSales = d.sales !== undefined ? d.sales : (physicalChange < 0 ? Math.abs(physicalChange) : 0);
+                                                                                    const effectiveRestock = physicalChange + effectiveSales;
                                                                                     
                                                                                     const valueChips = [];
                                                                                     if (effectiveSales > 0) {
@@ -1711,9 +1716,10 @@ export default function SihwaInventory() {
                                                                                     }
 
                                                                                     const finalId = d.id || d.name || '알수없음';
+                                                                                    const isOrderMatched = pureManualChange === 0 && d.change !== 0;
 
                                                                                     return (
-                                                                                        <div key={dIdx} className={`flex flex-col text-xs bg-white rounded border border-slate-100 border-l-4 ${pureManualChange > 0 ? 'border-l-emerald-500' : 'border-l-blue-500'}`}>
+                                                                                        <div key={dIdx} className={`flex flex-col text-xs bg-white rounded border border-slate-100 border-l-4 ${physicalChange > 0 ? 'border-l-emerald-500' : 'border-l-blue-500'} ${isOrderMatched ? 'opacity-80 border-dashed' : ''}`}>
                                                                                             <div 
                                                                                                 className="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-50 transition-colors"
                                                                                                 onClick={() => toggleTrendItem(rowKey)}
@@ -1738,8 +1744,11 @@ export default function SihwaInventory() {
                                                                                                                     )}
                                                                                                                 </div>
                                                                                                             ))}
-                                                                                                            {valueChips.length === 0 && pureManualChange === 0 && (
-                                                                                                                <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">임시 변동 (0)</span>
+                                                                                                            {valueChips.length === 0 && physicalChange === 0 && (
+                                                                                                                <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">변동상쇄됨 (0)</span>
+                                                                                                            )}
+                                                                                                            {isOrderMatched && (
+                                                                                                                <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded ml-1 font-bold" title="주문 관리 시스템 기록과 완벽 일치">✔️ 주문연동</span>
                                                                                                             )}
                                                                                                         </div>
 
@@ -1772,7 +1781,7 @@ export default function SihwaInventory() {
                                                                                     );
                                                                                 })}
                                                                             </div>
-                                                                        ) : <p className="text-xs text-slate-400 mt-2 px-1">주문 외 순수 수기 변동 내역이 없습니다.</p>
+                                                                        ) : <p className="text-xs text-slate-400 mt-2 px-1">변동 이력이 없습니다.</p>
                                                                     )}
                                                                 </div>
                                                             );
