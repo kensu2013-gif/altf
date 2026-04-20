@@ -181,8 +181,10 @@ export default function SihwaInventory() {
         }
     };
 
-    // 1. Fetch History Data from the local-api-server
+    // 1. Fetch History Data from the local-api-server (MUST WAIT FOR INVENTORY TO FINISH DIFFING)
     useEffect(() => {
+        if (invLoading) return; // Wait until inventory fetch completes (which triggers backend snapshot ledger)
+        
         const fetchHistory = async () => {
             try {
                 const token = useStore.getState().auth.token;
@@ -210,7 +212,7 @@ export default function SihwaInventory() {
             }
         };
         fetchHistory();
-    }, []);
+    }, [invLoading]);
 
     // 1.5 Fetch Orders to sync with inventory
     const setOrders = useStore(state => state.setOrders);
