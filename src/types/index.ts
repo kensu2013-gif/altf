@@ -111,6 +111,10 @@ export interface User {
     managerId?: string; // [DEPRECATED] Backwards compatibility
     // For MANAGER
     department?: string;
+    permissions?: {
+        viewCrm?: boolean;
+        viewSihwa?: boolean;
+    };
     contactInfo?: {
         phone: string;
         email: string;

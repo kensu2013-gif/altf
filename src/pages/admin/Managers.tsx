@@ -24,7 +24,8 @@ export default function AdminManagers() {
     const currentUser = useStore((state) => state.auth.user);
 
     const [newUser, setNewUser] = useState<Partial<User>>({
-        email: '', password: '', contactName: '', companyName: '', phone: '', address: '', role: 'MANAGER'
+        email: '', password: '', contactName: '', companyName: '', phone: '', address: '', role: 'MANAGER',
+        permissions: { viewCrm: false, viewSihwa: false }
     });
 
     useEffect(() => {
@@ -64,7 +65,7 @@ export default function AdminManagers() {
         if (success) {
             alert('영업 담당자가 생성되었습니다.');
             setIsCreateModalOpen(false);
-            setNewUser({ email: '', password: '', contactName: '', companyName: '', phone: '', address: '', role: 'MANAGER' });
+            setNewUser({ email: '', password: '', contactName: '', companyName: '', phone: '', address: '', role: 'MANAGER', permissions: { viewCrm: false, viewSihwa: false } });
         } else {
             alert('생성 실패. 이메일 중복 등을 확인해주세요.');
         }
@@ -83,7 +84,8 @@ export default function AdminManagers() {
             contactName: editingUser.contactName,
             companyName: editingUser.companyName,
             phone: editingUser.phone,
-            address: editingUser.address
+            address: editingUser.address,
+            permissions: editingUser.permissions || { viewCrm: false, viewSihwa: false }
         };
 
         if (editingUser.password && editingUser.password.trim() !== '') {
@@ -244,6 +246,26 @@ export default function AdminManagers() {
                                     title="주소" placeholder="주소 입력"
                                     value={newUser.address} onChange={e => setNewUser({ ...newUser, address: e.target.value })} />
                             </div>
+
+                            {/* Permissions Section */}
+                            <div className="pt-2 border-t border-slate-100">
+                                <label className="block text-xs font-bold text-slate-500 mb-3">권한 부여 (선택)</label>
+                                <div className="space-y-3">
+                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                        <input type="checkbox" className="w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500"
+                                            checked={newUser.permissions?.viewCrm || false}
+                                            onChange={e => setNewUser({ ...newUser, permissions: { ...newUser.permissions, viewCrm: e.target.checked } })} />
+                                        알트에프 거래처(CRM) 메뉴 접근 허용
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                        <input type="checkbox" className="w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500"
+                                            checked={newUser.permissions?.viewSihwa || false}
+                                            onChange={e => setNewUser({ ...newUser, permissions: { ...newUser.permissions, viewSihwa: e.target.checked } })} />
+                                        시화재고 관리 메뉴 접근 허용
+                                    </label>
+                                </div>
+                            </div>
+                            
                             <Button type="submit" className="w-full bg-slate-800 text-white hover:bg-slate-700 mt-2">
                                 생성하기
                             </Button>
@@ -314,6 +336,29 @@ export default function AdminManagers() {
                                     value={editingUser.address}
                                     onChange={e => setEditingUser({ ...editingUser, address: e.target.value })} />
                             </div>
+
+                            {/* Permissions Section (Only MASTER can see this typically, but Managers.tsx is MASTER-only usually) */}
+                            {currentUser?.role === 'MASTER' && (
+                                <div className="pt-2 border-t border-slate-100">
+                                    <label className="block text-xs font-bold text-slate-500 mb-3">메뉴 접근 권한 (RBAC)</label>
+                                    <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                            <input type="checkbox" className="w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500"
+                                                checked={editingUser.permissions?.viewCrm || false}
+                                                onChange={e => setEditingUser({ ...editingUser, permissions: { ...editingUser.permissions, viewCrm: e.target.checked } })} />
+                                            <span className="font-medium">알트에프 거래처(CRM)</span> 메뉴 접근 허용
+                                        </label>
+                                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                            <input type="checkbox" className="w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500"
+                                                checked={editingUser.permissions?.viewSihwa || false}
+                                                onChange={e => setEditingUser({ ...editingUser, permissions: { ...editingUser.permissions, viewSihwa: e.target.checked } })} />
+                                            <span className="font-medium">시화재고 관리</span> 메뉴 접근 허용
+                                        </label>
+                                        <p className="text-[10px] text-slate-500 mt-1 pl-6">* 체크를 해제하면 해당 담당자의 좌측 메뉴에서 탭이 즉시 사라집니다.</p>
+                                    </div>
+                                </div>
+                            )}
+
                             <Button type="submit" className="w-full bg-slate-800 text-white hover:bg-slate-700 mt-2">
                                 수정 저장
                             </Button>
