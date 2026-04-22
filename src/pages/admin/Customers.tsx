@@ -99,6 +99,32 @@ import { getSharedMaterialColor } from '../../lib/productUtils';
 
 const getMaterialColor = getSharedMaterialColor;
 
+const resolveItemCost = (o: any, itemExt: any, product: any, unitPrice: number): number => {
+    const id = itemExt.productId || itemExt.item_id || '';
+    const basePrice = (itemExt.base_price && itemExt.base_price > 0) 
+        ? itemExt.base_price 
+        : (product?.base_price ?? product?.unitPrice ?? 0);
+    
+    let costPrice = Math.round((unitPrice * 0.9) / 10) * 10;
+    
+    // [FIX] Read from po_items if available, since supplier data is managed there.
+    const poItem = o.po_items?.find((p: any) => p.productId === id && p.name === itemExt.name);
+    const override = poItem?.supplierPriceOverride ?? itemExt.supplierPriceOverride;
+    const sRate = poItem?.supplierRate ?? itemExt.supplierRate;
+
+    if (override !== undefined && override > 0) {
+        costPrice = override;
+    } else if (sRate !== undefined && sRate > 0) {
+        costPrice = Math.round((basePrice * (100 - sRate) / 100) / 10) * 10;
+    } else if (product) {
+        const rate = product.rate_act2 || product.rate_act || product.rate_pct || 0;
+        if (rate > 0) {
+            costPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+        }
+    }
+    return costPrice;
+};
+
 export default function Customers() {
     const user = useStore(state => state.auth.user);
     const token = useStore(state => state.auth.token);
@@ -398,17 +424,7 @@ export default function Customers() {
                 
                 const basePrice = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
                 
-                let costPrice = Math.round((unitPrice * 0.9) / 10) * 10; // Default: assume at least 10% margin if unknown
-                if (itemExt.supplierPriceOverride && itemExt.supplierPriceOverride > 0) {
-                    costPrice = itemExt.supplierPriceOverride;
-                } else if (item.supplierRate !== undefined && item.supplierRate > 0) {
-                    costPrice = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
-                } else if (product) {
-                    const rate = product.rate_act2 || product.rate_act || product.rate_pct || 0;
-                    if (rate > 0) {
-                        costPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
-                    }
-                }
+                const costPrice = resolveItemCost(o, itemExt, product, unitPrice);
 
                 const itemAmount = quantity * unitPrice;
                 const itemCost = quantity * costPrice;
@@ -522,18 +538,7 @@ export default function Customers() {
 
                 const basePrice = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
                 
-                let costPrice = Math.round((unitPrice * 0.9) / 10) * 10; // Fallback to 10% generic margin
-                
-                if (itemExt.supplierPriceOverride && itemExt.supplierPriceOverride > 0) {
-                    costPrice = itemExt.supplierPriceOverride;
-                } else if (item.supplierRate !== undefined && item.supplierRate > 0) {
-                    costPrice = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
-                } else if (product) {
-                    const rate = product.rate_act2 || product.rate_act || product.rate_pct || 0;
-                    if (rate > 0) {
-                        costPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
-                    }
-                }
+                const costPrice = resolveItemCost(o, itemExt, product, unitPrice);
 
                 const itemAmount = quantity * unitPrice;
                 const itemCost = quantity * costPrice;
@@ -628,10 +633,7 @@ export default function Customers() {
                 const itemKey = `${item.name}-${item.thickness}-${item.size}${matString}`;
                 
                 const basePrice = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
-                let costPrice = Math.round((unitPrice * 0.9) / 10) * 10;
-                if (item.supplierRate !== undefined && item.supplierRate > 0) {
-                    costPrice = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
-                }
+                const costPrice = resolveItemCost(o, itemExt, product, unitPrice);
 
                 const itemAmount = quantity * unitPrice;
                 const itemCost = quantity * costPrice;
@@ -933,17 +935,7 @@ export default function Customers() {
             ? itemExt.base_price 
             : (product?.base_price ?? product?.unitPrice ?? 0);
           
-          let costPrice = Math.round((unitPrice * 0.9) / 10) * 10; // Default: assume at least 10% margin if unknown
-          if (itemExt.supplierPriceOverride && itemExt.supplierPriceOverride > 0) {
-              costPrice = itemExt.supplierPriceOverride;
-          } else if (itemExt.supplierRate !== undefined && itemExt.supplierRate > 0) {
-              costPrice = Math.round((basePrice * (100 - itemExt.supplierRate) / 100) / 10) * 10;
-          } else if (product) {
-              const rate = product.rate_act2 || product.rate_act || product.rate_pct || 0;
-              if (rate > 0) {
-                  costPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
-              }
-          }
+          const costPrice = resolveItemCost(o, itemExt, product, unitPrice);
 
           const itemAmount = quantity * unitPrice;
           const itemCost = quantity * costPrice;
@@ -1197,15 +1189,7 @@ const actionIntel = useMemo(() => {
       const itemKey    = `${item.name}-${item.thickness}-${item.size}${matInfo ? `-${matInfo}` : ''}`;
       const basePrice  = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
 
-      let costPrice = Math.round((unitPrice * 0.9) / 10) * 10;
-      if (itemExt.supplierPriceOverride && itemExt.supplierPriceOverride > 0) {
-        costPrice = itemExt.supplierPriceOverride;
-      } else if (item.supplierRate !== undefined && item.supplierRate > 0) {
-        costPrice = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
-      } else if (product) {
-        const rate = product.rate_act2 || product.rate_act || product.rate_pct || 0;
-        if (rate > 0) costPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
-      }
+      const costPrice = resolveItemCost(o, itemExt, product, unitPrice);
 
       const itemAmt  = qty * unitPrice;
       const itemCost = qty * costPrice;
