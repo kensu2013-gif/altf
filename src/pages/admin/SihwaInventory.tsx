@@ -396,6 +396,38 @@ export default function SihwaInventory() {
         stockStatusByTurnover: 'CRITICAL' | 'LOW' | 'OPTIMAL' | 'EXCESS' | 'DEAD';
     }
 
+    // Dynamically calculate Real-Time Sales History combining static base ERP data and real-time orders
+    const liveSalesHistory = useMemo(() => {
+        const base = JSON.parse(JSON.stringify(salesHistory)) as Record<string, { salesVolume: number, salesFreq: number }>;
+        
+        orders.forEach(order => {
+            if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
+            if (order.status !== 'COMPLETED') return;
+            
+            const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
+            // Exclude internal stock transfers
+            if (customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화')) return;
+            
+            const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
+            if (!items) return;
+
+            items.forEach((item: any) => {
+                const id = item.productId || item.item_id;
+                if (!id) return;
+                const qty = Number(item.quantity ?? item.qty ?? 0);
+                if (qty <= 0) return;
+
+                if (!base[id]) {
+                    base[id] = { salesVolume: 0, salesFreq: 0 };
+                }
+                base[id].salesVolume += qty;
+                base[id].salesFreq += 1;
+            });
+        });
+        
+        return base;
+    }, [orders]);
+
     const analyzedInventory = useMemo(() => {
         const comparisonMap: Record<string, AnalyzedItem> = {};
 
@@ -441,7 +473,7 @@ export default function SihwaInventory() {
                 }
             }
 
-            const salesData = salesHistory[item.id] || { salesVolume: 0, salesFreq: 0 };
+            const salesData = liveSalesHistory[item.id] || { salesVolume: 0, salesFreq: 0 };
             const compData = COMPETITOR_DATA[item.id] || { compSales: 0, compFreq: 0 };
             const marketTotal = salesData.salesVolume + compData.compSales;
             const marketShare = marketTotal > 0 ? parseFloat(((salesData.salesVolume / marketTotal) * 100).toFixed(1)) : 0;
@@ -498,7 +530,7 @@ export default function SihwaInventory() {
                     const finalSellingPrice = calculateSellingPrice(id, rawBasePrice);
                     const recentInfo = recentSeoulPurchaseInfoMap[id];
                     
-                    const salesData = salesHistory[id] || { salesVolume: 0, salesFreq: 0 };
+                    const salesData = liveSalesHistory[id] || { salesVolume: 0, salesFreq: 0 };
                     const compData = COMPETITOR_DATA[id] || { compSales: 0, compFreq: 0 };
                     const marketTotal = salesData.salesVolume + compData.compSales;
                     const marketShare = marketTotal > 0 ? parseFloat(((salesData.salesVolume / marketTotal) * 100).toFixed(1)) : 0;
@@ -680,7 +712,7 @@ export default function SihwaInventory() {
                 default: return 0; // Fallback
             }
         });
-    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, searchTerm, sortConfig, historyData]);
+    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, searchTerm, sortConfig, historyData, liveSalesHistory]);
 
     // Aggregate stats and Asset Valuation totals
     const stats = useMemo(() => {
@@ -696,8 +728,8 @@ export default function SihwaInventory() {
                     recommendedQty = 0;
                 } else if (rawRecommended > 0) {
                     recommendedQty = Math.ceil(rawRecommended / 10) * 10;
-                    if (recommendedQty < 50) {
-                         recommendedQty = Math.max(50, Math.ceil(rawRecommended / 10) * 10);
+                    if (recommendedQty < 0) {
+                         recommendedQty = 0;
                     }
                 }
                 
@@ -749,7 +781,7 @@ export default function SihwaInventory() {
             } else if (listType === 'WARNING') {
                 const targetQty = row.targetStockByTurnover - (row.shQty + row.pendingOrderQty);
                 qty = targetQty > 0 ? targetQty : (row.deficit > 0 ? row.deficit : 0);
-                qty = Math.max(100, Math.ceil(qty / 10) * 10);
+                qty = Math.ceil(qty / 10) * 10;
                 const sizeNum = parseInt((row.product.size || '').replace(/[^0-9]/g, ''), 10);
                 if (!isNaN(sizeNum) && sizeNum >= 100) {
                     const dynamicCap = Math.max(300, Math.ceil(row.salesVolume / 4));
@@ -758,7 +790,7 @@ export default function SihwaInventory() {
             } else {
                 const targetQty = row.targetStockByTurnover - (row.shQty + row.pendingOrderQty);
                 qty = targetQty > 0 ? targetQty : (row.deficit > 0 ? row.deficit : 0);
-                qty = Math.max(10, Math.ceil(qty / 10) * 10);
+                qty = Math.ceil(qty / 10) * 10;
                 const sizeNum = parseInt((row.product.size || '').replace(/[^0-9]/g, ''), 10);
                 if (!isNaN(sizeNum) && sizeNum >= 100) {
                     const dynamicCap = Math.max(300, Math.ceil(row.salesVolume / 4));
