@@ -153,28 +153,38 @@ const resolveItemCost = (o: ResolveOrderType, itemExt: ResolveItemType, product:
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const resolveOrderDate = (o: any): Date => {
-    // 1. Try to parse Korean date from payload.meta.created_at
+    const parseDateStr = (yy: string, mm: string, dd: string) => {
+        const year = yy.length === 2 ? `20${yy}` : yy;
+        return new Date(`${year}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T12:00:00Z`); // Noon UTC avoids TZ shifts
+    };
+
+    // 1. Check poNumber or id for YYYYMMDD or YYMMDD
+    const identifiers = [o.poNumber, o.id].filter(Boolean);
+    for (const str of identifiers) {
+        if (typeof str !== 'string') continue;
+        
+        // Match YYYYMMDD (e.g. PO-20260422-1016)
+        let m = str.match(/\D(20\d{6})(-|$)/);
+        if (m) return parseDateStr(m[1].slice(0, 4), m[1].slice(4, 6), m[1].slice(6, 8));
+        
+        // Match YYMMDD (e.g. ES260422-1016 or O-GYEON-260315-001)
+        m = str.match(/\D(\d{6})(-|$)/);
+        if (m) return parseDateStr(m[1].slice(0, 2), m[1].slice(2, 4), m[1].slice(4, 6));
+    }
+
+    // 2. Try to parse Korean date from payload.meta.created_at
     const kDateStr = o.payload?.meta?.created_at;
     if (typeof kDateStr === 'string') {
         const kDateMatch = kDateStr.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
-        if (kDateMatch) {
-            return new Date(`${kDateMatch[1]}-${kDateMatch[2].padStart(2, '0')}-${kDateMatch[3].padStart(2, '0')}T00:00:00Z`);
-        }
+        if (kDateMatch) return parseDateStr(kDateMatch[1], kDateMatch[2], kDateMatch[3]);
     }
     
-    // 2. Try to parse YYMMDD from order ID (e.g., O-GYEON-260315-001)
-    if (typeof o.id === 'string') {
-        const idMatch = o.id.match(/\D(\d{6})(-|$)/);
-        if (idMatch) {
-            const yy = idMatch[1].slice(0, 2);
-            const mm = idMatch[1].slice(2, 4);
-            const dd = idMatch[1].slice(4, 6);
-            return new Date(`20${yy}-${mm}-${dd}T00:00:00Z`);
-        }
+    // 3. Fallback to createdAt, shifted to Noon UTC to prevent month boundary timezone issues
+    const d = new Date(o.createdAt || new Date());
+    if (!isNaN(d.getTime())) {
+        return new Date(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T12:00:00Z`);
     }
-
-    // 3. Fallback to createdAt
-    return new Date(o.createdAt || new Date());
+    return new Date();
 };
 
 export default function Customers() {
