@@ -54,6 +54,7 @@ export default function Customers() {
     });
     const [strategyPeriod, setStrategyPeriod] = useState<30 | 90 | 180 | 365>(30);
     const [strategySearchTerm, setStrategySearchTerm] = useState('');
+    const [strategySelectedRegion, setStrategySelectedRegion] = useState<string>('ALL');
     
     // Inventory mapped for cost inference
     const { inventory } = useInventory();
@@ -756,7 +757,7 @@ export default function Customers() {
                     className={`px-5 py-2.5 rounded-t-lg font-bold transition-all flex items-center gap-1.5 ${activeTab === 'STRATEGY_ANALYTICS' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-500 hover:bg-sky-50 hover:text-sky-600'}`}
                 >
                     <TrendingUp className="w-4 h-4"/>
-                    심화 BI 업체별 전략 분석
+                    지역별/업체 전략 분석
                 </button>
             </div>
 
@@ -1115,23 +1116,33 @@ export default function Customers() {
                         <div>
                             <h1 className="text-2xl font-black text-sky-600 flex items-center gap-2">
                                 <TrendingUp className="w-7 h-7 text-sky-500" />
-                                심화 BI 업체별 전략 분석 (Strategic Action)
+                                지역별/업체 전략 분석 (Regional/Strategic Action)
                             </h1>
                             <p className="text-slate-500 text-[15px] mt-1 tracking-tight">
-                                선택된 기간명(예: 최근 {strategyPeriod}일 vs 이전 동기)의 매출 증감 추이를 비교하여 업체의 활동 상태를 진단합니다.
+                                선택된 지역 및 기간(예: 최근 {strategyPeriod}일 vs 이전 동기)의 매출 증감 추이를 비교하여 업체의 활동 상태를 진단합니다.
                             </p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <select
+                                title="지역 필터링"
+                                value={strategySelectedRegion}
+                                onChange={(e) => setStrategySelectedRegion(e.target.value)}
+                                className="bg-white border text-slate-700 border-slate-300 rounded font-bold text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:border-sky-500 shadow-sm"
+                            >
+                                <option value="ALL">전국 지도 (전체)</option>
+                                {regions.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+
                             <select
                                 title="전략 분석 기간 선택"
                                 value={strategyPeriod}
                                 onChange={(e) => setStrategyPeriod(Number(e.target.value) as 30 | 90 | 180 | 365)}
                                 className="bg-white border text-slate-700 border-slate-300 rounded font-bold text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:border-sky-500 shadow-sm"
                             >
-                                <option value={30}>1개월 비교 (단기 추세)</option>
-                                <option value={90}>3개월 비교 (분기 안정성)</option>
-                                <option value={180}>6개월 비교 (반기 추세)</option>
-                                <option value={365}>1년 비교 (장기 동향)</option>
+                                <option value={30}>1개월 비교 (단기)</option>
+                                <option value={90}>3개월 비교 (분기)</option>
+                                <option value={180}>6개월 비교 (반기)</option>
+                                <option value={365}>1년 비교 (장기)</option>
                             </select>
 
                             <div className="flex items-center gap-2 w-full md:w-auto relative">
@@ -1153,7 +1164,8 @@ export default function Customers() {
                                 const searchRegex = new RegExp(strategySearchTerm.replace(/ /g, ''), 'i');
                                 const companiesInGroup = strategyAnalytics.filter(c => 
                                     c.status === statusKey &&
-                                    (strategySearchTerm === '' || searchRegex.test(c.companyName.replace(/ /g, '')))
+                                    (strategySearchTerm === '' || searchRegex.test(c.companyName.replace(/ /g, ''))) &&
+                                    (strategySelectedRegion === 'ALL' || c.region === strategySelectedRegion)
                                 );
                                 if (companiesInGroup.length === 0) return null;
 
