@@ -119,6 +119,7 @@ export default function Customers() {
     // COMPANY_CARD states
     const [companyCardSortBy, setCompanyCardSortBy] = useState<'amount' | 'qty' | 'orders' | 'conversion'>('amount');
     const [companyCardRegion, setCompanyCardRegion] = useState<string>('ALL');
+    const [companyCardPeriod, setCompanyCardPeriod] = useState<string>('ALL');
     const [companyCardSearch, setCompanyCardSearch] = useState<string>('');
     const [companyCardExpanded, setCompanyCardExpanded] = useState<Record<string, boolean>>({});
     const [cardItemSortBy, setCardItemSortBy] = useState<'qty' | 'amount' | 'freq'>('amount');
@@ -803,6 +804,26 @@ export default function Customers() {
 
         if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN' || oExt.isDeleted) return;
 
+        // 날짜 필터 적용
+        const orderDate = new Date(o.createdAt || new Date());
+        const year = orderDate.getFullYear();
+        const month = orderDate.getMonth() + 1;
+        const currentYear = new Date().getFullYear();
+
+        if (companyCardPeriod !== 'ALL') {
+          if (companyCardPeriod === 'THIS_YEAR' && year !== currentYear) return;
+          if (companyCardPeriod === 'H1' && (year !== currentYear || month > 6)) return;
+          if (companyCardPeriod === 'H2' && (year !== currentYear || month < 7)) return;
+          if (companyCardPeriod === 'Q1' && (year !== currentYear || month > 3)) return;
+          if (companyCardPeriod === 'Q2' && (year !== currentYear || month < 4 || month > 6)) return;
+          if (companyCardPeriod === 'Q3' && (year !== currentYear || month < 7 || month > 9)) return;
+          if (companyCardPeriod === 'Q4' && (year !== currentYear || month < 10)) return;
+          if (companyCardPeriod.startsWith('M')) {
+            const m = parseInt(companyCardPeriod.substring(1));
+            if (year !== currentYear || month !== m) return;
+          }
+        }
+
         // 내부 재고 주문 제외
         const fullCustomerName = (
           oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || ''
@@ -858,7 +879,6 @@ export default function Customers() {
         }
 
         // 날짜
-        const orderDate = new Date(o.createdAt || new Date());
         card.orderDates.push(orderDate);
 
         // 월별 집계
@@ -1034,7 +1054,7 @@ export default function Customers() {
         })
         .sort((a, b) => b.totalAmount - a.totalAmount);
 
-    }, [orders, customersList, inventoryMap]);
+    }, [orders, customersList, inventoryMap, companyCardPeriod]);
 
     const totalBiRevenue = useMemo(() => {
         return biAnalytics.reduce((acc, c) => acc + c.totalAmount, 0);
@@ -1752,6 +1772,34 @@ export default function Customers() {
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {/* 기간 필터 */}
+                    <select
+                      title="기간 필터"
+                      value={companyCardPeriod}
+                      onChange={e => setCompanyCardPeriod(e.target.value)}
+                      className="bg-white border text-slate-700 border-slate-300 rounded font-bold text-sm px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                    >
+                      <option value="ALL">전체 기간</option>
+                      <option value="THIS_YEAR">올해 전체</option>
+                      <option value="H1">상반기</option>
+                      <option value="H2">하반기</option>
+                      <option value="Q1">1분기</option>
+                      <option value="Q2">2분기</option>
+                      <option value="Q3">3분기</option>
+                      <option value="Q4">4분기</option>
+                      <option value="M1">1월</option>
+                      <option value="M2">2월</option>
+                      <option value="M3">3월</option>
+                      <option value="M4">4월</option>
+                      <option value="M5">5월</option>
+                      <option value="M6">6월</option>
+                      <option value="M7">7월</option>
+                      <option value="M8">8월</option>
+                      <option value="M9">9월</option>
+                      <option value="M10">10월</option>
+                      <option value="M11">11월</option>
+                      <option value="M12">12월</option>
+                    </select>
                     {/* 지역 필터 */}
                     <select
                       title="지역 필터"
@@ -1759,7 +1807,7 @@ export default function Customers() {
                       onChange={e => setCompanyCardRegion(e.target.value)}
                       className="bg-white border text-slate-700 border-slate-300 rounded font-bold text-sm px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
                     >
-                      <option value="ALL">전국</option>
+                      <option value="ALL">지역: 전국</option>
                       {regions.map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
                     {/* 정렬 */}
@@ -1805,7 +1853,7 @@ export default function Customers() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[
                         { label: '분석 대상 업체', value: `${visibleCards.length}개`, sub: '발주 이력 있는 업체', color: 'border-violet-400' },
-                        { label: '총 누적 매출', value: `₩${Math.round(totalRevenue / 10000).toLocaleString()}만`, sub: '내부 재고 제외', color: 'border-indigo-400' },
+                        { label: '총 매출', value: `${totalRevenue.toLocaleString()}원`, sub: '내부 재고 제외', color: 'border-indigo-400' },
                         { label: '이탈 위험 업체', value: `${churnRisk}개`, sub: `${CHURN_RISK_DAYS}일+ 무발주`, color: 'border-rose-400' },
                         { label: '평균 전환율', value: `${avgConversion}%`, sub: '견적→발주 전환', color: 'border-emerald-400' },
                       ].map(m => (
@@ -1909,7 +1957,7 @@ export default function Customers() {
                                 <div className="text-right hidden sm:block">
                                   <div className="text-[10px] text-slate-400 font-bold">누적 매출</div>
                                   <div className="font-black text-slate-800 text-base">
-                                    ₩{Math.round(card.totalAmount / 10000).toLocaleString()}만
+                                    {card.totalAmount.toLocaleString()}원
                                   </div>
                                 </div>
                                 <div className="text-right hidden md:block">
@@ -1983,9 +2031,9 @@ export default function Customers() {
                                   <div className="grid grid-cols-2 gap-2">
                                     {[
                                       { label: '총 수량', value: `${card.totalQty.toLocaleString()}개`, color: 'text-indigo-600' },
-                                      { label: '평균 발주액', value: `₩${Math.round(card.avgOrderAmount / 10000).toLocaleString()}만`, color: 'text-slate-700' },
+                                      { label: '평균 발주액', value: `${card.avgOrderAmount.toLocaleString()}원`, color: 'text-slate-700' },
                                       { label: '마진율', value: `${card.marginRate}%`, color: card.marginRate >= 20 ? 'text-emerald-600' : card.marginRate >= 10 ? 'text-amber-500' : 'text-rose-500' },
-                                      { label: '연간 LTV', value: `₩${Math.round(card.ltv / 10000).toLocaleString()}만`, color: 'text-violet-600' },
+                                      { label: '연간 LTV', value: `${card.ltv.toLocaleString()}원`, color: 'text-violet-600' },
                                       { label: '견적 건수', value: `${card.quoteCount}건`, color: 'text-slate-600' },
                                       { label: '전환 건수', value: `${card.orderFromQuote}건`, color: 'text-emerald-600' },
                                     ].map(kpi => (
@@ -2067,7 +2115,7 @@ export default function Customers() {
                                               )}
                                             </div>
                                             <span className="text-[11px] font-mono text-right w-16 shrink-0 text-slate-600">
-                                              {m.amount > 0 ? `${Math.round(m.amount / 10000).toLocaleString()}만` : '—'}
+                                              {m.amount > 0 ? `${m.amount.toLocaleString()}원` : '—'}
                                             </span>
                                           </div>
                                         );
@@ -2077,7 +2125,7 @@ export default function Customers() {
                                     <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between text-[12px]">
                                       <span className="text-slate-500 font-bold">12개월 합계</span>
                                       <span className="font-black text-violet-700">
-                                        ₩{Math.round(card.ltv / 10000).toLocaleString()}만
+                                        {card.ltv.toLocaleString()}원
                                       </span>
                                     </div>
                                   </div>
@@ -2130,7 +2178,7 @@ export default function Customers() {
                                                       {item.qty.toLocaleString()}개
                                                     </span>
                                                     <span className="text-[10px] text-slate-500">
-                                                      ₩{Math.round(item.amount / 10000).toLocaleString()}만
+                                                      {item.amount.toLocaleString()}원
                                                     </span>
                                                     <span className="text-[10px] text-amber-600">
                                                       {item.orderCount}회 발주
