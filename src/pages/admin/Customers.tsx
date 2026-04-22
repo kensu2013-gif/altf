@@ -107,7 +107,23 @@ export default function Customers() {
     const [customersList, setCustomersList] = useState<Customer[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
-    const [activeTab, setActiveTab] = useState<'MASTER' | 'ANALYTICS' | 'COMPANY_ANALYTICS' | 'BI_ANALYTICS' | 'STRATEGY_ANALYTICS' | 'COMPANY_CARD'>('MASTER');
+    const [activeTab, setActiveTab] = useState<'MASTER' | 'ANALYTICS' | 'COMPANY_ANALYTICS' | 'BI_ANALYTICS' | 'STRATEGY_ANALYTICS' | 'COMPANY_CARD' | 'ACTION_INTEL'>('MASTER');
+
+    // ── ACTION INTEL 탭 전용 State ──────────────────────────────
+    const [intelSubView, setIntelSubView] = useState<'urgent' | 'prep' | 'strategy' | 'growth' | 'inventory'>('urgent');
+    const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+    const [intelRegion, setIntelRegion] = useState<string>('ALL');
+    const [intelCardItemSort, setIntelCardItemSort] = useState<'amount' | 'qty' | 'freq'>('amount'); // renamed from cardItemSort to avoid conflict
+
+    const toggleCard = (id: string) => {
+        setExpandedCards(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) { next.clear(); }
+            else { next.clear(); next.add(id); }
+            return next;
+        });
+    };
+
     const [analyticsSortBy, setAnalyticsSortBy] = useState<'qty' | 'amount' | 'margin'>('qty');
     const [expandedStrategyGroups, setExpandedStrategyGroups] = useState<Record<string, boolean>>({
         CHURN_RISK: true, GROWTH: true, STABLE: false, NEW: true, DORMANT: false
@@ -1081,6 +1097,283 @@ export default function Customers() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+
+  // ── ACTION INTELLIGENCE ENGINE ───────────────────────────────
+const actionIntel = useMemo(() => {
+  const now = new Date();
+  const CHURN_RISK_DAYS = 45;
+  const DORMANT_DAYS    = 90;
+
+  // ── 업체별 집계 ─────────────────────────────────────────
+  const compMap: Record<string, {
+    companyName: string;
+    region:      string;
+    contactName: string;
+    phone:       string;
+    email:       string;
+    address:     string;
+    totalAmount: number;
+    totalCost:   number;
+    totalQty:    number;
+    totalOrders: number;
+    quoteOrders: number;
+    confirmedOrders: number;
+    itemMap:  Record<string, { qty: number; amount: number; cost: number; orderCount: number; lastDate: string }>;
+    monthMap: Record<string, { amount: number; qty: number; orderCount: number }>;
+    orderDates: Date[];
+    lastOrderDate:  Date | null;
+    firstOrderDate: Date | null;
+  }> = {};
+
+  orders.forEach(o => {
+    const oExt = o as typeof o & {
+      isDeleted?: boolean;
+      poEndCustomer?: string;
+      payload?: { customer?: { company_name?: string } };
+    };
+    if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN' || oExt.isDeleted) return;
+
+    const fullCust = (
+      oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || ''
+    ).toLowerCase();
+    if (
+      fullCust.includes('서울재고') || fullCust.includes('시화재고') ||
+      fullCust.includes('재고입고') || fullCust.includes('stock')
+    ) return;
+
+    const cleanOrderName = stripCorp(o.customerName);
+    const customer = customersList.find(c => {
+      const cleanCrm = stripCorp(c.companyName);
+      if (!cleanOrderName || !cleanCrm) return false;
+      return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
+    });
+
+    const companyName = customer?.companyName || o.customerName || '미확인 업체';
+    const region      = customer?.region      || '미분류';
+
+    if (!compMap[companyName]) {
+      compMap[companyName] = {
+        companyName, region,
+        contactName: customer?.contactName || '',
+        phone:       customer?.phone       || '',
+        email:       customer?.email       || '',
+        address:     customer?.address     || '',
+        totalAmount: 0, totalCost: 0, totalQty: 0,
+        totalOrders: 0, quoteOrders: 0, confirmedOrders: 0,
+        itemMap: {}, monthMap: {}, orderDates: [],
+        lastOrderDate: null, firstOrderDate: null,
+      };
+    }
+
+    const card = compMap[companyName];
+    card.totalOrders += 1;
+
+    const statusL = (o.status || '').toLowerCase();
+    if (statusL === 'quote' || statusL === 'pending') card.quoteOrders    += 1;
+    if (statusL === 'completed')                      card.confirmedOrders += 1;
+
+    const orderDate = new Date(o.createdAt || new Date());
+    card.orderDates.push(orderDate);
+    if (!card.lastOrderDate  || orderDate > card.lastOrderDate)  card.lastOrderDate  = orderDate;
+    if (!card.firstOrderDate || orderDate < card.firstOrderDate) card.firstOrderDate = orderDate;
+
+    const monthKey = orderDate.toISOString().slice(0, 7);
+    if (!card.monthMap[monthKey]) card.monthMap[monthKey] = { amount: 0, qty: 0, orderCount: 0 };
+    card.monthMap[monthKey].orderCount += 1;
+
+    o.items?.forEach(item => {
+      const itemExt = item as typeof item & {
+        item_id?: string; supplierPriceOverride?: number;
+        isDeleted?: boolean; material?: string;
+      };
+      if (itemExt.isDeleted) return;
+      const qty = item.quantity || 0;
+      if (qty <= 0) return;
+
+      const unitPrice  = item.unitPrice || 0;
+      const id         = itemExt.productId || itemExt.item_id || '';
+      const product    = inventoryMap.get(id);
+      const matInfo    = product?.material || itemExt.material || '';
+      const itemKey    = `${item.name}-${item.thickness}-${item.size}${matInfo ? `-${matInfo}` : ''}`;
+      const basePrice  = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
+
+      let costPrice = Math.round((unitPrice * 0.9) / 10) * 10;
+      if (itemExt.supplierPriceOverride && itemExt.supplierPriceOverride > 0) {
+        costPrice = itemExt.supplierPriceOverride;
+      } else if (item.supplierRate !== undefined && item.supplierRate > 0) {
+        costPrice = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
+      } else if (product) {
+        const rate = product.rate_act2 || product.rate_act || product.rate_pct || 0;
+        if (rate > 0) costPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+      }
+
+      const itemAmt  = qty * unitPrice;
+      const itemCost = qty * costPrice;
+
+      card.totalAmount += itemAmt;
+      card.totalCost   += itemCost;
+      card.totalQty    += qty;
+      card.monthMap[monthKey].amount += itemAmt;
+      card.monthMap[monthKey].qty    += qty;
+
+      if (!card.itemMap[itemKey]) {
+        card.itemMap[itemKey] = { qty: 0, amount: 0, cost: 0, orderCount: 0, lastDate: '' };
+      }
+      card.itemMap[itemKey].qty        += qty;
+      card.itemMap[itemKey].amount     += itemAmt;
+      card.itemMap[itemKey].cost       += itemCost;
+      card.itemMap[itemKey].orderCount += 1;
+      card.itemMap[itemKey].lastDate    = orderDate.toISOString().split('T')[0];
+    });
+  });
+
+  // ── 최근 12개월 키 ───────────────────────────────────────
+  const last12: string[] = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    last12.push(d.toISOString().slice(0, 7));
+  }
+
+  // ── 카드 변환 ────────────────────────────────────────────
+  const cards = Object.values(compMap)
+    .filter(c => c.totalAmount > 0)
+    .map(c => {
+      const sorted     = [...c.orderDates].sort((a, b) => a.getTime() - b.getTime());
+      const lastOrder  = c.lastOrderDate;
+      const firstOrder = c.firstOrderDate;
+      const daysSince  = lastOrder
+        ? Math.floor((now.getTime() - lastOrder.getTime()) / 86400000) : 9999;
+
+      // 평균 주기
+      let avgInterval = 0;
+      if (sorted.length > 1) {
+        const diffs: number[] = [];
+        for (let i = 1; i < sorted.length; i++) {
+          diffs.push(Math.floor((sorted[i].getTime() - sorted[i-1].getTime()) / 86400000));
+        }
+        avgInterval = Math.round(diffs.reduce((a, b) => a + b, 0) / diffs.length);
+      }
+
+      const predictedNext = lastOrder && avgInterval > 0
+        ? new Date(lastOrder.getTime() + avgInterval * 86400000).toISOString().split('T')[0]
+        : null;
+
+      const convRate = c.totalOrders > 0
+        ? parseFloat(((c.confirmedOrders / c.totalOrders) * 100).toFixed(1)) : 0;
+      const marginRate = c.totalAmount > 0
+        ? parseFloat((((c.totalAmount - c.totalCost) / c.totalAmount) * 100).toFixed(1)) : 0;
+      const avgOrderAmt = c.totalOrders > 0
+        ? Math.round(c.totalAmount / c.totalOrders) : 0;
+      const ltv12 = last12.reduce((s, m) => s + (c.monthMap[m]?.amount || 0), 0);
+
+      // 월별 데이터
+      const monthlyData = last12.map(m => ({
+        month: m.slice(5) + '월',
+        amount: c.monthMap[m]?.amount || 0,
+        qty:    c.monthMap[m]?.qty    || 0,
+        orderCount: c.monthMap[m]?.orderCount || 0,
+      }));
+
+      // 주력 품목 TOP 10
+      const topItems = Object.entries(c.itemMap)
+        .sort((a, b) => b[1].amount - a[1].amount)
+        .slice(0, 10)
+        .map(([key, val]) => ({ itemKey: key, ...val, marginPct: val.amount > 0 ? ((val.amount - val.cost) / val.amount * 100) : 0 }));
+
+      // 전략 상태 판정
+      let status: 'CHURN_RISK' | 'DORMANT' | 'GROWTH' | 'NEW' | 'STABLE' = 'STABLE';
+      const recentMonthAmt = c.monthMap[last12[11]]?.amount || 0;
+      const prevMonthAmt   = c.monthMap[last12[10]]?.amount || 0;
+
+      if (daysSince > DORMANT_DAYS) {
+        status = 'DORMANT';
+      } else if (daysSince > CHURN_RISK_DAYS) {
+        status = 'CHURN_RISK';
+      } else if (firstOrder && now.getTime() - firstOrder.getTime() < 30 * 86400000) {
+        status = 'NEW';
+      } else if (recentMonthAmt >= prevMonthAmt * 1.3 && prevMonthAmt > 500000) {
+        status = 'GROWTH';
+      }
+
+      // 긴급도 점수 (0~100)
+      let urgencyScore = 0;
+      if (status === 'CHURN_RISK') urgencyScore = 90 - daysSince;
+      else if (status === 'DORMANT') urgencyScore = 20;
+      else if (status === 'GROWTH') urgencyScore = -10;
+
+      // 성장률
+      const growthRate = prevMonthAmt > 0
+        ? parseFloat(((recentMonthAmt - prevMonthAmt) / prevMonthAmt * 100).toFixed(1)) : 0;
+
+      // 마케팅 액션 문구
+      const marketingAction =
+        status === 'CHURN_RISK' ? `${daysSince}일 무발주 — 오늘 긴급 컨택 필수 🚨` :
+        status === 'DORMANT'    ? `장기 휴면 ${daysSince}일 — 단가 할인 프로모션 재제안` :
+        status === 'NEW'        ? '신규 업체 — 정기 발주 유도 + 추천 품목 제안' :
+        status === 'GROWTH'     ? `전월 대비 +${growthRate}% 성장 — Upsell 황금 타이밍 📈` :
+        '안정적 거래 유지 — 추가 품목 제안 적기';
+
+      // 제안 품목 (아직 안 주문한 주력 아이템)
+      const orderedKeys = new Set(topItems.map(i => i.itemKey));
+      const suggestItems = [
+        '90E(L)-S10S-50A-STS304-W','90E(L)-S10S-25A-STS304-W',
+        'T(S)-S10S-32A-STS304-W','CAP-S10S-32A-STS304-S',
+        'T(R)-S10S-40A X 25A-STS304-W','R(C)-S10S-50A X 40A-STS304-W',
+      ].filter(k => !orderedKeys.has(k)).slice(0, 3);
+
+      return {
+        companyName: c.companyName, region: c.region,
+        contactName: c.contactName, phone: c.phone,
+        email: c.email, address: c.address,
+        totalAmount: c.totalAmount, totalCost: c.totalCost, totalQty: c.totalQty,
+        totalOrders: c.totalOrders, convRate, marginRate, avgOrderAmt, ltv12,
+        daysSince, avgInterval, predictedNext,
+        firstOrderDate: firstOrder?.toISOString().split('T')[0] || null,
+        lastOrderDate:  lastOrder?.toISOString().split('T')[0]  || null,
+        status, growthRate, urgencyScore, marketingAction, suggestItems,
+        monthlyData, topItems,
+      };
+    });
+
+  // ── 서브뷰별 필터 ────────────────────────────────────────
+  const byStatus = (s: string) => cards.filter(c => c.status === s);
+  const urgentCards   = cards.filter(c => c.status === 'CHURN_RISK' || c.status === 'DORMANT')
+                             .sort((a, b) => b.daysSince - a.daysSince);
+  const growthCards   = byStatus('GROWTH').sort((a, b) => b.growthRate - a.growthRate);
+  const newCards      = byStatus('NEW').sort((a, b) => b.totalAmount - a.totalAmount);
+  const stableCards   = byStatus('STABLE').sort((a, b) => b.totalAmount - a.totalAmount);
+  const urgentCount   = urgentCards.length;
+
+  // 오늘 할 일 우선순위 사이드바 데이터
+  const sidebarActions = [
+    ...urgentCards.slice(0, 3).map(c => ({
+      icon: '🚨', label: `${c.companyName} 즉시 컨택`,
+      desc: `${c.daysSince}일 무발주. ${c.phone || '번호 없음'}`,
+      tag: 'D-day 초과', tagColor: 'rose' as const, sub: 'urgent',
+    })),
+    {
+      icon: '💰', label: '대경 볼륨 네고 발주 묶기',
+      desc: '33개 부족 품목 2천만원 이상 묶기 가능. 절감 약 80~150만원',
+      tag: '이번 주 내', tagColor: 'amber' as const, sub: 'prep',
+    },
+    {
+      icon: '📦', label: '시화재고 목표 달성',
+      desc: '목표 2.5억 대비 현재 2.07억. 0.43억 부족',
+      tag: '이번 달 내', tagColor: 'amber' as const, sub: 'inventory',
+    },
+    ...growthCards.slice(0, 2).map(c => ({
+      icon: '📈', label: `${c.companyName} Upsell 제안`,
+      desc: `+${c.growthRate}% 성장 중. 미주문 품목 ${c.suggestItems.length}개 있음`,
+      tag: '기회 포착', tagColor: 'green' as const, sub: 'growth',
+    })),
+  ].slice(0, 7);
+
+  return {
+    cards, urgentCards, growthCards, newCards, stableCards,
+    urgentCount, sidebarActions, last12,
+  };
+}, [orders, customersList, inventoryMap]);
+
     if (user?.role !== 'MASTER' && user?.role?.toLowerCase() !== 'admin') {
         return (
             <div className="flex flex-col items-center justify-center h-full pt-20 text-slate-500">
@@ -1090,6 +1383,8 @@ export default function Customers() {
             </div>
         );
     }
+
+
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20">
@@ -1141,6 +1436,23 @@ export default function Customers() {
                   <Contact className="w-4 h-4" />
                   업체별 인텔리전스 카드
                 </button>
+                <button
+  onClick={() => setActiveTab('ACTION_INTEL')}
+  className={`px-5 py-2.5 rounded-t-lg font-bold transition-all flex items-center gap-1.5
+    ${activeTab === 'ACTION_INTEL'
+      ? 'bg-gradient-to-r from-rose-600 to-violet-600 text-white shadow-md'
+      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+    }`}
+>
+  <Activity className="w-4 h-4" />
+  Action Intelligence
+  {/* 이탈위험 badge — 항상 표시 */}
+  {actionIntel.urgentCount > 0 && (
+    <span className="ml-1 bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full animate-pulse">
+      {actionIntel.urgentCount}
+    </span>
+  )}
+</button>
             </div>
 
             {activeTab === 'MASTER' && (
@@ -2370,6 +2682,450 @@ export default function Customers() {
                     </div>
                 </div>
             )}
+            {activeTab === 'ACTION_INTEL' && (
+  <div className="flex gap-0 h-full animate-in fade-in duration-300">
+
+    {/* ── 왼쪽: 오늘 할 일 사이드바 ── */}
+    <aside className="w-72 flex-shrink-0 border-r border-slate-200 bg-slate-50/50 flex flex-col overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-200 bg-white">
+        <div className="flex items-center gap-2 mb-3">
+          <Activity className="w-4 h-4 text-rose-500" />
+          <span className="text-xs font-black text-rose-600 uppercase tracking-widest">오늘 할 일 우선순위</span>
+        </div>
+        {/* 긴급도 점수 */}
+        <div className="flex items-center gap-3 bg-slate-100 rounded-xl p-3">
+          <div className="flex-1">
+            <div className="text-[10px] text-slate-400 font-bold">긴급도 점수</div>
+            <div className="text-2xl font-black text-amber-500">
+              {actionIntel.urgentCount > 0 ? Math.min(50 + actionIntel.urgentCount * 15, 99) : 42}점
+            </div>
+            <div className="text-[9px] text-slate-400 mt-0.5">
+              {actionIntel.urgentCount > 0 ? '즉시 조치 필요' : '양호'}
+            </div>
+          </div>
+          <svg width="48" height="48" viewBox="0 0 48 48">
+            <circle cx="24" cy="24" r="18" fill="none" stroke="#e2e8f0" strokeWidth="5"/>
+            <circle cx="24" cy="24" r="18" fill="none"
+              stroke={actionIntel.urgentCount > 0 ? '#f59e0b' : '#22c55e'} strokeWidth="5"
+              strokeDasharray="113.1"
+              strokeDashoffset={113.1 * (1 - Math.min((actionIntel.urgentCount > 0 ? 50 + actionIntel.urgentCount * 15 : 42) / 100, 0.99))}
+              strokeLinecap="round" transform="rotate(-90 24 24)"
+            />
+          </svg>
+        </div>
+      </div>
+
+      {/* 액션 리스트 */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {actionIntel.sidebarActions.map((action, i) => (
+          <button
+            key={i}
+            onClick={() => setIntelSubView(action.sub as 'urgent' | 'prep' | 'strategy' | 'growth' | 'inventory')}
+            className={`w-full text-left p-3 rounded-xl border transition-all hover:shadow-sm hover:translate-x-0.5 ${
+              action.tagColor === 'rose'  ? 'border-rose-200 bg-rose-50/50 hover:bg-rose-50' :
+              action.tagColor === 'green' ? 'border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50' :
+              'border-amber-200 bg-amber-50/50 hover:bg-amber-50'
+            }`}
+          >
+            <div className="flex items-start gap-2">
+              <span className="text-lg flex-shrink-0 mt-0.5">{action.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-bold text-slate-800 mb-1 leading-tight">{action.label}</div>
+                <div className="text-[10px] text-slate-500 leading-snug">{action.desc}</div>
+                <span className={`inline-block mt-1.5 text-[9px] font-black px-2 py-0.5 rounded-full ${
+                  action.tagColor === 'rose'  ? 'bg-rose-100 text-rose-600' :
+                  action.tagColor === 'green' ? 'bg-emerald-100 text-emerald-600' :
+                  'bg-amber-100 text-amber-600'
+                }`}>{action.tag}</span>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </aside>
+
+    {/* ── 오른쪽: 서브뷰 ── */}
+    <div className="flex-1 flex flex-col overflow-hidden">
+
+      {/* 서브뷰 탭 바 */}
+      <div className="flex items-center gap-1 px-5 py-2 border-b border-slate-200 bg-white flex-shrink-0">
+        {([
+          { key: 'urgent',    label: '🚨 지금 당장', color: 'rose'    },
+          { key: 'prep',      label: '📦 준비할 것',  color: 'amber'   },
+          { key: 'strategy',  label: '🎯 전략 타겟',  color: 'blue'    },
+          { key: 'growth',    label: '📈 성장 관리',  color: 'green'   },
+          { key: 'inventory', label: '📊 재고 연동',  color: 'violet'  },
+        ] as const).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => { setIntelSubView(tab.key); setExpandedCards(new Set()); }}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              intelSubView === tab.key
+                ? tab.color === 'rose'   ? 'bg-rose-600 text-white shadow-sm' :
+                  tab.color === 'amber'  ? 'bg-amber-500 text-white shadow-sm' :
+                  tab.color === 'blue'   ? 'bg-blue-600 text-white shadow-sm' :
+                  tab.color === 'green'  ? 'bg-emerald-600 text-white shadow-sm' :
+                  'bg-violet-600 text-white shadow-sm'
+                : 'text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            {tab.label}
+            {tab.key === 'urgent' && actionIntel.urgentCount > 0 && (
+              <span className="bg-white/30 text-white text-[9px] font-black px-1.5 rounded-full">
+                {actionIntel.urgentCount}
+              </span>
+            )}
+          </button>
+        ))}
+
+        {/* 지역 필터 */}
+        <select
+          title="지역 필터"
+          value={intelRegion}
+          onChange={e => setIntelRegion(e.target.value)}
+          className="ml-auto bg-white border border-slate-300 text-slate-700 rounded-lg font-bold text-xs px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm"
+        >
+          <option value="ALL">전국</option>
+          {regions.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+      </div>
+
+      {/* ── 서브뷰 콘텐츠 ── */}
+      <div className="flex-1 overflow-y-auto p-4 bg-slate-50/30">
+
+        {/* 서브뷰 헤더 */}
+        <div className={`rounded-xl p-4 mb-4 border flex items-center gap-3 ${
+          intelSubView === 'urgent'    ? 'bg-rose-50 border-rose-200' :
+          intelSubView === 'prep'      ? 'bg-amber-50 border-amber-200' :
+          intelSubView === 'strategy'  ? 'bg-blue-50 border-blue-200' :
+          intelSubView === 'growth'    ? 'bg-emerald-50 border-emerald-200' :
+          'bg-violet-50 border-violet-200'
+        }`}>
+          <div className="text-3xl">
+            {intelSubView === 'urgent' ? '🚨' : intelSubView === 'prep' ? '📦' :
+             intelSubView === 'strategy' ? '🎯' : intelSubView === 'growth' ? '📈' : '📊'}
+          </div>
+          <div>
+            <div className={`text-sm font-black ${
+              intelSubView === 'urgent'   ? 'text-rose-700' :
+              intelSubView === 'prep'     ? 'text-amber-700' :
+              intelSubView === 'strategy' ? 'text-blue-700' :
+              intelSubView === 'growth'   ? 'text-emerald-700' :
+              'text-violet-700'
+            }`}>
+              {intelSubView === 'urgent'   ? '오늘 안 하면 손실이 확정됩니다' :
+               intelSubView === 'prep'     ? '이번 주~달 안에 준비하면 경쟁력이 올라갑니다' :
+               intelSubView === 'strategy' ? '집중 투자하면 점유율을 확대할 수 있습니다' :
+               intelSubView === 'growth'   ? '잘 되고 있는 곳 — 이탈 방지 + Upsell 타이밍' :
+               '회전율 × 수요 × 발주 타이밍을 한 화면에'}
+            </div>
+            <div className="text-xs text-slate-500 mt-0.5">
+              업체 카드를 클릭하면 월별 분석 · 주력 품목 · 실행 액션이 펼쳐집니다
+            </div>
+          </div>
+        </div>
+
+        {/* ── 카드 그리드 ── */}
+        {(() => {
+          // 서브뷰별 표시 데이터
+          const viewCards = (() => {
+            let base = intelSubView === 'urgent'   ? actionIntel.urgentCards :
+                       intelSubView === 'growth'   ? actionIntel.growthCards :
+                       intelSubView === 'prep'     ? [...actionIntel.stableCards, ...actionIntel.newCards] :
+                       intelSubView === 'strategy' ? actionIntel.cards.filter(c =>
+                         c.status !== 'CHURN_RISK' && c.status !== 'DORMANT') :
+                       actionIntel.cards;
+            if (intelRegion !== 'ALL') base = base.filter(c => c.region === intelRegion);
+            return base.slice(0, 50);
+          })();
+
+          if (viewCards.length === 0) {
+            return (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <Activity className="w-12 h-12 mb-3 opacity-30" />
+                <div className="font-bold">해당 조건의 업체가 없습니다</div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4">
+              {viewCards.map(card => {
+                const isExpanded  = expandedCards.has(card.companyName);
+                const isUrgent    = card.status === 'CHURN_RISK';
+                const isDormant   = card.status === 'DORMANT';
+                const isGrowth    = card.status === 'GROWTH';
+                const isNew       = card.status === 'NEW';
+                const maxMonthAmt = Math.max(...card.monthlyData.map(m => m.amount), 1);
+                const topItemsSorted = [...card.topItems].sort((a, b) =>
+                  intelCardItemSort === 'qty'  ? b.qty - a.qty :
+                  intelCardItemSort === 'freq' ? b.orderCount - a.orderCount :
+                  b.amount - a.amount
+                );
+
+                return (
+                  <div
+                    key={card.companyName}
+                    className={`bg-white rounded-2xl border overflow-hidden transition-all cursor-pointer
+                      ${isUrgent  ? 'border-rose-300 ring-2 ring-rose-100 hover:ring-rose-200' :
+                        isDormant ? 'border-amber-300 ring-1 ring-amber-50' :
+                        isGrowth  ? 'border-emerald-200 ring-1 ring-emerald-50' :
+                        isNew     ? 'border-blue-200 ring-1 ring-blue-50' :
+                        'border-slate-200 hover:border-slate-300'}
+                      ${isExpanded ? 'shadow-lg ring-2 ring-indigo-200 col-span-full' : 'hover:shadow-md hover:-translate-y-0.5'}
+                    `}
+                    onClick={() => toggleCard(card.companyName)}
+                  >
+                    {/* ── 카드 헤더 ── */}
+                    <div className={`px-5 py-4 ${
+                      isUrgent ? 'bg-rose-50/40' : isGrowth ? 'bg-emerald-50/30' : 'bg-slate-50/30'
+                    }`}>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1 min-w-0 mr-3">
+                          <h3 className="font-black text-slate-800 text-base leading-tight">{card.companyName}</h3>
+                          <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
+                            {card.contactName && <span>{card.contactName}</span>}
+                            {card.phone && <span className="font-mono">{card.phone}</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                            isUrgent  ? 'bg-rose-100 text-rose-700 border border-rose-200' :
+                            isDormant ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+                            isGrowth  ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+                            isNew     ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                            'bg-slate-100 text-slate-600 border border-slate-200'
+                          }`}>
+                            {isUrgent ? '🚨 이탈위험' : isDormant ? '💤 휴면' :
+                             isGrowth ? '📈 성장중' : isNew ? '🆕 신규' : '⚖️ 안정'}
+                          </span>
+                          <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full border border-slate-200">
+                            {card.region}
+                          </span>
+                          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        </div>
+                      </div>
+
+                      {/* KPI 4칸 */}
+                      <div className="grid grid-cols-4 gap-2">
+                        {[
+                          { label: '누적 매출', value: `₩${Math.round(card.totalAmount / 10000).toLocaleString()}만`, color: 'text-indigo-600' },
+                          { label: '거래 건수', value: `${card.totalOrders}건`, color: 'text-teal-600' },
+                          { label: '전환율',    value: `${card.convRate}%`,
+                            color: card.convRate >= 80 ? 'text-emerald-600' : card.convRate >= 50 ? 'text-amber-500' : 'text-rose-500' },
+                          { label: '마진율',    value: `${card.marginRate}%`,
+                            color: card.marginRate >= 22 ? 'text-emerald-600' : card.marginRate >= 15 ? 'text-blue-600' : 'text-amber-500' },
+                        ].map(kpi => (
+                          <div key={kpi.label} className="bg-white rounded-lg p-2 text-center border border-slate-100">
+                            <div className="text-[9px] font-bold text-slate-400 mb-1">{kpi.label}</div>
+                            <div className={`text-sm font-black ${kpi.color}`}>{kpi.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 미니 히트맵 */}
+                    <div className="px-5 py-3 flex items-end gap-1 h-[52px]">
+                      {card.monthlyData.map((m, i) => {
+                        const pct  = maxMonthAmt > 0 ? (m.amount / maxMonthAmt) * 100 : 0;
+                        const isNow = i === 11;
+                        return (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                            <div // NOSONAR
+                              title={`${m.month} ₩${Math.round(m.amount / 10000)}만 ${m.orderCount}건`}
+                              className="w-full rounded-t"
+                              style={{
+                                height: Math.max(pct * 0.28 + 3, 3),
+                                background: isNow
+                                  ? (pct > 30 ? '#4f46e5' : '#818cf8')
+                                  : (isUrgent && pct > 30 ? '#fca5a5' : pct > 60 ? '#a5b4fc' : pct > 20 ? '#c7d2fe' : '#f1f5f9'),
+                              }}
+                            />
+                            <span className="text-[7px] text-slate-300">{m.month.slice(0, 2)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* 마케팅 액션 줄 */}
+                    <div className={`px-5 py-3 border-t flex items-center justify-between gap-3 ${
+                      isUrgent ? 'bg-rose-50/50 border-rose-100' :
+                      isGrowth ? 'bg-emerald-50/50 border-emerald-100' :
+                      'bg-slate-50/50 border-slate-100'
+                    }`}>
+                      <div className={`text-xs font-bold flex-1 leading-tight ${
+                        isUrgent ? 'text-rose-700' : isGrowth ? 'text-emerald-700' : 'text-slate-600'
+                      }`}>
+                        {card.marketingAction}
+                      </div>
+                      <button
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black border transition-all flex-shrink-0
+                          ${isUrgent
+                            ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-600 hover:text-white'
+                            : isGrowth
+                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-600 hover:text-white'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600'
+                          }`}
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {isUrgent ? '즉시 컨택 →' : isGrowth ? 'Upsell 제안 →' : '상세 분석 →'}
+                      </button>
+                    </div>
+
+                    {/* ── 확장 상세 패널 ── */}
+                    {isExpanded && (
+                      <div className="border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
+
+                          {/* 왼쪽: 기본 정보 + KPI */}
+                          <div className="space-y-4">
+                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                              <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3">거래처 정보</div>
+                              <div className="space-y-1.5 text-xs text-slate-600">
+                                {card.address && <div className="flex items-start gap-1.5"><MapPin className="w-3 h-3 text-slate-400 mt-0.5 flex-shrink-0" />{card.address}</div>}
+                                {card.email   && <div className="text-slate-400">@ {card.email}</div>}
+                                <div className="pt-2 border-t border-slate-200 space-y-1">
+                                  <div className="flex justify-between"><span className="text-slate-400">첫 거래</span><span className="font-bold">{card.firstOrderDate || '없음'}</span></div>
+                                  <div className="flex justify-between"><span className="text-slate-400">마지막 발주</span><span className={`font-bold ${card.daysSince > 45 ? 'text-rose-500' : 'text-slate-700'}`}>{card.daysSince}일 전</span></div>
+                                  <div className="flex justify-between"><span className="text-slate-400">평균 주기</span><span className="font-bold">{card.avgInterval > 0 ? `${card.avgInterval}일` : '측정불가'}</span></div>
+                                  {card.predictedNext && <div className="flex justify-between"><span className="text-slate-400">예상 다음 발주</span><span className={`font-bold ${card.predictedNext < new Date().toISOString().split('T')[0] ? 'text-rose-500' : 'text-indigo-600'}`}>{card.predictedNext}</span></div>}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* KPI 격자 */}
+                            <div className="grid grid-cols-2 gap-2">
+                              {[
+                                { l: '연 LTV',    v: `₩${Math.round(card.ltv12/10000).toLocaleString()}만`,  c:'text-violet-600' },
+                                { l: '건당 평균', v: `₩${Math.round(card.avgOrderAmt/10000).toLocaleString()}만`, c:'text-slate-700' },
+                                { l: '전환율',    v: `${card.convRate}%`,
+                                  c: card.convRate>=80?'text-emerald-600':card.convRate>=50?'text-amber-500':'text-rose-500'},
+                                { l: '마진율',    v: `${card.marginRate}%`,
+                                  c: card.marginRate>=22?'text-emerald-600':card.marginRate>=15?'text-blue-600':'text-amber-500'},
+                              ].map(kpi => (
+                                <div key={kpi.l} className="bg-slate-50 rounded-lg p-2.5 border border-slate-100 text-center">
+                                  <div className="text-[9px] text-slate-400 font-bold mb-0.5">{kpi.l}</div>
+                                  <div className={`text-sm font-black ${kpi.c}`}>{kpi.v}</div>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* 전환율 바 */}
+                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-[10px] font-black text-slate-500">견적→발주 전환율</span>
+                                <span className={`text-sm font-black ${card.convRate>=80?'text-emerald-600':card.convRate>=50?'text-amber-500':'text-rose-500'}`}>
+                                  {card.convRate}%
+                                </span>
+                              </div>
+                              <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                                <div className={`h-full rounded-full ${card.convRate>=80?'bg-emerald-500':card.convRate>=50?'bg-amber-400':'bg-rose-400'}`} // NOSONAR
+                                  style={{ width: `${Math.min(card.convRate, 100)}%` }} />
+                              </div>
+                            </div>
+
+                            {/* 제안 품목 */}
+                            {card.suggestItems.length > 0 && (
+                              <div className="bg-indigo-50 rounded-xl p-3 border border-indigo-100">
+                                <div className="text-[10px] font-black text-indigo-600 mb-2">추가 제안 가능 품목</div>
+                                {card.suggestItems.map(item => (
+                                  <div key={item} className="text-[10px] font-mono bg-white px-2 py-1 rounded border border-indigo-100 mb-1 text-indigo-700 font-bold truncate">{item}</div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 가운데: 월별 바차트 */}
+                          <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-4">월별 매출 흐름 (최근 12개월)</div>
+                            <div className="space-y-2">
+                              {card.monthlyData.map((m, i) => {
+                                const pct = maxMonthAmt > 0 ? (m.amount / maxMonthAmt) * 100 : 0;
+                                const isNow = i === 11;
+                                return (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <span className={`text-[10px] font-mono w-8 flex-shrink-0 text-right ${isNow ? 'font-black text-indigo-600' : 'text-slate-400'}`}>
+                                      {m.month}
+                                    </span>
+                                    <div className="flex-1 h-5 bg-slate-200 rounded overflow-hidden relative">
+                                      <div // NOSONAR
+                                        className={`h-full rounded transition-all ${
+                                          pct >= 80 ? (isUrgent ? 'bg-rose-400' : 'bg-indigo-500') :
+                                          pct >= 50 ? (isUrgent ? 'bg-rose-300' : 'bg-indigo-400') :
+                                          pct >= 20 ? 'bg-indigo-200' :
+                                          pct > 0 ? 'bg-slate-300' : 'bg-transparent'
+                                        }`}
+                                        style={{ width: `${pct}%` }}
+                                      />
+                                      {m.orderCount > 0 && (
+                                        <span className="absolute inset-0 flex items-center px-2 text-[9px] font-bold text-slate-600">
+                                          {m.orderCount}건
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-[10px] font-mono text-slate-600 w-14 text-right flex-shrink-0">
+                                      {m.amount > 0 ? `${Math.round(m.amount/10000).toLocaleString()}만` : '—'}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between text-xs">
+                              <span className="text-slate-400 font-bold">12개월 합계</span>
+                              <span className="font-black text-indigo-600">₩{Math.round(card.ltv12/10000).toLocaleString()}만</span>
+                            </div>
+                          </div>
+
+                          {/* 오른쪽: 주력 품목 TOP */}
+                          <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider">주력 품목 TOP {Math.min(topItemsSorted.length, 10)}</div>
+                              <div className="flex bg-white border border-slate-200 rounded-lg overflow-hidden">
+                                {(['amount', 'qty', 'freq'] as const).map(s => (
+                                  <button key={s}
+                                    onClick={e => { e.stopPropagation(); setIntelCardItemSort(s); }}
+                                    className={`px-2 py-1 text-[9px] font-bold transition-all ${intelCardItemSort === s ? 'bg-indigo-100 text-indigo-700' : 'text-slate-400 hover:text-slate-600'}`}
+                                  >
+                                    {s === 'amount' ? '매출' : s === 'qty' ? '수량' : '빈도'}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              {topItemsSorted.slice(0, 10).map((item, i) => (
+                                <div key={item.itemKey} className="bg-white rounded-lg p-2.5 border border-slate-100 hover:border-indigo-200 transition-colors">
+                                  <div className="flex items-start gap-2">
+                                    <span className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-black flex-shrink-0 mt-0.5 ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>{i+1}</span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-[10px] font-bold text-slate-700 truncate leading-tight" title={item.itemKey}>{item.itemKey}</div>
+                                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                        <span className="text-[9px] text-indigo-600 font-bold bg-indigo-50 px-1.5 rounded">{item.qty.toLocaleString()}개</span>
+                                        <span className="text-[9px] text-slate-500">₩{Math.round(item.amount/10000).toLocaleString()}만</span>
+                                        <span className="text-[9px] text-amber-600">{item.orderCount}회</span>
+                                        <span className={`text-[9px] font-bold ${item.marginPct>=20?'text-emerald-600':item.marginPct>=10?'text-amber-500':'text-rose-500'}`}>
+                                          마진{item.marginPct.toFixed(0)}%
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  </div>
+)}
         </div>
     );
 }

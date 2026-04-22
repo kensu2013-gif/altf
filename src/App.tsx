@@ -25,9 +25,8 @@ const MarketingConsent = lazy(() => import('./pages/policy/MarketingConsent'));
 
 // Admin Pages
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
-const AdminMembers = lazy(() => import('./pages/admin/Members'));
+const AdminMembers = lazy(() => import('./pages/admin/MemberManagement'));
 const AdminCustomers = lazy(() => import('./pages/admin/Customers'));
-const AdminManagers = lazy(() => import('./pages/admin/Managers'));
 const AdminOrders = lazy(() => import('./pages/AdminPage'));
 const AdminQuotes = lazy(() => import('./pages/admin/Quotes')); // [RENAME]
 const PendingOrders = lazy(() => import('./pages/admin/Pending'));
@@ -35,7 +34,6 @@ const AdminSihwaInventory = lazy(() => import('./pages/admin/SihwaInventory'));
 const AdminInventory = lazy(() => import('./pages/admin/Inventory'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
 const AdminProfile = lazy(() => import('./pages/admin/Profile'));
-const AdminActiveUsers = lazy(() => import('./pages/admin/ActiveUsers'));
 
 // ... (keep existing code)
 
@@ -116,7 +114,6 @@ function AnimatedRoutes() {
               <Route index element={<Navigate to="/admin/orders" replace />} />
               <Route path="customers" element={<PageTransition><AdminCustomers /></PageTransition>} />
               <Route path="members" element={<PageTransition><AdminMembers /></PageTransition>} />
-              <Route path="managers" element={<PageTransition><AdminManagers /></PageTransition>} />
               <Route path="orders" element={<PageTransition><AdminOrders /></PageTransition>} />
               <Route path="quotes" element={<PageTransition><AdminQuotes /></PageTransition>} />
               <Route path="pending" element={<PageTransition><PendingOrders /></PageTransition>} />
@@ -124,7 +121,6 @@ function AnimatedRoutes() {
               <Route path="inventory" element={<PageTransition><AdminInventory /></PageTransition>} />
               <Route path="settings" element={<PageTransition><AdminSettings /></PageTransition>} />
               <Route path="profile" element={<PageTransition><AdminProfile /></PageTransition>} />
-              <Route path="active-users" element={<PageTransition><AdminActiveUsers /></PageTransition>} />
             </Route>
           </Route>
 

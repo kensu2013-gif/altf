@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
-import { CalmPageShell } from '../../components/ui/CalmPageShell';
 import { PageTransition } from '../../components/ui/PageTransition';
-import { ShieldCheck, Clock, Monitor } from 'lucide-react';
+import { Clock, Monitor } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
@@ -70,15 +69,7 @@ export default function ActiveUsers() {
     }
 
     return (
-        <CalmPageShell>
-            <div className="mb-6 flex flex-col gap-1">
-                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                    <ShieldCheck className="w-6 h-6 text-teal-600" />
-                    접속자 현황
-                </h1>
-                <p className="text-sm text-slate-500">현재 시스템을 사용 중인 사용자 목록입니다.</p>
-            </div>
-
+        <div className="space-y-6">
             <PageTransition>
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     {loading ? (
@@ -195,6 +186,6 @@ export default function ActiveUsers() {
                     )}
                 </div>
             </PageTransition>
-        </CalmPageShell>
+        </div>
     );
 }

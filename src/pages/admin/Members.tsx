@@ -1,7 +1,7 @@
 import { useState, useEffect, useDeferredValue } from 'react';
 import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
-import { Check, X, Search, ShieldCheck, Clock, Trash2, RefreshCcw } from 'lucide-react';
+import { Check, X, Search, Clock, Trash2, RefreshCcw } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 
@@ -99,14 +99,8 @@ export default function AdminMembers() {
     return (
         <div className="space-y-6 animate-in fade-in duration-500 relative min-h-screen pb-20">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <ShieldCheck className="w-6 h-6 text-teal-600" />
-                        회원 관리 (Members)
-                    </h1>
-                    <p className="text-slate-500 text-sm mt-1">
-                        고객 회원을 승인하고 영업 담당자를 배정합니다.
-                    </p>
+                <div className="hidden md:block">
+                    {/* Empty div to keep flex-between layout if needed, or we can just justify-end the right side */}
                 </div>
 
                 <div className="flex items-center gap-2">

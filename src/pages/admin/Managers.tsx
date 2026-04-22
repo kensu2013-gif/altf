@@ -1,7 +1,7 @@
 import { useState, useEffect, useDeferredValue } from 'react';
 import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
-import { UserPlus, Trash2, Mail, Phone, MapPin, X, Briefcase, Search, Pencil } from 'lucide-react';
+import { UserPlus, Trash2, Mail, Phone, MapPin, X, Search, Pencil } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import type { User } from '../../types';
 
@@ -113,14 +113,8 @@ export default function AdminManagers() {
     return (
         <div className="space-y-6 animate-in fade-in duration-500 relative">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Briefcase className="w-6 h-6 text-teal-600" />
-                        담당자 관리 (Managers)
-                    </h1>
-                    <p className="text-slate-500 text-sm mt-1">
-                        영업 담당자를 생성하고 관리합니다. 이들은 주문 및 견적 관리가 가능합니다.
-                    </p>
+                <div className="hidden md:block">
+                    {/* Empty div to preserve flex-between */}
                 </div>
 
                 <div className="flex items-center gap-2">
