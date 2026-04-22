@@ -151,7 +151,8 @@ const resolveItemCost = (o: ResolveOrderType, itemExt: ResolveItemType, product:
     return costPrice;
 };
 
-const resolveOrderDate = (o: { id?: string; createdAt?: string; payload?: { meta?: { created_at?: string } } | null }): Date => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const resolveOrderDate = (o: any): Date => {
     // 1. Try to parse Korean date from payload.meta.created_at
     const kDateStr = o.payload?.meta?.created_at;
     if (typeof kDateStr === 'string') {
