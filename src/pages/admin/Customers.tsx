@@ -138,9 +138,9 @@ const resolveItemCost = (o: ResolveOrderType, itemExt: ResolveItemType, product:
     const override = poItem?.supplierPriceOverride ?? itemExt.supplierPriceOverride;
     const sRate = poItem?.supplierRate ?? itemExt.supplierRate;
 
-    if (override !== undefined && override > 0) {
+    if (override != null && override > 0) {
         costPrice = override;
-    } else if (sRate !== undefined && sRate > 0) {
+    } else if (sRate != null && sRate > 0) {
         costPrice = Math.round((basePrice * (100 - sRate) / 100) / 10) * 10;
     } else if (product) {
         const rate = product.rate_act2 || product.rate_act || product.rate_pct || 0;
