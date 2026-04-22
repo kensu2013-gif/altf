@@ -917,8 +917,17 @@ export default function Customers() {
             ? itemExt.base_price 
             : (product?.base_price ?? product?.unitPrice ?? 0);
           
-          const supplierRate = itemExt.supplierRate ?? 0;
-          const costPrice = Math.round((basePrice * (100 - supplierRate) / 100) / 10) * 10;
+          let costPrice = Math.round((unitPrice * 0.9) / 10) * 10; // Default: assume at least 10% margin if unknown
+          if (itemExt.supplierPriceOverride && itemExt.supplierPriceOverride > 0) {
+              costPrice = itemExt.supplierPriceOverride;
+          } else if (itemExt.supplierRate !== undefined && itemExt.supplierRate > 0) {
+              costPrice = Math.round((basePrice * (100 - itemExt.supplierRate) / 100) / 10) * 10;
+          } else if (product) {
+              const rate = product.rate_act2 || product.rate_act || product.rate_pct || 0;
+              if (rate > 0) {
+                  costPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+              }
+          }
 
           const itemAmount = quantity * unitPrice;
           const itemCost = quantity * costPrice;
