@@ -1017,7 +1017,7 @@ export default function Customers() {
       const last12Months: string[] = [];
       for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        last12Months.push(d.toISOString().slice(0, 7));
+        last12Months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
       }
 
       return Object.values(cardMap)
@@ -1215,7 +1215,7 @@ const actionIntel = useMemo(() => {
 
     const statusL = (o.status || '').toLowerCase();
     if (statusL === 'quote' || statusL === 'pending') card.quoteOrders    += 1;
-    if (statusL === 'completed')                      card.confirmedOrders += 1;
+    if (statusL === 'completed' || statusL === 'shipping' || statusL === 'processing') card.confirmedOrders += 1;
 
     const orderDate = resolveOrderDate(o);
     card.orderDates.push(orderDate);
@@ -1266,7 +1266,7 @@ const actionIntel = useMemo(() => {
   const last12: string[] = [];
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    last12.push(d.toISOString().slice(0, 7));
+    last12.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
 
   // ── 카드 변환 ────────────────────────────────────────────
