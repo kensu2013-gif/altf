@@ -40,6 +40,7 @@ interface CompanyIntelCard {
 
   // 견적 전환
   quoteCount: number;            // 견적 요청 건수
+  quoteAnswered: number;         // 견적 답변 건수
   orderFromQuote: number;        // 견적 기반 발주 건수
   conversionRate: number;        // 전환율 (%)
 
@@ -192,6 +193,7 @@ export default function Customers() {
     const token = useStore(state => state.auth.token);
     const orders = useStore(state => state.orders);
     const setOrders = useStore(state => state.setOrders);
+    const [quotations, setQuotations] = useState<any[]>([]);
     const [customersList, setCustomersList] = useState<Customer[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
@@ -287,10 +289,17 @@ export default function Customers() {
                 if (user?.role) orderHeaders['x-requester-role'] = user.role;
 
                 const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`, { headers: orderHeaders });
+                const quotesRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations?limit=2000`, { headers: orderHeaders });
                 if (ordersRes.ok) {
                     const ordersData = await ordersRes.json();
                     if (isMounted && Array.isArray(ordersData)) {
                         setOrders(ordersData);
+                    }
+                }
+                if (quotesRes.ok) {
+                    const quotesData = await quotesRes.json();
+                    if (isMounted && Array.isArray(quotesData)) {
+                        setQuotations(quotesData);
                     }
                 }
             } catch (e) {
@@ -847,7 +856,7 @@ export default function Customers() {
                 return b.totalAmount - a.totalAmount;
             });
 
-    }, [orders, customersList, strategyPeriod]);
+    }, [orders, quotations, customersList, strategyPeriod]);
 
     const companyIntelCards = useMemo((): CompanyIntelCard[] => {
       // ── Step 1: 업체별 전체 집계 ─────────────────────────────
@@ -863,12 +872,52 @@ export default function Customers() {
         totalAmount: number;
         totalQty: number;
         totalCost: number;
-        quoteOrders: number;                      // status = QUOTE 인 건수
+        quoteCount: number;
+        quoteAnswered: number;
+        orderFromQuote: number;
         confirmedOrders: number;                  // COMPLETED 건수
         monthlyMap: Record<string, { amount: number; qty: number; orderCount: number }>;
         itemMap: Record<string, { qty: number; amount: number; cost: number; orderCount: number; lastOrderDate: string }>;
         orderDates: Date[];
       }> = {};
+
+      quotations.forEach(q => {
+        if (q.status === 'TRASH' || q.isDeleted) return;
+        const custName = q.customerName || (q.customerInfo ? q.customerInfo.company_name : '');
+        const cleanOrderName = stripCorp(custName);
+        const customer = customersList.find(c => {
+          const cleanCrm = stripCorp(c.companyName);
+          if (!cleanOrderName || !cleanCrm) return false;
+          return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
+        });
+
+        const companyName = customer ? customer.companyName : (cleanOrderName || '미확인 업체');
+        if (!cardMap[companyName]) {
+          cardMap[companyName] = {
+            companyName,
+            region: customer?.region || '미분류',
+            ceo: customer?.ceo || '',
+            address: customer?.address || '',
+            contactName: customer?.contactName || '',
+            phone: customer?.phone || '',
+            email: customer?.email || '',
+            orders: [],
+            totalAmount: 0,
+            totalQty: 0,
+            totalCost: 0,
+            quoteCount: 0,
+            quoteAnswered: 0,
+            orderFromQuote: 0,
+            confirmedOrders: 0,
+            monthlyMap: {},
+            itemMap: {},
+            orderDates: [],
+          };
+        }
+        cardMap[companyName].quoteCount += 1;
+        if (q.status === 'PROCESSED' || q.status === 'COMPLETED') cardMap[companyName].quoteAnswered += 1;
+        if (q.status === 'COMPLETED') cardMap[companyName].orderFromQuote += 1;
+      });
 
       orders.forEach(o => {
         const oExt = o as typeof o & {
@@ -937,7 +986,9 @@ export default function Customers() {
             totalAmount: 0,
             totalQty: 0,
             totalCost: 0,
-            quoteOrders: 0,
+            quoteCount: 0,
+            quoteAnswered: 0,
+            orderFromQuote: 0,
             confirmedOrders: 0,
             monthlyMap: {},
             itemMap: {},
@@ -950,9 +1001,6 @@ export default function Customers() {
 
         // 견적 vs 발주 카운트 (status 기반)
         const statusLower = (o.status || '').toLowerCase();
-        if (statusLower === 'quote' || statusLower === 'pending') {
-          card.quoteOrders += 1;
-        }
         if (statusLower === 'completed' || statusLower === 'confirmed') {
           card.confirmedOrders += 1;
         }
@@ -1050,8 +1098,8 @@ export default function Customers() {
 
           // 견적 전환율
           const totalOrderCount = c.orders.length;
-          const conversionRate = totalOrderCount > 0
-            ? parseFloat(((c.confirmedOrders / totalOrderCount) * 100).toFixed(1))
+          const conversionRate = c.quoteCount > 0
+            ? parseFloat(((c.orderFromQuote / c.quoteCount) * 100).toFixed(1))
             : 0;
 
           // LTV: 최근 12개월 매출 합산 → 연환산
@@ -1118,7 +1166,7 @@ export default function Customers() {
             totalOrders: totalOrderCount, totalAmount: c.totalAmount,
             totalQty: c.totalQty, totalCost: c.totalCost,
             avgOrderAmount, marginRate,
-            quoteCount: c.quoteOrders, orderFromQuote: c.confirmedOrders, conversionRate,
+            quoteCount: c.quoteCount, quoteAnswered: c.quoteAnswered, orderFromQuote: c.orderFromQuote, conversionRate,
             monthlyData, topItems,
             firstOrderDate, lastOrderDate, daysSinceLastOrder,
             avgOrderIntervalDays, predictedNextOrder,
@@ -2394,12 +2442,14 @@ const actionIntel = useMemo(() => {
                                   {/* KPI 격자 */}
                                   <div className="grid grid-cols-2 gap-2">
                                     {[
-                                      { label: '총 수량', value: `${card.totalQty.toLocaleString()}개`, color: 'text-indigo-600' },
-                                      { label: '평균 발주액', value: `${card.avgOrderAmount.toLocaleString()}원`, color: 'text-slate-700' },
+                                      { label: '총 발주 수량', value: `${card.totalQty.toLocaleString()}개`, color: 'text-indigo-600' },
+                                      { label: '평균 발주액', value: `${Math.round(card.avgOrderAmount / 10000).toLocaleString()}만원`, color: 'text-slate-700' },
                                       { label: '마진율', value: `${card.marginRate}%`, color: card.marginRate >= 20 ? 'text-emerald-600' : card.marginRate >= 10 ? 'text-amber-500' : 'text-rose-500' },
-                                      { label: '연간 LTV', value: `${card.ltv.toLocaleString()}원`, color: 'text-violet-600' },
-                                      { label: '견적 건수', value: `${card.quoteCount}건`, color: 'text-slate-600' },
-                                      { label: '전환 건수', value: `${card.orderFromQuote}건`, color: 'text-emerald-600' },
+                                      { label: '연간 LTV', value: `${Math.round(card.ltv / 10000).toLocaleString()}만원`, color: 'text-violet-600' },
+                                      { label: '견적 요청', value: `${card.quoteCount}건`, color: 'text-slate-600' },
+                                      { label: '견적 답변', value: `${card.quoteAnswered}건`, color: 'text-blue-600' },
+                                      { label: '발주 전환', value: `${card.orderFromQuote}건`, color: 'text-emerald-600' },
+                                      { label: '총 발주(주문)', value: `${card.totalOrders}건`, color: 'text-indigo-600' },
                                     ].map(kpi => (
                                       <div key={kpi.label} className="bg-slate-50 rounded-lg p-2.5 border border-slate-100">
                                         <div className="text-[10px] text-slate-400 font-bold mb-0.5">{kpi.label}</div>

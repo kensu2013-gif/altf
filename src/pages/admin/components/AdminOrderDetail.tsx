@@ -1264,7 +1264,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     };
 
     return createPortal(
-        <div className="fixed inset-0 z-[100] flex justify-end pointer-events-none">
+        <div className="fixed inset-0 z-100 flex justify-end pointer-events-none">
             {/* Backdrop */}
 
 
