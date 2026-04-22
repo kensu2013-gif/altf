@@ -893,14 +893,18 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     };
 
     const handleJustSave = async () => {
+        if (!poEndCustomer || !editableCustomerInfo.bizNo || !editableCustomerInfo.contactName || !editableCustomerInfo.tel || !editableCustomerInfo.address) {
+            alert("업체명, 사업자번호, 담당자명, 연락처, 주소를 모두 입력해야 저장이 가능합니다. (신규 거래처인 경우 상세 내역에 정보를 입력해 주세요.)");
+            return;
+        }
         setIsSaving(true);
         try {
             persistCustomPrices();
 
         // CRM 데이터 반영 (비동기)
         if (poEndCustomer) {
-            const existingCrm = crmCustomers.find(c => c.companyName === poEndCustomer);
-            const crmPayload = {
+            const normalize = (str?: string) => (str || '').replace(/[\s()주식회사]/g, '').toLowerCase();
+            const currentData = {
                 companyName: poEndCustomer,
                 businessNumber: editableCustomerInfo.bizNo,
                 contactName: editableCustomerInfo.contactName,
@@ -909,17 +913,34 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 address: editableCustomerInfo.address
             };
             
-            if (existingCrm && existingCrm.id) {
-                fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers/${existingCrm.id}`, {
+            let matchedCrm = null;
+            let bestMatches = 0;
+
+            for (const c of crmCustomers) {
+                let matches = 0;
+                if (c.companyName && currentData.companyName && normalize(c.companyName) === normalize(currentData.companyName)) matches++;
+                if (c.businessNumber && currentData.businessNumber && normalize(c.businessNumber) === normalize(currentData.businessNumber)) matches++;
+                if (c.address && currentData.address && normalize(c.address) === normalize(currentData.address)) matches++;
+                if (c.phone && currentData.phone && normalize(c.phone) === normalize(currentData.phone)) matches++;
+                if (c.email && currentData.email && normalize(c.email) === normalize(currentData.email)) matches++;
+
+                if (matches >= 4 && matches > bestMatches) {
+                    matchedCrm = c;
+                    bestMatches = matches;
+                }
+            }
+            
+            if (matchedCrm && matchedCrm.id) {
+                fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers/${matchedCrm.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json', ...(user?.role ? { 'x-requester-role': user.role } : {}) },
-                    body: JSON.stringify(crmPayload)
+                    body: JSON.stringify(currentData)
                 }).catch(console.error);
             } else {
                 fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...(user?.role ? { 'x-requester-role': user.role } : {}) },
-                    body: JSON.stringify(crmPayload)
+                    body: JSON.stringify(currentData)
                 }).catch(console.error);
             }
         }
@@ -974,14 +995,18 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     };
 
     const handleSave = async (extraUpdate: Partial<Order> = {}) => {
+        if (!poEndCustomer || !editableCustomerInfo.bizNo || !editableCustomerInfo.contactName || !editableCustomerInfo.tel || !editableCustomerInfo.address) {
+            alert("업체명, 사업자번호, 담당자명, 연락처, 주소를 모두 입력해야 저장이 가능합니다. (신규 거래처인 경우 상세 내역에 정보를 입력해 주세요.)");
+            return;
+        }
         setIsSaving(true);
         try {
             persistCustomPrices();
 
         // CRM 데이터 반영 (비동기)
         if (poEndCustomer) {
-            const existingCrm = crmCustomers.find(c => c.companyName === poEndCustomer);
-            const crmPayload = {
+            const normalize = (str?: string) => (str || '').replace(/[\s()주식회사]/g, '').toLowerCase();
+            const currentData = {
                 companyName: poEndCustomer,
                 businessNumber: editableCustomerInfo.bizNo,
                 contactName: editableCustomerInfo.contactName,
@@ -990,17 +1015,34 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 address: editableCustomerInfo.address
             };
             
-            if (existingCrm && existingCrm.id) {
-                fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers/${existingCrm.id}`, {
+            let matchedCrm = null;
+            let bestMatches = 0;
+
+            for (const c of crmCustomers) {
+                let matches = 0;
+                if (c.companyName && currentData.companyName && normalize(c.companyName) === normalize(currentData.companyName)) matches++;
+                if (c.businessNumber && currentData.businessNumber && normalize(c.businessNumber) === normalize(currentData.businessNumber)) matches++;
+                if (c.address && currentData.address && normalize(c.address) === normalize(currentData.address)) matches++;
+                if (c.phone && currentData.phone && normalize(c.phone) === normalize(currentData.phone)) matches++;
+                if (c.email && currentData.email && normalize(c.email) === normalize(currentData.email)) matches++;
+
+                if (matches >= 4 && matches > bestMatches) {
+                    matchedCrm = c;
+                    bestMatches = matches;
+                }
+            }
+            
+            if (matchedCrm && matchedCrm.id) {
+                fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers/${matchedCrm.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json', ...(user?.role ? { 'x-requester-role': user.role } : {}) },
-                    body: JSON.stringify(crmPayload)
+                    body: JSON.stringify(currentData)
                 }).catch(console.error);
             } else {
                 fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...(user?.role ? { 'x-requester-role': user.role } : {}) },
-                    body: JSON.stringify(crmPayload)
+                    body: JSON.stringify(currentData)
                 }).catch(console.error);
             }
         }
@@ -1076,6 +1118,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     };
 
     const handleSupplierSave = async () => {
+        if (!poEndCustomer || !editableCustomerInfo.bizNo || !editableCustomerInfo.contactName || !editableCustomerInfo.tel || !editableCustomerInfo.address) {
+            alert("업체명, 사업자번호, 담당자명, 연락처, 주소를 모두 입력해야 발주서 전송이 가능합니다.");
+            return;
+        }
         persistCustomPrices();
         if (user?.role !== 'MASTER' && user?.role !== 'MANAGER') {
             alert('권한이 없습니다 (Only Master/Manager allowed).');

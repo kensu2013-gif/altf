@@ -481,8 +481,9 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
     const syncCustomerToCRM = () => {
         if (!customerInfo.companyName) return;
-        const existingCrm = crmCustomers.find(c => c.companyName === customerInfo.companyName);
-        const crmPayload = {
+
+        const normalize = (str?: string) => (str || '').replace(/[\s()주식회사]/g, '').toLowerCase();
+        const currentData = {
             companyName: customerInfo.companyName,
             businessNumber: customerInfo.bizNo,
             contactName: customerInfo.contactName,
@@ -490,18 +491,35 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             email: customerInfo.email,
             address: customerInfo.address
         };
+
+        let matchedCrm = null;
+        let bestMatches = 0;
+
+        for (const c of crmCustomers) {
+            let matches = 0;
+            if (c.companyName && currentData.companyName && normalize(c.companyName) === normalize(currentData.companyName)) matches++;
+            if (c.businessNumber && currentData.businessNumber && normalize(c.businessNumber) === normalize(currentData.businessNumber)) matches++;
+            if (c.address && currentData.address && normalize(c.address) === normalize(currentData.address)) matches++;
+            if (c.phone && currentData.phone && normalize(c.phone) === normalize(currentData.phone)) matches++;
+            if (c.email && currentData.email && normalize(c.email) === normalize(currentData.email)) matches++;
+
+            if (matches >= 4 && matches > bestMatches) {
+                matchedCrm = c;
+                bestMatches = matches;
+            }
+        }
         
-        if (existingCrm && existingCrm.id) {
-            fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers/${existingCrm.id}`, {
+        if (matchedCrm && matchedCrm.id) {
+            fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers/${matchedCrm.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', ...(user?.role ? { 'x-requester-role': user.role } : {}) },
-                body: JSON.stringify(crmPayload)
+                body: JSON.stringify(currentData)
             }).catch(console.error);
         } else {
             fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(user?.role ? { 'x-requester-role': user.role } : {}) },
-                body: JSON.stringify(crmPayload)
+                body: JSON.stringify(currentData)
             }).catch(console.error);
         }
     };
@@ -520,6 +538,11 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     }, []);
 
     const handleProcessing = async () => {
+        if (!customerInfo.companyName || !customerInfo.bizNo || !customerInfo.contactName || !customerInfo.phone || !customerInfo.address) {
+            alert("업체명, 사업자번호, 담당자명, 연락처, 주소를 모두 입력해야 합니다. (신규 거래처인 경우 정보를 모두 입력해 주세요.)");
+            return;
+        }
+
         if (!confirm('견적서를 회수(수정모드)하시겠습니까? 고객은 더 이상 답변서를 볼 수 없습니다.\n(상태가 답변작성중으로 변경됩니다)')) return;
 
         persistCustomPrices();
@@ -551,6 +574,11 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     };
 
     const handleSend = async () => {
+        if (!customerInfo.companyName || !customerInfo.bizNo || !customerInfo.contactName || !customerInfo.phone || !customerInfo.address) {
+            alert("업체명, 사업자번호, 담당자명, 연락처, 주소를 모두 입력해야 합니다. (신규 거래처인 경우 정보를 모두 입력해 주세요.)");
+            return;
+        }
+
         if (!confirm('견적서를 전송하시겠습니까? (상태가 답변완료로 변경됩니다)')) return;
         setIsSaving(true);
 
