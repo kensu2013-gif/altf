@@ -1175,7 +1175,7 @@ export default function Customers() {
         })
         .sort((a, b) => b.totalAmount - a.totalAmount);
 
-    }, [orders, customersList, inventoryMap, companyCardPeriod]);
+    }, [orders, quotations, customersList, inventoryMap, companyCardPeriod]);
 
     const totalBiRevenue = useMemo(() => {
         return biAnalytics.reduce((acc, c) => acc + c.totalAmount, 0);
