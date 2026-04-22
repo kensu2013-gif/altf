@@ -20,6 +20,66 @@ interface Customer {
     isDeleted?: boolean;
 }
 
+// ── 업체별 인텔리전스 카드 타입 ──────────────────────────────
+interface CompanyIntelCard {
+  companyName: string;
+  region: string;
+  ceo: string;
+  address: string;
+  contactName: string;
+  phone: string;
+  email: string;
+
+  // 거래 요약
+  totalOrders: number;           // 전체 발주 건수
+  totalAmount: number;           // 전체 누적 매출
+  totalQty: number;              // 전체 누적 수량
+  totalCost: number;             // 추정 매입 원가
+  avgOrderAmount: number;        // 건당 평균 발주액
+  marginRate: number;            // 추정 마진율 (%)
+
+  // 견적 전환
+  quoteCount: number;            // 견적 요청 건수
+  orderFromQuote: number;        // 견적 기반 발주 건수
+  conversionRate: number;        // 전환율 (%)
+
+  // 월별 매출 (최근 12개월)
+  monthlyData: {
+    month: string;               // "YYYY-MM"
+    amount: number;
+    qty: number;
+    orderCount: number;
+  }[];
+
+  // 주력 품목
+  topItems: {
+    itemKey: string;
+    qty: number;
+    amount: number;
+    cost: number;
+    orderCount: number;          // 이 품목이 포함된 주문 건수
+    lastOrderDate: string;
+  }[];
+
+  // 거래 활동
+  firstOrderDate: string | null;
+  lastOrderDate: string | null;
+  daysSinceLastOrder: number;
+  avgOrderIntervalDays: number;  // 평균 발주 주기 (일)
+  predictedNextOrder: string;    // 예상 다음 발주일
+
+  // 전략 등급
+  status: 'NEW' | 'GROWTH' | 'STABLE' | 'CHURN_RISK' | 'DORMANT';
+  ltv: number;                   // LTV: 연환산 매출 (12개월 기준)
+  marketingAction: string;
+  marketingTargetItems: string[]; // 추가 제안 가능한 품목
+}
+
+// 마케팅 타겟 판단 기준
+const CHURN_RISK_DAYS = 45;    // 최근 N일 내 주문 없으면 이탈 위험
+const DORMANT_DAYS = 90;       // N일 이상 무주문이면 휴면
+const GROWTH_RATE_THRESHOLD = 1.3; // 이전 대비 30% 이상 성장
+
 const stripCorp = (name: string) => {
     if (!name) return '';
     return name.replace(/\(주\)|주식회사/g, '')
@@ -47,7 +107,7 @@ export default function Customers() {
     const [customersList, setCustomersList] = useState<Customer[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
-    const [activeTab, setActiveTab] = useState<'MASTER' | 'ANALYTICS' | 'COMPANY_ANALYTICS' | 'BI_ANALYTICS' | 'STRATEGY_ANALYTICS'>('MASTER');
+    const [activeTab, setActiveTab] = useState<'MASTER' | 'ANALYTICS' | 'COMPANY_ANALYTICS' | 'BI_ANALYTICS' | 'STRATEGY_ANALYTICS' | 'COMPANY_CARD'>('MASTER');
     const [analyticsSortBy, setAnalyticsSortBy] = useState<'qty' | 'amount' | 'margin'>('qty');
     const [expandedStrategyGroups, setExpandedStrategyGroups] = useState<Record<string, boolean>>({
         CHURN_RISK: true, GROWTH: true, STABLE: false, NEW: true, DORMANT: false
@@ -55,6 +115,13 @@ export default function Customers() {
     const [strategyPeriod, setStrategyPeriod] = useState<30 | 90 | 180 | 365>(30);
     const [strategySearchTerm, setStrategySearchTerm] = useState('');
     const [strategySelectedRegion, setStrategySelectedRegion] = useState<string>('ALL');
+    
+    // COMPANY_CARD states
+    const [companyCardSortBy, setCompanyCardSortBy] = useState<'amount' | 'qty' | 'orders' | 'conversion'>('amount');
+    const [companyCardRegion, setCompanyCardRegion] = useState<string>('ALL');
+    const [companyCardSearch, setCompanyCardSearch] = useState<string>('');
+    const [companyCardExpanded, setCompanyCardExpanded] = useState<Record<string, boolean>>({});
+    const [cardItemSortBy, setCardItemSortBy] = useState<'qty' | 'amount' | 'freq'>('amount');
     
     // Inventory mapped for cost inference
     const { inventory } = useInventory();
@@ -706,6 +773,269 @@ export default function Customers() {
 
     }, [orders, customersList, strategyPeriod]);
 
+    const companyIntelCards = useMemo((): CompanyIntelCard[] => {
+      // ── Step 1: 업체별 전체 집계 ─────────────────────────────
+      const cardMap: Record<string, {
+        companyName: string;
+        region: string;
+        ceo: string;
+        address: string;
+        contactName: string;
+        phone: string;
+        email: string;
+        orders: typeof orders;                    // 이 업체의 주문 배열
+        totalAmount: number;
+        totalQty: number;
+        totalCost: number;
+        quoteOrders: number;                      // status = QUOTE 인 건수
+        confirmedOrders: number;                  // COMPLETED 건수
+        monthlyMap: Record<string, { amount: number; qty: number; orderCount: number }>;
+        itemMap: Record<string, { qty: number; amount: number; cost: number; orderCount: number; lastOrderDate: string }>;
+        orderDates: Date[];
+      }> = {};
+
+      orders.forEach(o => {
+        const oExt = o as typeof o & {
+          isDeleted?: boolean;
+          poEndCustomer?: string;
+          payload?: { customer?: { company_name?: string } };
+        };
+
+        if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN' || oExt.isDeleted) return;
+
+        // 내부 재고 주문 제외
+        const fullCustomerName = (
+          oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || ''
+        ).toLowerCase();
+        if (
+          fullCustomerName.includes('서울재고') ||
+          fullCustomerName.includes('시화재고') ||
+          fullCustomerName.includes('재고입고') ||
+          fullCustomerName.includes('stock')
+        ) return;
+
+        const cleanOrderName = stripCorp(o.customerName);
+        const customer = customersList.find(c => {
+          const cleanCrm = stripCorp(c.companyName);
+          if (!cleanOrderName || !cleanCrm) return false;
+          return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
+        });
+
+        const companyName = customer?.companyName || o.customerName || '미확인 업체';
+        const region = customer?.region || '미분류';
+
+        if (!cardMap[companyName]) {
+          cardMap[companyName] = {
+            companyName,
+            region,
+            ceo: customer?.ceo || '',
+            address: customer?.address || '',
+            contactName: customer?.contactName || '',
+            phone: customer?.phone || '',
+            email: customer?.email || '',
+            orders: [],
+            totalAmount: 0,
+            totalQty: 0,
+            totalCost: 0,
+            quoteOrders: 0,
+            confirmedOrders: 0,
+            monthlyMap: {},
+            itemMap: {},
+            orderDates: [],
+          };
+        }
+
+        const card = cardMap[companyName];
+        card.orders.push(o);
+
+        // 견적 vs 발주 카운트 (status 기반)
+        const statusLower = (o.status || '').toLowerCase();
+        if (statusLower === 'quote' || statusLower === 'pending') {
+          card.quoteOrders += 1;
+        }
+        if (statusLower === 'completed' || statusLower === 'confirmed') {
+          card.confirmedOrders += 1;
+        }
+
+        // 날짜
+        const orderDate = new Date(o.createdAt || new Date());
+        card.orderDates.push(orderDate);
+
+        // 월별 집계
+        const monthKey = orderDate.toISOString().slice(0, 7); // "YYYY-MM"
+        if (!card.monthlyMap[monthKey]) {
+          card.monthlyMap[monthKey] = { amount: 0, qty: 0, orderCount: 0 };
+        }
+        card.monthlyMap[monthKey].orderCount += 1;
+
+        // 아이템 집계
+        o.items?.forEach(item => {
+          const itemExt = item as typeof item & {
+            item_id?: string;
+            supplierPriceOverride?: number;
+            isDeleted?: boolean;
+            material?: string;
+          };
+          if (itemExt.isDeleted) return;
+
+          const quantity = item.quantity || 0;
+          if (quantity <= 0) return;
+
+          const unitPrice = item.unitPrice || 0;
+          const id = itemExt.productId || itemExt.item_id || '';
+          const product = inventoryMap.get(id);
+          const materialInfo = product?.material || itemExt.material || '';
+          const matString = materialInfo ? `-${materialInfo}` : '';
+          const itemKey = `${item.name}-${item.thickness}-${item.size}${matString}`;
+
+          const basePrice = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
+          let costPrice = Math.round((unitPrice * 0.9) / 10) * 10;
+          if (item.supplierRate !== undefined && item.supplierRate > 0) {
+            costPrice = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
+          } else if (product) {
+            const rate = product.rate_act2 || product.rate_act || product.rate_pct || 0;
+            if (rate > 0) costPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+          }
+
+          const itemAmount = quantity * unitPrice;
+          const itemCost = quantity * costPrice;
+
+          card.totalQty += quantity;
+          card.totalAmount += itemAmount;
+          card.totalCost += itemCost;
+          card.monthlyMap[monthKey].amount += itemAmount;
+          card.monthlyMap[monthKey].qty += quantity;
+
+          if (!card.itemMap[itemKey]) {
+            card.itemMap[itemKey] = { qty: 0, amount: 0, cost: 0, orderCount: 0, lastOrderDate: '' };
+          }
+          card.itemMap[itemKey].qty += quantity;
+          card.itemMap[itemKey].amount += itemAmount;
+          card.itemMap[itemKey].cost += itemCost;
+          card.itemMap[itemKey].orderCount += 1;
+          card.itemMap[itemKey].lastOrderDate = orderDate.toISOString().split('T')[0];
+        });
+      });
+
+      // ── Step 2: 카드 객체 변환 ──────────────────────────────────
+      const now = new Date();
+
+      // 최근 12개월 라벨 생성
+      const last12Months: string[] = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        last12Months.push(d.toISOString().slice(0, 7));
+      }
+
+      return Object.values(cardMap)
+        .filter(c => c.totalAmount > 0)
+        .map(c => {
+          const sortedDates = c.orderDates.sort((a, b) => a.getTime() - b.getTime());
+          const firstOrderDate = sortedDates[0]?.toISOString().split('T')[0] || null;
+          const lastOrderDate = sortedDates[sortedDates.length - 1]?.toISOString().split('T')[0] || null;
+          const daysSinceLastOrder = lastOrderDate
+            ? Math.floor((now.getTime() - new Date(lastOrderDate).getTime()) / 86400000)
+            : 9999;
+
+          // 평균 발주 주기 계산
+          let avgOrderIntervalDays = 0;
+          if (sortedDates.length > 1) {
+            const intervals: number[] = [];
+            for (let i = 1; i < sortedDates.length; i++) {
+              intervals.push(
+                Math.floor((sortedDates[i].getTime() - sortedDates[i - 1].getTime()) / 86400000)
+              );
+            }
+            avgOrderIntervalDays = Math.round(intervals.reduce((a, b) => a + b, 0) / intervals.length);
+          }
+
+          // 예상 다음 발주일
+          const predictedNextOrder = lastOrderDate && avgOrderIntervalDays > 0
+            ? new Date(new Date(lastOrderDate).getTime() + avgOrderIntervalDays * 86400000)
+                .toISOString().split('T')[0]
+            : '예측 불가';
+
+          // 견적 전환율
+          const totalOrderCount = c.orders.length;
+          const conversionRate = totalOrderCount > 0
+            ? parseFloat(((c.confirmedOrders / totalOrderCount) * 100).toFixed(1))
+            : 0;
+
+          // LTV: 최근 12개월 매출 합산 → 연환산
+          const recentYear = last12Months.reduce((sum, m) => sum + (c.monthlyMap[m]?.amount || 0), 0);
+          const ltv = recentYear;
+
+          // 마진율
+          const marginRate = c.totalAmount > 0
+            ? parseFloat((((c.totalAmount - c.totalCost) / c.totalAmount) * 100).toFixed(1))
+            : 0;
+
+          // 평균 발주액
+          const avgOrderAmount = totalOrderCount > 0
+            ? Math.round(c.totalAmount / totalOrderCount)
+            : 0;
+
+          // 월별 데이터 (최근 12개월)
+          const monthlyData = last12Months.map(m => ({
+            month: m,
+            amount: c.monthlyMap[m]?.amount || 0,
+            qty: c.monthlyMap[m]?.qty || 0,
+            orderCount: c.monthlyMap[m]?.orderCount || 0,
+          }));
+
+          // 주력 품목 TOP 10
+          const topItems = Object.entries(c.itemMap)
+            .sort((a, b) => b[1].amount - a[1].amount)
+            .slice(0, 10)
+            .map(([itemKey, stats]) => ({ itemKey, ...stats }));
+
+          // 타겟 마케팅 품목 (발주량 많은데 아직 안 주문한 주요 품목)
+          const alreadyOrderedKeys = new Set(topItems.map(i => i.itemKey));
+          const marketingTargetItems = [
+            '90E(L)-S10S-50A-STS304-W', '90E(L)-S10S-25A-STS304-W',
+            'T(S)-S10S-32A-STS304-W', 'CAP-S10S-32A-STS304-S',
+            'T(R)-S10S-40A X 25A-STS304-W', 'R(C)-S10S-50A X 40A-STS304-W',
+          ].filter(k => !alreadyOrderedKeys.has(k)).slice(0, 3);
+
+          // 전략 상태
+          let status: CompanyIntelCard['status'] = 'STABLE';
+          let marketingAction = '안정적 거래 유지. 추가 취급 품목 제안 적기';
+          if (daysSinceLastOrder > DORMANT_DAYS) {
+            status = 'DORMANT';
+            marketingAction = `장기 휴면 ${daysSinceLastOrder}일 — 단가 할인 프로모션 재제안 필요`;
+          } else if (daysSinceLastOrder > CHURN_RISK_DAYS) {
+            status = 'CHURN_RISK';
+            marketingAction = `이탈 위험 ${daysSinceLastOrder}일 무발주 — 긴급 컨택 요망 🚨`;
+          } else if (firstOrderDate && new Date(firstOrderDate) >= new Date(now.getTime() - 30 * 86400000)) {
+            status = 'NEW';
+            marketingAction = '신규 업체 — 정기 발주 유도 및 추천 품목 제안';
+          } else {
+            const recentMonth = c.monthlyMap[last12Months[last12Months.length - 1]]?.amount || 0;
+            const prevMonth = c.monthlyMap[last12Months[last12Months.length - 2]]?.amount || 0;
+            if (recentMonth >= prevMonth * GROWTH_RATE_THRESHOLD && prevMonth > 0) {
+              status = 'GROWTH';
+              marketingAction = '매출 성장 📈 — 우수 고객 혜택 안내 및 점유율 굳히기';
+            }
+          }
+
+          return {
+            companyName: c.companyName, region: c.region, ceo: c.ceo,
+            address: c.address, contactName: c.contactName,
+            phone: c.phone, email: c.email,
+            totalOrders: totalOrderCount, totalAmount: c.totalAmount,
+            totalQty: c.totalQty, totalCost: c.totalCost,
+            avgOrderAmount, marginRate,
+            quoteCount: c.quoteOrders, orderFromQuote: c.confirmedOrders, conversionRate,
+            monthlyData, topItems,
+            firstOrderDate, lastOrderDate, daysSinceLastOrder,
+            avgOrderIntervalDays, predictedNextOrder,
+            status, ltv, marketingAction, marketingTargetItems,
+          };
+        })
+        .sort((a, b) => b.totalAmount - a.totalAmount);
+
+    }, [orders, customersList, inventoryMap]);
+
     const totalBiRevenue = useMemo(() => {
         return biAnalytics.reduce((acc, c) => acc + c.totalAmount, 0);
     }, [biAnalytics]);
@@ -758,6 +1088,17 @@ export default function Customers() {
                 >
                     <TrendingUp className="w-4 h-4"/>
                     지역별/업체 전략 분석
+                </button>
+                <button
+                  onClick={() => setActiveTab('COMPANY_CARD')}
+                  className={`px-5 py-2.5 rounded-t-lg font-bold transition-all flex items-center gap-1.5 ${
+                    activeTab === 'COMPANY_CARD'
+                      ? 'bg-violet-600 text-white shadow-md'
+                      : 'text-slate-500 hover:bg-violet-50 hover:text-violet-600'
+                  }`}
+                >
+                  <Contact className="w-4 h-4" />
+                  업체별 인텔리전스 카드
                 </button>
             </div>
 
@@ -1385,6 +1726,430 @@ export default function Customers() {
                         })}
                     </div>
                 </div>
+            )}
+
+            {/* ── 업체별 인텔리전스 카드 탭 ──────────────────────────── */}
+            {activeTab === 'COMPANY_CARD' && (
+              <div className="space-y-6">
+
+                {/* 헤더 */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                  <div>
+                    <h1 className="text-2xl font-black text-violet-700 flex items-center gap-2">
+                      <Contact className="w-7 h-7 text-violet-500" />
+                      업체별 인텔리전스 카드 (CRM Deep Analytics)
+                    </h1>
+                    <p className="text-slate-500 text-[15px] mt-1 tracking-tight">
+                      업체별 월별 매출 흐름 · 주력 품목 · 견적 전환율 · 이탈 예측까지 타겟 마케팅에 필요한 모든 지표를 한 카드에.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* 지역 필터 */}
+                    <select
+                      title="지역 필터"
+                      value={companyCardRegion}
+                      onChange={e => setCompanyCardRegion(e.target.value)}
+                      className="bg-white border text-slate-700 border-slate-300 rounded font-bold text-sm px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                    >
+                      <option value="ALL">전국</option>
+                      {regions.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    {/* 정렬 */}
+                    <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-inner">
+                      {(['amount', 'qty', 'orders', 'conversion'] as const).map(s => (
+                        <button
+                          key={s}
+                          onClick={() => setCompanyCardSortBy(s)}
+                          className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                            companyCardSortBy === s ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          {s === 'amount' ? '매출순' : s === 'qty' ? '수량순' : s === 'orders' ? '거래건수' : '전환율'}
+                        </button>
+                      ))}
+                    </div>
+                    {/* 검색 */}
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="업체명 검색..."
+                        value={companyCardSearch}
+                        onChange={e => setCompanyCardSearch(e.target.value)}
+                        className="bg-white border pl-9 text-slate-700 border-slate-300 rounded font-medium text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400 w-52 shadow-inner"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 요약 메트릭 4개 */}
+                {(() => {
+                  const visibleCards = companyIntelCards.filter(c =>
+                    (companyCardRegion === 'ALL' || c.region === companyCardRegion) &&
+                    (!companyCardSearch || c.companyName.toLowerCase().includes(companyCardSearch.toLowerCase()))
+                  );
+                  const totalRevenue = visibleCards.reduce((s, c) => s + c.totalAmount, 0);
+                  const churnRisk = visibleCards.filter(c => c.status === 'CHURN_RISK').length;
+                  const avgConversion = visibleCards.length > 0
+                    ? (visibleCards.reduce((s, c) => s + c.conversionRate, 0) / visibleCards.length).toFixed(1)
+                    : '0';
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {[
+                        { label: '분석 대상 업체', value: `${visibleCards.length}개`, sub: '발주 이력 있는 업체', color: 'border-violet-400' },
+                        { label: '총 누적 매출', value: `₩${Math.round(totalRevenue / 10000).toLocaleString()}만`, sub: '내부 재고 제외', color: 'border-indigo-400' },
+                        { label: '이탈 위험 업체', value: `${churnRisk}개`, sub: `${CHURN_RISK_DAYS}일+ 무발주`, color: 'border-rose-400' },
+                        { label: '평균 전환율', value: `${avgConversion}%`, sub: '견적→발주 전환', color: 'border-emerald-400' },
+                      ].map(m => (
+                        <div key={m.label} className={`bg-white rounded-xl border-l-4 ${m.color} border border-slate-200 p-4 shadow-sm`}>
+                          <div className="text-xs text-slate-400 font-bold mb-1">{m.label}</div>
+                          <div className="text-xl font-black text-slate-800">{m.value}</div>
+                          <div className="text-xs text-slate-400 mt-0.5">{m.sub}</div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                {/* 업체 카드 그리드 */}
+                <div className="space-y-3">
+                  {(() => {
+                    const cards = companyIntelCards
+                      .filter(c =>
+                        (companyCardRegion === 'ALL' || c.region === companyCardRegion) &&
+                        (!companyCardSearch || c.companyName.toLowerCase().includes(companyCardSearch.toLowerCase()))
+                      )
+                      .sort((a, b) => {
+                        if (companyCardSortBy === 'amount')     return b.totalAmount - a.totalAmount;
+                        if (companyCardSortBy === 'qty')        return b.totalQty - a.totalQty;
+                        if (companyCardSortBy === 'orders')     return b.totalOrders - a.totalOrders;
+                        if (companyCardSortBy === 'conversion') return b.conversionRate - a.conversionRate;
+                        return 0;
+                      });
+
+                    if (cards.length === 0) {
+                      return (
+                        <div className="py-20 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
+                          분석할 업체 데이터가 없습니다.
+                        </div>
+                      );
+                    }
+
+                    return cards.map((card, idx) => {
+                      const isExpanded = !!companyCardExpanded[card.companyName];
+                      const isAlert = card.status === 'CHURN_RISK' || card.status === 'DORMANT';
+                      const isGood = card.status === 'GROWTH' || card.status === 'NEW';
+
+                      // 월별 히트맵 최대값 (색상 강도 기준)
+                      const maxMonthlyAmount = Math.max(...card.monthlyData.map(m => m.amount), 1);
+
+                      return (
+                        <div
+                          key={card.companyName}
+                          className={`bg-white rounded-2xl border shadow-sm overflow-hidden transition-all ${
+                            isAlert ? 'border-rose-300 ring-2 ring-rose-100' :
+                            isGood  ? 'border-emerald-200 ring-1 ring-emerald-50' :
+                            'border-slate-200'
+                          }`}
+                        >
+                          {/* ── 카드 헤더 (항상 표시) ── */}
+                          <button
+                            onClick={() => setCompanyCardExpanded(prev => ({ ...prev, [card.companyName]: !isExpanded }))}
+                            className="w-full text-left"
+                          >
+                            <div className={`px-5 py-4 flex items-center justify-between gap-4 ${
+                              isAlert ? 'bg-rose-50/30' : isGood ? 'bg-emerald-50/30' : 'bg-slate-50/30'
+                            }`}>
+                              <div className="flex items-center gap-3 min-w-0">
+                                {/* 순위 */}
+                                <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
+                                  idx < 3 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
+                                }`}>{idx + 1}</span>
+
+                                {/* 이름 + 지역 */}
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-black text-slate-800 text-base">{card.companyName}</span>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                      card.region === '경기도' ? 'bg-emerald-100 text-emerald-700' :
+                                      card.region === '경상도' ? 'bg-indigo-100 text-indigo-700' :
+                                      card.region === '충청도' ? 'bg-amber-100 text-amber-700' :
+                                      card.region === '전라도' ? 'bg-rose-100 text-rose-700' :
+                                      'bg-slate-100 text-slate-600'
+                                    }`}>{card.region}</span>
+                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                      card.status === 'CHURN_RISK' ? 'bg-rose-200 text-rose-700' :
+                                      card.status === 'DORMANT'    ? 'bg-amber-200 text-amber-700' :
+                                      card.status === 'GROWTH'     ? 'bg-emerald-200 text-emerald-700' :
+                                      card.status === 'NEW'        ? 'bg-blue-200 text-blue-700' :
+                                      'bg-slate-100 text-slate-500'
+                                    }`}>
+                                      {card.status === 'CHURN_RISK' ? '🚨 이탈위험' :
+                                       card.status === 'DORMANT'    ? '💤 휴면' :
+                                       card.status === 'GROWTH'     ? '📈 성장' :
+                                       card.status === 'NEW'        ? '🆕 신규' : '⚖️ 안정'}
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-slate-400 mt-0.5">
+                                    {card.contactName} {card.phone && `· ${card.phone}`}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* 핵심 숫자 4개 */}
+                              <div className="flex items-center gap-6 shrink-0">
+                                <div className="text-right hidden sm:block">
+                                  <div className="text-[10px] text-slate-400 font-bold">누적 매출</div>
+                                  <div className="font-black text-slate-800 text-base">
+                                    ₩{Math.round(card.totalAmount / 10000).toLocaleString()}만
+                                  </div>
+                                </div>
+                                <div className="text-right hidden md:block">
+                                  <div className="text-[10px] text-slate-400 font-bold">거래 건수</div>
+                                  <div className="font-black text-indigo-600 text-base">{card.totalOrders}건</div>
+                                </div>
+                                <div className="text-right hidden md:block">
+                                  <div className="text-[10px] text-slate-400 font-bold">전환율</div>
+                                  <div className={`font-black text-base ${
+                                    card.conversionRate >= 70 ? 'text-emerald-600' :
+                                    card.conversionRate >= 40 ? 'text-amber-500' : 'text-rose-500'
+                                  }`}>{card.conversionRate}%</div>
+                                </div>
+                                <div className="text-right hidden lg:block">
+                                  <div className="text-[10px] text-slate-400 font-bold">마지막 발주</div>
+                                  <div className={`font-black text-sm ${
+                                    card.daysSinceLastOrder > CHURN_RISK_DAYS ? 'text-rose-500' : 'text-slate-700'
+                                  }`}>{card.daysSinceLastOrder}일 전</div>
+                                </div>
+                                <div className={`p-2 rounded-lg bg-white/60 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                                  <ChevronDown className="w-5 h-5" />
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+
+                          {/* ── 카드 상세 (펼쳤을 때) ── */}
+                          {isExpanded && (
+                            <div className="border-t border-slate-100 bg-white">
+                              <div className="p-5 grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+                                {/* 왼쪽: 기본 정보 + 핵심 KPI */}
+                                <div className="space-y-4">
+                                  {/* 연락처 정보 */}
+                                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                    <div className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-3">거래처 기본 정보</div>
+                                    <div className="space-y-1.5 text-[13px]">
+                                      {card.address && (
+                                        <div className="flex items-start gap-2 text-slate-600">
+                                          <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                                          <span className="leading-tight">{card.address}</span>
+                                        </div>
+                                      )}
+                                      {card.email && (
+                                        <div className="flex items-center gap-2 text-slate-500">
+                                          <span className="w-3.5 h-3.5 text-slate-400">@</span>
+                                          <span>{card.email}</span>
+                                        </div>
+                                      )}
+                                      <div className="flex items-center gap-2 text-slate-500">
+                                        <Activity className="w-3.5 h-3.5 text-slate-400" />
+                                        <span>첫 거래: {card.firstOrderDate || '없음'}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2 text-slate-500">
+                                        <TrendingUp className="w-3.5 h-3.5 text-slate-400" />
+                                        <span>평균 주기: {card.avgOrderIntervalDays > 0 ? `${card.avgOrderIntervalDays}일` : '측정불가'}</span>
+                                      </div>
+                                      {card.avgOrderIntervalDays > 0 && (
+                                        <div className={`flex items-center gap-2 font-bold ${
+                                          card.predictedNextOrder < new Date().toISOString().split('T')[0]
+                                            ? 'text-rose-500' : 'text-indigo-600'
+                                        }`}>
+                                          <span className="w-3.5 text-center">→</span>
+                                          <span>예상 다음 발주: {card.predictedNextOrder}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* KPI 격자 */}
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                      { label: '총 수량', value: `${card.totalQty.toLocaleString()}개`, color: 'text-indigo-600' },
+                                      { label: '평균 발주액', value: `₩${Math.round(card.avgOrderAmount / 10000).toLocaleString()}만`, color: 'text-slate-700' },
+                                      { label: '마진율', value: `${card.marginRate}%`, color: card.marginRate >= 20 ? 'text-emerald-600' : card.marginRate >= 10 ? 'text-amber-500' : 'text-rose-500' },
+                                      { label: '연간 LTV', value: `₩${Math.round(card.ltv / 10000).toLocaleString()}만`, color: 'text-violet-600' },
+                                      { label: '견적 건수', value: `${card.quoteCount}건`, color: 'text-slate-600' },
+                                      { label: '전환 건수', value: `${card.orderFromQuote}건`, color: 'text-emerald-600' },
+                                    ].map(kpi => (
+                                      <div key={kpi.label} className="bg-slate-50 rounded-lg p-2.5 border border-slate-100">
+                                        <div className="text-[10px] text-slate-400 font-bold mb-0.5">{kpi.label}</div>
+                                        <div className={`text-sm font-black ${kpi.color}`}>{kpi.value}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {/* 전환율 게이지 */}
+                                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                    <div className="flex justify-between items-center mb-2">
+                                      <span className="text-[11px] font-black text-slate-500">견적→발주 전환율</span>
+                                      <span className={`text-base font-black ${
+                                        card.conversionRate >= 70 ? 'text-emerald-600' :
+                                        card.conversionRate >= 40 ? 'text-amber-500' : 'text-rose-500'
+                                      }`}>{card.conversionRate}%</span>
+                                    </div>
+                                    <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                                      <div
+                                        className={`h-full rounded-full transition-all w-pct-${Math.round(Math.min(card.conversionRate, 100) / 5) * 5} ${
+                                          card.conversionRate >= 70 ? 'bg-emerald-500' :
+                                          card.conversionRate >= 40 ? 'bg-amber-400' : 'bg-rose-400'
+                                        }`}
+                                      />
+                                    </div>
+                                    <div className="flex justify-between text-[9px] text-slate-400 mt-1">
+                                      <span>낮음</span><span>40%</span><span>70%</span><span>높음</span>
+                                    </div>
+                                  </div>
+
+                                  {/* 마케팅 액션 */}
+                                  <div className={`rounded-xl p-3 border text-[12px] font-bold leading-relaxed ${
+                                    isAlert ? 'bg-rose-50 border-rose-200 text-rose-700' :
+                                    isGood  ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                                    'bg-slate-50 border-slate-200 text-slate-600'
+                                  }`}>
+                                    {card.marketingAction}
+                                    {card.marketingTargetItems.length > 0 && (
+                                      <div className="mt-2 pt-2 border-t border-current/20">
+                                        <span className="text-[10px] opacity-70">추가 제안 품목: </span>
+                                        {card.marketingTargetItems.map(item => (
+                                          <span key={item} className="inline-block text-[10px] bg-white/60 px-1.5 py-0.5 rounded mr-1 mt-0.5 font-mono">{item}</span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* 가운데: 월별 매출 히트맵 */}
+                                <div className="space-y-4">
+                                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 h-full">
+                                    <div className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-4">
+                                      월별 매출 흐름 (최근 12개월)
+                                    </div>
+                                    <div className="space-y-2">
+                                      {card.monthlyData.map(m => {
+                                        const pct = maxMonthlyAmount > 0 ? (m.amount / maxMonthlyAmount) * 100 : 0;
+                                        const isCurrentMonth = m.month === new Date().toISOString().slice(0, 7);
+                                        return (
+                                          <div key={m.month} className="flex items-center gap-2">
+                                            <span className={`text-[11px] font-mono w-14 shrink-0 ${
+                                              isCurrentMonth ? 'font-black text-violet-600' : 'text-slate-400'
+                                            }`}>{m.month.slice(5)}월</span>
+                                            <div className="flex-1 h-5 bg-slate-100 rounded overflow-hidden relative">
+                                              <div
+                                                className={`h-full rounded transition-all w-pct-${Math.round(pct / 5) * 5} ${
+                                                  pct >= 80 ? 'bg-violet-500' :
+                                                  pct >= 50 ? 'bg-indigo-400' :
+                                                  pct >= 20 ? 'bg-indigo-200' :
+                                                  pct > 0   ? 'bg-slate-200' : 'bg-transparent'
+                                                }`}
+                                              />
+                                              {m.amount > 0 && (
+                                                <span className="absolute inset-0 flex items-center px-2 text-[10px] font-bold text-slate-600">
+                                                  {m.orderCount}건
+                                                </span>
+                                              )}
+                                            </div>
+                                            <span className="text-[11px] font-mono text-right w-16 shrink-0 text-slate-600">
+                                              {m.amount > 0 ? `${Math.round(m.amount / 10000).toLocaleString()}만` : '—'}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                    {/* 합계 */}
+                                    <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between text-[12px]">
+                                      <span className="text-slate-500 font-bold">12개월 합계</span>
+                                      <span className="font-black text-violet-700">
+                                        ₩{Math.round(card.ltv / 10000).toLocaleString()}만
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* 오른쪽: 주력 품목 TOP 10 */}
+                                <div className="space-y-4">
+                                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <div className="text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                                        주력 품목 TOP {Math.min(card.topItems.length, 10)}
+                                      </div>
+                                      <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 gap-0.5">
+                                        {(['amount', 'qty', 'freq'] as const).map(s => (
+                                          <button
+                                            key={s}
+                                            onClick={e => { e.stopPropagation(); setCardItemSortBy(s); }}
+                                            className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${
+                                              cardItemSortBy === s ? 'bg-violet-100 text-violet-700' : 'text-slate-400 hover:text-slate-600'
+                                            }`}
+                                          >
+                                            {s === 'amount' ? '매출' : s === 'qty' ? '수량' : '빈도'}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                      {[...card.topItems]
+                                        .sort((a, b) =>
+                                          cardItemSortBy === 'amount' ? b.amount - a.amount :
+                                          cardItemSortBy === 'qty'    ? b.qty - a.qty :
+                                          b.orderCount - a.orderCount
+                                        )
+                                        .slice(0, 10)
+                                        .map((item, i) => {
+                                          const itemMargin = item.amount - item.cost;
+                                          const mPct = item.amount > 0 ? (itemMargin / item.amount * 100).toFixed(0) : '0';
+                                          return (
+                                            <div key={item.itemKey} className="bg-white rounded-lg p-2.5 border border-slate-100 hover:border-violet-200 transition-colors">
+                                              <div className="flex items-start gap-2">
+                                                <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5 ${
+                                                  i < 3 ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'
+                                                }`}>{i + 1}</span>
+                                                <div className="flex-1 min-w-0">
+                                                  <div className="text-[11px] font-bold text-slate-700 leading-tight truncate" title={item.itemKey}>
+                                                    {item.itemKey}
+                                                  </div>
+                                                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                    <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-1.5 rounded">
+                                                      {item.qty.toLocaleString()}개
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-500">
+                                                      ₩{Math.round(item.amount / 10000).toLocaleString()}만
+                                                    </span>
+                                                    <span className="text-[10px] text-amber-600">
+                                                      {item.orderCount}회 발주
+                                                    </span>
+                                                    <span className={`text-[10px] font-bold ${
+                                                      Number(mPct) >= 20 ? 'text-emerald-600' :
+                                                      Number(mPct) >= 10 ? 'text-amber-500' : 'text-rose-400'
+                                                    }`}>마진 {mPct}%</span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                    </div>
+                                  </div>
+                                </div>
+
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
             )}
 
             {/* MODAL (ADD / EDIT) */}
