@@ -151,6 +151,31 @@ const resolveItemCost = (o: ResolveOrderType, itemExt: ResolveItemType, product:
     return costPrice;
 };
 
+const resolveOrderDate = (o: { id?: string; createdAt?: string; payload?: { meta?: { created_at?: string } } | null }): Date => {
+    // 1. Try to parse Korean date from payload.meta.created_at
+    const kDateStr = o.payload?.meta?.created_at;
+    if (typeof kDateStr === 'string') {
+        const kDateMatch = kDateStr.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
+        if (kDateMatch) {
+            return new Date(`${kDateMatch[1]}-${kDateMatch[2].padStart(2, '0')}-${kDateMatch[3].padStart(2, '0')}T00:00:00Z`);
+        }
+    }
+    
+    // 2. Try to parse YYMMDD from order ID (e.g., O-GYEON-260315-001)
+    if (typeof o.id === 'string') {
+        const idMatch = o.id.match(/\D(\d{6})(-|$)/);
+        if (idMatch) {
+            const yy = idMatch[1].slice(0, 2);
+            const mm = idMatch[1].slice(2, 4);
+            const dd = idMatch[1].slice(4, 6);
+            return new Date(`20${yy}-${mm}-${dd}T00:00:00Z`);
+        }
+    }
+
+    // 3. Fallback to createdAt
+    return new Date(o.createdAt || new Date());
+};
+
 export default function Customers() {
     const user = useStore(state => state.auth.user);
     const token = useStore(state => state.auth.token);
@@ -1181,7 +1206,7 @@ const actionIntel = useMemo(() => {
     if (statusL === 'quote' || statusL === 'pending') card.quoteOrders    += 1;
     if (statusL === 'completed')                      card.confirmedOrders += 1;
 
-    const orderDate = new Date(o.createdAt || new Date());
+    const orderDate = resolveOrderDate(o);
     card.orderDates.push(orderDate);
     if (!card.lastOrderDate  || orderDate > card.lastOrderDate)  card.lastOrderDate  = orderDate;
     if (!card.firstOrderDate || orderDate < card.firstOrderDate) card.firstOrderDate = orderDate;
@@ -2993,7 +3018,7 @@ const actionIntel = useMemo(() => {
                             {/* KPI 격자 */}
                             <div className="grid grid-cols-2 gap-2">
                               {[
-                                { l: '연 LTV',    v: `${Math.round(card.ltv12 / 10000).toLocaleString()}만원`,  c:'text-violet-600' },
+                                { l: '총 발주금액',    v: `${Math.round(card.ltv12 / 10000).toLocaleString()}만원`,  c:'text-violet-600' },
                                 { l: '건당 평균', v: `${Math.round(card.avgOrderAmt / 10000).toLocaleString()}만원`, c:'text-slate-700' },
                                 { l: '전환율',    v: `${card.convRate}%`,
                                   c: card.convRate>=80?'text-emerald-600':card.convRate>=50?'text-amber-500':'text-rose-500'},
