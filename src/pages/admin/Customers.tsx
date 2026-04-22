@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Users, MapPin, Building2, TrendingUp, Search, Contact, Activity, AlertTriangle, Trash2, Edit2, Plus, BarChart2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useInventory } from '../../hooks/useInventory';
-import type { Product } from '../../types';
+import type { Product, Quotation } from '../../types';
 
 interface Customer {
     id: string;
@@ -193,7 +193,7 @@ export default function Customers() {
     const token = useStore(state => state.auth.token);
     const orders = useStore(state => state.orders);
     const setOrders = useStore(state => state.setOrders);
-    const [quotations, setQuotations] = useState<any[]>([]);
+    const [quotations, setQuotations] = useState<Quotation[]>([]);
     const [customersList, setCustomersList] = useState<Customer[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
@@ -882,8 +882,8 @@ export default function Customers() {
       }> = {};
 
       quotations.forEach(q => {
-        if (q.status === 'TRASH' || q.isDeleted) return;
-        const custName = q.customerName || (q.customerInfo ? q.customerInfo.company_name : '');
+        if ((q.status as string) === 'TRASH' || q.isDeleted) return;
+        const custName = q.customerName || (q.customerInfo ? (q.customerInfo.companyName || (q.customerInfo as any).company_name) : '');
         const cleanOrderName = stripCorp(custName);
         const customer = customersList.find(c => {
           const cleanCrm = stripCorp(c.companyName);
