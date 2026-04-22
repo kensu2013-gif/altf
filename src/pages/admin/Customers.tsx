@@ -883,7 +883,7 @@ export default function Customers() {
 
       quotations.forEach(q => {
         if ((q.status as string) === 'TRASH' || q.isDeleted) return;
-        const custName = q.customerName || (q.customerInfo ? (q.customerInfo.companyName || (q.customerInfo as any).company_name) : '');
+        const custName = q.customerName || (q.customerInfo ? (q.customerInfo.companyName || (q.customerInfo as Record<string, unknown>).company_name as string) : '');
         const cleanOrderName = stripCorp(custName);
         const customer = customersList.find(c => {
           const cleanCrm = stripCorp(c.companyName);
