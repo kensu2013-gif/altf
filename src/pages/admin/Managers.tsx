@@ -99,6 +99,17 @@ export default function AdminManagers() {
         setEditingUser(null);
     };
 
+    const handleTogglePermission = async (user: User, field: 'viewCrm' | 'viewSihwa') => {
+        const currentPerms = user.permissions || { viewCrm: false, viewSihwa: false };
+        const updates = {
+            permissions: {
+                ...currentPerms,
+                [field]: !currentPerms[field]
+            }
+        };
+        await updateUser(user.id, updates);
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500 relative">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -138,6 +149,7 @@ export default function AdminManagers() {
                             <th className="px-6 py-4 font-medium">소속 (부서)</th>
                             <th className="px-6 py-4 font-medium">연락처</th>
                             <th className="px-6 py-4 font-medium text-center">최근 접속일</th>
+                            <th className="px-6 py-4 font-medium text-center">메뉴 권한</th>
                             <th className="px-6 py-4 font-medium text-right">관리</th>
                         </tr>
                     </thead>
@@ -178,6 +190,24 @@ export default function AdminManagers() {
                                     ) : (
                                         <span className="text-slate-300">-</span>
                                     )}
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                    <div className="flex justify-center gap-2">
+                                        <button 
+                                            onClick={() => handleTogglePermission(user, 'viewCrm')}
+                                            className={`px-2.5 py-1 text-[11px] font-bold rounded-full border transition-colors ${user.permissions?.viewCrm ? 'bg-teal-50 text-teal-600 border-teal-200' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'}`}
+                                            title="클릭하여 CRM 권한 변경"
+                                        >
+                                            {user.permissions?.viewCrm ? '✓ CRM' : 'CRM (제한)'}
+                                        </button>
+                                        <button 
+                                            onClick={() => handleTogglePermission(user, 'viewSihwa')}
+                                            className={`px-2.5 py-1 text-[11px] font-bold rounded-full border transition-colors ${user.permissions?.viewSihwa ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'}`}
+                                            title="클릭하여 시화재고 권한 변경"
+                                        >
+                                            {user.permissions?.viewSihwa ? '✓ 재고' : '재고 (제한)'}
+                                        </button>
+                                    </div>
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     <div className="flex justify-end gap-2">
