@@ -411,7 +411,7 @@ export default function SihwaInventory() {
             const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
             if (!items) return;
 
-            items.forEach((item: any) => {
+            items.forEach((item: Partial<LineItem> & { item_id?: string; qty?: number }) => {
                 const id = item.productId || item.item_id;
                 if (!id) return;
                 const qty = Number(item.quantity ?? item.qty ?? 0);
