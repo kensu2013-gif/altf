@@ -99,7 +99,33 @@ import { getSharedMaterialColor } from '../../lib/productUtils';
 
 const getMaterialColor = getSharedMaterialColor;
 
-const resolveItemCost = (o: any, itemExt: any, product: any, unitPrice: number): number => {
+interface ResolveOrderType {
+    po_items?: Array<{
+        productId?: string | null;
+        name?: string | null;
+        supplierPriceOverride?: number | null;
+        supplierRate?: number | null;
+    }>;
+}
+
+interface ResolveItemType {
+    productId?: string | null;
+    item_id?: string | null;
+    name?: string | null;
+    base_price?: number | null;
+    supplierPriceOverride?: number | null;
+    supplierRate?: number | null;
+}
+
+interface ResolveProductType {
+    base_price?: number;
+    unitPrice?: number;
+    rate_act2?: number;
+    rate_act?: number;
+    rate_pct?: number;
+}
+
+const resolveItemCost = (o: ResolveOrderType, itemExt: ResolveItemType, product: ResolveProductType | undefined | null, unitPrice: number): number => {
     const id = itemExt.productId || itemExt.item_id || '';
     const basePrice = (itemExt.base_price && itemExt.base_price > 0) 
         ? itemExt.base_price 
@@ -108,7 +134,7 @@ const resolveItemCost = (o: any, itemExt: any, product: any, unitPrice: number):
     let costPrice = Math.round((unitPrice * 0.9) / 10) * 10;
     
     // [FIX] Read from po_items if available, since supplier data is managed there.
-    const poItem = o.po_items?.find((p: any) => p.productId === id && p.name === itemExt.name);
+    const poItem = o.po_items?.find((p) => p.productId === id && p.name === itemExt.name);
     const override = poItem?.supplierPriceOverride ?? itemExt.supplierPriceOverride;
     const sRate = poItem?.supplierRate ?? itemExt.supplierRate;
 
@@ -422,8 +448,6 @@ export default function Customers() {
                 const matString = materialInfo ? `-${materialInfo}` : '';
                 const itemKey = `${item.name}-${item.thickness}-${item.size}${matString}`;
                 
-                const basePrice = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
-                
                 const costPrice = resolveItemCost(o, itemExt, product, unitPrice);
 
                 const itemAmount = quantity * unitPrice;
@@ -536,8 +560,6 @@ export default function Customers() {
                 const id = itemExt.productId || itemExt.item_id || '';
                 const product = inventoryMap.get(id);
 
-                const basePrice = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
-                
                 const costPrice = resolveItemCost(o, itemExt, product, unitPrice);
 
                 const itemAmount = quantity * unitPrice;
@@ -632,7 +654,6 @@ export default function Customers() {
                 const matString = materialInfo ? `-${materialInfo}` : '';
                 const itemKey = `${item.name}-${item.thickness}-${item.size}${matString}`;
                 
-                const basePrice = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
                 const costPrice = resolveItemCost(o, itemExt, product, unitPrice);
 
                 const itemAmount = quantity * unitPrice;
@@ -931,10 +952,6 @@ export default function Customers() {
           const itemKey = `${item.name}-${item.thickness}-${item.size}${matString}`;
 
           // '주문관리' (QuoteItemRow.tsx) 와 매입가 계산 로직을 100% 동일하게 동기화
-          const basePrice = (itemExt.base_price && itemExt.base_price > 0) 
-            ? itemExt.base_price 
-            : (product?.base_price ?? product?.unitPrice ?? 0);
-          
           const costPrice = resolveItemCost(o, itemExt, product, unitPrice);
 
           const itemAmount = quantity * unitPrice;
@@ -1187,8 +1204,6 @@ const actionIntel = useMemo(() => {
       const product    = inventoryMap.get(id);
       const matInfo    = product?.material || itemExt.material || '';
       const itemKey    = `${item.name}-${item.thickness}-${item.size}${matInfo ? `-${matInfo}` : ''}`;
-      const basePrice  = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
-
       const costPrice = resolveItemCost(o, itemExt, product, unitPrice);
 
       const itemAmt  = qty * unitPrice;
