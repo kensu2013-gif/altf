@@ -856,7 +856,7 @@ export default function Customers() {
                 return b.totalAmount - a.totalAmount;
             });
 
-    }, [orders, quotations, customersList, strategyPeriod]);
+    }, [orders, customersList, strategyPeriod]);
 
     const companyIntelCards = useMemo((): CompanyIntelCard[] => {
       // ── Step 1: 업체별 전체 집계 ─────────────────────────────
