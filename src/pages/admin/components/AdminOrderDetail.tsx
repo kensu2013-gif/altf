@@ -458,6 +458,12 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const globalDiscountAmount = Math.round(subTotalWithCharges * (response.globalDiscountRate / 100));
     const totalWithCharges = subTotalWithCharges - globalDiscountAmount;
 
+    // Overall order totals (Used for persisting to the database to prevent partial saving)
+    const overallOrderTotal = enrichedItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+    const overallSubTotalWithCharges = overallOrderTotal + charges.reduce((sum, c) => sum + c.amount, 0);
+    const overallGlobalDiscountAmount = Math.round(overallSubTotalWithCharges * (response.globalDiscountRate / 100));
+    const overallTotalWithCharges = overallSubTotalWithCharges - overallGlobalDiscountAmount;
+
     // Supplier Totals Calculation
     const { totalSupplierAmount, totalProfit } = selectedItems.reduce((acc, item) => {
         const product = findProduct({ productId: item.productId });
@@ -946,10 +952,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         }
 
         const updateData: Partial<Order> = {
-            totalAmount: totalWithCharges,
+            totalAmount: overallTotalWithCharges,
             adminResponse: {
                 ...response,
-                confirmedPrice: totalWithCharges,
+                confirmedPrice: overallTotalWithCharges,
                 additionalCharges: charges
             },
             status: order.status === 'SUBMITTED' ? 'PROCESSING' : order.status,
@@ -1068,10 +1074,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         }
 
         const updateData: Partial<Order> = {
-            totalAmount: totalWithCharges,
+            totalAmount: overallTotalWithCharges,
             adminResponse: {
                 ...response,
-                confirmedPrice: totalWithCharges,
+                confirmedPrice: overallTotalWithCharges,
                 additionalCharges: charges
             },
             status: finalStatus,
@@ -1263,7 +1269,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
 
             {/* Slide-over Panel */}
-            <div className="w-full xl:max-w-7xl h-full bg-white shadow-2xl pointer-events-auto flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="w-full xl:max-w-[85vw] h-full bg-white shadow-2xl pointer-events-auto flex flex-col animate-in slide-in-from-right duration-300">
 
                 {/* Header */}
                 <div className={`flex items-center justify-between p-6 border-b shrink-0 ${isSupplierMode ? 'bg-indigo-50/50 border-indigo-100' : 'bg-slate-50/50 border-slate-100'}`

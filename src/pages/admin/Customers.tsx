@@ -1440,7 +1440,7 @@ const actionIntel = useMemo(() => {
   onClick={() => setActiveTab('ACTION_INTEL')}
   className={`px-5 py-2.5 rounded-t-lg font-bold transition-all flex items-center gap-1.5
     ${activeTab === 'ACTION_INTEL'
-      ? 'bg-gradient-to-r from-rose-600 to-violet-600 text-white shadow-md'
+      ? 'bg-linear-to-r from-rose-600 to-violet-600 text-white shadow-md'
       : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
     }`}
 >
@@ -1923,7 +1923,7 @@ const actionIntel = useMemo(() => {
                                                                 <h3 className="font-black text-slate-800 text-[13px] truncate">{comp.companyName}</h3>
                                                             </div>
                                                             <div className="text-right shrink-0">
-                                                                <div className="text-[11px] font-black text-slate-700 font-mono">₩{(Math.round(comp.totalAmount / 10000)).toLocaleString()}만</div>
+                                                                <div className="text-[11px] font-black text-slate-700 font-mono">{(Math.round(comp.totalAmount / 10000)).toLocaleString()}만원</div>
                                                             </div>
                                                         </div>
                                                         <div className="p-3 grid grid-cols-2 gap-2 flex-1 relative">
@@ -1932,14 +1932,14 @@ const actionIntel = useMemo(() => {
                                                                     <span>최근30</span>
                                                                     <span className="text-indigo-400">{comp.recentQty}건</span>
                                                                 </div>
-                                                                <div className="font-black text-slate-800 text-[12px] font-mono leading-none mt-0.5">{(Math.round(comp.recentAmount / 10000)).toLocaleString()}만</div>
+                                                                <div className="font-black text-slate-800 text-[12px] font-mono leading-none mt-0.5">{(Math.round(comp.recentAmount / 10000)).toLocaleString()}만원</div>
                                                             </div>
                                                             <div className="bg-slate-50 p-1.5 rounded border border-slate-100 flex flex-col justify-center">
                                                                 <div className="text-[9px] text-slate-400 font-bold flex justify-between">
                                                                     <span>이전30</span>
                                                                     <span className="text-slate-400">{comp.previousQty}건</span>
                                                                 </div>
-                                                                <div className="font-black text-slate-600 text-[12px] font-mono leading-none mt-0.5">{(Math.round(comp.previousAmount / 10000)).toLocaleString()}만</div>
+                                                                <div className="font-black text-slate-600 text-[12px] font-mono leading-none mt-0.5">{(Math.round(comp.previousAmount / 10000)).toLocaleString()}만원</div>
                                                             </div>
                                                             
                                                             <div className="col-span-2 flex items-center justify-between text-[10px] font-bold pt-1 pb-1">
@@ -2686,7 +2686,7 @@ const actionIntel = useMemo(() => {
   <div className="flex gap-0 h-full animate-in fade-in duration-300">
 
     {/* ── 왼쪽: 오늘 할 일 사이드바 ── */}
-    <aside className="w-72 flex-shrink-0 border-r border-slate-200 bg-slate-50/50 flex flex-col overflow-hidden">
+    <aside className="w-72 shrink-0 border-r border-slate-200 bg-slate-50/50 flex flex-col overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-200 bg-white">
         <div className="flex items-center gap-2 mb-3">
           <Activity className="w-4 h-4 text-rose-500" />
@@ -2728,7 +2728,7 @@ const actionIntel = useMemo(() => {
             }`}
           >
             <div className="flex items-start gap-2">
-              <span className="text-lg flex-shrink-0 mt-0.5">{action.icon}</span>
+              <span className="text-lg shrink-0 mt-0.5">{action.icon}</span>
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-bold text-slate-800 mb-1 leading-tight">{action.label}</div>
                 <div className="text-[10px] text-slate-500 leading-snug">{action.desc}</div>
@@ -2748,7 +2748,7 @@ const actionIntel = useMemo(() => {
     <div className="flex-1 flex flex-col overflow-hidden">
 
       {/* 서브뷰 탭 바 */}
-      <div className="flex items-center gap-1 px-5 py-2 border-b border-slate-200 bg-white flex-shrink-0">
+      <div className="flex items-center gap-1 px-5 py-2 border-b border-slate-200 bg-white shrink-0">
         {([
           { key: 'urgent',    label: '🚨 지금 당장', color: 'rose'    },
           { key: 'prep',      label: '📦 준비할 것',  color: 'amber'   },
@@ -2909,7 +2909,7 @@ const actionIntel = useMemo(() => {
                       {/* KPI 4칸 */}
                       <div className="grid grid-cols-4 gap-2">
                         {[
-                          { label: '누적 매출', value: `₩${Math.round(card.totalAmount / 10000).toLocaleString()}만`, color: 'text-indigo-600' },
+                          { label: '누적 매출', value: `${Math.round(card.totalAmount / 10000).toLocaleString()}만원`, color: 'text-indigo-600' },
                           { label: '거래 건수', value: `${card.totalOrders}건`, color: 'text-teal-600' },
                           { label: '전환율',    value: `${card.convRate}%`,
                             color: card.convRate >= 80 ? 'text-emerald-600' : card.convRate >= 50 ? 'text-amber-500' : 'text-rose-500' },
@@ -2929,17 +2929,15 @@ const actionIntel = useMemo(() => {
                       {card.monthlyData.map((m, i) => {
                         const pct  = maxMonthAmt > 0 ? (m.amount / maxMonthAmt) * 100 : 0;
                         const isNow = i === 11;
+                        const hClass = pct >= 90 ? 'h-8' : pct >= 75 ? 'h-7' : pct >= 60 ? 'h-6' : pct >= 45 ? 'h-5' : pct >= 30 ? 'h-4' : pct >= 15 ? 'h-3' : pct > 0 ? 'h-2' : 'h-1';
+                        const bgClass = isNow
+                          ? (pct > 30 ? 'bg-indigo-600' : 'bg-indigo-400')
+                          : (isUrgent && pct > 30 ? 'bg-rose-300' : pct > 60 ? 'bg-indigo-300' : pct > 20 ? 'bg-indigo-200' : 'bg-slate-100');
                         return (
                           <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                            <div // NOSONAR
-                              title={`${m.month} ₩${Math.round(m.amount / 10000)}만 ${m.orderCount}건`}
-                              className="w-full rounded-t"
-                              style={{
-                                height: Math.max(pct * 0.28 + 3, 3),
-                                background: isNow
-                                  ? (pct > 30 ? '#4f46e5' : '#818cf8')
-                                  : (isUrgent && pct > 30 ? '#fca5a5' : pct > 60 ? '#a5b4fc' : pct > 20 ? '#c7d2fe' : '#f1f5f9'),
-                              }}
+                            <div
+                              title={`${m.month} ${Math.round(m.amount / 10000).toLocaleString()}만원 ${m.orderCount}건`}
+                              className={`w-full rounded-t ${hClass} ${bgClass}`}
                             />
                             <span className="text-[7px] text-slate-300">{m.month.slice(0, 2)}</span>
                           </div>
@@ -2959,7 +2957,7 @@ const actionIntel = useMemo(() => {
                         {card.marketingAction}
                       </div>
                       <button
-                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black border transition-all flex-shrink-0
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black border transition-all shrink-0
                           ${isUrgent
                             ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-600 hover:text-white'
                             : isGrowth
@@ -2982,7 +2980,7 @@ const actionIntel = useMemo(() => {
                             <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                               <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3">거래처 정보</div>
                               <div className="space-y-1.5 text-xs text-slate-600">
-                                {card.address && <div className="flex items-start gap-1.5"><MapPin className="w-3 h-3 text-slate-400 mt-0.5 flex-shrink-0" />{card.address}</div>}
+                                {card.address && <div className="flex items-start gap-1.5"><MapPin className="w-3 h-3 text-slate-400 mt-0.5 shrink-0" />{card.address}</div>}
                                 {card.email   && <div className="text-slate-400">@ {card.email}</div>}
                                 <div className="pt-2 border-t border-slate-200 space-y-1">
                                   <div className="flex justify-between"><span className="text-slate-400">첫 거래</span><span className="font-bold">{card.firstOrderDate || '없음'}</span></div>
@@ -2996,8 +2994,8 @@ const actionIntel = useMemo(() => {
                             {/* KPI 격자 */}
                             <div className="grid grid-cols-2 gap-2">
                               {[
-                                { l: '연 LTV',    v: `₩${Math.round(card.ltv12/10000).toLocaleString()}만`,  c:'text-violet-600' },
-                                { l: '건당 평균', v: `₩${Math.round(card.avgOrderAmt/10000).toLocaleString()}만`, c:'text-slate-700' },
+                                { l: '연 LTV',    v: `${Math.round(card.ltv12 / 10000).toLocaleString()}만원`,  c:'text-violet-600' },
+                                { l: '건당 평균', v: `${Math.round(card.avgOrderAmt / 10000).toLocaleString()}만원`, c:'text-slate-700' },
                                 { l: '전환율',    v: `${card.convRate}%`,
                                   c: card.convRate>=80?'text-emerald-600':card.convRate>=50?'text-amber-500':'text-rose-500'},
                                 { l: '마진율',    v: `${card.marginRate}%`,
@@ -3019,8 +3017,7 @@ const actionIntel = useMemo(() => {
                                 </span>
                               </div>
                               <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full ${card.convRate>=80?'bg-emerald-500':card.convRate>=50?'bg-amber-400':'bg-rose-400'}`} // NOSONAR
-                                  style={{ width: `${Math.min(card.convRate, 100)}%` }} />
+                                <div className={`h-full rounded-full ${['w-0', 'w-1/12', 'w-1/6', 'w-1/4', 'w-1/3', 'w-5/12', 'w-1/2', 'w-7/12', 'w-2/3', 'w-3/4', 'w-5/6', 'w-11/12', 'w-full'][Math.round((Math.max(0, Math.min(card.convRate, 100)) / 100) * 12)]} ${card.convRate>=80?'bg-emerald-500':card.convRate>=50?'bg-amber-400':'bg-rose-400'}`} />
                               </div>
                             </div>
 
@@ -3042,20 +3039,21 @@ const actionIntel = useMemo(() => {
                               {card.monthlyData.map((m, i) => {
                                 const pct = maxMonthAmt > 0 ? (m.amount / maxMonthAmt) * 100 : 0;
                                 const isNow = i === 11;
+                                const wIndex = Math.max(0, Math.min(12, Math.round((pct / 100) * 12)));
+                                const wClass = ['w-0', 'w-1/12', 'w-1/6', 'w-1/4', 'w-1/3', 'w-5/12', 'w-1/2', 'w-7/12', 'w-2/3', 'w-3/4', 'w-5/6', 'w-11/12', 'w-full'][wIndex];
                                 return (
                                   <div key={i} className="flex items-center gap-2">
-                                    <span className={`text-[10px] font-mono w-8 flex-shrink-0 text-right ${isNow ? 'font-black text-indigo-600' : 'text-slate-400'}`}>
+                                    <span className={`text-[10px] font-mono w-8 shrink-0 text-right ${isNow ? 'font-black text-indigo-600' : 'text-slate-400'}`}>
                                       {m.month}
                                     </span>
                                     <div className="flex-1 h-5 bg-slate-200 rounded overflow-hidden relative">
-                                      <div // NOSONAR
-                                        className={`h-full rounded transition-all ${
+                                      <div
+                                        className={`h-full rounded transition-all ${wClass} ${
                                           pct >= 80 ? (isUrgent ? 'bg-rose-400' : 'bg-indigo-500') :
                                           pct >= 50 ? (isUrgent ? 'bg-rose-300' : 'bg-indigo-400') :
                                           pct >= 20 ? 'bg-indigo-200' :
                                           pct > 0 ? 'bg-slate-300' : 'bg-transparent'
                                         }`}
-                                        style={{ width: `${pct}%` }}
                                       />
                                       {m.orderCount > 0 && (
                                         <span className="absolute inset-0 flex items-center px-2 text-[9px] font-bold text-slate-600">
@@ -3063,8 +3061,8 @@ const actionIntel = useMemo(() => {
                                         </span>
                                       )}
                                     </div>
-                                    <span className="text-[10px] font-mono text-slate-600 w-14 text-right flex-shrink-0">
-                                      {m.amount > 0 ? `${Math.round(m.amount/10000).toLocaleString()}만` : '—'}
+                                    <span className="text-[10px] font-mono text-slate-600 w-14 text-right shrink-0">
+                                      {m.amount > 0 ? `${Math.round(m.amount / 10000).toLocaleString()}만원` : '—'}
                                     </span>
                                   </div>
                                 );
@@ -3072,7 +3070,7 @@ const actionIntel = useMemo(() => {
                             </div>
                             <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between text-xs">
                               <span className="text-slate-400 font-bold">12개월 합계</span>
-                              <span className="font-black text-indigo-600">₩{Math.round(card.ltv12/10000).toLocaleString()}만</span>
+                              <span className="font-black text-indigo-600">{Math.round(card.ltv12 / 10000).toLocaleString()}만원</span>
                             </div>
                           </div>
 
@@ -3095,12 +3093,12 @@ const actionIntel = useMemo(() => {
                               {topItemsSorted.slice(0, 10).map((item, i) => (
                                 <div key={item.itemKey} className="bg-white rounded-lg p-2.5 border border-slate-100 hover:border-indigo-200 transition-colors">
                                   <div className="flex items-start gap-2">
-                                    <span className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-black flex-shrink-0 mt-0.5 ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>{i+1}</span>
+                                    <span className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-black shrink-0 mt-0.5 ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>{i+1}</span>
                                     <div className="flex-1 min-w-0">
                                       <div className="text-[10px] font-bold text-slate-700 truncate leading-tight" title={item.itemKey}>{item.itemKey}</div>
                                       <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                         <span className="text-[9px] text-indigo-600 font-bold bg-indigo-50 px-1.5 rounded">{item.qty.toLocaleString()}개</span>
-                                        <span className="text-[9px] text-slate-500">₩{Math.round(item.amount/10000).toLocaleString()}만</span>
+                                        <span className="text-[9px] text-slate-500">{Math.round(item.amount / 10000).toLocaleString()}만원</span>
                                         <span className="text-[9px] text-amber-600">{item.orderCount}회</span>
                                         <span className={`text-[9px] font-bold ${item.marginPct>=20?'text-emerald-600':item.marginPct>=10?'text-amber-500':'text-rose-500'}`}>
                                           마진{item.marginPct.toFixed(0)}%
