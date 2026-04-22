@@ -1040,6 +1040,14 @@ export default function Customers() {
         return biAnalytics.reduce((acc, c) => acc + c.totalAmount, 0);
     }, [biAnalytics]);
 
+    const navigateToCompanyCard = (companyName: string) => {
+        setActiveTab('COMPANY_CARD');
+        setCompanyCardSearch(companyName);
+        setCompanyCardRegion('ALL');
+        setCompanyCardExpanded(prev => ({ ...prev, [companyName]: true }));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     if (user?.role !== 'MASTER' && user?.role?.toLowerCase() !== 'admin') {
         return (
             <div className="flex flex-col items-center justify-center h-full pt-20 text-slate-500">
@@ -1419,7 +1427,7 @@ export default function Customers() {
                                 </div>
                                 <div className="space-y-4">
                                     {reg.sortedCompanies.map((comp, i) => (
-                                        <div key={comp.companyName} className="bg-white border text-left border-slate-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all">
+                                        <div key={comp.companyName} onClick={() => navigateToCompanyCard(comp.companyName)} className="bg-white border text-left border-slate-200 rounded-lg p-3 shadow-sm hover:shadow-md hover:border-violet-400 transition-all cursor-pointer">
                                             <div className="flex justify-between items-center mb-2 pb-2 border-b border-dashed border-slate-100">
                                                 <div className="font-bold text-slate-800 text-[15px] flex items-center gap-2">
                                                     <span className="w-5 h-5 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs">{i+1}</span>
@@ -1564,7 +1572,7 @@ export default function Customers() {
                                                 const isAlert = comp.status === 'CHURN_RISK';
                                                 const isGood = comp.status === 'GROWTH' || comp.status === 'NEW';
                                                 return (
-                                                    <div key={comp.companyName} className={`rounded-xl border bg-white shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow ${isAlert ? 'border-rose-300 ring-2 ring-rose-100 hover:ring-rose-200' : isGood ? 'border-emerald-200 ring-1 ring-emerald-50' : 'border-slate-200'}`}>
+                                                    <div key={comp.companyName} onClick={() => navigateToCompanyCard(comp.companyName)} className={`cursor-pointer rounded-xl border bg-white shadow-sm overflow-hidden flex flex-col hover:shadow-md hover:border-violet-400 transition-shadow ${isAlert ? 'border-rose-300 ring-2 ring-rose-100 hover:ring-rose-200' : isGood ? 'border-emerald-200 ring-1 ring-emerald-50' : 'border-slate-200'}`}>
                                                         <div className={`px-3 py-2 border-b flex justify-between items-center ${isAlert ? 'bg-rose-50/30' : isGood ? 'bg-emerald-50/30' : 'bg-slate-50/30'}`}>
                                                             <div className="truncate pr-2">
                                                                 <h3 className="font-black text-slate-800 text-[13px] truncate">{comp.companyName}</h3>
