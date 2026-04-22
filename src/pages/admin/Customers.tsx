@@ -811,14 +811,18 @@ export default function Customers() {
         const currentYear = new Date().getFullYear();
 
         if (companyCardPeriod !== 'ALL') {
-          if (companyCardPeriod === 'THIS_YEAR' && year !== currentYear) return;
-          if (companyCardPeriod === 'H1' && (year !== currentYear || month > 6)) return;
-          if (companyCardPeriod === 'H2' && (year !== currentYear || month < 7)) return;
-          if (companyCardPeriod === 'Q1' && (year !== currentYear || month > 3)) return;
-          if (companyCardPeriod === 'Q2' && (year !== currentYear || month < 4 || month > 6)) return;
-          if (companyCardPeriod === 'Q3' && (year !== currentYear || month < 7 || month > 9)) return;
-          if (companyCardPeriod === 'Q4' && (year !== currentYear || month < 10)) return;
-          if (companyCardPeriod.startsWith('M')) {
+          if (companyCardPeriod.startsWith('LAST_')) {
+            const days = parseInt(companyCardPeriod.replace('LAST_', '').replace('_DAYS', ''));
+            const cutoffDate = new Date(now.getTime() - days * 86400000);
+            if (orderDate < cutoffDate) return;
+          } else if (companyCardPeriod === 'THIS_YEAR' && year !== currentYear) return;
+          else if (companyCardPeriod === 'H1' && (year !== currentYear || month > 6)) return;
+          else if (companyCardPeriod === 'H2' && (year !== currentYear || month < 7)) return;
+          else if (companyCardPeriod === 'Q1' && (year !== currentYear || month > 3)) return;
+          else if (companyCardPeriod === 'Q2' && (year !== currentYear || month < 4 || month > 6)) return;
+          else if (companyCardPeriod === 'Q3' && (year !== currentYear || month < 7 || month > 9)) return;
+          else if (companyCardPeriod === 'Q4' && (year !== currentYear || month < 10)) return;
+          else if (companyCardPeriod.startsWith('M')) {
             const m = parseInt(companyCardPeriod.substring(1));
             if (year !== currentYear || month !== m) return;
           }
@@ -908,14 +912,13 @@ export default function Customers() {
           const matString = materialInfo ? `-${materialInfo}` : '';
           const itemKey = `${item.name}-${item.thickness}-${item.size}${matString}`;
 
-          const basePrice = item.base_price || product?.base_price || product?.unitPrice || unitPrice || 0;
-          let costPrice = Math.round((unitPrice * 0.9) / 10) * 10;
-          if (item.supplierRate !== undefined && item.supplierRate > 0) {
-            costPrice = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
-          } else if (product) {
-            const rate = product.rate_act2 || product.rate_act || product.rate_pct || 0;
-            if (rate > 0) costPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
-          }
+          // '주문관리' (QuoteItemRow.tsx) 와 매입가 계산 로직을 100% 동일하게 동기화
+          const basePrice = (itemExt.base_price && itemExt.base_price > 0) 
+            ? itemExt.base_price 
+            : (product?.base_price ?? product?.unitPrice ?? 0);
+          
+          const supplierRate = itemExt.supplierRate ?? 0;
+          const costPrice = Math.round((basePrice * (100 - supplierRate) / 100) / 10) * 10;
 
           const itemAmount = quantity * unitPrice;
           const itemCost = quantity * costPrice;
@@ -1060,10 +1063,11 @@ export default function Customers() {
         return biAnalytics.reduce((acc, c) => acc + c.totalAmount, 0);
     }, [biAnalytics]);
 
-    const navigateToCompanyCard = (companyName: string) => {
+    const navigateToCompanyCard = (companyName: string, period?: string) => {
         setActiveTab('COMPANY_CARD');
         setCompanyCardSearch(companyName);
         setCompanyCardRegion('ALL');
+        if (period) setCompanyCardPeriod(period);
         setCompanyCardExpanded(prev => ({ ...prev, [companyName]: true }));
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -1447,7 +1451,7 @@ export default function Customers() {
                                 </div>
                                 <div className="space-y-4">
                                     {reg.sortedCompanies.map((comp, i) => (
-                                        <div key={comp.companyName} onClick={() => navigateToCompanyCard(comp.companyName)} className="bg-white border text-left border-slate-200 rounded-lg p-3 shadow-sm hover:shadow-md hover:border-violet-400 transition-all cursor-pointer">
+                                        <div key={comp.companyName} onClick={() => navigateToCompanyCard(comp.companyName, 'LAST_30_DAYS')} className="bg-white border text-left border-slate-200 rounded-lg p-3 shadow-sm hover:shadow-md hover:border-violet-400 transition-all cursor-pointer">
                                             <div className="flex justify-between items-center mb-2 pb-2 border-b border-dashed border-slate-100">
                                                 <div className="font-bold text-slate-800 text-[15px] flex items-center gap-2">
                                                     <span className="w-5 h-5 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs">{i+1}</span>
@@ -1592,7 +1596,7 @@ export default function Customers() {
                                                 const isAlert = comp.status === 'CHURN_RISK';
                                                 const isGood = comp.status === 'GROWTH' || comp.status === 'NEW';
                                                 return (
-                                                    <div key={comp.companyName} onClick={() => navigateToCompanyCard(comp.companyName)} className={`cursor-pointer rounded-xl border bg-white shadow-sm overflow-hidden flex flex-col hover:shadow-md hover:border-violet-400 transition-shadow ${isAlert ? 'border-rose-300 ring-2 ring-rose-100 hover:ring-rose-200' : isGood ? 'border-emerald-200 ring-1 ring-emerald-50' : 'border-slate-200'}`}>
+                                                    <div key={comp.companyName} onClick={() => navigateToCompanyCard(comp.companyName, 'LAST_30_DAYS')} className={`cursor-pointer rounded-xl border bg-white shadow-sm overflow-hidden flex flex-col hover:shadow-md hover:border-violet-400 transition-shadow ${isAlert ? 'border-rose-300 ring-2 ring-rose-100 hover:ring-rose-200' : isGood ? 'border-emerald-200 ring-1 ring-emerald-50' : 'border-slate-200'}`}>
                                                         <div className={`px-3 py-2 border-b flex justify-between items-center ${isAlert ? 'bg-rose-50/30' : isGood ? 'bg-emerald-50/30' : 'bg-slate-50/30'}`}>
                                                             <div className="truncate pr-2">
                                                                 <h3 className="font-black text-slate-800 text-[13px] truncate">{comp.companyName}</h3>
@@ -1780,6 +1784,10 @@ export default function Customers() {
                       className="bg-white border text-slate-700 border-slate-300 rounded font-bold text-sm px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
                     >
                       <option value="ALL">전체 기간</option>
+                      <option value="LAST_30_DAYS">최근 1개월 (30일)</option>
+                      <option value="LAST_90_DAYS">최근 3개월 (90일)</option>
+                      <option value="LAST_180_DAYS">최근 6개월 (180일)</option>
+                      <option value="LAST_365_DAYS">최근 1년 (365일)</option>
                       <option value="THIS_YEAR">올해 전체</option>
                       <option value="H1">상반기</option>
                       <option value="H2">하반기</option>
