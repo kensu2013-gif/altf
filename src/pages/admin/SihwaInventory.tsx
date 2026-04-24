@@ -1087,8 +1087,7 @@ export default function SihwaInventory() {
 
       // ── 즉시 처분 대상 (악성재고 중 대경 반품 가능 여부 기준) ──
       const urgentDisposalItems = deadStockItems
-        .sort((a, b) => ((b as typeof b & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0) - ((a as typeof a & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0))
-        .slice(0, 15);
+        .sort((a, b) => ((b as typeof b & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0) - ((a as typeof a & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0));
 
       return {
         totalStockValue,
@@ -2491,7 +2490,6 @@ export default function SihwaInventory() {
             <tbody className="divide-y divide-slate-100">
               {(healthDiagnosis.excessStockItems as (typeof healthDiagnosis.excessStockItems[0] & { _excessQty?: number; _excessValue?: number })[])
                 .sort((a, b) => (b._excessValue || 0) - (a._excessValue || 0))
-                .slice(0, 20)
                 .map(row => {
                   const excessQty   = (row._excessQty   || 0);
                   const excessValue = (row._excessValue  || 0);
