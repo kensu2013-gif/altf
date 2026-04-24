@@ -744,9 +744,10 @@ export default function SihwaInventory() {
             ) as AnalyzedItem['stockStatusByTurnover'];
 
             // === 신규 건전성 등급 평가 로직 ===
-            const isDeadStock = row.shQty > 0 && row.recent60dSales === 0 && row.quoteCount === 0;
+            // 단가가 0원인 품목은 재고 자산에 영향을 주지 않으므로 악성/과잉재고 판단에서 제외
+            const isDeadStock = row.shQty > 0 && row.recent60dSales === 0 && row.quoteCount === 0 && row.recentPurchasePrice > 0;
             
-            const isExcessStock = !isDeadStock && targetStockByTurnover > 0 && row.shQty > (targetStockByTurnover * 1.5);
+            const isExcessStock = !isDeadStock && targetStockByTurnover > 0 && row.shQty > (targetStockByTurnover * 1.5) && row.recentPurchasePrice > 0;
 
             let healthGrade: AnalyzedItem['healthGrade'] = 'N';
             if (isDeadStock) {
