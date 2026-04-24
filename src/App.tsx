@@ -27,33 +27,15 @@ const MarketingConsent = lazy(() => import('./pages/policy/MarketingConsent'));
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
 const AdminMembers = lazy(() => import('./pages/admin/MemberManagement'));
 const AdminCustomers = lazy(() => import('./pages/admin/Customers'));
-const AdminCustomersEn = lazy(() => import('./pages/admin/CustomersEn'));
 const AdminOrders = lazy(() => import('./pages/AdminPage'));
 const AdminQuotes = lazy(() => import('./pages/admin/Quotes')); // [RENAME]
 const PendingOrders = lazy(() => import('./pages/admin/Pending'));
 const AdminSihwaInventory = lazy(() => import('./pages/admin/SihwaInventory'));
-const AdminSihwaInventoryEn = lazy(() => import('./pages/admin/SihwaInventoryEn'));
 const AdminInventory = lazy(() => import('./pages/admin/Inventory'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
 const AdminProfile = lazy(() => import('./pages/admin/Profile'));
 
 // ... (keep existing code)
-
-
-function AdminCustomersWrapper() {
-  const { user } = useStore((state) => state.auth);
-  return user?.email === 'remy@altf.kr' ? <AdminCustomersEn /> : <AdminCustomers />;
-}
-
-function AdminSihwaInventoryWrapper() {
-  const { user } = useStore((state) => state.auth);
-  return user?.email === 'remy@altf.kr' ? <AdminSihwaInventoryEn /> : <AdminSihwaInventory />;
-}
-
-function AdminIndexRedirect() {
-  const { user } = useStore((state) => state.auth);
-  return user?.email === 'remy@altf.kr' ? <Navigate to="/admin/customers" replace /> : <Navigate to="/admin/orders" replace />;
-}
 
 // Protected Route Wrapper (User)
 function ProtectedRoute() {
@@ -128,13 +110,13 @@ function AnimatedRoutes() {
           {/* Admin Routes (Admin Layout) */}
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<AdminIndexRedirect />} />
-              <Route path="customers" element={<PageTransition><AdminCustomersWrapper /></PageTransition>} />
+              <Route index element={<Navigate to="/admin/orders" replace />} />
+              <Route path="customers" element={<PageTransition><AdminCustomers /></PageTransition>} />
               <Route path="members" element={<PageTransition><AdminMembers /></PageTransition>} />
               <Route path="orders" element={<PageTransition><AdminOrders /></PageTransition>} />
               <Route path="quotes" element={<PageTransition><AdminQuotes /></PageTransition>} />
               <Route path="pending" element={<PageTransition><PendingOrders /></PageTransition>} />
-              <Route path="sihwainventory" element={<PageTransition><AdminSihwaInventoryWrapper /></PageTransition>} />
+              <Route path="sihwainventory" element={<PageTransition><AdminSihwaInventory /></PageTransition>} />
               <Route path="inventory" element={<PageTransition><AdminInventory /></PageTransition>} />
               <Route path="settings" element={<PageTransition><AdminSettings /></PageTransition>} />
               <Route path="profile" element={<PageTransition><AdminProfile /></PageTransition>} />
