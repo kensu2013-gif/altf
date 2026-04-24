@@ -1287,7 +1287,10 @@ export default function SihwaInventory() {
 
             {/* Smart Tableau Dashboard */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 xl:gap-5">
-                <div className="bg-linear-to-br from-rose-500 to-red-600 rounded-2xl p-5 shadow-lg shadow-rose-200 text-white flex flex-col relative overflow-hidden group">
+                <div 
+                    onClick={() => { setActiveTab('AI_SUMMARY'); setExpandedGroups(prev => ({...prev, CRITICAL: true})); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
+                    className="bg-linear-to-br from-rose-500 to-red-600 rounded-2xl p-5 shadow-lg shadow-rose-200 text-white flex flex-col relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 active:scale-95"
+                >
                     <div className="absolute top-0 right-0 -mr-6 -mt-6 p-4 opacity-20 transform group-hover:scale-110 transition-transform duration-500">
                         <AlertTriangle className="w-32 h-32" />
                     </div>
@@ -1296,7 +1299,10 @@ export default function SihwaInventory() {
                     <p className="text-sm font-medium opacity-80 z-10 break-keep mt-auto">현재고 및 대경 재고가 바닥났으며, 연 판매량(100↑)이 많아 선발주 관리가 필요한 품목입니다.</p>
                 </div>
                 
-                <div className="bg-linear-to-br from-amber-400 to-orange-500 rounded-2xl p-5 shadow-lg shadow-amber-200 text-white flex flex-col relative overflow-hidden group">
+                <div 
+                    onClick={() => { setActiveTab('AI_SUMMARY'); setExpandedGroups(prev => ({...prev, WARNING: true})); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
+                    className="bg-linear-to-br from-amber-400 to-orange-500 rounded-2xl p-5 shadow-lg shadow-amber-200 text-white flex flex-col relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 active:scale-95"
+                >
                     <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-20 transform group-hover:rotate-12 transition-transform duration-500">
                         <Box className="w-32 h-32" />
                     </div>
@@ -1305,7 +1311,10 @@ export default function SihwaInventory() {
                     <p className="text-sm font-medium opacity-80 z-10 mt-auto">대경 재고를 통해 조달하거나 목표수량에 미달되어 일반발주(최소 100개)가 필요한 품목입니다.</p>
                 </div>
 
-                <div className="bg-linear-to-br from-slate-700 to-slate-900 rounded-2xl p-5 shadow-lg shadow-slate-300 text-white flex flex-col relative overflow-hidden group">
+                <div 
+                    onClick={() => { setActiveTab('ALL_TABLE'); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
+                    className="bg-linear-to-br from-slate-700 to-slate-900 rounded-2xl p-5 shadow-lg shadow-slate-300 text-white flex flex-col relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 active:scale-95"
+                >
                     <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-10 transform group-hover:-translate-y-2 transition-transform duration-500">
                         <Activity className="w-32 h-32" />
                     </div>
@@ -1314,7 +1323,10 @@ export default function SihwaInventory() {
                     <p className="text-sm font-medium opacity-80 z-10 mt-auto">현재 보유 중인 시화재고 전체의 실매입 추정 자산가치입니다 (Stubend 제외)</p>
                 </div>
 
-                <div className="bg-linear-to-br from-indigo-500 to-purple-600 rounded-2xl p-5 shadow-lg shadow-indigo-200 text-white flex flex-col relative overflow-hidden group">
+                <div 
+                    onClick={() => { setActiveTab('HEALTH_DIAGNOSIS'); setSelectedHealthCategory('MISSED'); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
+                    className="bg-linear-to-br from-indigo-500 to-purple-600 rounded-2xl p-5 shadow-lg shadow-indigo-200 text-white flex flex-col relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 active:scale-95"
+                >
                     <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-20 transform group-hover:scale-110 transition-transform duration-500">
                         <BrainCircuit className="w-32 h-32" />
                     </div>
@@ -2165,10 +2177,23 @@ export default function SihwaInventory() {
                                     <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none">
                                         <tr>
                                             <th className="px-4 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 ID {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-center">건전성</th>
+                                            <th className="px-4 py-3 text-center group relative cursor-help">
+                                                건전성 <span className="text-[10px] text-slate-400">ⓘ</span>
+                                                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 bg-slate-800 text-white text-[11px] p-3 rounded shadow-lg hidden group-hover:block z-50 text-left font-normal whitespace-normal">
+                                                    <div className="font-bold mb-1 border-b border-slate-600 pb-1">건전성 평가 항목(%) 기준</div>
+                                                    <div className="mb-2 text-slate-300">실제 판매량, 견적 유입량, 주문 데이터를 복합 연계하여 산출한 종합 등급입니다.</div>
+                                                    <ul className="space-y-1">
+                                                        <li><span className="text-green-300 font-bold">S급 (우량)</span>: 회전율 최고 (S/A급)</li>
+                                                        <li><span className="text-teal-300 font-bold">A급 (보통)</span>: 회전율 양호 (B/C급)</li>
+                                                        <li><span className="text-amber-300 font-bold">B급 (주의)</span>: 과잉재고 또는 장기 미판매</li>
+                                                        <li><span className="text-rose-300 font-bold">D급 (악성)</span>: 무판매/무견적 (처분고려)</li>
+                                                        <li><span className="text-slate-300 font-bold">N급 (제외)</span>: 평가를 위한 기준 데이터 부족</li>
+                                                    </ul>
+                                                </div>
+                                            </th>
                                             <th className="px-4 py-3 text-center">60일 판매/견적</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-amber-700" onClick={() => handleSort('salesVolume')}>우리 전체출고 {sortConfig.key==='salesVolume' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right text-slate-500">직발송(%)</th>
+                                            {/* <th className="px-4 py-3 text-right text-slate-500">직발송(%)</th> */}
                                             <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('turnoverRate')}>회전율 {sortConfig.key==='turnoverRate' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('daysOnHand')}>잔여일 {sortConfig.key==='daysOnHand' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-indigo-700" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
@@ -2181,7 +2206,7 @@ export default function SihwaInventory() {
                                         {/* Show Summary row first */}
                                         <tr className="bg-indigo-50/50 font-bold border-b-2 border-indigo-200">
                                             <td colSpan={2} className="px-4 py-3 text-slate-700">총 자산 합계(STUBEND제외)</td>
-                                            <td colSpan={5} className="px-4 py-3 text-right"></td>
+                                            <td colSpan={4} className="px-4 py-3 text-right"></td>
                                             <td className="px-4 py-3 text-right text-indigo-700 flex flex-col">
                                                 <span>{formatCur(totalsMap.totalCurrentStockCost)} 원</span>
                                                 <span className="text-[10px] text-rose-500">추가예정 (+{formatCur(totalsMap.totalPendingPurchaseValue)}원)</span>
@@ -2214,11 +2239,11 @@ export default function SihwaInventory() {
                                                         <span><span className="font-bold text-slate-800">{row.salesVolume}</span> <span className="text-[10px] text-slate-500">({row.salesFreq}회)</span></span>
                                                     ) : '-'}
                                                 </td>
-                                                <td className="px-4 py-2 text-right text-slate-400 font-mono text-xs">
+                                                {/* <td className="px-4 py-2 text-right text-slate-400 font-mono text-xs">
                                                     {row.daekyungDirectRatio > 0 ? (
                                                         <span className={`${row.daekyungDirectRatio >= 80 ? 'text-rose-500 font-bold' : ''}`}>{row.daekyungDirectRatio}%</span>
                                                     ) : '—'}
-                                                </td>
+                                                </td> */}
                                                 {/* 회전율 */}
                                                 <td className="px-4 py-2 text-center">
                                                 {row.turnoverGrade !== 'N' ? (
