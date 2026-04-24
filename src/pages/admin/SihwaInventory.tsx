@@ -21,7 +21,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
 import type { Product, LineItem } from '../../types';
 import salesHistoryRaw from '../../data/sales_history.json';
-import { COMPETITOR_DATA, getStrategicGrade, type StrategicGrade, gradeColorClass, gradeLabel } from '../../../competitorData';
+import { COMPETITOR_DATA, getStrategicGrade, type StrategicGrade } from '../../../competitorData';
 
 const salesHistory = salesHistoryRaw as Record<string, { salesVolume: number, salesFreq: number }>;
 
@@ -95,12 +95,7 @@ const calculateFallbackPurchasePrice = (id: string, basePrice: number): number =
 };
 
 // ── 재고 건전성 진단 기준 (쿠팡·다이소 물류 기준 참고) ──────────
-const DEAD_STOCK_DAYS        = 90;    // 무판매 N일 이상 = 악성재고
-const DEAD_STOCK_TURNOVER    = 0.5;   // 회전율 이 이하 = 악성재고
-const EXCESS_STOCK_RATIO     = 2.0;   // 목표재고의 N배 초과 = 과잉
-const EXCESS_DAYS_THRESHOLD  = 180;   // 잔여일 N일 이상 = 과잉
-const SLOW_MOVE_DAYS_MIN     = 90;    // 부진재고 잔여일 하한
-const SLOW_MOVE_DAYS_MAX     = 180;   // 부진재고 잔여일 상한
+// Removed unused DEAD_STOCK_DAYS etc.
 const HEALTHY_DEAD_RATIO     = 0.05;  // 허용 악성재고 비중 (5%)
 const HEALTHY_EXCESS_RATIO   = 0.10;  // 허용 과잉재고 비중 (10%)
 const HEALTHY_ITS_MAX        = 0.12;  // 허용 ITS (재고/매출) 상한 12%
@@ -121,8 +116,9 @@ interface InventoryHistorySnapshot {
 }
 
 export default function SihwaInventory() {
-    const { orders, user, addItem } = useStore(useShallow(state => ({ 
+    const { orders, quotes, user, addItem } = useStore(useShallow(state => ({ 
         orders: state.orders, 
+        quotes: state.quotes,
         user: state.auth.user,
         addItem: state.addItem
     })));
@@ -392,6 +388,11 @@ export default function SihwaInventory() {
         salesFreq: number;
         recent7dSales: number;
         recent30dSales: number;
+        recent60dSales: number;
+        quoteCount: number;
+        daekyungDirectRatio: number;
+        profitMarginRate: number;
+        healthGrade: 'S' | 'A' | 'B' | 'D' | 'N'; // S(우량), A(보통), B(주의/부진), D(악성)
         compSales: number;
         compFreq: number;
         marketTotal: number;
@@ -405,6 +406,12 @@ export default function SihwaInventory() {
         reorderPoint: number;
         targetStockByTurnover: number;
         stockStatusByTurnover: 'CRITICAL' | 'LOW' | 'OPTIMAL' | 'EXCESS' | 'DEAD';
+        deficit: number;
+        effectiveStock: number;
+        statusCategory: string;
+        statusLabel: string;
+        isDeadStock?: boolean;
+        isExcessStock?: boolean;
     }
 
     // Dynamically calculate Real-Time Sales History combining static base ERP data and real-time orders
@@ -444,27 +451,45 @@ export default function SihwaInventory() {
 
         const nowTime = Date.now();
         const thirtyDaysAgo = nowTime - (30 * 24 * 60 * 60 * 1000);
+        const sixtyDaysAgo = nowTime - (60 * 24 * 60 * 60 * 1000);
         const sevenDaysAgo = nowTime - (7 * 24 * 60 * 60 * 1000);
         
-        const recentSalesMap: Record<string, { recent7d: number, recent30d: number }> = {};
+        const recentSalesMap: Record<string, { recent7d: number, recent30d: number, recent60d: number }> = {};
         historyData.inventoryHistory.forEach((snap: InventoryHistorySnapshot) => {
             const snapDate = new Date(snap.date).getTime();
             if (isNaN(snapDate)) return;
             const isWithin7d = snapDate >= sevenDaysAgo;
             const isWithin30d = snapDate >= thirtyDaysAgo;
+            const isWithin60d = snapDate >= sixtyDaysAgo;
 
-            if (isWithin30d && snap.diff) {
+            if (isWithin60d && snap.diff) {
                 snap.diff.forEach((d: InventoryDiffItem) => {
                     if (d.change < 0) {
                         const absChg = Math.abs(d.change);
-                        if (!recentSalesMap[d.id]) recentSalesMap[d.id] = { recent7d: 0, recent30d: 0 };
-                        recentSalesMap[d.id].recent30d += absChg;
+                        if (!recentSalesMap[d.id]) recentSalesMap[d.id] = { recent7d: 0, recent30d: 0, recent60d: 0 };
+                        recentSalesMap[d.id].recent60d += absChg;
+                        if (isWithin30d) {
+                            recentSalesMap[d.id].recent30d += absChg;
+                        }
                         if (isWithin7d) {
                             recentSalesMap[d.id].recent7d += absChg;
                         }
                     }
                 });
             }
+        });
+
+        const quoteCountMap: Record<string, number> = {};
+        quotes.forEach(quote => {
+            if (['CANCELLED', 'WITHDRAWN'].includes(quote.status) || quote.isDeleted) return;
+            const quoteDate = new Date(quote.createdAt).getTime();
+            if (isNaN(quoteDate) || quoteDate < sixtyDaysAgo) return; // Only count recent 60 days
+            
+            quote.items.forEach(item => {
+                const id = item.productId || (item as { item_id?: string }).item_id;
+                if (!id) return;
+                quoteCountMap[id] = (quoteCountMap[id] || 0) + 1;
+            });
         });
 
         inventory.forEach((item: Product) => {
@@ -491,8 +516,20 @@ export default function SihwaInventory() {
             
             const basePrice = item.base_price ?? item.unitPrice ?? 0;
             const recentInfo = recentSeoulPurchaseInfoMap[item.id];
-            const recentSales = recentSalesMap[item.id] || { recent7d: 0, recent30d: 0 };
+            const recentSales = recentSalesMap[item.id] || { recent7d: 0, recent30d: 0, recent60d: 0 };
             
+            // Calculate Profit Margin
+            const sellingPrice = calculateSellingPrice(item.id, basePrice);
+            const purchasePrice = recentInfo ? recentInfo.price : calculateFallbackPurchasePrice(item.id, basePrice);
+            const profitMarginRate = sellingPrice > 0 ? parseFloat((((sellingPrice - purchasePrice) / sellingPrice) * 100).toFixed(1)) : 0;
+
+            // Calculate Daekyung Direct Ratio (estimated from total sales vs sihwa drops)
+            // If total sales is 100, but Sihwa dropped by 20, 80 were direct dropped (80%).
+            const total60dSales = salesData.salesVolume; // Actually, salesVolume is all-time from orders. We'll approximate.
+            const daekyungDirectRatio = (total60dSales > 0 && total60dSales > recentSales.recent60d) 
+                ? parseFloat((((total60dSales - recentSales.recent60d) / total60dSales) * 100).toFixed(1)) 
+                : 0;
+
             // Populate items (if it has stock or sales data, we analyze it)
             if (shQty > 0 || ysQty > 0 || salesData.salesVolume > 0 || recentSales.recent30d > 0 || compData.compSales > 0) {
                 comparisonMap[item.id] = {
@@ -500,13 +537,18 @@ export default function SihwaInventory() {
                     shQty,
                     ysQty,
                     pendingOrderQty: 0,
-                    recentPurchasePrice: recentInfo ? recentInfo.price : calculateFallbackPurchasePrice(item.id, basePrice),
+                    recentPurchasePrice: purchasePrice,
                     recentPurchaseDate: recentInfo ? recentInfo.date : null,
-                    sellingPrice: calculateSellingPrice(item.id, basePrice),
+                    sellingPrice,
                     salesVolume: salesData.salesVolume,
                     salesFreq: salesData.salesFreq,
                     recent7dSales: recentSales.recent7d,
                     recent30dSales: recentSales.recent30d,
+                    recent60dSales: recentSales.recent60d,
+                    quoteCount: quoteCountMap[item.id] || 0,
+                    daekyungDirectRatio,
+                    profitMarginRate,
+                    healthGrade: 'N',
                     compSales: compData.compSales,
                     compFreq: compData.compFreq,
                     marketTotal,
@@ -519,7 +561,11 @@ export default function SihwaInventory() {
                     dailyAvgSales: 0,
                     reorderPoint: 0,
                     targetStockByTurnover: 0,
-                    stockStatusByTurnover: 'DEAD'
+                    stockStatusByTurnover: 'DEAD',
+                    deficit: 0,
+                    effectiveStock: 0,
+                    statusCategory: 'IDLE',
+                    statusLabel: '대기/데이터없음'
                 };
             }
         });
@@ -546,18 +592,32 @@ export default function SihwaInventory() {
                     const marketTotal = salesData.salesVolume + compData.compSales;
                     const marketShare = marketTotal > 0 ? parseFloat(((salesData.salesVolume / marketTotal) * 100).toFixed(1)) : 0;
                     
+                    const recentSales = recentSalesMap[id] || { recent7d: 0, recent30d: 0, recent60d: 0 };
+                    const purchasePrice = recentInfo ? recentInfo.price : calculateFallbackPurchasePrice(id, rawBasePrice);
+                    const profitMarginRate = finalSellingPrice > 0 ? parseFloat((((finalSellingPrice - purchasePrice) / finalSellingPrice) * 100).toFixed(1)) : 0;
+
+                    const total60dSales = salesData.salesVolume; 
+                    const daekyungDirectRatio = (total60dSales > 0 && total60dSales > recentSales.recent60d) 
+                        ? parseFloat((((total60dSales - recentSales.recent60d) / total60dSales) * 100).toFixed(1)) 
+                        : 0;
+
                     comparisonMap[id] = {
                         product: product || { id, name: item.name || item.item_name || '미등록 상품', stockStatus: 'OUT_OF_STOCK' },
                         shQty: 0,
                         ysQty: 0,
                         pendingOrderQty: addQty,
-                        recentPurchasePrice: recentInfo ? recentInfo.price : calculateFallbackPurchasePrice(id, rawBasePrice),
+                        recentPurchasePrice: purchasePrice,
                         recentPurchaseDate: recentInfo ? recentInfo.date : null,
                         sellingPrice: finalSellingPrice,
                         salesVolume: salesData.salesVolume,
                         salesFreq: salesData.salesFreq,
-                        recent7dSales: 0,
-                        recent30dSales: 0,
+                        recent7dSales: recentSales.recent7d,
+                        recent30dSales: recentSales.recent30d,
+                        recent60dSales: recentSales.recent60d,
+                        quoteCount: quoteCountMap[id] || 0,
+                        daekyungDirectRatio,
+                        profitMarginRate,
+                        healthGrade: 'N',
                         compSales: compData.compSales,
                         compFreq: compData.compFreq,
                         marketTotal,
@@ -570,7 +630,11 @@ export default function SihwaInventory() {
                         dailyAvgSales: 0,
                         reorderPoint: 0,
                         targetStockByTurnover: 0,
-                        stockStatusByTurnover: 'DEAD'
+                        stockStatusByTurnover: 'DEAD',
+                        deficit: 0,
+                        effectiveStock: 0,
+                        statusCategory: 'IDLE',
+                        statusLabel: '대기/데이터없음'
                     };
                 } else {
                     comparisonMap[id].pendingOrderQty += addQty;
@@ -679,6 +743,26 @@ export default function SihwaInventory() {
                 row.shQty, targetStockByTurnover, daysOnHand, turnoverGrade
             ) as AnalyzedItem['stockStatusByTurnover'];
 
+            // === 신규 건전성 등급 평가 로직 ===
+            const isDeadStock = row.shQty > 0 && row.recent60dSales === 0 && row.quoteCount === 0;
+            
+            const isExcessStock = !isDeadStock && targetStockByTurnover > 0 && row.shQty > (targetStockByTurnover * 1.5);
+
+            let healthGrade: AnalyzedItem['healthGrade'] = 'N';
+            if (isDeadStock) {
+                healthGrade = 'D'; // 악성
+            } else if (isExcessStock) {
+                healthGrade = 'B'; // 과잉/주의
+            } else if (row.shQty > 0 && row.daekyungDirectRatio >= 80 && row.recent60dSales === 0) {
+                healthGrade = 'B'; // 시화 방치, 대경 출고 위주
+            } else if (row.turnoverGrade === 'S' || row.turnoverGrade === 'A') {
+                healthGrade = 'S'; // 우량
+            } else if (row.turnoverGrade === 'B' || row.turnoverGrade === 'C') {
+                healthGrade = 'A'; // 보통
+            } else if (row.shQty > 0) {
+                healthGrade = 'B'; // 그 외 재고 보유시 주의
+            }
+
             return {
                 ...row,
                 safeStock,
@@ -692,7 +776,10 @@ export default function SihwaInventory() {
                 dailyAvgSales,
                 reorderPoint,
                 targetStockByTurnover,
-                stockStatusByTurnover
+                stockStatusByTurnover,
+                isDeadStock,
+                isExcessStock,
+                healthGrade
             };
         });
 
@@ -734,8 +821,12 @@ export default function SihwaInventory() {
                 const rawRecommended = r.targetStockByTurnover - r.effectiveStock;
                 let recommendedQty = 0;
                 
+                // 과잉재고인 경우 발주 추천 차단
+                if (r.isExcessStock) {
+                    recommendedQty = 0;
+                }
                 // 대경 창고에 이미 500개 이상 대량 스탁이 있다면 굳이 시화에 벌크로 미리 들여놓을 필요 없음
-                if (r.ysQty >= 500) {
+                else if (r.ysQty >= 500) {
                     recommendedQty = 0;
                 } else if (rawRecommended > 0) {
                     recommendedQty = Math.ceil(rawRecommended / 10) * 10;
@@ -754,6 +845,11 @@ export default function SihwaInventory() {
             })
             .filter(r => r.recommendedQty > 0);
 
+        // 견적 문의가 많으나 재고가 없는 경우 기회손실 (결품)
+        const missedOpportunities = analyzedInventory.filter(r => 
+            r.shQty === 0 && r.ysQty === 0 && r.quoteCount > 0
+        );
+
         // ★ 신규: 전략등급별 집계
         const A2items = analyzedInventory.filter(r => r.strategicGrade === 'A2' && r.marketShare < 35);
         const needsVolumeNego = analyzedInventory.filter(r =>
@@ -764,12 +860,13 @@ export default function SihwaInventory() {
             .reduce((sum, r) => sum + r.shQty * r.recentPurchasePrice, 0);
 
         return {
-            critical: analyzedInventory.filter(r => r.statusCategory === 'CRITICAL'),
-            warning: analyzedInventory.filter(r => r.statusCategory === 'WARNING'),
+            critical: analyzedInventory.filter(r => r.statusCategory === 'CRITICAL' && !r.isExcessStock),
+            warning: analyzedInventory.filter(r => r.statusCategory === 'WARNING' && !r.isExcessStock),
             safeActive: analyzedInventory.filter(r => r.statusCategory === 'SAFE' && r.salesFreq > 10),
             regular,
             A2items,
             needsVolumeNego,
+            missedOpportunities,
             totalAssetCost
         };
     }, [analyzedInventory]);
@@ -932,23 +1029,15 @@ export default function SihwaInventory() {
           : (row.salesVolume === 0 ? 999 : 0);
 
         // 악성재고 판단
-        const isDeadStock =
-          (daysSinceLastSale >= DEAD_STOCK_DAYS && row.turnoverRate < DEAD_STOCK_TURNOVER)
-          || (row.salesVolume === 0 && row.shQty > 0 && row.compSales === 0);
+        const isDeadStock = row.isDeadStock === true;
 
         // 과잉재고 판단 (악성이 아닌 것 중에서)
         const targetStock = row.targetStockByTurnover > 0 ? row.targetStockByTurnover : row.safeStock;
         const excessQty = targetStock > 0 ? row.shQty - targetStock : 0;
-        const isExcessStock = !isDeadStock && (
-          (targetStock > 0 && row.shQty > targetStock * EXCESS_STOCK_RATIO)
-          || (row.daysOnHand > EXCESS_DAYS_THRESHOLD && row.daysOnHand < 9999)
-        );
+        const isExcessStock = row.isExcessStock === true;
 
-        // 부진재고 판단
-        const isSlowMove = !isDeadStock && !isExcessStock
-          && row.daysOnHand >= SLOW_MOVE_DAYS_MIN
-          && row.daysOnHand <= SLOW_MOVE_DAYS_MAX
-          && row.turnoverGrade === 'D';
+        // 부진재고 판단 (N급이 아닌 B/A/S급 중에서 주의 상태)
+        const isSlowMove = !isDeadStock && !isExcessStock && row.healthGrade === 'B' && row.shQty > 0;
 
         if (isDeadStock) {
           deadStockItems.push({ ...row, _daysSinceLastSale: daysSinceLastSale } as typeof row & { _daysSinceLastSale: number });
@@ -1223,7 +1312,14 @@ export default function SihwaInventory() {
                     <p className="text-sm font-medium opacity-80 z-10 mt-auto">현재 보유 중인 시화재고 전체의 실매입 추정 자산가치입니다 (Stubend 제외)</p>
                 </div>
 
-                {/* 회전율 분포 요약 */}
+                <div className="bg-linear-to-br from-indigo-500 to-purple-600 rounded-2xl p-5 shadow-lg shadow-indigo-200 text-white flex flex-col relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-20 transform group-hover:scale-110 transition-transform duration-500">
+                        <BrainCircuit className="w-32 h-32" />
+                    </div>
+                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><TrendingUp className="w-5 h-5"/>견적 유입 & 결품 (기회손실)</h3>
+                    <p className="text-4xl font-black mb-1 z-10">{stats.missedOpportunities.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
+                    <p className="text-sm font-medium opacity-80 z-10 mt-auto">최근 60일 내 견적 문의가 있었으나 시화/대경 재고가 없어 판매 기회를 잃었을 가능성이 높은 품목입니다.</p>
+                </div>
                 <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col">
                     <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-2 z-10 opacity-90">
                         <Activity className="w-5 h-5 text-purple-500" />
@@ -1448,11 +1544,14 @@ export default function SihwaInventory() {
                                                                         </div>
                                                                         <div className="text-xs text-slate-400 pl-5">
                                                                             ROP: {row.reorderPoint}개 도달 시 발주 | 목표적정: {row.targetStockByTurnover}개
-                                                                            {row.stockStatusByTurnover === 'EXCESS' && (
-                                                                                <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.targetStockByTurnover}개 초과]</span>
+                                                                            {row.isExcessStock && (
+                                                                                <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.targetStockByTurnover > 0 ? row.shQty - row.targetStockByTurnover : row.shQty}개 초과]</span>
                                                                             )}
-                                                                            {row.stockStatusByTurnover === 'DEAD' && (
+                                                                            {row.isDeadStock && (
                                                                                 <span className="text-slate-400 ml-1">[사장재고 의심 — 소진 후 재평가]</span>
+                                                                            )}
+                                                                            {row.daekyungDirectRatio >= 80 && row.shQty > 0 && (
+                                                                                <span className="text-rose-500 font-bold ml-1 bg-rose-50 px-1 rounded border border-rose-200">⚠️ 시화재고 방치 (직발송 {row.daekyungDirectRatio}%)</span>
                                                                             )}
                                                                         </div>
                                                                     </div>
@@ -2064,16 +2163,15 @@ export default function SihwaInventory() {
                                     <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none">
                                         <tr>
                                             <th className="px-4 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 ID {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-center">전략등급</th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-amber-700" onClick={() => handleSort('salesVolume')}>우리 누적출고 {sortConfig.key==='salesVolume' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right text-slate-500">경쟁사 출고</th>
+                                            <th className="px-4 py-3 text-center">건전성</th>
+                                            <th className="px-4 py-3 text-center">60일 판매/견적</th>
+                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-amber-700" onClick={() => handleSort('salesVolume')}>우리 전체출고 {sortConfig.key==='salesVolume' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                            <th className="px-4 py-3 text-right text-slate-500">직발송(%)</th>
                                             <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('turnoverRate')}>회전율 {sortConfig.key==='turnoverRate' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('daysOnHand')}>잔여일 {sortConfig.key==='daysOnHand' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right">발주점(ROP)</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-indigo-700" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-600" onClick={() => handleSort('pendingOrderQty')}>입고 대기(+Pending) {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-500 font-black" onClick={() => handleSort('deficit')}>보충 필요분(Deficit) {sortConfig.key==='deficit' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-teal-700" onClick={() => handleSort('recentPurchasePrice')}>최근 매입단가 {sortConfig.key==='recentPurchasePrice' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-500 font-black" onClick={() => handleSort('deficit')}>보충(Deficit) {sortConfig.key==='deficit' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-teal-700" onClick={() => handleSort('recentPurchasePrice')}>이익률(단가) {sortConfig.key==='recentPurchasePrice' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200" onClick={() => handleSort('ysQty')}>대경 재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                         </tr>
                                     </thead>
@@ -2082,15 +2180,32 @@ export default function SihwaInventory() {
                                         <tr className="bg-indigo-50/50 font-bold border-b-2 border-indigo-200">
                                             <td colSpan={2} className="px-4 py-3 text-slate-700">총 자산 합계(STUBEND제외)</td>
                                             <td colSpan={5} className="px-4 py-3 text-right"></td>
-                                            <td className="px-4 py-3 text-right text-indigo-700">{formatCur(totalsMap.totalCurrentStockCost)} 원</td>
-                                            <td className="px-4 py-3 text-right text-rose-600">추가예정 (+{formatCur(totalsMap.totalPendingPurchaseValue)}원)</td>
+                                            <td className="px-4 py-3 text-right text-indigo-700 flex flex-col">
+                                                <span>{formatCur(totalsMap.totalCurrentStockCost)} 원</span>
+                                                <span className="text-[10px] text-rose-500">추가예정 (+{formatCur(totalsMap.totalPendingPurchaseValue)}원)</span>
+                                            </td>
                                             <td colSpan={3}></td>
                                         </tr>
                                         {analyzedInventory.slice(0, 500).map(row => (
                                             <tr key={row.product.id} className="hover:bg-slate-50 group">
-                                                <td className="px-4 py-2 font-mono font-bold text-slate-700">{row.product.id}</td>
+                                                <td className="px-4 py-2 font-mono font-bold text-slate-700">
+                                                    {row.product.id}
+                                                    {row.isExcessStock && <span className="ml-1 text-[9px] bg-orange-100 text-orange-600 px-1 rounded font-bold">과잉</span>}
+                                                </td>
                                                 <td className="px-4 py-2 text-center">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-black ${gradeColorClass(row.strategicGrade)}`} title={gradeLabel(row.strategicGrade)}>{row.strategicGrade}</span>
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-black ${
+                                                        row.healthGrade === 'S' ? 'bg-green-100 text-green-700' :
+                                                        row.healthGrade === 'A' ? 'bg-teal-100 text-teal-700' :
+                                                        row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
+                                                        row.healthGrade === 'D' ? 'bg-rose-100 text-rose-700' :
+                                                        'bg-slate-100 text-slate-500'
+                                                    }`} title="종합 건전성 등급">{row.healthGrade}급</span>
+                                                </td>
+                                                <td className="px-4 py-2 text-center text-slate-600">
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="font-black text-slate-800">{row.recent60dSales} <span className="text-[9px] text-slate-400">판매</span></span>
+                                                        <span className="font-bold text-indigo-500 text-[10px]">{row.quoteCount} <span className="text-[9px] text-indigo-300">견적</span></span>
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-2 text-right text-slate-600">
                                                     {row.salesVolume > 0 ? (
@@ -2098,7 +2213,9 @@ export default function SihwaInventory() {
                                                     ) : '-'}
                                                 </td>
                                                 <td className="px-4 py-2 text-right text-slate-400 font-mono text-xs">
-                                                    {row.compSales > 0 ? row.compSales.toLocaleString() : '—'}
+                                                    {row.daekyungDirectRatio > 0 ? (
+                                                        <span className={`${row.daekyungDirectRatio >= 80 ? 'text-rose-500 font-bold' : ''}`}>{row.daekyungDirectRatio}%</span>
+                                                    ) : '—'}
                                                 </td>
                                                 {/* 회전율 */}
                                                 <td className="px-4 py-2 text-center">
@@ -2132,21 +2249,18 @@ export default function SihwaInventory() {
                                                 </span>
                                                 </td>
 
-                                                {/* 발주점 */}
-                                                <td className="px-4 py-2 text-right font-mono text-xs text-indigo-500">
-                                                {row.reorderPoint > 0 ? `≤${row.reorderPoint}개` : '—'}
-                                                </td>
                                                 <td className="px-4 py-2 text-right font-black font-mono text-indigo-600 bg-indigo-50/20">
                                                     {row.shQty}
-                                                </td>
-                                                <td className="px-4 py-2 text-right font-bold font-mono text-rose-500 bg-rose-50/10">
-                                                    {row.pendingOrderQty > 0 ? `+${row.pendingOrderQty}` : '-'}
+                                                    {row.pendingOrderQty > 0 && <span className="text-[9px] text-rose-400 ml-1">(+{row.pendingOrderQty})</span>}
                                                 </td>
                                                 <td className="px-4 py-2 text-right font-black text-rose-600 bg-rose-50/30">
                                                     {row.deficit > 0 ? `-${row.deficit}개` : <span className="text-slate-300 font-normal">충분</span>}
                                                 </td>
-                                                <td className="px-4 py-2 text-right font-bold text-teal-700">
-                                                    {formatCur(row.recentPurchasePrice)}<span className="text-xs font-normal text-slate-400 ml-1">원</span>
+                                                <td className="px-4 py-2 text-right">
+                                                    <div className="flex flex-col items-end">
+                                                        <span className={`font-black text-xs ${row.profitMarginRate <= 0 ? 'text-rose-500' : row.profitMarginRate >= 30 ? 'text-emerald-600' : 'text-slate-700'}`}>{row.profitMarginRate}%</span>
+                                                        <span className="text-[9px] text-slate-400 font-mono">단가 {formatCur(row.recentPurchasePrice)}</span>
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-2 text-center font-bold font-mono text-slate-500">
                                                     {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty}</span> : <span className="text-rose-400">0</span>}
