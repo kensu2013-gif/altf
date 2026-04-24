@@ -138,6 +138,8 @@ export default function SihwaInventory() {
         'WARNING': true,
         'REGULAR': true
     });
+    const [selectedHealthCategory, setSelectedHealthCategory] = useState<'DEAD' | 'EXCESS' | 'SLOW' | 'MISSED' | 'URGENT' | null>(null);
+
 
     const [selectedCriticalIds, setSelectedCriticalIds] = useState<Set<string>>(new Set());
     const [selectedWarningIds, setSelectedWarningIds] = useState<Set<string>>(new Set());
@@ -2379,25 +2381,33 @@ export default function SihwaInventory() {
     {/* ── 섹션 2: KPI 5개 ── */}
     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
       {[
-        { emoji:'☠️', label:'악성재고 품목', value:`${healthDiagnosis.deadStockItems.length}개`, sub:'90일+ 무판매 or 0.5x미만', color:'rose', border:'border-rose-400' },
-        { emoji:'📦', label:'과잉재고 품목', value:`${healthDiagnosis.excessStockItems.length}개`, sub:'목표재고 200%+ 초과', color:'orange', border:'border-orange-400' },
-        { emoji:'🐌', label:'부진재고 품목', value:`${healthDiagnosis.slowMoveItems.length}개`, sub:'D등급·잔여 90~180일', color:'purple', border:'border-purple-400' },
-        { emoji:'🔍', label:'결품 기회손실', value:`${healthDiagnosis.missedDemandList.filter(m=>m.count>=2).length}건↑`, sub:'2회↑ 취소·철회 감지', color:'blue', border:'border-blue-400' },
-        { emoji:'💡', label:'즉시 처분 권장', value:`${Math.min(healthDiagnosis.urgentDisposalItems.length, 11)}개`, sub:'대경반품 or 단가인하', color:'teal', border:'border-teal-400' },
+        { id: 'DEAD', emoji:'☠️', label:'악성재고 품목', value:`${healthDiagnosis.deadStockItems.length}개`, sub:'90일+ 무판매 or 0.5x미만', color:'rose', border:'border-rose-400', amount: healthDiagnosis.deadStockValue },
+        { id: 'EXCESS', emoji:'📦', label:'과잉재고 품목', value:`${healthDiagnosis.excessStockItems.length}개`, sub:'목표재고 200%+ 초과', color:'orange', border:'border-orange-400', amount: healthDiagnosis.excessStockValue },
+        { id: 'SLOW', emoji:'🐌', label:'부진재고 품목', value:`${healthDiagnosis.slowMoveItems.length}개`, sub:'D등급·잔여 90~180일', color:'purple', border:'border-purple-400', amount: healthDiagnosis.slowMoveValue },
+        { id: 'MISSED', emoji:'🔍', label:'결품 기회손실', value:`${healthDiagnosis.missedDemandList.filter(m=>m.count>=2).length}건↑`, sub:'2회↑ 취소·철회 감지', color:'blue', border:'border-blue-400' },
+        { id: 'URGENT', emoji:'💡', label:'즉시 처분 권장', value:`${Math.min(healthDiagnosis.urgentDisposalItems.length, 11)}개`, sub:'대경반품 or 단가인하', color:'teal', border:'border-teal-400' },
       ].map(k => (
-        <div key={k.label} className={`bg-white rounded-xl border-l-4 border border-slate-200 ${k.border} p-4 shadow-sm`}>
+        <button 
+          key={k.label} 
+          onClick={() => setSelectedHealthCategory(selectedHealthCategory === k.id ? null : k.id as 'DEAD' | 'EXCESS' | 'SLOW' | 'MISSED' | 'URGENT')}
+          className={`bg-white rounded-xl border-l-4 border border-slate-200 ${k.border} p-4 shadow-sm text-left transition-all hover:bg-slate-50 hover:shadow-md active:scale-95 ${selectedHealthCategory === k.id ? `ring-2 ring-offset-2 ring-${k.color}-400` : ''}`}
+        >
           <div className="text-xl mb-1">{k.emoji}</div>
           <div className="text-[9px] font-bold text-slate-400 mb-1">{k.label}</div>
-          <div className={`text-xl font-black text-${k.color}-600`}>{k.value}</div>
+          <div className={`text-xl font-black text-${k.color}-600 flex items-end gap-1.5`}>
+            {k.value}
+            {k.amount !== undefined && <span className="text-[10px] text-slate-400 font-bold mb-1">/ ₩{formatCur(k.amount)}</span>}
+          </div>
           <div className="text-[9px] text-slate-400 mt-1">{k.sub}</div>
-        </div>
+        </button>
       ))}
     </div>
 
     {/* ── 섹션 3: 악성·과잉재고 상세 테이블 ── */}
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+    <div className={`grid grid-cols-1 ${selectedHealthCategory ? 'xl:grid-cols-1' : 'xl:grid-cols-2'} gap-4`}>
 
       {/* 악성재고 */}
+      {(!selectedHealthCategory || selectedHealthCategory === 'DEAD') && (
       <div className="bg-white rounded-2xl border border-rose-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3 bg-rose-50 border-b border-rose-200 flex items-center justify-between">
           <div>
@@ -2422,7 +2432,7 @@ export default function SihwaInventory() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {healthDiagnosis.urgentDisposalItems.map(row => {
+              {healthDiagnosis.deadStockItems.map(row => {
                 const daysSince = (row as typeof row & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0;
                 const itemValue = row.shQty * row.recentPurchasePrice;
                 const action = row.ysQty > 0
@@ -2463,8 +2473,10 @@ export default function SihwaInventory() {
           </table>
         </div>
       </div>
+      )}
 
       {/* 과잉재고 */}
+      {(!selectedHealthCategory || selectedHealthCategory === 'EXCESS') && (
       <div className="bg-white rounded-2xl border border-orange-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3 bg-orange-50 border-b border-orange-200 flex items-center justify-between">
           <div>
@@ -2526,11 +2538,134 @@ export default function SihwaInventory() {
           </table>
         </div>
       </div>
+      )}
+
+      {/* 부진재고 */}
+      {selectedHealthCategory === 'SLOW' && (
+      <div className="bg-white rounded-2xl border border-purple-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 bg-purple-50 border-b border-purple-200 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-black text-purple-800">🐌 부진재고 상세</div>
+            <div className="text-[10px] text-purple-500 mt-0.5">D등급이면서 잔여일 90일~180일 품목</div>
+          </div>
+          <span className="bg-purple-200 text-purple-800 font-black px-3 py-1 rounded-full text-xs">
+            {healthDiagnosis.slowMoveItems.length}건
+          </span>
+        </div>
+        <div className="overflow-auto max-h-80">
+          <table className="w-full text-xs text-left whitespace-nowrap">
+            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100">
+              <tr>
+                <th className="px-4 py-2">품목코드</th>
+                <th className="px-4 py-2 text-right">무판매</th>
+                <th className="px-4 py-2 text-right">회전율</th>
+                <th className="px-4 py-2 text-right">보유량</th>
+                <th className="px-4 py-2 text-right">자산가치</th>
+                <th className="px-4 py-2 text-right">잔여일</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {healthDiagnosis.slowMoveItems.map(row => {
+                const daysSince = (row as typeof row & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0;
+                const itemValue = row.shQty * row.recentPurchasePrice;
+
+                return (
+                  <tr key={row.product.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-2 font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</td>
+                    <td className="px-4 py-2 text-right">
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700`}>
+                        {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-right font-mono font-bold text-purple-600">
+                      {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '0x'}
+                    </td>
+                    <td className="px-4 py-2 text-right font-bold">{row.shQty}개</td>
+                    <td className="px-4 py-2 text-right font-black text-purple-600">{formatCur(itemValue)}원</td>
+                    <td className="px-4 py-2 text-right font-mono font-bold text-amber-600">
+                        {row.daysOnHand === 9999 ? '∞' : `${Math.round(row.daysOnHand)}일`}
+                    </td>
+                  </tr>
+                );
+              })}
+              {healthDiagnosis.slowMoveItems.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">부진재고가 없습니다 🎉</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      )}
+
+      {/* 즉시처분권장 */}
+      {selectedHealthCategory === 'URGENT' && (
+      <div className="bg-white rounded-2xl border border-teal-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 bg-teal-50 border-b border-teal-200 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-black text-teal-800">💡 즉시 처분 권장 상세</div>
+            <div className="text-[10px] text-teal-600 mt-0.5">악성재고 중 대경 반품 또는 단가 인하가 가능한 품목</div>
+          </div>
+          <span className="bg-teal-200 text-teal-800 font-black px-3 py-1 rounded-full text-xs">
+            {healthDiagnosis.urgentDisposalItems.length}건
+          </span>
+        </div>
+        <div className="overflow-auto max-h-80">
+          <table className="w-full text-xs text-left whitespace-nowrap">
+            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100">
+              <tr>
+                <th className="px-4 py-2">품목코드</th>
+                <th className="px-4 py-2 text-right">무판매</th>
+                <th className="px-4 py-2 text-right">보유량</th>
+                <th className="px-4 py-2 text-right">자산가치</th>
+                <th className="px-4 py-2 text-right">대경</th>
+                <th className="px-4 py-2">권장 조치</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {healthDiagnosis.urgentDisposalItems.map(row => {
+                const daysSince = (row as typeof row & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0;
+                const itemValue = row.shQty * row.recentPurchasePrice;
+                const action = row.ysQty > 0
+                  ? '대경 반품 협의'
+                  : daysSince > 180
+                  ? '단가인하 긴급처분'
+                  : '영업 판매 독촉';
+                const actionColor = row.ysQty > 0
+                  ? 'bg-purple-100 text-purple-700'
+                  : daysSince > 180
+                  ? 'bg-rose-100 text-rose-700'
+                  : 'bg-amber-100 text-amber-700';
+
+                return (
+                  <tr key={row.product.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-2 font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</td>
+                    <td className="px-4 py-2 text-right">
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${daysSince > 180 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-right font-bold">{row.shQty}개</td>
+                    <td className="px-4 py-2 text-right font-black text-rose-600">{formatCur(itemValue)}원</td>
+                    <td className="px-4 py-2 text-right text-slate-400">{row.ysQty}개</td>
+                    <td className="px-4 py-2">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${actionColor}`}>{action}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {healthDiagnosis.urgentDisposalItems.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">처분 대상이 없습니다 🎉</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      )}
     </div>
 
     {/* ── 섹션 4: 결품 기회손실 ── */}
-    {healthDiagnosis.missedDemandList.length > 0 && (
-      <div className="bg-white rounded-2xl border border-violet-200 shadow-sm overflow-hidden">
+    {(!selectedHealthCategory || selectedHealthCategory === 'MISSED') && healthDiagnosis.missedDemandList.length > 0 && (
+      <div className="bg-white rounded-2xl border border-violet-200 shadow-sm overflow-hidden mt-4">
         <div className="px-5 py-3 bg-violet-50 border-b border-violet-200 flex items-center justify-between">
           <div>
             <div className="text-sm font-black text-violet-800">
