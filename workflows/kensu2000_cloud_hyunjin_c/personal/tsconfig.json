@@ -1,19 +1,14 @@
 {
     "compilerOptions": {
         "target": "ES2022",
-        "module": "ESNext",
-        "moduleResolution": "node",
-        "baseUrl": ".",
-        "paths": {
-            "@n8n-as-code/transformer": [
-                "./n8n-workflows.d.ts"
-            ]
-        },
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
         "experimentalDecorators": true,
         "emitDecoratorMetadata": false,
-        "strict": false,
+        "strict": true,
         "noEmit": true,
-        "skipLibCheck": true
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true
     },
     "include": [
         "**/*.workflow.ts",

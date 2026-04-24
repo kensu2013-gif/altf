@@ -955,7 +955,7 @@ export default function SihwaInventory() {
         document.body.removeChild(link);
     };
 
-    if (user?.role === 'MANAGER') {
+    if (user?.role === 'MANAGER' && !user?.permissions?.viewSihwa) {
         return (
             <div className="flex flex-col items-center justify-center p-20 text-center pb-40">
                 <AlertTriangle className="w-16 h-16 text-rose-300 mb-4" />
