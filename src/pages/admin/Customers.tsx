@@ -1457,12 +1457,12 @@ const actionIntel = useMemo(() => {
   };
 }, [orders, customersList, inventoryMap]);
 
-    if (user?.role !== 'MASTER' && user?.role?.toLowerCase() !== 'admin') {
+    if (user?.role !== 'MASTER' && user?.role?.toLowerCase() !== 'admin' && !user?.permissions?.viewCrm) {
         return (
             <div className="flex flex-col items-center justify-center h-full pt-20 text-slate-500">
                 <AlertTriangle className="w-16 h-16 text-rose-500 mb-4" />
                 <h1 className="text-2xl font-bold text-slate-800">접근 권한 없음</h1>
-                <p className="mt-2">알트에프 거래처(CRM) 원장 관리는 최고 관리자(MASTER) 권한만 접근할 수 있습니다.</p>
+                <p className="mt-2">알트에프 거래처(CRM) 원장 관리는 최고 관리자(MASTER) 권한이거나 개별 권한이 부여되어야 접근할 수 있습니다.</p>
             </div>
         );
     }
