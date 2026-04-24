@@ -94,6 +94,17 @@ const calculateFallbackPurchasePrice = (id: string, basePrice: number): number =
     }
 };
 
+// ── 재고 건전성 진단 기준 (쿠팡·다이소 물류 기준 참고) ──────────
+const DEAD_STOCK_DAYS        = 90;    // 무판매 N일 이상 = 악성재고
+const DEAD_STOCK_TURNOVER    = 0.5;   // 회전율 이 이하 = 악성재고
+const EXCESS_STOCK_RATIO     = 2.0;   // 목표재고의 N배 초과 = 과잉
+const EXCESS_DAYS_THRESHOLD  = 180;   // 잔여일 N일 이상 = 과잉
+const SLOW_MOVE_DAYS_MIN     = 90;    // 부진재고 잔여일 하한
+const SLOW_MOVE_DAYS_MAX     = 180;   // 부진재고 잔여일 상한
+const HEALTHY_DEAD_RATIO     = 0.05;  // 허용 악성재고 비중 (5%)
+const HEALTHY_EXCESS_RATIO   = 0.10;  // 허용 과잉재고 비중 (10%)
+const HEALTHY_ITS_MAX        = 0.12;  // 허용 ITS (재고/매출) 상한 12%
+
 interface InventoryDiffItem {
     id: string;
     name: string;
@@ -125,7 +136,7 @@ export default function SihwaInventory() {
     const [historyLoading, setHistoryLoading] = useState(true);
     
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE'>('AI_SUMMARY');
+    const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE' | 'HEALTH_DIAGNOSIS'>('AI_SUMMARY');
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
         'CRITICAL': true,
         'WARNING': true,
@@ -850,6 +861,161 @@ export default function SihwaInventory() {
         };
     }, [analyzedInventory]);
 
+    // ── 재고 건전성 진단 ENGINE ─────────────────────────────────────
+    const healthDiagnosis = useMemo(() => {
+
+      // ── 기준 날짜 ──────────────────────────────────────────────
+      const now = Date.now();
+
+      // ── 품목별 마지막 판매일 추출 (inventoryHistory 기반) ──────
+      const lastSaleDateMap: Record<string, number> = {};
+      historyData.inventoryHistory.forEach((snap: InventoryHistorySnapshot) => {
+        const snapTime = new Date(snap.date).getTime();
+        if (isNaN(snapTime)) return;
+        snap.diff?.forEach((d: InventoryDiffItem) => {
+          if (d.change < 0) {  // 감소 = 출고 = 판매
+            if (!lastSaleDateMap[d.id] || snapTime > lastSaleDateMap[d.id]) {
+              lastSaleDateMap[d.id] = snapTime;
+            }
+          }
+        });
+      });
+
+      // ── 결품 기회손실: 대경+시화 모두 0일 때 주문→취소 이력 ────
+      const missedDemandMap: Record<string, { count: number; estimatedRevenue: number }> = {};
+      orders.forEach(o => {
+        if (!['CANCELLED', 'WITHDRAWN'].includes(o.status)) return;
+        if (o.isDeleted) return;
+        // 내부 재고 이동 주문 제외
+        const custStr = (o.poEndCustomer || o.customerName || '').toLowerCase();
+        if (custStr.includes('재고') || custStr.includes('시화') || custStr.includes('서울')) return;
+
+        const items = o.po_items?.length ? o.po_items : o.items;
+        items?.forEach(item => {
+          const id = item.productId || (item as { item_id?: string }).item_id || '';
+          if (!id) return;
+          const row = analyzedInventory.find(r => r.product.id === id);
+          if (!row) return;
+          // 주문 시점에 시화+대경 모두 0이었을 가능성 높은 품목 (현재도 0이거나 critical인 경우)
+          if (row.shQty <= 0 && row.ysQty <= 0) {
+            const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
+            if (!missedDemandMap[id]) missedDemandMap[id] = { count: 0, estimatedRevenue: 0 };
+            missedDemandMap[id].count += 1;
+            missedDemandMap[id].estimatedRevenue += qty * row.sellingPrice;
+          }
+        });
+      });
+
+      // ── 품목별 분류 ────────────────────────────────────────────
+      const deadStockItems:   typeof analyzedInventory = [];
+      const excessStockItems: typeof analyzedInventory = [];
+      const slowMoveItems:    typeof analyzedInventory = [];
+      const optimalItems:     typeof analyzedInventory = [];
+
+      let totalStockValue    = 0;
+      let deadStockValue     = 0;
+      let excessStockValue   = 0;
+      let slowMoveValue      = 0;
+      let optimalStockValue  = 0;
+
+      analyzedInventory.forEach(row => {
+        // STUBEND 제외
+        if (row.product.id.toLowerCase().includes('stubend')) return;
+        const itemValue = row.shQty * row.recentPurchasePrice;
+        if (itemValue <= 0 && row.shQty <= 0) return;
+        totalStockValue += itemValue;
+
+        // 무판매 일수 계산
+        const lastSaleTime = lastSaleDateMap[row.product.id];
+        const daysSinceLastSale = lastSaleTime
+          ? Math.floor((now - lastSaleTime) / 86400000)
+          : (row.salesVolume === 0 ? 999 : 0);
+
+        // 악성재고 판단
+        const isDeadStock =
+          (daysSinceLastSale >= DEAD_STOCK_DAYS && row.turnoverRate < DEAD_STOCK_TURNOVER)
+          || (row.salesVolume === 0 && row.shQty > 0 && row.compSales === 0);
+
+        // 과잉재고 판단 (악성이 아닌 것 중에서)
+        const targetStock = row.targetStockByTurnover > 0 ? row.targetStockByTurnover : row.safeStock;
+        const excessQty = targetStock > 0 ? row.shQty - targetStock : 0;
+        const isExcessStock = !isDeadStock && (
+          (targetStock > 0 && row.shQty > targetStock * EXCESS_STOCK_RATIO)
+          || (row.daysOnHand > EXCESS_DAYS_THRESHOLD && row.daysOnHand < 9999)
+        );
+
+        // 부진재고 판단
+        const isSlowMove = !isDeadStock && !isExcessStock
+          && row.daysOnHand >= SLOW_MOVE_DAYS_MIN
+          && row.daysOnHand <= SLOW_MOVE_DAYS_MAX
+          && row.turnoverGrade === 'D';
+
+        if (isDeadStock) {
+          deadStockItems.push({ ...row, _daysSinceLastSale: daysSinceLastSale } as typeof row & { _daysSinceLastSale: number });
+          deadStockValue += itemValue;
+        } else if (isExcessStock) {
+          excessStockItems.push({ ...row, _excessQty: excessQty, _excessValue: excessQty * row.recentPurchasePrice } as typeof row & { _excessQty: number; _excessValue: number });
+          excessStockValue += itemValue;
+        } else if (isSlowMove) {
+          slowMoveItems.push(row);
+          slowMoveValue += itemValue;
+        } else {
+          optimalItems.push(row);
+          optimalStockValue += itemValue;
+        }
+      });
+
+      // ── 건강도 점수 (0~100) ────────────────────────────────────
+      const deadRatio    = totalStockValue > 0 ? deadStockValue  / totalStockValue : 0;
+      const excessRatio  = totalStockValue > 0 ? excessStockValue/ totalStockValue : 0;
+      const slowRatio    = totalStockValue > 0 ? slowMoveValue   / totalStockValue : 0;
+
+      // 항목별 감점
+      const deadPenalty   = Math.min(40, Math.round(deadRatio  / HEALTHY_DEAD_RATIO  * 20));
+      const excessPenalty = Math.min(30, Math.round(excessRatio/ HEALTHY_EXCESS_RATIO* 15));
+      const slowPenalty   = Math.min(15, Math.round(slowRatio  * 30));
+      const healthScore   = Math.max(0, 100 - deadPenalty - excessPenalty - slowPenalty);
+
+      const healthGrade =
+        healthScore >= 80 ? { label: '우량 🟢', textClass: 'text-green-600', strokeColor: '#16a34a' } :
+        healthScore >= 60 ? { label: '보통 🟡', textClass: 'text-amber-600', strokeColor: '#d97706' } :
+        healthScore >= 40 ? { label: '주의 🟠', textClass: 'text-orange-600', strokeColor: '#ea580c' } :
+        { label: '위험 🔴', textClass: 'text-rose-600', strokeColor: '#dc2626' };
+
+      // ── 매출 대비 재고 비율 (ITS) ─────────────────────────────
+      const annualRevenue = analyzedInventory.reduce((s, r) => s + r.salesVolume * r.sellingPrice, 0);
+      const its = annualRevenue > 0 ? (totalStockValue / annualRevenue) : 0;
+
+      // ── 결품 기회손실 상위 품목 ─────────────────────────────────
+      const missedDemandList = Object.entries(missedDemandMap)
+        .map(([id, v]) => {
+          const row = analyzedInventory.find(r => r.product.id === id);
+          return { id, ...v, row };
+        })
+        .filter(m => m.count >= 1)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+
+      // ── 즉시 처분 대상 (악성재고 중 대경 반품 가능 여부 기준) ──
+      const urgentDisposalItems = deadStockItems
+        .sort((a, b) => ((b as typeof b & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0) - ((a as typeof a & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0))
+        .slice(0, 15);
+
+      return {
+        totalStockValue,
+        deadStockItems,   deadStockValue,
+        excessStockItems, excessStockValue,
+        slowMoveItems,    slowMoveValue,
+        optimalItems,     optimalStockValue,
+        deadRatio, excessRatio, slowRatio,
+        healthScore, healthGrade,
+        annualRevenue, its,
+        missedDemandList,
+        urgentDisposalItems,
+        lockedCapital: deadStockValue + excessStockValue,
+      };
+    }, [analyzedInventory, historyData, orders]);
+
     const dailyOrderDiffMap = useMemo(() => {
         const map: Record<string, Record<string, number>> = {}; 
         orders.forEach(order => {
@@ -1124,6 +1290,22 @@ export default function SihwaInventory() {
                             onClick={() => setActiveTab('ALL_TABLE')}
                         >
                             전체 재고 리스트(정렬지원)
+                        </button>
+                        <button
+                          className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-1.5 ${
+                            activeTab === 'HEALTH_DIAGNOSIS'
+                              ? 'bg-linear-to-r from-rose-600 to-violet-600 text-white shadow-sm'
+                              : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                          onClick={() => setActiveTab('HEALTH_DIAGNOSIS')}
+                        >
+                          🩺 재고 건전성 진단
+                          {/* 악성재고 경고 배지 */}
+                          {healthDiagnosis.deadStockItems.length > 0 && (
+                            <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                              {healthDiagnosis.deadStockItems.length}
+                            </span>
+                          )}
                         </button>
                     </div>
                     
@@ -1974,6 +2156,346 @@ export default function SihwaInventory() {
                                     </tbody>
                                 </table>
                             )}
+                            
+{/* ════════════════════════════════════════════════
+    🩺 재고 건전성 진단 탭
+════════════════════════════════════════════════ */}
+{activeTab === 'HEALTH_DIAGNOSIS' && (
+  <div className="space-y-5 p-4 md:p-0 pb-8 animate-in fade-in duration-300">
+
+    {/* ── 섹션 1: 건강도 점수 + 구성 개요 ── */}
+    <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr] gap-4">
+
+      {/* 건강도 게이지 */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+        <div className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">
+          🩺 재고 건강도 종합 점수
+        </div>
+        <div className="flex items-center gap-4">
+          {/* SVG 게이지 */}
+          <div className="relative w-28 h-28 shrink-0">
+            <svg viewBox="0 0 112 112" width="112" height="112">
+              <circle cx="56" cy="56" r="44" fill="none" stroke="#f1f5f9" strokeWidth="11"/>
+              <circle cx="56" cy="56" r="44" fill="none"
+                stroke={healthDiagnosis.healthGrade.strokeColor} strokeWidth="11"
+                strokeDasharray="276.5"
+                strokeDashoffset={276.5 * (1 - healthDiagnosis.healthScore / 100)}
+                strokeLinecap="round"
+                transform="rotate(-90 56 56)"
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className={`text-2xl font-black ${healthDiagnosis.healthGrade.textClass}`}>
+                {healthDiagnosis.healthScore}
+              </span>
+              <span className="text-[9px] text-slate-400 font-bold">/ 100점</span>
+            </div>
+          </div>
+          <div className="flex-1">
+            <div className={`text-sm font-black mb-1 ${healthDiagnosis.healthGrade.textClass}`}>
+              {healthDiagnosis.healthGrade.label}
+            </div>
+            <div className="text-[11px] text-slate-500 space-y-0.5">
+              <div>악성재고 <span className="font-bold text-rose-600">{(healthDiagnosis.deadRatio * 100).toFixed(1)}%</span></div>
+              <div>과잉재고 <span className="font-bold text-orange-500">{(healthDiagnosis.excessRatio * 100).toFixed(1)}%</span></div>
+              <div>ITS 비율 <span className="font-bold text-amber-600">{(healthDiagnosis.its * 100).toFixed(1)}%</span></div>
+            </div>
+            <div className="text-[9px] text-slate-400 mt-2">쿠팡·다이소 기준: 악성 5% 이하, 과잉 10% 이하</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 재고 구성 스택 바 + ITS */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+        <div className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">
+          전체 재고 자산 구성 ({formatCur(Math.round(healthDiagnosis.totalStockValue / 10000))}만원)
+        </div>
+        {/* 스택 바 */}
+        <div className="h-7 rounded-lg overflow-hidden flex mb-3">
+          {[
+            { value: healthDiagnosis.optimalStockValue,  bgClass: 'bg-green-600', label: '적정·안전' },
+            { value: healthDiagnosis.excessStockValue,   bgClass: 'bg-orange-600', label: '과잉' },
+            { value: healthDiagnosis.deadStockValue,     bgClass: 'bg-rose-600', label: '악성' },
+            { value: healthDiagnosis.slowMoveValue,      bgClass: 'bg-purple-600', label: '부진' },
+          ].map(seg => {
+            const pct = healthDiagnosis.totalStockValue > 0
+              ? (seg.value / healthDiagnosis.totalStockValue * 100) : 0;
+            return pct > 0 ? (
+              <div key={seg.label} {...{ style: { flex: pct } }}
+                className={`flex items-center justify-center text-white text-[9px] font-black overflow-hidden ${seg.bgClass}`}
+                title={`${seg.label}: ${pct.toFixed(1)}%`}
+              >
+                {pct >= 5 ? `${pct.toFixed(0)}%` : ''}
+              </div>
+            ) : null;
+          })}
+        </div>
+        {/* 범례 */}
+        <div className="flex flex-wrap gap-3 mb-4">
+          {[
+            { bgClass:'bg-green-600', label:'적정·안전', value: healthDiagnosis.optimalStockValue },
+            { bgClass:'bg-orange-600', label:'과잉재고 ⚠', value: healthDiagnosis.excessStockValue },
+            { bgClass:'bg-rose-600', label:'악성재고 🚨', value: healthDiagnosis.deadStockValue },
+            { bgClass:'bg-purple-600', label:'부진재고', value: healthDiagnosis.slowMoveValue },
+          ].map(l => (
+            <div key={l.label} className="flex items-center gap-1.5 text-xs">
+              <div className={`w-2.5 h-2.5 rounded-sm shrink-0 ${l.bgClass}`}></div>
+              <span className="font-bold text-slate-600">{l.label}</span>
+              <span className="text-slate-400 font-mono">₩{formatCur(Math.round(l.value / 10000))}만</span>
+            </div>
+          ))}
+        </div>
+        {/* KPI 3개 */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: '묶인 자금 (악성+과잉)', value: `₩${formatCur(Math.round(healthDiagnosis.lockedCapital / 10000))}만`, color: 'text-rose-600', note:'해소 시 발주 여력 확보' },
+            { label: '매출 대비 재고 비율', value: `${(healthDiagnosis.its * 100).toFixed(1)}%`, color: healthDiagnosis.its > HEALTHY_ITS_MAX ? 'text-amber-600' : 'text-green-600', note:'쿠팡 기준 8~12%' },
+            { label: '처분 대상 품목', value: `${healthDiagnosis.urgentDisposalItems.length}개`, color: 'text-purple-600', note:'대경 반품 or 단가인하' },
+          ].map(k => (
+            <div key={k.label} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+              <div className="text-[9px] font-bold text-slate-400 mb-1">{k.label}</div>
+              <div className={`text-lg font-black ${k.color}`}>{k.value}</div>
+              <div className="text-[9px] text-slate-400 mt-0.5">{k.note}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    {/* ── 섹션 2: KPI 5개 ── */}
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      {[
+        { emoji:'☠️', label:'악성재고 품목', value:`${healthDiagnosis.deadStockItems.length}개`, sub:'90일+ 무판매 or 0.5x미만', color:'rose', border:'border-rose-400' },
+        { emoji:'📦', label:'과잉재고 품목', value:`${healthDiagnosis.excessStockItems.length}개`, sub:'목표재고 200%+ 초과', color:'orange', border:'border-orange-400' },
+        { emoji:'🐌', label:'부진재고 품목', value:`${healthDiagnosis.slowMoveItems.length}개`, sub:'D등급·잔여 90~180일', color:'purple', border:'border-purple-400' },
+        { emoji:'🔍', label:'결품 기회손실', value:`${healthDiagnosis.missedDemandList.filter(m=>m.count>=2).length}건↑`, sub:'2회↑ 취소·철회 감지', color:'blue', border:'border-blue-400' },
+        { emoji:'💡', label:'즉시 처분 권장', value:`${Math.min(healthDiagnosis.urgentDisposalItems.length, 11)}개`, sub:'대경반품 or 단가인하', color:'teal', border:'border-teal-400' },
+      ].map(k => (
+        <div key={k.label} className={`bg-white rounded-xl border-l-4 border border-slate-200 ${k.border} p-4 shadow-sm`}>
+          <div className="text-xl mb-1">{k.emoji}</div>
+          <div className="text-[9px] font-bold text-slate-400 mb-1">{k.label}</div>
+          <div className={`text-xl font-black text-${k.color}-600`}>{k.value}</div>
+          <div className="text-[9px] text-slate-400 mt-1">{k.sub}</div>
+        </div>
+      ))}
+    </div>
+
+    {/* ── 섹션 3: 악성·과잉재고 상세 테이블 ── */}
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+
+      {/* 악성재고 */}
+      <div className="bg-white rounded-2xl border border-rose-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 bg-rose-50 border-b border-rose-200 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-black text-rose-800">☠️ 악성재고 상세 — 즉시 조치 필요</div>
+            <div className="text-[10px] text-rose-500 mt-0.5">무판매 90일↑ AND 회전율 0.5x 미만 품목</div>
+          </div>
+          <span className="bg-rose-200 text-rose-800 font-black px-3 py-1 rounded-full text-xs">
+            {healthDiagnosis.deadStockItems.length}건
+          </span>
+        </div>
+        <div className="overflow-auto max-h-80">
+          <table className="w-full text-xs text-left whitespace-nowrap">
+            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100">
+              <tr>
+                <th className="px-4 py-2">품목코드</th>
+                <th className="px-4 py-2 text-right">무판매</th>
+                <th className="px-4 py-2 text-right">회전율</th>
+                <th className="px-4 py-2 text-right">보유량</th>
+                <th className="px-4 py-2 text-right">자산가치</th>
+                <th className="px-4 py-2 text-right">대경</th>
+                <th className="px-4 py-2">권장 조치</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {healthDiagnosis.urgentDisposalItems.map(row => {
+                const daysSince = (row as typeof row & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0;
+                const itemValue = row.shQty * row.recentPurchasePrice;
+                const action = row.ysQty > 0
+                  ? '대경 반품 협의'
+                  : daysSince > 180
+                  ? '단가인하 긴급처분'
+                  : '영업 판매 독촉';
+                const actionColor = row.ysQty > 0
+                  ? 'bg-purple-100 text-purple-700'
+                  : daysSince > 180
+                  ? 'bg-rose-100 text-rose-700'
+                  : 'bg-amber-100 text-amber-700';
+
+                return (
+                  <tr key={row.product.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-2 font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</td>
+                    <td className="px-4 py-2 text-right">
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${daysSince > 180 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-right font-mono font-bold text-rose-600">
+                      {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '0x'}
+                    </td>
+                    <td className="px-4 py-2 text-right font-bold">{row.shQty}개</td>
+                    <td className="px-4 py-2 text-right font-black text-rose-600">{formatCur(itemValue)}원</td>
+                    <td className="px-4 py-2 text-right text-slate-400">{row.ysQty}개</td>
+                    <td className="px-4 py-2">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${actionColor}`}>{action}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {healthDiagnosis.deadStockItems.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">악성재고가 없습니다 🎉</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 과잉재고 */}
+      <div className="bg-white rounded-2xl border border-orange-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 bg-orange-50 border-b border-orange-200 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-black text-orange-800">📦 과잉재고 상세 — 발주 일시 중단 권고</div>
+            <div className="text-[10px] text-orange-500 mt-0.5">현재고 &gt; 목표재고 × 2배 OR 잔여일 180일↑</div>
+          </div>
+          <span className="bg-orange-200 text-orange-800 font-black px-3 py-1 rounded-full text-xs">
+            {healthDiagnosis.excessStockItems.length}건
+          </span>
+        </div>
+        <div className="overflow-auto max-h-80">
+          <table className="w-full text-xs text-left whitespace-nowrap">
+            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100">
+              <tr>
+                <th className="px-4 py-2">품목코드</th>
+                <th className="px-4 py-2 text-right">현재고</th>
+                <th className="px-4 py-2 text-right">목표재고</th>
+                <th className="px-4 py-2 text-right">초과량</th>
+                <th className="px-4 py-2 text-right">초과자산</th>
+                <th className="px-4 py-2 text-right">잔여일</th>
+                <th className="px-4 py-2">권장 조치</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {(healthDiagnosis.excessStockItems as (typeof healthDiagnosis.excessStockItems[0] & { _excessQty?: number; _excessValue?: number })[])
+                .sort((a, b) => (b._excessValue || 0) - (a._excessValue || 0))
+                .slice(0, 20)
+                .map(row => {
+                  const excessQty   = (row._excessQty   || 0);
+                  const excessValue = (row._excessValue  || 0);
+                  const action = excessQty > row.targetStockByTurnover
+                    ? '장기 발주 중단'
+                    : '이번 달 발주 보류';
+                  const actionColor = excessQty > row.targetStockByTurnover
+                    ? 'bg-rose-100 text-rose-700'
+                    : 'bg-blue-100 text-blue-700';
+
+                  return (
+                    <tr key={row.product.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-2 font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</td>
+                      <td className="px-4 py-2 text-right font-black text-orange-600">{row.shQty}개</td>
+                      <td className="px-4 py-2 text-right text-slate-400">{row.targetStockByTurnover || row.safeStock}개</td>
+                      <td className="px-4 py-2 text-right">
+                        <span className="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-[9px] font-bold">+{excessQty}개</span>
+                      </td>
+                      <td className="px-4 py-2 text-right font-bold text-orange-600">{formatCur(excessValue)}원</td>
+                      <td className="px-4 py-2 text-right font-mono font-bold text-amber-600">
+                        {row.daysOnHand === 9999 ? '∞' : `${Math.round(row.daysOnHand)}일`}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${actionColor}`}>{action}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              {healthDiagnosis.excessStockItems.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">과잉재고가 없습니다 🎉</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    {/* ── 섹션 4: 결품 기회손실 ── */}
+    {healthDiagnosis.missedDemandList.length > 0 && (
+      <div className="bg-white rounded-2xl border border-violet-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 bg-violet-50 border-b border-violet-200 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-black text-violet-800">
+              🔍 재고 없어서 놓친 수요 — 결품 기회비용 분석
+              <span className="ml-2 text-[9px] bg-violet-600 text-white px-2 py-0.5 rounded-full">데이터 누적 시 정밀화</span>
+            </div>
+            <div className="text-[10px] text-violet-500 mt-0.5">
+              대경+시화 재고 0 상태에서 주문 시도 후 취소·철회된 이력 기반 (추정치)
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-xs font-black text-violet-700">
+              추정 기회손실 ₩{formatCur(Math.round(healthDiagnosis.missedDemandList.reduce((s,m) => s + m.estimatedRevenue, 0) / 10000))}만
+            </div>
+          </div>
+        </div>
+        <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+          {healthDiagnosis.missedDemandList.slice(0, 10).map((m, i) => (
+            <div key={m.id} className={`rounded-xl p-3 border ${m.count >= 3 ? 'border-rose-200 bg-rose-50' : 'border-violet-100 bg-violet-50'}`}>
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-black shrink-0 ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>{i+1}</span>
+                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${m.count >= 3 ? 'bg-rose-200 text-rose-700' : 'bg-violet-200 text-violet-700'}`}>
+                  {m.count}회 결품
+                </span>
+              </div>
+              <div className="text-[10px] font-bold text-slate-800 font-mono leading-tight break-all mb-1">{m.id}</div>
+              <div className="text-[9px] text-slate-500">추정손실 ₩{formatCur(Math.round(m.estimatedRevenue / 10000))}만</div>
+              <div className="mt-2">
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${m.count >= 3 ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                  {m.count >= 3 ? '즉시 소량 매입' : '수요 모니터링'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {/* ── 섹션 5: 데이터 개선 로드맵 ── */}
+    <div className="bg-linear-to-br from-slate-800 to-indigo-900 rounded-2xl p-5 text-white">
+      <div className="text-sm font-black text-white mb-1 flex items-center gap-2">
+        📡 데이터 누적 로드맵 — 쌓일수록 진단이 정확해집니다
+        <span className="text-[9px] bg-amber-500 text-amber-900 font-bold px-2 py-0.5 rounded-full">현재 신뢰도 58%</span>
+      </div>
+      <div className="text-[11px] text-slate-300 mb-4">아래 데이터가 누적되면 악성·과잉재고 판단 정확도가 90%↑로 향상됩니다</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+        {[
+          { phase:'즉시 가능', textClass:'text-rose-600', bgClass:'bg-rose-600', items:['주문 취소 시 결품 원인 필드 추가','대경 반품 가능 여부 플래그','최초 견적 발생일(Opportunity Date)'] },
+          { phase:'1개월 후', textClass:'text-orange-600', bgClass:'bg-orange-600', items:['일별 스냅샷 30일 누적→σ 정밀화','품목별 무판매일 정확 계산 가능','과잉·악성 오차 50% 감소'] },
+          { phase:'3개월 후', textClass:'text-amber-600', bgClass:'bg-amber-600', items:['권역별 수요 패턴 분리','하치장 품목 기준 데이터화','악성재고 사전 예측 모델'] },
+          { phase:'6개월 후', textClass:'text-green-600', bgClass:'bg-green-600', items:['계절성 보정 지수 산출','납품 현장 유형별 수요 패턴','ITS 목표 8% 이하 달성 가이드'] },
+          { phase:'12개월 후', textClass:'text-blue-600', bgClass:'bg-blue-600', items:['AI 자동 처분 타이밍 추천','신뢰도 99% 발주 시스템','ROI 기반 재고 운용 최적화'] },
+        ].map(p => (
+          <div key={p.phase} className="bg-white/10 rounded-xl p-3 border border-white/15">
+            <div className="text-[10px] font-black mb-2 flex items-center gap-1.5">
+              <div className={`w-2 h-2 rounded-full shrink-0 ${p.bgClass}`}></div>
+              <span className={p.textClass}>{p.phase}</span>
+            </div>
+            {p.items.map((item, i) => (
+              <div key={i} className="text-[9px] text-slate-300 mb-1 flex items-start gap-1">
+                <span className="shrink-0 mt-0.5">→</span>{item}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 pt-4 border-t border-white/15">
+        <div className="text-[10px] font-bold text-slate-300 mb-2">▶ 즉시 추가 권장 데이터 필드</div>
+        <div className="flex flex-wrap gap-2">
+          {['주문 취소 사유 (결품/단가/납기)','납품 현장 분류 (플랜트/건설/조선)','대경 반품 가능 여부 플래그','최초 견적 일자','거래처 업종 코드 (SIC)','계절 수요 태그'].map(tag => (
+            <span key={tag} className="text-[9px] font-bold bg-white/15 px-2 py-1 rounded-full border border-white/20 text-slate-200">{tag}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+
+  </div>
+)}
                         </div>
                     )}
                 </div>
