@@ -50,6 +50,11 @@ function AdminSihwaInventoryWrapper() {
   return user?.email === 'remy@altf.kr' ? <AdminSihwaInventoryEn /> : <AdminSihwaInventory />;
 }
 
+function AdminIndexRedirect() {
+  const { user } = useStore((state) => state.auth);
+  return user?.email === 'remy@altf.kr' ? <Navigate to="/admin/customers" replace /> : <Navigate to="/admin/orders" replace />;
+}
+
 // Protected Route Wrapper (User)
 function ProtectedRoute() {
   const isAuth = useStore((state) => state.auth.isAuthenticated);
@@ -123,7 +128,7 @@ function AnimatedRoutes() {
           {/* Admin Routes (Admin Layout) */}
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<Navigate to="/admin/orders" replace />} />
+              <Route index element={<AdminIndexRedirect />} />
               <Route path="customers" element={<PageTransition><AdminCustomersWrapper /></PageTransition>} />
               <Route path="members" element={<PageTransition><AdminMembers /></PageTransition>} />
               <Route path="orders" element={<PageTransition><AdminOrders /></PageTransition>} />

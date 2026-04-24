@@ -79,16 +79,17 @@ export default function AdminLayout() {
         navigate('/login');
     };
 
+    const isRemy = user?.email === 'remy@altf.kr';
+
     const NAV_ITEMS = [
-        // { label: '대시보드', path: '/admin', exact: true, emoji: '📊' }, // Maybe later
-        { label: '알트에프 거래처 (CRM)', path: '/admin/customers', emoji: '🏢' },
-        { label: '멤버 관리', path: '/admin/members', emoji: '👥' },
-        { label: '주문 관리', path: '/admin/orders', emoji: '🛒', badge: orders.filter(o => o.status === 'SUBMITTED' && !o.isDeleted).length },
-        { label: '미결 관리', path: '/admin/pending', emoji: '⏳', badge: delayedPendingCount },
-        { label: '견적 관리', path: '/admin/quotes', emoji: '📝', badge: quotes.filter(q => q.status === 'SUBMITTED' && !q.isDeleted).length },
-        { label: '시화재고 관리', path: '/admin/sihwainventory', emoji: '🏭' },
-        { label: '재고 관리', path: '/admin/inventory', emoji: '📦' },
-        { label: '설정', path: '/admin/settings', emoji: '⚙️' },
+        { label: isRemy ? 'CRM Data' : '알트에프 거래처 (CRM)', path: '/admin/customers', emoji: '🏢' },
+        { label: isRemy ? 'Members' : '멤버 관리', path: '/admin/members', emoji: '👥' },
+        { label: isRemy ? 'Orders' : '주문 관리', path: '/admin/orders', emoji: '🛒', badge: orders.filter(o => o.status === 'SUBMITTED' && !o.isDeleted).length },
+        { label: isRemy ? 'Pending' : '미결 관리', path: '/admin/pending', emoji: '⏳', badge: delayedPendingCount },
+        { label: isRemy ? 'Quotes' : '견적 관리', path: '/admin/quotes', emoji: '📝', badge: quotes.filter(q => q.status === 'SUBMITTED' && !q.isDeleted).length },
+        { label: isRemy ? 'Sihwa Inventory' : '시화재고 관리', path: '/admin/sihwainventory', emoji: '🏭' },
+        { label: isRemy ? 'Inventory' : '재고 관리', path: '/admin/inventory', emoji: '📦' },
+        { label: isRemy ? 'Settings' : '설정', path: '/admin/settings', emoji: '⚙️' },
     ];
 
     return (
@@ -177,7 +178,7 @@ export default function AdminLayout() {
                         <span className={`flex items-center justify-center shrink-0 transition-all ${isSidebarOpen ? 'text-xl w-6 h-6' : 'text-2xl w-8 h-8 mx-auto'}`}>
                             🚪
                         </span>
-                        {isSidebarOpen && <span className="text-sm font-medium">로그아웃</span>}
+                        {isSidebarOpen && <span className="text-sm font-medium">{isRemy ? 'Logout' : '로그아웃'}</span>}
                     </button>
                 </div>
             </aside>
@@ -195,12 +196,12 @@ export default function AdminLayout() {
                         >
                             <Menu className="w-5 h-5" />
                         </button>
-                        <h2 className="text-lg font-bold text-slate-800">관리자 페이지</h2>
+                        <h2 className="text-lg font-bold text-slate-800">{isRemy ? 'Admin Portal' : '관리자 페이지'}</h2>
                     </div>
 
                     <NavLink to="/admin/profile" className="flex items-center gap-3 hover:bg-slate-50 p-2 rounded-lg transition-colors group">
                         <div className="flex flex-col items-end mr-2">
-                            <span className="text-sm font-bold text-slate-800 group-hover:text-teal-600 transition-colors">{user?.contactName || '관리자'}</span>
+                            <span className="text-sm font-bold text-slate-800 group-hover:text-teal-600 transition-colors">{user?.contactName || (isRemy ? 'Admin' : '관리자')}</span>
                             <span className="text-xs text-slate-500">{user?.email}</span>
                         </div>
                         <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 group-hover:bg-teal-50 group-hover:text-teal-600 transition-colors">
