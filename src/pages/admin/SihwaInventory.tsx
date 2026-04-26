@@ -44,24 +44,9 @@ const WORKING_DAYS = 250;      // 연간 영업일수
 const LEAD_TIME = 5;           // 리드타임 (대경 → 시화, 영업일 기준)
 const Z_VALUE = 1.645;         // 목표 서비스율 95% (데이터 충분하면 2.33 = 99%로 상향)
 
-// 회전율 등급 기준
-const TURNOVER_THRESHOLDS = {
-  S: 12,   // 월 1회 이상 소진 — 즉시발주 우선
-  A: 6,    // 2개월 이내 소진 — 정기발주 (2개월치)
-  B: 3,    // 4개월 이내 소진 — 분기 발주
-  C: 1,    // 연 1회 이상 소진 — 반기 발주
-  // C 미만 = D등급: 과잉재고 경고
-} as const;
 
-// 회전등급별 목표재고 산출 배수 (연판매 ÷ 이 숫자 = 목표재고)
-const TARGET_STOCK_DIVISOR: Record<string, number> = {
-  S: 8,   // 연판매 ÷ 8  = 약 1.5개월치 목표 (빠르게 소진되므로 자주 소량 보충)
-  A: 6,   // 연판매 ÷ 6  = 약 2개월치 목표
-  B: 4,   // 연판매 ÷ 4  = 약 3개월치 목표
-  C: 2,   // 연판매 ÷ 2  = 약 6개월치 목표
-  D: 0,   // 발주 중단 — 기존 재고 소진 우선
-  N: 0,   // 판매 없음 — 제외
-};
+
+
 
 // ══════════════════════════════════════════════════════════════
 // ★ 새 등급 시스템: 5개 지표 복합 점수 (100점 만점)
@@ -152,26 +137,9 @@ function getExcessActionLabel(grade: string): string {
     return '발주 중단';
 }
 
-// 재고 회전율 등급 반환
-function getTurnoverGrade(rate: number, salesVolume: number) {
-  if (salesVolume === 0) return 'N';
-  if (rate >= TURNOVER_THRESHOLDS.S) return 'S';
-  if (rate >= TURNOVER_THRESHOLDS.A) return 'A';
-  if (rate >= TURNOVER_THRESHOLDS.B) return 'B';
-  if (rate >= TURNOVER_THRESHOLDS.C) return 'C';
-  return 'D';
-}
 
-// 회전율 기반 재고 상태 반환
-function getStockStatusByTurnover(currentStock: number, targetStock: number, daysOnHand: number, grade: string) {
-  if (grade === 'N') return 'DEAD';
-  if (currentStock === 0) return 'CRITICAL';
-  if (daysOnHand <= LEAD_TIME * 2) return 'CRITICAL';
-  if (currentStock < targetStock * 0.5) return 'LOW';
-  if (currentStock <= targetStock * 1.3) return 'OPTIMAL';
-  if (daysOnHand > 365) return 'DEAD';
-  return 'EXCESS';
-}
+
+
 
 // Helper: Calculate Fallback Purchase Price based on item rules
 const calculateFallbackPurchasePrice = (id: string, basePrice: number): number => {
