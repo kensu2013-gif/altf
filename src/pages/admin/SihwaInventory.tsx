@@ -832,7 +832,7 @@ export default function SihwaInventory() {
                 default: return 0; // Fallback
             }
         });
-    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, searchTerm, sortConfig, historyData, liveSalesHistory]);
+    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, searchTerm, sortConfig, historyData, liveSalesHistory, quotes]);
 
     // Aggregate stats and Asset Valuation totals
     const stats = useMemo(() => {
