@@ -710,20 +710,42 @@ export default function SihwaInventory() {
             const sigma = dailyAvg * cvEstimate;
             const safetyStockSigma = Math.ceil(Z_VALUE * sigma * Math.sqrt(LEAD_TIME));
             
-            let safeStock = safetyStockSigma + Math.ceil(dailyAvg * 14);
+            // 1. 기초 계산식 축소: 안전재고 + 2주치(10일) 평균
+            let safeStock = safetyStockSigma + Math.ceil(dailyAvg * 10);
+            
+            // 2. 1회 평균 주문량(Average Order Size) 기반 강력한 캡 (1.5배)
+            if (row.salesFreq > 0) {
+                const avgOrderSize = row.salesVolume / row.salesFreq;
+                safeStock = Math.min(safeStock, Math.ceil(avgOrderSize * 1.5));
+            }
+            
+            // 3. 주문 횟수(Freq) 및 견적(Quote) 기반 제한
+            if (row.salesFreq < 12 && row.quoteCount < 2) {
+                safeStock = Math.min(safeStock, Math.ceil(dailyAvg * 5)); // 최대 1주일 치
+            }
+            if (row.salesVolume < 50 && row.salesFreq < 5) {
+                safeStock = 0;
+            }
+
             safeStock = safeStock > 0 ? Math.max(10, Math.round(safeStock / 10) * 10) : 0;
             
-            // AI Filter Rules
+            // 4. 대경 재고(ysQty) 기반 페널티
+            if (row.ysQty > dailyAvg * 60) {
+                safeStock = Math.round((safeStock * 0.4) / 10) * 10; // 3개월치 이상 대경 보유시 60% 삭감
+            } else if (row.ysQty > dailyAvg * 20) {
+                safeStock = Math.round((safeStock * 0.7) / 10) * 10; // 1개월치 이상 대경 보유시 30% 삭감
+            }
+
+            // 5. WP 및 Material Filter Rules
             const mat = (row.product.material || '').toUpperCase();
             if (mat.startsWith('WP') || mat.includes('CARBON')) {
-                if (row.salesVolume < 200 || row.salesFreq < 10) {
-                    safeStock = 0;
+                // WP/CARBON은 기본적으로 시화재고에서 제외 (0개)
+                // 단, 월 3회 이상(연 36회) 초고빈도 필수 품목은 최대 20개까지만 예외 허용
+                if (row.salesFreq >= 36 && row.salesVolume >= 500) {
+                    safeStock = Math.min(safeStock, 20); 
                 } else {
-                    safeStock = Math.min(safeStock, 50); // WP는 최대 50개 캡
+                    safeStock = 0;
                 }
-            }
-            if (row.salesFreq < 10) {
-                safeStock = 0;
             }
 
             // 부피 제약 다단화
