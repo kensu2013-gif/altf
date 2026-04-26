@@ -2,12 +2,10 @@ import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { useInventory } from '../../hooks/useInventory';
 import { 
-    Factory, 
     CalendarDays, 
     TrendingUp, 
     AlertTriangle,
     PackageSearch,
-    Box,
     History,
     BrainCircuit,
     ChevronDown,
