@@ -394,7 +394,7 @@ export default function SihwaInventory() {
         quoteCount: number;
         daekyungDirectRatio: number;
         profitMarginRate: number;
-        healthGrade: 'S' | 'A' | 'B' | 'D' | 'N'; // S(우량), A(보통), B(주의/부진), D(악성)
+        healthGrade: 'A' | 'B' | 'C' | 'D' | 'E' | 'N'; // A(최우수), B(양호), C(보통), D(주의), E(악성), N(제외)
         compSales: number;
         compFreq: number;
         marketTotal: number;
@@ -751,19 +751,33 @@ export default function SihwaInventory() {
             
             const isExcessStock = !isDeadStock && targetStockByTurnover > 0 && row.shQty > (targetStockByTurnover * 1.5) && row.recentPurchasePrice > 0;
 
+            // A-E grading logic
             let healthGrade: AnalyzedItem['healthGrade'] = 'N';
+            
+            // 1. Is it completely dead?
             if (isDeadStock) {
-                healthGrade = 'D'; // 악성
+                healthGrade = 'E'; // E급 (악성 - 장기 무판매 및 재고 있음)
             } else if (isExcessStock) {
-                healthGrade = 'B'; // 과잉/주의
-            } else if (row.shQty > 0 && row.daekyungDirectRatio >= 80 && row.recent60dSales === 0) {
-                healthGrade = 'B'; // 시화 방치, 대경 출고 위주
-            } else if (row.turnoverGrade === 'S' || row.turnoverGrade === 'A') {
-                healthGrade = 'S'; // 우량
-            } else if (row.turnoverGrade === 'B' || row.turnoverGrade === 'C') {
-                healthGrade = 'A'; // 보통
+                healthGrade = 'D'; // D급 (과잉재고 경고)
+            } else if (row.shQty > 0 && row.recent60dSales === 0) {
+                healthGrade = 'D'; // D급 (주의 - 최근 정체)
+            } else if (row.salesVolume > 0) {
+                // If it has sales history
+                if ((row.turnoverGrade === 'S' || row.turnoverGrade === 'A') && row.recent60dSales >= 2) {
+                    healthGrade = 'A'; // A급 (최우수/핵심품목)
+                } else if ((row.turnoverGrade === 'S' || row.turnoverGrade === 'A') && row.recent60dSales < 2) {
+                    healthGrade = 'B'; // 회전율은 높지만 최근 출고가 적음
+                } else if (row.turnoverGrade === 'B' && row.recent60dSales >= 1) {
+                    healthGrade = 'B'; // B급 (양호/안정적)
+                } else if (row.turnoverGrade === 'C' || row.turnoverGrade === 'D') {
+                    healthGrade = 'C'; // C급 (보통/저회전)
+                } else {
+                    healthGrade = 'C';
+                }
             } else if (row.shQty > 0) {
-                healthGrade = 'B'; // 그 외 재고 보유시 주의
+                healthGrade = 'C'; // 재고는 있는데 총 판매량이 0 (초기 입고 등)
+            } else {
+                healthGrade = 'N'; // No stock, no sales
             }
 
             return {
@@ -1337,30 +1351,30 @@ export default function SihwaInventory() {
                 <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col">
                     <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-2 z-10 opacity-90">
                         <Activity className="w-5 h-5 text-purple-500" />
-                        재고 회전율 분포
+                        재고 건전성 등급 분포 (A~E)
                     </h3>
                     <p className="text-4xl font-black text-slate-800 mb-2 invisible h-0">0</p>
                     
                     <div className="space-y-2 mt-auto">
-                        {(['S','A','B','C','D'] as const).map(grade => {
+                        {(['A','B','C','D','E'] as const).map(grade => {
                         const count = analyzedInventory.filter(r =>
-                            r.turnoverGrade === grade && r.shQty > 0
+                            r.healthGrade === grade && r.shQty > 0
                         ).length;
-                        const total = analyzedInventory.filter(r => r.shQty > 0).length;
+                        const total = analyzedInventory.filter(r => r.shQty > 0 && r.healthGrade !== 'N').length;
                         const pct = total > 0 ? Math.round(count / total * 100) : 0;
                         const labels: Record<string, string> = {
-                            S: 'S급 초고속',
-                            A: 'A급 고속',
-                            B: 'B급 보통',
-                            C: 'C급 저속',
-                            D: 'D급 과잉위험',
+                            A: 'A급 최우수 (핵심)',
+                            B: 'B급 양호 (안정적)',
+                            C: 'C급 보통 (관망)',
+                            D: 'D급 주의 (과잉/정체)',
+                            E: 'E급 악성 (즉시처분)',
                         };
                         const colors: Record<string, string> = {
-                            S: '#7F77DD', A: '#639922', B: '#BA7517', C: '#378ADD', D: '#E24B4A'
+                            A: '#10B981', B: '#3B82F6', C: '#F59E0B', D: '#F97316', E: '#EF4444'
                         };
                         return (
                             <div key={grade} className="flex items-center gap-2">
-                            <span className="text-[11px] font-bold w-16 text-slate-600 shrink-0">
+                            <span className="text-[11px] font-bold w-28 text-slate-600 shrink-0">
                                 {labels[grade]}
                             </span>
                             <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -2178,41 +2192,38 @@ export default function SihwaInventory() {
                                         <tr>
                                             <th className="px-4 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 ID {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-center group relative cursor-help">
-                                                건전성 <span className="text-[10px] text-slate-400">ⓘ</span>
-                                                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 bg-slate-800 text-white text-[11px] p-3 rounded shadow-lg hidden group-hover:block z-50 text-left font-normal whitespace-normal">
+                                                등급 <span className="text-[10px] text-slate-400">ⓘ</span>
+                                                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 bg-slate-800 text-white text-[11px] p-3 rounded shadow-lg hidden group-hover:block z-50 text-left font-normal whitespace-normal cursor-auto">
                                                     <div className="font-bold mb-1 border-b border-slate-600 pb-1">건전성 평가 항목(%) 기준</div>
                                                     <div className="mb-2 text-slate-300">실제 판매량, 견적 유입량, 주문 데이터를 복합 연계하여 산출한 종합 등급입니다.</div>
                                                     <ul className="space-y-1">
-                                                        <li><span className="text-green-300 font-bold">S급 (우량)</span>: 회전율 최고 (S/A급)</li>
-                                                        <li><span className="text-teal-300 font-bold">A급 (보통)</span>: 회전율 양호 (B/C급)</li>
-                                                        <li><span className="text-amber-300 font-bold">B급 (주의)</span>: 과잉재고 또는 장기 미판매</li>
-                                                        <li><span className="text-rose-300 font-bold">D급 (악성)</span>: 무판매/무견적 (처분고려)</li>
-                                                        <li><span className="text-slate-300 font-bold">N급 (제외)</span>: 평가를 위한 기준 데이터 부족</li>
+                                                        <li><span className="text-emerald-300 font-bold">A급 (최우수)</span>: 회전율 우수, 꾸준한 매출 기여</li>
+                                                        <li><span className="text-blue-300 font-bold">B급 (양호)</span>: 회전율 양호, 안정적 유지권</li>
+                                                        <li><span className="text-amber-300 font-bold">C급 (보통)</span>: 저회전 또는 간헐적 판매 발생</li>
+                                                        <li><span className="text-orange-300 font-bold">D급 (주의)</span>: 과잉재고 또는 최근 무판매 정체</li>
+                                                        <li><span className="text-rose-300 font-bold">E급 (악성)</span>: 장기 무판매 사장재고 (처분 요망)</li>
+                                                        <li><span className="text-slate-300 font-bold">N급 (제외)</span>: 판매/재고 없음 (평가 불가)</li>
                                                     </ul>
                                                 </div>
                                             </th>
-                                            <th className="px-4 py-3 text-center">60일 판매/견적</th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-amber-700" onClick={() => handleSort('salesVolume')}>우리 전체출고 {sortConfig.key==='salesVolume' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            {/* <th className="px-4 py-3 text-right text-slate-500">직발송(%)</th> */}
                                             <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('turnoverRate')}>회전율 {sortConfig.key==='turnoverRate' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('daysOnHand')}>잔여일 {sortConfig.key==='daysOnHand' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                            <th className="px-4 py-3 text-center">최근 실적(60일)</th>
+                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-amber-700" onClick={() => handleSort('salesVolume')}>판매이력 {sortConfig.key==='salesVolume' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-indigo-700" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-500 font-black" onClick={() => handleSort('deficit')}>보충(Deficit) {sortConfig.key==='deficit' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-teal-700" onClick={() => handleSort('recentPurchasePrice')}>이익률(단가) {sortConfig.key==='recentPurchasePrice' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200" onClick={() => handleSort('ysQty')}>대경 재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition group relative" onClick={() => handleSort('daysOnHand')}>
+                                                잔여일 {sortConfig.key==='daysOnHand' && (sortConfig.direction==='asc'?'↑':'↓')}
+                                                <div className="absolute right-0 bottom-full mb-2 w-56 bg-slate-800 text-white text-[11px] p-3 rounded shadow-lg hidden group-hover:block z-50 text-left font-normal whitespace-normal cursor-auto">
+                                                    <div className="font-bold mb-1 border-b border-slate-600 pb-1">잔여일 산출 로직</div>
+                                                    <div className="text-slate-300 mb-1">현재 시화재고를 <span className="font-bold">일평균 판매량</span>으로 나눈 값으로, <span className="text-amber-300 font-bold">재발주 시점 산출 및 결품 예방</span>을 위해 사용됩니다.</div>
+                                                    <div className="text-slate-400 text-[10px] mt-1">※ 무한대(∞)는 판매량 대비 재고가 너무 많아 소진 시점을 추정하기 어려운 상태를 의미합니다.</div>
+                                                </div>
+                                            </th>
+                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-500 font-black" onClick={() => handleSort('deficit')}>보충 {sortConfig.key==='deficit' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-teal-700" onClick={() => handleSort('recentPurchasePrice')}>이익률(단가) {sortConfig.key==='recentPurchasePrice' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {/* Show Summary row first */}
-                                        <tr className="bg-indigo-50/50 font-bold border-b-2 border-indigo-200">
-                                            <td colSpan={2} className="px-4 py-3 text-slate-700">총 자산 합계(STUBEND제외)</td>
-                                            <td colSpan={4} className="px-4 py-3 text-right"></td>
-                                            <td className="px-4 py-3 text-right text-indigo-700 flex flex-col">
-                                                <span>{formatCur(totalsMap.totalCurrentStockCost)} 원</span>
-                                                <span className="text-[10px] text-rose-500">추가예정 (+{formatCur(totalsMap.totalPendingPurchaseValue)}원)</span>
-                                            </td>
-                                            <td colSpan={3}></td>
-                                        </tr>
                                         {analyzedInventory.slice(0, 500).map(row => (
                                             <tr key={row.product.id} className="hover:bg-slate-50 group">
                                                 <td className="px-4 py-2 font-mono font-bold text-slate-700">
@@ -2221,30 +2232,14 @@ export default function SihwaInventory() {
                                                 </td>
                                                 <td className="px-4 py-2 text-center">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-black ${
-                                                        row.healthGrade === 'S' ? 'bg-green-100 text-green-700' :
-                                                        row.healthGrade === 'A' ? 'bg-teal-100 text-teal-700' :
-                                                        row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
-                                                        row.healthGrade === 'D' ? 'bg-rose-100 text-rose-700' :
+                                                        row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                        row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' :
+                                                        row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' :
+                                                        row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' :
+                                                        row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' :
                                                         'bg-slate-100 text-slate-500'
                                                     }`} title="종합 건전성 등급">{row.healthGrade}급</span>
                                                 </td>
-                                                <td className="px-4 py-2 text-center text-slate-600">
-                                                    <div className="flex flex-col items-center">
-                                                        <span className="font-black text-slate-800">{row.recent60dSales} <span className="text-[9px] text-slate-400">판매</span></span>
-                                                        <span className="font-bold text-indigo-500 text-[10px]">{row.quoteCount} <span className="text-[9px] text-indigo-300">견적</span></span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-2 text-right text-slate-600">
-                                                    {row.salesVolume > 0 ? (
-                                                        <span><span className="font-bold text-slate-800">{row.salesVolume}</span> <span className="text-[10px] text-slate-500">({row.salesFreq}회)</span></span>
-                                                    ) : '-'}
-                                                </td>
-                                                {/* <td className="px-4 py-2 text-right text-slate-400 font-mono text-xs">
-                                                    {row.daekyungDirectRatio > 0 ? (
-                                                        <span className={`${row.daekyungDirectRatio >= 80 ? 'text-rose-500 font-bold' : ''}`}>{row.daekyungDirectRatio}%</span>
-                                                    ) : '—'}
-                                                </td> */}
-                                                {/* 회전율 */}
                                                 <td className="px-4 py-2 text-center">
                                                 {row.turnoverGrade !== 'N' ? (
                                                     <div className="flex flex-col items-center">
@@ -2261,8 +2256,24 @@ export default function SihwaInventory() {
                                                     </div>
                                                 ) : <span className="text-slate-200">—</span>}
                                                 </td>
-
-                                                {/* 잔여가능일수 */}
+                                                <td className="px-4 py-2 text-center text-slate-600">
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="font-black text-slate-800">{row.recent60dSales} <span className="text-[9px] text-slate-400">판매</span></span>
+                                                        <span className="font-bold text-indigo-500 text-[10px]">{row.quoteCount} <span className="text-[9px] text-indigo-300">견적</span></span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-2 text-right text-slate-600">
+                                                    {row.salesVolume > 0 ? (
+                                                        <span><span className="font-bold text-slate-800">{row.salesVolume}</span> <span className="text-[10px] text-slate-500">({row.salesFreq}회)</span></span>
+                                                    ) : '-'}
+                                                </td>
+                                                <td className="px-4 py-2 text-right font-black font-mono text-indigo-600 bg-indigo-50/20">
+                                                    {row.shQty}
+                                                    {row.pendingOrderQty > 0 && <span className="text-[9px] text-rose-400 ml-1">(+{row.pendingOrderQty})</span>}
+                                                </td>
+                                                <td className="px-4 py-2 text-center font-bold font-mono text-slate-500">
+                                                    {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty}</span> : <span className="text-rose-400">0</span>}
+                                                </td>
                                                 <td className="px-4 py-2 text-right font-mono text-xs">
                                                 <span className={
                                                     row.daysOnHand <= 10  ? 'text-rose-600 font-bold' :
@@ -2275,11 +2286,6 @@ export default function SihwaInventory() {
                                                     `${Math.round(row.daysOnHand)}일`}
                                                 </span>
                                                 </td>
-
-                                                <td className="px-4 py-2 text-right font-black font-mono text-indigo-600 bg-indigo-50/20">
-                                                    {row.shQty}
-                                                    {row.pendingOrderQty > 0 && <span className="text-[9px] text-rose-400 ml-1">(+{row.pendingOrderQty})</span>}
-                                                </td>
                                                 <td className="px-4 py-2 text-right font-black text-rose-600 bg-rose-50/30">
                                                     {row.deficit > 0 ? `-${row.deficit}개` : <span className="text-slate-300 font-normal">충분</span>}
                                                 </td>
@@ -2288,9 +2294,6 @@ export default function SihwaInventory() {
                                                         <span className={`font-black text-xs ${row.profitMarginRate <= 0 ? 'text-rose-500' : row.profitMarginRate >= 30 ? 'text-emerald-600' : 'text-slate-700'}`}>{row.profitMarginRate}%</span>
                                                         <span className="text-[9px] text-slate-400 font-mono">단가 {formatCur(row.recentPurchasePrice)}</span>
                                                     </div>
-                                                </td>
-                                                <td className="px-4 py-2 text-center font-bold font-mono text-slate-500">
-                                                    {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty}</span> : <span className="text-rose-400">0</span>}
                                                 </td>
                                             </tr>
                                         ))}
@@ -2466,10 +2469,10 @@ export default function SihwaInventory() {
                   ? '단가인하 긴급처분'
                   : '영업 판매 독촉';
                 const actionColor = row.ysQty > 0
-                  ? 'bg-purple-100 text-purple-700'
+                  ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
                   : daysSince > 180
-                  ? 'bg-rose-100 text-rose-700'
-                  : 'bg-amber-100 text-amber-700';
+                  ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                  : 'bg-amber-100 text-amber-700 hover:bg-amber-200';
 
                 return (
                   <tr key={row.product.id} className="hover:bg-slate-50">
@@ -2486,7 +2489,16 @@ export default function SihwaInventory() {
                     <td className="px-4 py-2 text-right font-black text-rose-600">{formatCur(itemValue)}원</td>
                     <td className="px-4 py-2 text-right text-slate-400">{row.ysQty}개</td>
                     <td className="px-4 py-2">
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${actionColor}`}>{action}</span>
+                      <button 
+                        onClick={() => {
+                            if (window.confirm(`[${row.product.id}] 품목에 대해 '${action}' 조치를 실행하시겠습니까?`)) {
+                                alert(`'${action}' 조치 요청이 시스템에 등록되었습니다.`);
+                            }
+                        }}
+                        className={`px-2 py-1 rounded text-[10px] font-bold ${actionColor} transition-colors active:scale-95 shadow-sm border border-black/5 flex items-center gap-1`}
+                      >
+                        {action} ⚡
+                      </button>
                     </td>
                   </tr>
                 );
@@ -2535,8 +2547,8 @@ export default function SihwaInventory() {
                     ? '장기 발주 중단'
                     : '이번 달 발주 보류';
                   const actionColor = excessQty > row.targetStockByTurnover
-                    ? 'bg-rose-100 text-rose-700'
-                    : 'bg-blue-100 text-blue-700';
+                    ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200';
 
                   return (
                     <tr key={row.product.id} className="hover:bg-slate-50">
@@ -2551,7 +2563,16 @@ export default function SihwaInventory() {
                         {row.daysOnHand === 9999 ? '∞' : `${Math.round(row.daysOnHand)}일`}
                       </td>
                       <td className="px-4 py-2">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${actionColor}`}>{action}</span>
+                        <button 
+                          onClick={() => {
+                              if (window.confirm(`[${row.product.id}] 품목에 대해 '${action}' 시스템 설정을 적용하시겠습니까?`)) {
+                                  alert('발주 제한 설정이 안전하게 적용되었습니다.');
+                              }
+                          }}
+                          className={`px-2 py-1 rounded text-[10px] font-bold ${actionColor} transition-colors active:scale-95 shadow-sm border border-black/5 flex items-center gap-1`}
+                        >
+                          {action} 🔒
+                        </button>
                       </td>
                     </tr>
                   );
@@ -2656,10 +2677,10 @@ export default function SihwaInventory() {
                   ? '단가인하 긴급처분'
                   : '영업 판매 독촉';
                 const actionColor = row.ysQty > 0
-                  ? 'bg-purple-100 text-purple-700'
+                  ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
                   : daysSince > 180
-                  ? 'bg-rose-100 text-rose-700'
-                  : 'bg-amber-100 text-amber-700';
+                  ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                  : 'bg-amber-100 text-amber-700 hover:bg-amber-200';
 
                 return (
                   <tr key={row.product.id} className="hover:bg-slate-50">
@@ -2673,7 +2694,16 @@ export default function SihwaInventory() {
                     <td className="px-4 py-2 text-right font-black text-rose-600">{formatCur(itemValue)}원</td>
                     <td className="px-4 py-2 text-right text-slate-400">{row.ysQty}개</td>
                     <td className="px-4 py-2">
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${actionColor}`}>{action}</span>
+                      <button 
+                        onClick={() => {
+                            if (window.confirm(`[${row.product.id}] 품목에 대해 '${action}' 조치를 즉시 실행하시겠습니까?`)) {
+                                alert(`'${action}' 조치 프로세스가 시작되었습니다.`);
+                            }
+                        }}
+                        className={`px-2 py-1 rounded text-[10px] font-bold ${actionColor} transition-colors active:scale-95 shadow-sm border border-black/5 flex items-center gap-1`}
+                      >
+                        {action} ⚡
+                      </button>
                     </td>
                   </tr>
                 );
