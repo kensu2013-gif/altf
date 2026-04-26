@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
-import type { Product, LineItem } from '../../types';
+import type { Product, LineItem, Order } from '../../types';
 import salesHistoryRaw from '../../data/sales_history.json';
 import { COMPETITOR_DATA, getStrategicGrade, type StrategicGrade } from '../../../competitorData';
 
@@ -1278,7 +1278,12 @@ export default function SihwaInventory() {
     }, [orders]);
 
     const dailyPendingMap = useMemo(() => {
-        const map: Record<string, any[]> = {}; 
+        const map: Record<string, Array<{
+            order: Order;
+            item: Partial<LineItem> & { item_id?: string; qty?: number; transactionIssued?: boolean; name?: string };
+            id: string;
+            qty: number;
+        }>> = {}; 
         orders.forEach(order => {
             if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
             if (order.status === 'COMPLETED') return; 
