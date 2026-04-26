@@ -122,7 +122,8 @@ function getHealthGradeFromScore(
     if (score >= 10) return 'D';
     if (score < 10 && effectiveStock > 0) {
         const idLower = productId.toLowerCase();
-        if (idLower.includes('composite') || idLower.includes('lateral') || idLower.includes('stubend')) {
+        if (idLower.includes('composite') || idLower.includes('lateral') || idLower.includes('stubend') ||
+            idLower.includes('32205') || idLower.includes('stsb-s') || idLower.includes('310-s') || idLower.includes('904l')) {
             return 'D'; // 예외 품목은 악성재고(E)에서 제외
         }
         return 'E';
@@ -1407,7 +1408,7 @@ export default function SihwaInventory() {
             </div>
 
             {/* Smart Tableau Dashboard */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 xl:gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 xl:gap-5">
                 <div 
                     onClick={() => { setActiveTab('AI_SUMMARY'); setExpandedGroups(prev => ({...prev, CRITICAL: true})); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
                     className="bg-linear-to-br from-rose-500 to-red-600 rounded-2xl p-5 shadow-lg shadow-rose-200 text-white flex flex-col relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 active:scale-95"
@@ -1491,11 +1492,29 @@ export default function SihwaInventory() {
                                 />
                             </div>
                             <span className="text-[11px] font-bold text-slate-500 w-8 text-right shrink-0">
-                                {count}개
+                                {count}품목
                             </span>
                             </div>
                         );
                         })}
+                    </div>
+                </div>
+
+                <div className="bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-700 flex flex-col text-white">
+                    <h3 className="font-bold text-slate-100 flex items-center gap-2 mb-3 z-10 opacity-90 text-[13px] border-b border-slate-600 pb-2">
+                        <Info className="w-4 h-4 text-sky-400" />
+                        건전성 점수 산출 가이드 (100점 만점)
+                    </h3>
+                    <div className="text-[11px] text-slate-300 space-y-2.5 leading-tight mt-auto">
+                        <p><strong className="text-emerald-400">A급 (65점↑)</strong>: 초고회전, 핵심 매출</p>
+                        <p><strong className="text-blue-400">B급 (45점↑)</strong>: 안정적 유지, 지속 매출</p>
+                        <p><strong className="text-amber-400">C급 (25점↑)</strong>: 간헐적 매출, 관망 필요</p>
+                        <p><strong className="text-orange-400">D급 (10점↑)</strong>: 과잉/무발주, 정체 품목</p>
+                        <p><strong className="text-rose-400">E급 (10점↓)</strong>: 장기 무매출, 악성재고</p>
+                        <div className="border-t border-slate-700 pt-2.5 mt-2.5 text-slate-400 text-[10px]">
+                            <span className="block mb-1.5 font-bold text-slate-300 text-[11px]">항목별 가중치 (배점)</span>
+                            판매빈도(25) + 판매규모(15) + <br/>최근트렌드(25) + 견적유입(20) + <br/>이익률(15)
+                        </div>
                     </div>
                 </div>
             </div>
