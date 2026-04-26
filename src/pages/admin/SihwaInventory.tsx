@@ -1883,7 +1883,7 @@ export default function SihwaInventory() {
                                                                             재고부족 <span className="text-rose-600">-{row.deficit}</span>개
                                                                         </div>
                                                                         <div className="text-xs text-slate-500 pl-5">
-                                                                            등급: <strong className={`font-black ${row.healthGrade === 'A' ? 'text-emerald-600' : row.healthGrade === 'B' ? 'text-blue-600' : row.healthGrade === 'C' ? 'text-amber-500' : 'text-rose-500'}`}>{row.healthGrade}급</strong> | 최근 판매: <strong className="text-indigo-600">{row.recentSales.recent60d}개(60일)</strong> / 연 총 {row.salesVolume}개
+                                                                            등급: <strong className={`font-black ${row.healthGrade === 'A' ? 'text-emerald-600' : row.healthGrade === 'B' ? 'text-blue-600' : row.healthGrade === 'C' ? 'text-amber-500' : 'text-rose-500'}`}>{row.healthGrade}급</strong> | 최근 판매: <strong className="text-indigo-600">{row.recent60dSales}개(60일)</strong> / 연 총 {row.salesVolume}개
                                                                         </div>
                                                                         <div className="text-[11px] text-slate-400 pl-5 mt-0.5">
                                                                             목표 재고 {row.safeStock}개 대비 현재 {row.shQty}개 보유 중 (ROP: {row.reorderPoint}개)
@@ -2708,7 +2708,7 @@ export default function SihwaInventory() {
                                   {row.daysOnHand > 180 ? '장기 체화 (잔여 180일 초과)' : `목표재고(${row.safeStock}개) 대비 과잉`}
                               </div>
                               <div className="text-[10px] text-slate-500">
-                                  최근 판매: <strong className="text-indigo-600">{row.recentSales.recent60d}개(60일)</strong> / 연 총 {row.salesVolume}개
+                                  최근 판매: <strong className="text-indigo-600">{row.recent60dSales}개(60일)</strong> / 연 총 {row.salesVolume}개
                               </div>
                           </div>
                       </td>
