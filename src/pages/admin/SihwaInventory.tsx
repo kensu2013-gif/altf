@@ -465,7 +465,6 @@ export default function SihwaInventory() {
         daysOnHand: number;
         dailyAvgSales: number;
         reorderPoint: number;
-        stockStatusByTurnover: 'CRITICAL' | 'LOW' | 'OPTIMAL' | 'EXCESS' |
         deficit: number;
         effectiveStock: number;
         statusCategory: string;
@@ -619,11 +618,9 @@ export default function SihwaInventory() {
                     strategicGrade: getStrategicGrade(salesData.salesVolume, compData.compSales, marketShare),
                     volumeNegoFlag: false,
                     turnoverRate: 0,
-                    turnoverGrade: 'N',
                     daysOnHand: 0,
                     dailyAvgSales: 0,
                     reorderPoint: 0,
-                    stockStatusByTurnover: 'DEAD',
                     deficit: 0,
                     effectiveStock: 0,
                     statusCategory: 'IDLE',
@@ -693,7 +690,6 @@ export default function SihwaInventory() {
                         daysOnHand: 0,
                         dailyAvgSales: 0,
                         reorderPoint: 0,
-                        stockStatusByTurnover: 'DEAD',
                         deficit: 0,
                         effectiveStock: 0,
                         statusCategory: 'IDLE',
@@ -873,7 +869,6 @@ export default function SihwaInventory() {
                 daysOnHand,
                 dailyAvgSales,
                 reorderPoint,
-                stockStatusByTurnover,
                 isDeadStock,
                 isExcessStock,
             };
@@ -1609,7 +1604,6 @@ export default function SihwaInventory() {
                                                                 <td className="px-5 py-4 text-center border-l border-slate-100">
                                                                     <div className="flex flex-col items-center gap-1">
                                                                         <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
-                                                                            row.healthGrade === 'A' ? 'bg-purple-100 text-purple-700' :
                                                                             row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
                                                                             row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
                                                                             row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
@@ -1617,7 +1611,6 @@ export default function SihwaInventory() {
                                                                             'bg-slate-100 text-slate-400'
                                                                         }`}>
                                                                             {row.healthGrade === 'A' ? 'A급' :
-                                                                            row.healthGrade === 'A' ? 'A급' :
                                                                             row.healthGrade === 'B' ? 'B급' :
                                                                             row.healthGrade === 'C' ? 'C급' :
                                                                             row.healthGrade === 'D' ? 'D급' : '—'}
@@ -1786,7 +1779,6 @@ export default function SihwaInventory() {
                                                                 <td className="px-5 py-4 text-center border-l border-slate-100">
                                                                     <div className="flex flex-col items-center gap-1">
                                                                         <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
-                                                                            row.healthGrade === 'A' ? 'bg-purple-100 text-purple-700' :
                                                                             row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
                                                                             row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
                                                                             row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
@@ -1794,7 +1786,6 @@ export default function SihwaInventory() {
                                                                             'bg-slate-100 text-slate-400'
                                                                         }`}>
                                                                             {row.healthGrade === 'A' ? 'A급' :
-                                                                            row.healthGrade === 'A' ? 'A급' :
                                                                             row.healthGrade === 'B' ? 'B급' :
                                                                             row.healthGrade === 'C' ? 'C급' :
                                                                             row.healthGrade === 'D' ? 'D급' : '—'}
@@ -1833,10 +1824,10 @@ export default function SihwaInventory() {
                                                                         </div>
                                                                         <div className="text-xs text-slate-400 pl-5">
                                                                             ROP: {row.reorderPoint}개 도달 시 발주 | 목표적정: {row.safeStock}개
-                                                                            {row.stockStatusByTurnover === 'EXCESS' && (
-                                                                                <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.safeStock}개 초과]</span>
+                                                                            {row.isExcessStock && (
+                                                                                <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.safeStock > 0 ? row.shQty - row.safeStock : row.shQty}개 초과]</span>
                                                                             )}
-                                                                            {row.stockStatusByTurnover === 'DEAD' && (
+                                                                            {row.isDeadStock && (
                                                                                 <span className="text-slate-400 ml-1">[사장재고 의심 — 소진 후 재평가]</span>
                                                                             )}
                                                                         </div>
@@ -2328,7 +2319,6 @@ export default function SihwaInventory() {
                                                 {row.healthGrade !== 'N' ? (
                                                     <div className="flex flex-col items-center">
                                                     <span className={`text-[10px] font-black px-1.5 rounded ${
-                                                        row.healthGrade === 'A' ? 'bg-purple-100 text-purple-700' :
                                                         row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
                                                         row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
                                                         row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
