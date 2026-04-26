@@ -1,0 +1,14 @@
+const fs = require('fs'); 
+let c = fs.readFileSync('src/pages/admin/SihwaInventory.tsx', 'utf8'); 
+c = c.replace(/row\.turnoverGrade === 'S'/g, "row.healthGrade === 'A'"); 
+c = c.replace(/row\.turnoverGrade === 'A'/g, "row.healthGrade === 'A'"); 
+c = c.replace(/row\.turnoverGrade === 'B'/g, "row.healthGrade === 'B'"); 
+c = c.replace(/row\.turnoverGrade === 'C'/g, "row.healthGrade === 'C'"); 
+c = c.replace(/row\.turnoverGrade === 'D'/g, "row.healthGrade === 'D'"); 
+c = c.replace(/row\.turnoverGrade === 'E'/g, "row.healthGrade === 'E'"); 
+c = c.replace(/row\.turnoverGrade !== 'N'/g, "row.healthGrade !== 'N'"); 
+c = c.replace(/row\.turnoverGrade/g, 'row.healthGrade'); 
+c = c.replace(/'S급'/g, "'A급'"); 
+c = c.replace(/row\.targetStockByTurnover/g, 'row.safeStock'); 
+fs.writeFileSync('src/pages/admin/SihwaInventory.tsx', c); 
+console.log('Replaced in UI!');
