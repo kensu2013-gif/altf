@@ -1408,7 +1408,7 @@ export default function SihwaInventory() {
             </div>
 
             {/* Smart Tableau Dashboard */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 xl:gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 xl:gap-5">
                 <div 
                     onClick={() => { setActiveTab('AI_SUMMARY'); setExpandedGroups(prev => ({...prev, CRITICAL: true})); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
                     className="bg-linear-to-br from-rose-500 to-red-600 rounded-2xl p-5 shadow-lg shadow-rose-200 text-white flex flex-col relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 active:scale-95"
@@ -1420,15 +1420,15 @@ export default function SihwaInventory() {
                     <p className="text-4xl font-black mb-1 z-10">{stats.critical.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
                     <p className="text-sm font-medium opacity-80 z-10 break-keep mt-auto">현재고 및 대경 재고가 바닥났으며, 연 판매량(100↑)이 많아 선발주 관리가 필요한 품목입니다.</p>
                 </div>
-                
+
                 <div 
                     onClick={() => { setActiveTab('AI_SUMMARY'); setExpandedGroups(prev => ({...prev, WARNING: true})); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
-                    className="bg-linear-to-br from-amber-400 to-orange-500 rounded-2xl p-5 shadow-lg shadow-amber-200 text-white flex flex-col relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 active:scale-95"
+                    className="bg-linear-to-br from-amber-500 to-orange-500 rounded-2xl p-5 shadow-lg shadow-amber-200 text-white flex flex-col relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 active:scale-95"
                 >
-                    <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-20 transform group-hover:rotate-12 transition-transform duration-500">
-                        <Box className="w-32 h-32" />
+                    <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-20 transform group-hover:scale-110 transition-transform duration-500">
+                        <PackageSearch className="w-32 h-32" />
                     </div>
-                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><Factory className="w-5 h-5"/>일반 발주 필요 (적정재고 미달)</h3>
+                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><PackageSearch className="w-5 h-5"/>일반 발주 필요 (적정재고 미달)</h3>
                     <p className="text-4xl font-black mb-1 z-10">{stats.warning.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
                     <p className="text-sm font-medium opacity-80 z-10 mt-auto">대경 재고를 통해 조달하거나 목표수량에 미달되어 일반발주(최소 100개)가 필요한 품목입니다.</p>
                 </div>
@@ -1514,6 +1514,24 @@ export default function SihwaInventory() {
                         <div className="border-t border-slate-700 pt-2.5 mt-2.5 text-slate-400 text-[10px]">
                             <span className="block mb-1.5 font-bold text-slate-300 text-[11px]">항목별 가중치 (배점)</span>
                             판매빈도(25) + 판매규모(15) + <br/>최근트렌드(25) + 견적유입(20) + <br/>이익률(15)
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-700 flex flex-col text-white">
+                    <h3 className="font-bold text-slate-100 flex items-center gap-2 mb-3 z-10 opacity-90 text-[13px] border-b border-slate-600 pb-2">
+                        <Activity className="w-4 h-4 text-emerald-400" />
+                        세부 항목별 산출 기준표
+                    </h3>
+                    <div className="text-[11px] text-slate-300 space-y-2.5 leading-tight mt-auto">
+                        <p><strong className="text-indigo-400">판매빈도(25)</strong>: 최근 6개월 내 판매 발생 월수. 매달 꾸준한 수요가 있는가?</p>
+                        <p><strong className="text-teal-400">판매규모(15)</strong>: 연간 총 판매액 기여도. 전체 매출에 얼마나 도움이 되는가?</p>
+                        <p><strong className="text-amber-400">최근트렌드(25)</strong>: 최근 60일 내 판매량이 연평균 대비 증가했는가? 최근 수요 유지 여부.</p>
+                        <p><strong className="text-rose-400">견적유입(20)</strong>: 최근 60일 내 견적 문의 횟수. 실제 판매가 없어도 시장 관심도가 있는가?</p>
+                        <p><strong className="text-blue-400">이익률(15)</strong>: 대경 원가 대비 시화의 추정 영업 이익률. 고수익 품목인가?</p>
+                        <div className="border-t border-slate-700 pt-2.5 mt-2.5 text-slate-400 text-[10px]">
+                            <span className="block mb-1.5 font-bold text-slate-300 text-[11px]">보정 및 예외</span>
+                            재고 0인 상태는 점수 0점(N등급). 과잉재고 및 악성재고 패널티는 점수에서 차감.
                         </div>
                     </div>
                 </div>
@@ -1867,10 +1885,10 @@ export default function SihwaInventory() {
                                                                             재고부족 <span className="text-rose-600">-{row.deficit}</span>개
                                                                         </div>
                                                                         <div className="text-xs text-slate-500 pl-5">
-                                                                            연판매 {row.salesFreq}회 / 적정재고 {row.safeStock}개
+                                                                            등급: <strong className={`font-black ${row.healthGrade === 'A' ? 'text-emerald-600' : row.healthGrade === 'B' ? 'text-blue-600' : row.healthGrade === 'C' ? 'text-amber-500' : 'text-rose-500'}`}>{row.healthGrade}급</strong> | 최근 판매: <strong className="text-indigo-600">{row.recentSales.recent60d}개(60일)</strong> / 연 총 {row.salesVolume}개
                                                                         </div>
-                                                                        <div className="text-xs text-slate-400 pl-5">
-                                                                            ROP: {row.reorderPoint}개 도달 시 발주 | 목표적정: {row.safeStock}개
+                                                                        <div className="text-[11px] text-slate-400 pl-5 mt-0.5">
+                                                                            목표 재고 {row.safeStock}개 대비 현재 {row.shQty}개 보유 중 (ROP: {row.reorderPoint}개)
                                                                             {row.isExcessStock && (
                                                                                 <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.safeStock > 0 ? row.shQty - row.safeStock : row.shQty}개 초과]</span>
                                                                             )}
@@ -2597,7 +2615,12 @@ export default function SihwaInventory() {
 
                 return (
                   <tr key={row.product.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2 font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</td>
+                    <td className="px-4 py-2">
+                        <div className="flex items-center gap-2">
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
+                            <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
+                        </div>
+                    </td>
                     <td className="px-4 py-2 text-right">
                       <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${daysSince > 180 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
                         {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
@@ -2649,7 +2672,8 @@ export default function SihwaInventory() {
           <table className="w-full text-xs text-left whitespace-nowrap">
             <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100">
               <tr>
-                <th className="px-4 py-2">품목코드</th>
+                <th className="px-4 py-2">품목코드 (등급)</th>
+                <th className="px-4 py-2">분석근거 (과잉 사유)</th>
                 <th className="px-4 py-2 text-right">현재고</th>
                 <th className="px-4 py-2 text-right">목표재고</th>
                 <th className="px-4 py-2 text-right">초과량</th>
@@ -2673,7 +2697,23 @@ export default function SihwaInventory() {
 
                   return (
                     <tr key={row.product.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-2 font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</td>
+                      <td className="px-4 py-2">
+                          <div className="flex items-center gap-2">
+                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
+                              <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
+                          </div>
+                      </td>
+                      <td className="px-4 py-2">
+                          <div className="flex flex-col gap-0.5">
+                              <div className="text-[11px] font-bold text-orange-700 flex items-center gap-1">
+                                  <Info className="w-3 h-3" />
+                                  {row.daysOnHand > 180 ? '장기 체화 (잔여 180일 초과)' : `목표재고(${row.safeStock}개) 대비 과잉`}
+                              </div>
+                              <div className="text-[10px] text-slate-500">
+                                  최근 판매: <strong className="text-indigo-600">{row.recentSales.recent60d}개(60일)</strong> / 연 총 {row.salesVolume}개
+                              </div>
+                          </div>
+                      </td>
                       <td className="px-4 py-2 text-right font-black text-orange-600">{row.shQty}개</td>
                       <td className="px-4 py-2 text-right text-slate-400">{row.safeStock || row.safeStock}개</td>
                       <td className="px-4 py-2 text-right">
@@ -2738,7 +2778,12 @@ export default function SihwaInventory() {
 
                 return (
                   <tr key={row.product.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2 font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</td>
+                    <td className="px-4 py-2">
+                        <div className="flex items-center gap-2">
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
+                            <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
+                        </div>
+                    </td>
                     <td className="px-4 py-2 text-right">
                       <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700`}>
                         {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
@@ -2805,7 +2850,12 @@ export default function SihwaInventory() {
 
                 return (
                   <tr key={row.product.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2 font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</td>
+                    <td className="px-4 py-2">
+                        <div className="flex items-center gap-2">
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
+                            <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
+                        </div>
+                    </td>
                     <td className="px-4 py-2 text-right">
                       <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${daysSince > 180 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
                         {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
@@ -2841,7 +2891,7 @@ export default function SihwaInventory() {
 
     {/* ── 섹션 4: 결품 기회손실 ── */}
     {(!selectedHealthCategory || selectedHealthCategory === 'MISSED') && healthDiagnosis.missedDemandList.length > 0 && (
-      <div className="bg-white rounded-2xl border border-violet-200 shadow-sm overflow-hidden mt-4">
+      <div id="missed-demand-section" className="bg-white rounded-2xl border border-violet-200 shadow-sm overflow-hidden mt-4">
         <div className="px-5 py-3 bg-violet-50 border-b border-violet-200 flex items-center justify-between">
           <div>
             <div className="text-sm font-black text-violet-800">
