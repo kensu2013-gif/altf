@@ -1294,7 +1294,7 @@ export default function SihwaInventory() {
             if (isSihwaIncoming) {
                 const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
                 if (!items) return;
-                items.forEach((item: any) => {
+                items.forEach((item: Partial<LineItem> & { item_id?: string; qty?: number; transactionIssued?: boolean }) => {
                     if (item.transactionIssued) return;
                     const id = item.productId || item.item_id;
                     if (!id) return;
@@ -1335,7 +1335,7 @@ export default function SihwaInventory() {
                 
                 if (isSihwaIncoming) {
                     const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
-                    items?.forEach((poItem: any) => {
+                    items?.forEach((poItem: Partial<LineItem> & { transactionIssued?: boolean; poSent?: boolean }) => {
                         if (!poItem.transactionIssued) {
                             if (
                                 poItem.name === specName &&
