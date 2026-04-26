@@ -465,7 +465,7 @@ export default function SihwaInventory() {
         daysOnHand: number;
         dailyAvgSales: number;
         reorderPoint: number;
-        stockStatusByTurnover: 'CRITICAL' | 'LOW' | 'OPTIMAL' | 'EXCESS' | 'DEAD';
+        stockStatusByTurnover: 'CRITICAL' | 'LOW' | 'OPTIMAL' | 'EXCESS' |
         deficit: number;
         effectiveStock: number;
         statusCategory: string;
@@ -826,7 +826,7 @@ export default function SihwaInventory() {
 
             // 발주 상태(statusCategory, statusLabel)를 새로운 등급/목표재고 기준으로 덮어쓰기
             if (healthGrade === 'E') {
-                statusCategory = 'DEAD';
+                statusCategory =
                 statusLabel = '☠️ 처분 대상 (악성재고)';
             } else if (isExcessStock) {
                 statusCategory = 'EXCESS';
