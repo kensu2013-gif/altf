@@ -250,11 +250,11 @@ export default function SihwaInventory() {
     const [expandedDailyGroups, setExpandedDailyGroups] = useState<Record<string, boolean>>({});
 
     const [sortConfig, setSortConfig] = useState<{ 
-        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock', 
+        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade', 
         direction: 'asc' | 'desc' 
     }>({ key: 'deficit', direction: 'desc' });
 
-    const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock') => {
+    const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade') => {
         setSortConfig(prev => ({
             key,
             direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
@@ -497,7 +497,7 @@ export default function SihwaInventory() {
         profitMarginRate: number;
         compositeScore: number;
         healthGrade: 'A' | 'B' | 'C' | 'D' | 'E' | 'N'; // A(핵심) B(안정) C(관망) D(부진) E(악성/처분) N(평가불가)
-        targetStockByHealthGrade: number;
+
         excessCategory: string | null;
         compSales: number;
         compFreq: number;
@@ -656,7 +656,7 @@ export default function SihwaInventory() {
                     profitMarginRate,
                     compositeScore: 0,
                     healthGrade: 'N',
-                    targetStockByHealthGrade: 0,
+                    
                     excessCategory: null,
                     compSales: compData.compSales,
                     compFreq: compData.compFreq,
@@ -728,7 +728,7 @@ export default function SihwaInventory() {
                         profitMarginRate,
                         compositeScore: 0,
                         healthGrade: 'N',
-                        targetStockByHealthGrade: 0,
+                        
                         excessCategory: null,
                         compSales: compData.compSales,
                         compFreq: compData.compFreq,
@@ -1280,6 +1280,7 @@ export default function SihwaInventory() {
         missedDemandList,
         urgentDisposalItems,
         lockedCapital: deadStockValue + excessStockValue,
+        totalIssueCount: analyzedInventory.filter(r => r.healthGrade === 'E' || r.excessCategory !== null).length,
       };
     }, [analyzedInventory, historyData, orders]);
 
@@ -1513,7 +1514,7 @@ export default function SihwaInventory() {
                 <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col">
                     <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-2 z-10 opacity-90">
                         <Activity className="w-5 h-5 text-purple-500" />
-                        재고 건전성 등급 분포 (A~E)
+                        재고 건전성 등급 분포 (A~E) <span className="text-xs text-slate-400 font-normal ml-1">(총 {analyzedInventory.filter(r => r.healthGrade !== 'N').length}개 품목)</span>
                     </h3>
                     <p className="text-4xl font-black text-slate-800 mb-2 invisible h-0">0</p>
                     
@@ -1523,7 +1524,7 @@ export default function SihwaInventory() {
                             r.healthGrade === grade
                         ).length;
                         const total = analyzedInventory.filter(r => r.healthGrade !== 'N').length;
-                        const pct = total > 0 ? Math.round(count / total * 100) : 0;
+                        const pct = total > 0 ? (count / total * 100).toFixed(1) : 0;
                         const labels: Record<string, string> = {
                             A: 'A급 최우수 (핵심)',
                             B: 'B급 양호 (안정적)',
@@ -1563,7 +1564,7 @@ export default function SihwaInventory() {
                             className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'AI_SUMMARY' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             onClick={() => setActiveTab('AI_SUMMARY')}
                         >
-                            AI 요약보기 (Action Items)
+                            AI 요약보기 (발주 추천)
                         </button>
                         <button 
                             className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'TOTAL_DASHBOARD' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -1589,7 +1590,7 @@ export default function SihwaInventory() {
                           {/* 악성재고 경고 배지 */}
                           {healthDiagnosis.deadStockItems.length > 0 && (
                             <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
-                              {healthDiagnosis.deadStockItems.length}
+                              {healthDiagnosis.totalIssueCount}
                             </span>
                           )}
                         </button>
@@ -1652,7 +1653,7 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 text-right">매입단가</th>
                                                             <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
                                                             <th className="px-5 py-3 text-right">경쟁사 연판매</th>
-                                                            <th className="px-5 py-3 text-center">회전율</th>
+                                                            <th className="px-5 py-3 text-center">건전성 등급</th>
                                                             <th className="px-5 py-3 text-right">잔여일수</th>
                                                             <th className="px-5 py-3">🚨 분석 근거 (명확성)</th>
                                                         </tr>
@@ -1822,7 +1823,7 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 text-right">매입단가</th>
                                                             <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
                                                             <th className="px-5 py-3 text-right">경쟁사 연판매</th>
-                                                            <th className="px-5 py-3 text-center cursor-pointer hover:bg-slate-200" onClick={() => handleSort('turnoverRate')}>회전율 {sortConfig.key==='turnoverRate' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                                            <th className="px-5 py-3 text-center cursor-pointer hover:bg-slate-200" onClick={() => handleSort('healthGrade')}>건전성 등급 {sortConfig.key==='healthGrade' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => handleSort('daysOnHand')}>잔여일수 {sortConfig.key==='daysOnHand' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3">💡 분석 근거</th>
                                                         </tr>
@@ -2464,7 +2465,7 @@ export default function SihwaInventory() {
                             )}
                             
 {/* ════════════════════════════════════════════════
-    🩺 재고 건전성 진단 탭
+    🩺 악성·과잉 재고 진단 탭
 ════════════════════════════════════════════════ */}
 {activeTab === 'HEALTH_DIAGNOSIS' && (
   <div className="space-y-5 p-4 md:p-0 pb-8 animate-in fade-in duration-300">
@@ -2753,8 +2754,8 @@ export default function SihwaInventory() {
       <div className="bg-white rounded-2xl border border-purple-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3 bg-purple-50 border-b border-purple-200 flex items-center justify-between">
           <div>
-            <div className="text-sm font-black text-purple-800">🐌 부진재고 상세</div>
-            <div className="text-[10px] text-purple-500 mt-0.5">D등급이면서 잔여일 90일~180일 품목</div>
+            <div className="text-sm font-black text-purple-800">🐌 정체재고 상세 (장기 미판매)</div>
+            <div className="text-[10px] text-purple-500 mt-0.5">D등급이면서 잔여일 90일~180일 품목 (악성재고 전환 주의)</div>
           </div>
           <span className="bg-purple-200 text-purple-800 font-black px-3 py-1 rounded-full text-xs">
             {healthDiagnosis.slowMoveItems.length}건
