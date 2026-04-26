@@ -764,8 +764,6 @@ export default function SihwaInventory() {
                 healthGrade = 'E'; // E급 (악성 - 장기 무판매, 견적없음, 재고보유)
             } else if (isExcessStock) {
                 healthGrade = 'D'; // D급 (과잉재고 경고)
-            } else if (row.shQty > 0 && row.recent60dSales === 0 && row.quoteCount === 0) {
-                healthGrade = 'D'; // D급 (주의 - 최근 정체/견적없음)
             } else if (row.salesVolume > 0) {
                 // If it has sales history
                 if ((row.turnoverGrade === 'S' || row.turnoverGrade === 'A') && row.salesVolume >= 50) {
@@ -774,13 +772,19 @@ export default function SihwaInventory() {
                     healthGrade = 'B'; // 회전율은 높지만 총 판매볼륨이 낮음
                 } else if (row.turnoverGrade === 'B' && row.salesVolume >= 10) {
                     healthGrade = 'B'; // B급 (양호/안정적 - 꾸준한 볼륨)
+                } else if (row.shQty > 0 && row.recent60dSales === 0 && row.quoteCount === 0) {
+                    healthGrade = 'D'; // D급 (주의 - 최근 정체/견적없음)
                 } else if (row.turnoverGrade === 'C' || row.turnoverGrade === 'D') {
                     healthGrade = 'C'; // C급 (보통/저회전)
                 } else {
                     healthGrade = 'C';
                 }
             } else if (row.shQty > 0) {
-                healthGrade = 'C'; // 재고는 있는데 총 판매량이 0 (초기 입고 등)
+                if (row.recent60dSales === 0 && row.quoteCount === 0) {
+                    healthGrade = 'D';
+                } else {
+                    healthGrade = 'C'; // 재고는 있는데 총 판매량이 0 (초기 입고 등)
+                }
             } else {
                 healthGrade = 'N'; // No stock, no sales
             }
