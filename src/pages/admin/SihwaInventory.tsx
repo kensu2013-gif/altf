@@ -80,31 +80,28 @@ function calcCompositeScore(row: {
     profitMarginRate: number;
 }): number {
     const salesFreqScore =
-        row.salesFreq >= 50 ? 100 :
-        row.salesFreq >= 20 ? 70  :
-        row.salesFreq >= 10 ? 45  :
-        row.salesFreq >= 5  ? 25  :
-        row.salesFreq >= 1  ? 10  : 0;
+        row.salesFreq >= 30 ? 100 :
+        row.salesFreq >= 10 ? 70  :
+        row.salesFreq >= 5  ? 40  :
+        row.salesFreq >= 1  ? 15  : 0;
 
     const monthlyExpected = row.salesVolume / 12;
     const trendRatio = monthlyExpected > 0 ? (row.recent30dSales / monthlyExpected) : 0;
     const recentTrendScore = Math.min(100,
-        trendRatio >= 1.5 ? 100 :
-        trendRatio >= 1.0 ? 80  :
-        trendRatio >= 0.5 ? 50  :
-        trendRatio >= 0.2 ? 25  :
-        row.recent60dSales > 0 ? 15 : 0
+        trendRatio >= 1.0 ? 100 :
+        trendRatio >= 0.5 ? 80  :
+        trendRatio >= 0.2 ? 50  :
+        row.recent60dSales > 0 ? 30 : 0
     );
 
     const quoteDemandScore =
-        row.quoteCount >= 5 ? 100 :
-        row.quoteCount >= 3 ? 70  :
-        row.quoteCount >= 1 ? 40  : 0;
+        row.quoteCount >= 3 ? 100 :
+        row.quoteCount >= 1 ? 60  : 0;
 
     const salesVolumeScore =
-        row.salesVolume >= 1000 ? 100 :
-        row.salesVolume >= 500  ? 75  :
-        row.salesVolume >= 100  ? 50  :
+        row.salesVolume >= 500  ? 100 :
+        row.salesVolume >= 200  ? 75  :
+        row.salesVolume >= 50   ? 50  :
         row.salesVolume >= 10   ? 25  : 0;
 
     const profitScore =
@@ -124,7 +121,7 @@ function calcCompositeScore(row: {
 
 /**
  * 복합 점수 → 건전성 등급 변환
- * A(핵심) ≥75 | B(안정) 55~74 | C(관망) 35~54 | D(부진) 15~34 | E(처분) <15 & 재고있음 | N(평가불가)
+ * A(핵심) ≥65 | B(안정) 45~64 | C(관망) 25~44 | D(부진) 10~24 | E(처분) <10 & 재고있음 | N(평가불가)
  */
 function getHealthGradeFromScore(
     score: number,
@@ -133,11 +130,11 @@ function getHealthGradeFromScore(
     quoteCount: number
 ): 'A' | 'B' | 'C' | 'D' | 'E' | 'N' {
     if (salesVolume === 0 && quoteCount === 0 && effectiveStock === 0) return 'N';
-    if (score >= 75) return 'A';
-    if (score >= 55) return 'B';
-    if (score >= 35) return 'C';
-    if (score >= 15) return 'D';
-    if (score < 15 && effectiveStock > 0) return 'E'; // E급: 점수가 매우 낮고 재고가 있는 경우만 → 악성재고
+    if (score >= 65) return 'A';
+    if (score >= 45) return 'B';
+    if (score >= 25) return 'C';
+    if (score >= 10) return 'D';
+    if (score < 10 && effectiveStock > 0) return 'E'; // E급: 점수가 매우 낮고 재고가 있는 경우만 → 악성재고
     return 'D';
 }
 
@@ -916,7 +913,8 @@ export default function SihwaInventory() {
                 statusLabel = '🟡 미발주 대상 (D/N등급)';
             } else if (targetStockByHealthGrade > 0) {
                 if (effectiveStock <= 0) {
-                    if (row.ysQty <= 0 && row.salesVolume > 100 && row.salesFreq >= 10) {
+                    // 선발주 요망(CRITICAL) 조건: 대경 재고가 없으면서, A/B급 핵심 품목이거나 일정 수준 이상 팔리는 품목
+                    if (row.ysQty <= 0 && (healthGrade === 'A' || healthGrade === 'B' || (row.salesVolume >= 30 && row.salesFreq >= 5))) {
                         statusCategory = 'CRITICAL';
                         statusLabel = '🚨 선발주 요망 (매입결품)';
                     } else {
