@@ -1111,8 +1111,12 @@ export default function SihwaInventory() {
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
 
-      // ── 즉시 처분 대상 (악성재고 중 대경 반품 가능 여부 기준) ──
+      // ── 즉시 처분 대상 (악성재고 중 대경 반품 가능하거나 장기(180일+) 악성인 품목) ──
       const urgentDisposalItems = deadStockItems
+        .filter(row => {
+          const daysSince = (row as typeof row & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0;
+          return row.ysQty > 0 || daysSince > 180;
+        })
         .sort((a, b) => ((b as typeof b & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0) - ((a as typeof a & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0));
 
       return {
@@ -2422,7 +2426,7 @@ export default function SihwaInventory() {
         { id: 'EXCESS', emoji:'📦', label:'과잉재고 품목', value:`${healthDiagnosis.excessStockItems.length}개`, sub:'목표재고 200%+ 초과', color:'orange', border:'border-orange-400', amount: healthDiagnosis.excessStockValue },
         { id: 'SLOW', emoji:'🐌', label:'부진재고 품목', value:`${healthDiagnosis.slowMoveItems.length}개`, sub:'D등급·잔여 90~180일', color:'purple', border:'border-purple-400', amount: healthDiagnosis.slowMoveValue },
         { id: 'MISSED', emoji:'🔍', label:'결품 기회손실', value:`${healthDiagnosis.missedDemandList.filter(m=>m.count>=2).length}건↑`, sub:'2회↑ 취소·철회 감지', color:'blue', border:'border-blue-400' },
-        { id: 'URGENT', emoji:'💡', label:'즉시 처분 권장', value:`${Math.min(healthDiagnosis.urgentDisposalItems.length, 11)}개`, sub:'대경반품 or 단가인하', color:'teal', border:'border-teal-400' },
+        { id: 'URGENT', emoji:'💡', label:'즉시 처분 권장', value:`${healthDiagnosis.urgentDisposalItems.length}개`, sub:'대경반품 or 단가인하', color:'teal', border:'border-teal-400' },
       ].map(k => (
         <button 
           key={k.label} 
