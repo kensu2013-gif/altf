@@ -1503,7 +1503,7 @@ export default function SihwaInventory() {
                                 {...{ style: { width: `${pct}%`, background: colors[grade] } }}
                                 />
                             </div>
-                            <span className="text-[11px] font-bold text-slate-500 w-8 text-right shrink-0">
+                            <span className="text-[11px] font-bold text-slate-500 w-12 text-right shrink-0 whitespace-nowrap">
                                 {count}품목
                             </span>
                             </div>
