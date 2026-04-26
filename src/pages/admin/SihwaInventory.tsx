@@ -112,14 +112,21 @@ function getHealthGradeFromScore(
     score: number,
     effectiveStock: number,
     salesVolume: number,
-    quoteCount: number
+    quoteCount: number,
+    productId: string
 ): 'A' | 'B' | 'C' | 'D' | 'E' | 'N' {
     if (salesVolume === 0 && quoteCount === 0 && effectiveStock === 0) return 'N';
     if (score >= 65) return 'A';
     if (score >= 45) return 'B';
     if (score >= 25) return 'C';
     if (score >= 10) return 'D';
-    if (score < 10 && effectiveStock > 0) return 'E'; // E급: 점수가 매우 낮고 재고가 있는 경우만 → 악성재고
+    if (score < 10 && effectiveStock > 0) {
+        const idLower = productId.toLowerCase();
+        if (idLower.includes('composite') || idLower.includes('lateral') || idLower.includes('stubend')) {
+            return 'D'; // 예외 품목은 악성재고(E)에서 제외
+        }
+        return 'E';
+    }
     return 'D';
 }
 
@@ -821,7 +828,8 @@ export default function SihwaInventory() {
                 compositeScore,
                 effectiveStock,
                 row.salesVolume,
-                row.quoteCount
+                row.quoteCount,
+                row.product.id
             );
 
             // 악성재고: E급만
@@ -844,7 +852,7 @@ export default function SihwaInventory() {
 
             // 발주 상태(statusCategory, statusLabel)를 새로운 등급/목표재고 기준으로 덮어쓰기
             if (healthGrade === 'E') {
-                statusCategory =
+                statusCategory = 'DEAD';
                 statusLabel = '☠️ 처분 대상 (악성재고)';
             } else if (isExcessStock) {
                 statusCategory = 'EXCESS';
@@ -931,26 +939,24 @@ export default function SihwaInventory() {
             .filter(r => r.statusCategory === 'SAFE' && r.salesFreq >= 20)
             .filter(r => !(r.product.material || '').toLowerCase().startsWith('wp'))
             .map(r => {
-                const rawRecommended = r.safeStock - r.effectiveStock;
-                let recommendedQty = 0;
+                // 정기발주 예측은 2달(40영업일) 정도의 소요량을 계산하여 볼륨네고를 하기 위해 필요한 수량
+                const twoMonthDemand = Math.ceil(r.dailyAvgSales * 40);
+                let recommendedQty = twoMonthDemand - r.effectiveStock;
                 
-                // 과잉재고인 경우 발주 추천 차단
-                if (r.isExcessStock) {
+                // 과잉재고인 경우이거나 대경 재고가 이미 많은 경우 발주 추천 차단
+                if (r.isExcessStock || r.ysQty >= 500) {
                     recommendedQty = 0;
-                }
-                // 대경 창고에 이미 500개 이상 대량 스탁이 있다면 굳이 시화에 벌크로 미리 들여놓을 필요 없음
-                else if (r.ysQty >= 500) {
+                } else if (recommendedQty > 0) {
+                    recommendedQty = Math.ceil(recommendedQty / 10) * 10;
+                    if (recommendedQty < 50) recommendedQty = 50;
+                    if (recommendedQty > 500) recommendedQty = 500;
+                } else {
                     recommendedQty = 0;
-                } else if (rawRecommended > 0) {
-                    recommendedQty = Math.ceil(rawRecommended / 10) * 10;
-                    if (recommendedQty < 0) {
-                         recommendedQty = 0;
-                    }
                 }
                 
                 const sizeNum = parseInt((r.product.size || '').replace(/[^0-9]/g, ''), 10);
                 if (!isNaN(sizeNum) && sizeNum >= 100) {
-                    const dynamicCap = Math.max(300, Math.ceil(r.salesVolume / 4));
+                    const dynamicCap = Math.max(100, Math.ceil(r.salesVolume / 4));
                     recommendedQty = recommendedQty > 0 ? Math.min(dynamicCap, recommendedQty) : 0;
                 }
                 
@@ -1901,7 +1907,7 @@ export default function SihwaInventory() {
                                                     <span>♻️ 정기 발주 예측</span>
                                                     <span className="text-sm font-medium text-indigo-500">(우량 품목 2개월분 선주문 권장)</span>
                                                     <span className="text-sm font-bold bg-indigo-100/70 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200 tracking-tight">
-                                                        [산출식: 빈도≥20 & 추천량=((연판매/6)-현재고) | 발주단위: 최소 500개 (Size≥100A는 최대 300캡)]
+                                                        [산출식: 2개월 예상소요량 - 현재고 | 발주단위: 50~500개 (Size≥100A는 별도캡)]
                                                     </span>
                                                 </h3>
                                             </div>
