@@ -1328,11 +1328,15 @@ export default function SihwaInventory() {
 
             orders.forEach(order => {
                 if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
-                const targetCustomer = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
+                if (order.status === 'COMPLETED') return;
                 
-                if (targetCustomer.includes('서울재고')) {
-                    order.po_items?.forEach(poItem => {
-                        if (poItem.poSent && !poItem.transactionIssued) {
+                const targetCustomer = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
+                const isSihwaIncoming = targetCustomer.includes('재고') || targetCustomer.includes('서울') || targetCustomer.includes('시화');
+                
+                if (isSihwaIncoming) {
+                    const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
+                    items?.forEach((poItem: any) => {
+                        if (!poItem.transactionIssued) {
                             if (
                                 poItem.name === specName &&
                                 (poItem.thickness || '') === specThick &&
@@ -2454,6 +2458,7 @@ export default function SihwaInventory() {
                                             <th className="px-4 py-3 text-center">최근 실적(60일)</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-amber-700" onClick={() => handleSort('salesVolume')}>판매이력 {sortConfig.key==='salesVolume' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-indigo-700" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-600" onClick={() => handleSort('pendingOrderQty')}>입고대기 {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200" onClick={() => handleSort('ysQty')}>대경 재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition group relative" onClick={() => handleSort('daysOnHand')}>
                                                 잔여일 {sortConfig.key==='daysOnHand' && (sortConfig.direction==='asc'?'↑':'↓')}
@@ -2512,7 +2517,9 @@ export default function SihwaInventory() {
                                                 </td>
                                                 <td className="px-4 py-2 text-right font-black font-mono text-indigo-600 bg-indigo-50/20">
                                                     {row.shQty}
-                                                    {row.pendingOrderQty > 0 && <span className="text-[9px] text-rose-400 ml-1">(+{row.pendingOrderQty})</span>}
+                                                </td>
+                                                <td className="px-4 py-2 text-right font-bold font-mono text-rose-500">
+                                                    {row.pendingOrderQty > 0 ? `+${row.pendingOrderQty}` : <span className="text-slate-300">0</span>}
                                                 </td>
                                                 <td className="px-4 py-2 text-center font-bold font-mono text-slate-500">
                                                     {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty}</span> : <span className="text-rose-400">0</span>}
