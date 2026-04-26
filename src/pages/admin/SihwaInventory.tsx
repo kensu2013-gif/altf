@@ -939,7 +939,7 @@ export default function SihwaInventory() {
                 ...row,
                 compositeScore,
                 healthGrade,
-                targetStockByHealthGrade,
+
                 excessCategory,
                 safeStock,
                 deficit: finalDeficit,
