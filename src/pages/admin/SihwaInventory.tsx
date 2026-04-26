@@ -1363,9 +1363,9 @@ export default function SihwaInventory() {
                     <div className="space-y-2 mt-auto">
                         {(['A','B','C','D','E'] as const).map(grade => {
                         const count = analyzedInventory.filter(r =>
-                            r.healthGrade === grade && r.shQty > 0
+                            r.healthGrade === grade
                         ).length;
-                        const total = analyzedInventory.filter(r => r.shQty > 0 && r.healthGrade !== 'N').length;
+                        const total = analyzedInventory.filter(r => r.healthGrade !== 'N').length;
                         const pct = total > 0 ? Math.round(count / total * 100) : 0;
                         const labels: Record<string, string> = {
                             A: 'A급 최우수 (핵심)',
