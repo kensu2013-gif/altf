@@ -1277,6 +1277,40 @@ export default function SihwaInventory() {
         return map;
     }, [orders]);
 
+    const dailyPendingMap = useMemo(() => {
+        const map: Record<string, any[]> = {}; 
+        orders.forEach(order => {
+            if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
+            if (order.status === 'COMPLETED') return; 
+            
+            const dateStr = order.adminResponse?.deliveryDate || order.createdAt;
+            const dt = new Date(dateStr);
+            const kstDt = new Date(dt.getTime() + 9 * 60 * 60 * 1000);
+            const dateKey = kstDt.toISOString().split('T')[0];
+            
+            const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
+            const isSihwaIncoming = customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화');
+            
+            if (isSihwaIncoming) {
+                const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
+                if (!items) return;
+                items.forEach((item: any) => {
+                    if (item.transactionIssued) return;
+                    const id = item.productId || item.item_id;
+                    if (!id) return;
+                    if (!map[dateKey]) map[dateKey] = [];
+                    map[dateKey].push({
+                        order,
+                        item,
+                        id,
+                        qty: Number(item.quantity ?? item.qty ?? 0)
+                    });
+                });
+            }
+        });
+        return map;
+    }, [orders]);
+
     const handleExportSihwaSummary = () => {
         const headers = ['품목', '두께', '사이즈', '재질', '현재재고(시화)', '입고예정(미결결과)', '발주서번호(들)', '발주날짜(들)', '입고예정일'];
         const csvRows = [headers.join(',')];
@@ -2161,13 +2195,15 @@ export default function SihwaInventory() {
                                                             const isGroupExpanded = expandedDailyGroups[snap.date] ?? (idx === 0);
 
                                                                             const itemsToRender = snap.diff || [];
+                                                                            const pendingItemsToRender = dailyPendingMap[snap.date] || [];
+                                                                            const totalChangeCount = itemsToRender.length + pendingItemsToRender.length;
 
                                                                             return (
                                                                                 <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
                                                                                     <div className="flex flex-col gap-2 mb-3">
                                                                                         <div className="flex items-center justify-between">
                                                                                             <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono font-bold hover:bg-slate-300 cursor-pointer transition-colors" onClick={() => toggleDailyGroup(snap.date)}>{snap.date}</span>
-                                                                                            <span className="text-slate-500 font-medium text-xs">총 변동 {itemsToRender.length}건 <span className="text-rose-500 ml-1 font-bold">{validCount > 0 ? `(순수 수기 ${validCount}건)` : ''}</span></span>
+                                                                                            <span className="text-slate-500 font-medium text-xs">총 변동/대기 {totalChangeCount}건 <span className="text-rose-500 ml-1 font-bold">{validCount > 0 ? `(순수 수기 ${validCount}건)` : ''}</span></span>
                                                                                         </div>
                                                                         
                                                                         {(dailyRevenue > 0 || dailyCost > 0) && (
@@ -2189,8 +2225,49 @@ export default function SihwaInventory() {
                                                                         )}
                                                                     </div>
                                                                     {isGroupExpanded && (
-                                                                        itemsToRender.length > 0 ? (
+                                                                        totalChangeCount > 0 ? (
                                                                             <div className="grid grid-cols-1 gap-2 mt-2">
+                                                                                {pendingItemsToRender.map((pi, piIdx) => {
+                                                                                    const rowKey = `${snap.date}-pending-${pi.id}-${piIdx}`;
+                                                                                    const analysis = pi.id ? analyzedInventory.find(ai => ai.product.id === pi.id) : null;
+                                                                                    const isExpanded = !!expandedTrendItems[rowKey];
+                                                                                    
+                                                                                    return (
+                                                                                        <div key={rowKey} className="bg-rose-50 rounded-lg border border-rose-200 shadow-sm overflow-hidden flex flex-col">
+                                                                                            <div 
+                                                                                                className="flex items-center justify-between p-3 cursor-pointer hover:bg-rose-100/50 transition-colors bg-white/50"
+                                                                                                onClick={() => toggleTrendItem(rowKey)}
+                                                                                            >
+                                                                                                <div className="flex items-center gap-3">
+                                                                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-500 text-white">입고 대기</span>
+                                                                                                    <div className="font-mono text-xs font-black text-slate-800">
+                                                                                                        {pi.item.name || pi.id}
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <div className="flex items-center gap-2">
+                                                                                                    <div className="flex gap-1">
+                                                                                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold text-rose-700 bg-white border border-rose-200 shadow-sm">
+                                                                                                            예정 +{pi.qty}개
+                                                                                                        </span>
+                                                                                                    </div>
+                                                                                                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            {isExpanded && (
+                                                                                                <div className="p-3 bg-white border-t border-rose-100 flex flex-col gap-2">
+                                                                                                    <div className="flex justify-between items-center text-xs">
+                                                                                                        <span className="text-slate-500 font-bold">주문 고객</span>
+                                                                                                        <span className="font-medium text-slate-700">{pi.order.poEndCustomer || pi.order.customerName || '알 수 없음'}</span>
+                                                                                                    </div>
+                                                                                                    <div className="flex justify-between items-center text-xs">
+                                                                                                        <span className="text-slate-500 font-bold">예상 매입 단가</span>
+                                                                                                        <span className="font-mono font-bold text-slate-700">₩{formatCur(analysis ? analysis.recentPurchasePrice : 0)}</span>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
                                                                                 {[...itemsToRender].sort((a, b) => {
                                                                                     const aiA = a.id ? analyzedInventory.find(ai => ai.product.id === a.id) : null;
                                                                                     const aiB = b.id ? analyzedInventory.find(ai => ai.product.id === b.id) : null;
