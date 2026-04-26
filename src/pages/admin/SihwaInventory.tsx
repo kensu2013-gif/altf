@@ -747,7 +747,12 @@ export default function SihwaInventory() {
 
             // === 신규 건전성 등급 평가 로직 ===
             // 단가가 0원인 품목은 재고 자산에 영향을 주지 않으므로 악성/과잉재고 판단에서 제외
-            const isDeadStock = row.shQty > 0 && row.recent60dSales === 0 && row.quoteCount === 0 && row.recentPurchasePrice > 0;
+            const hasNoRecentActivity = row.recent60dSales === 0 && row.quoteCount === 0;
+            const hasExcessiveStockForLowSales = row.salesVolume < 50 && row.shQty > row.salesVolume;
+            const hasNoSalesEver = row.salesVolume === 0;
+            
+            // 악성재고 기준: 시화재고가 존재하면서, 최근 활동(판매/견적)이 없고, (과거 판매이력조차 없거나 판매이력보다 훨씬 많은 재고를 악성으로 안고 있는 경우)
+            const isDeadStock = row.shQty > 0 && row.recentPurchasePrice > 0 && hasNoRecentActivity && (hasExcessiveStockForLowSales || hasNoSalesEver);
             
             const isExcessStock = !isDeadStock && targetStockByTurnover > 0 && row.shQty > (targetStockByTurnover * 1.5) && row.recentPurchasePrice > 0;
 
@@ -756,19 +761,19 @@ export default function SihwaInventory() {
             
             // 1. Is it completely dead?
             if (isDeadStock) {
-                healthGrade = 'E'; // E급 (악성 - 장기 무판매 및 재고 있음)
+                healthGrade = 'E'; // E급 (악성 - 장기 무판매, 견적없음, 재고보유)
             } else if (isExcessStock) {
                 healthGrade = 'D'; // D급 (과잉재고 경고)
-            } else if (row.shQty > 0 && row.recent60dSales === 0) {
-                healthGrade = 'D'; // D급 (주의 - 최근 정체)
+            } else if (row.shQty > 0 && row.recent60dSales === 0 && row.quoteCount === 0) {
+                healthGrade = 'D'; // D급 (주의 - 최근 정체/견적없음)
             } else if (row.salesVolume > 0) {
                 // If it has sales history
-                if ((row.turnoverGrade === 'S' || row.turnoverGrade === 'A') && row.recent60dSales >= 2) {
-                    healthGrade = 'A'; // A급 (최우수/핵심품목)
-                } else if ((row.turnoverGrade === 'S' || row.turnoverGrade === 'A') && row.recent60dSales < 2) {
-                    healthGrade = 'B'; // 회전율은 높지만 최근 출고가 적음
-                } else if (row.turnoverGrade === 'B' && row.recent60dSales >= 1) {
-                    healthGrade = 'B'; // B급 (양호/안정적)
+                if ((row.turnoverGrade === 'S' || row.turnoverGrade === 'A') && row.salesVolume >= 50) {
+                    healthGrade = 'A'; // A급 (최우수/핵심품목 - 고회전율 & 충분한 판매볼륨)
+                } else if ((row.turnoverGrade === 'S' || row.turnoverGrade === 'A') && row.salesVolume < 50) {
+                    healthGrade = 'B'; // 회전율은 높지만 총 판매볼륨이 낮음
+                } else if (row.turnoverGrade === 'B' && row.salesVolume >= 10) {
+                    healthGrade = 'B'; // B급 (양호/안정적 - 꾸준한 볼륨)
                 } else if (row.turnoverGrade === 'C' || row.turnoverGrade === 'D') {
                     healthGrade = 'C'; // C급 (보통/저회전)
                 } else {
