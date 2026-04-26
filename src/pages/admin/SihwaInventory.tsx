@@ -63,6 +63,110 @@ const TARGET_STOCK_DIVISOR: Record<string, number> = {
   N: 0,   // 판매 없음 — 제외
 };
 
+// ══════════════════════════════════════════════════════════════
+// ★ 새 등급 시스템: 5개 지표 복합 점수 (100점 만점)
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * 복합 건전성 점수 산출
+ * - 판매빈도 25% + 최근트렌드 25% + 견적문의 20% + 판매량규모 15% + 이익률 15%
+ */
+function calcCompositeScore(row: {
+    salesFreq: number;
+    salesVolume: number;
+    recent30dSales: number;
+    recent60dSales: number;
+    quoteCount: number;
+    profitMarginRate: number;
+}): number {
+    const salesFreqScore =
+        row.salesFreq >= 50 ? 100 :
+        row.salesFreq >= 20 ? 70  :
+        row.salesFreq >= 10 ? 45  :
+        row.salesFreq >= 5  ? 25  :
+        row.salesFreq >= 1  ? 10  : 0;
+
+    const monthlyExpected = row.salesVolume / 12;
+    const trendRatio = monthlyExpected > 0 ? (row.recent30dSales / monthlyExpected) : 0;
+    const recentTrendScore = Math.min(100,
+        trendRatio >= 1.5 ? 100 :
+        trendRatio >= 1.0 ? 80  :
+        trendRatio >= 0.5 ? 50  :
+        trendRatio >= 0.2 ? 25  :
+        row.recent60dSales > 0 ? 15 : 0
+    );
+
+    const quoteDemandScore =
+        row.quoteCount >= 5 ? 100 :
+        row.quoteCount >= 3 ? 70  :
+        row.quoteCount >= 1 ? 40  : 0;
+
+    const salesVolumeScore =
+        row.salesVolume >= 1000 ? 100 :
+        row.salesVolume >= 500  ? 75  :
+        row.salesVolume >= 100  ? 50  :
+        row.salesVolume >= 10   ? 25  : 0;
+
+    const profitScore =
+        row.profitMarginRate >= 30 ? 100 :
+        row.profitMarginRate >= 20 ? 75  :
+        row.profitMarginRate >= 10 ? 50  :
+        row.profitMarginRate >= 0  ? 25  : 0;
+
+    return Math.round(
+        salesFreqScore    * 0.25 +
+        recentTrendScore  * 0.25 +
+        quoteDemandScore  * 0.20 +
+        salesVolumeScore  * 0.15 +
+        profitScore       * 0.15
+    );
+}
+
+/**
+ * 복합 점수 → 건전성 등급 변환
+ * A(핵심) ≥75 | B(안정) 55~74 | C(관망) 35~54 | D(부진) 15~34 | E(처분) <15 & 재고있음 | N(평가불가)
+ */
+function getHealthGradeFromScore(
+    score: number,
+    effectiveStock: number,
+    salesVolume: number,
+    quoteCount: number
+): 'A' | 'B' | 'C' | 'D' | 'E' | 'N' {
+    if (salesVolume === 0 && quoteCount === 0 && effectiveStock === 0) return 'N';
+    if (score >= 75) return 'A';
+    if (score >= 55) return 'B';
+    if (score >= 35) return 'C';
+    if (score >= 15) return 'D';
+    if (score < 15 && effectiveStock > 0) return 'E'; // E급: 점수가 매우 낮고 재고가 있는 경우만 → 악성재고
+    return 'D';
+}
+
+/**
+ * 등급별 목표재고 산출
+ * A: 월평균 × 2.0 | B: × 1.5 | C: × 1.0 | D/E: 0 (추가발주 금지)
+ */
+function getTargetStockByHealthGrade(grade: string, monthlyAvgSales: number): number {
+    const multiplier =
+        grade === 'A' ? 2.0 :
+        grade === 'B' ? 1.5 :
+        grade === 'C' ? 1.0 : 0;
+    return multiplier > 0
+        ? Math.max(10, Math.ceil(monthlyAvgSales * multiplier / 10) * 10)
+        : 0;
+}
+
+/**
+ * 과잉재고 등급별 처분 전략 라벨
+ */
+function getExcessActionLabel(grade: string): string {
+    if (grade === 'A') return '일시 발주 중단 (곧 소진)';
+    if (grade === 'B') return '이번 달 발주 보류';
+    if (grade === 'C') return '판촉/할인 검토';
+    if (grade === 'D') return '대경 반품 협의';
+    if (grade === 'E') return '전량 처분 요망';
+    return '발주 중단';
+}
+
 // 재고 회전율 등급 반환
 function getTurnoverGrade(rate: number, salesVolume: number) {
   if (salesVolume === 0) return 'N';
@@ -394,7 +498,10 @@ export default function SihwaInventory() {
         quoteCount: number;
         daekyungDirectRatio: number;
         profitMarginRate: number;
-        healthGrade: 'A' | 'B' | 'C' | 'D' | 'E' | 'N'; // A(최우수), B(양호), C(보통), D(주의), E(악성), N(제외)
+        compositeScore: number;
+        healthGrade: 'A' | 'B' | 'C' | 'D' | 'E' | 'N'; // A(핵심) B(안정) C(관망) D(부진) E(악성/처분) N(평가불가)
+        targetStockByHealthGrade: number;
+        excessCategory: string | null;
         compSales: number;
         compFreq: number;
         marketTotal: number;
@@ -550,7 +657,10 @@ export default function SihwaInventory() {
                     quoteCount: quoteCountMap[item.id] || 0,
                     daekyungDirectRatio,
                     profitMarginRate,
+                    compositeScore: 0,
                     healthGrade: 'N',
+                    targetStockByHealthGrade: 0,
+                    excessCategory: null,
                     compSales: compData.compSales,
                     compFreq: compData.compFreq,
                     marketTotal,
@@ -619,7 +729,10 @@ export default function SihwaInventory() {
                         quoteCount: quoteCountMap[id] || 0,
                         daekyungDirectRatio,
                         profitMarginRate,
+                        compositeScore: 0,
                         healthGrade: 'N',
+                        targetStockByHealthGrade: 0,
+                        excessCategory: null,
                         compSales: compData.compSales,
                         compFreq: compData.compFreq,
                         marketTotal,
@@ -682,7 +795,6 @@ export default function SihwaInventory() {
 
             // REQUIREMENT 3: INCLUDE PENDING ORDERS as effective stock
             const effectiveStock = row.shQty + row.pendingOrderQty; 
-            const deficit = safeStock - effectiveStock;
 
             let statusCategory = 'IDLE'; 
             let statusLabel = '대기/데이터없음';
@@ -745,54 +857,94 @@ export default function SihwaInventory() {
                 row.shQty, targetStockByTurnover, daysOnHand, turnoverGrade
             ) as AnalyzedItem['stockStatusByTurnover'];
 
-            // === 신규 건전성 등급 평가 로직 ===
-            // 단가가 0원인 품목은 재고 자산에 영향을 주지 않으므로 악성/과잉재고 판단에서 제외
-            const hasNoRecentActivity = row.recent60dSales === 0 && row.quoteCount === 0;
-            const hasExcessiveStockForLowSales = row.salesVolume < 50 && row.shQty > row.salesVolume;
-            const hasNoSalesEver = row.salesVolume === 0;
-            
-            // 악성재고 기준: 시화재고가 존재하면서, 최근 활동(판매/견적)이 없고, (과거 판매이력조차 없거나 판매이력보다 훨씬 많은 재고를 악성으로 안고 있는 경우)
-            const isDeadStock = row.shQty > 0 && row.recentPurchasePrice > 0 && hasNoRecentActivity && (hasExcessiveStockForLowSales || hasNoSalesEver);
-            
-            const isExcessStock = !isDeadStock && targetStockByTurnover > 0 && row.shQty > (targetStockByTurnover * 1.5) && row.recentPurchasePrice > 0;
+            // === 신규 건전성 등급 평가 로직 (100점 만점 복합 점수제) ===
+            const compositeScore = calcCompositeScore({
+                salesFreq:       row.salesFreq,
+                salesVolume:     row.salesVolume,
+                recent30dSales:  row.recent30dSales,
+                recent60dSales:  row.recent60dSales,
+                quoteCount:      row.quoteCount,
+                profitMarginRate: row.profitMarginRate,
+            });
 
-            // A-E grading logic
-            let healthGrade: AnalyzedItem['healthGrade'] = 'N';
-            
-            // 1. Is it completely dead?
-            if (isDeadStock) {
-                healthGrade = 'E'; // E급 (악성 - 장기 무판매, 견적없음, 재고보유)
-            } else if (isExcessStock) {
-                healthGrade = 'D'; // D급 (과잉재고 경고)
-            } else if (row.salesVolume > 0) {
-                // If it has sales history
-                if ((row.turnoverGrade === 'S' || row.turnoverGrade === 'A') && row.salesVolume >= 50) {
-                    healthGrade = 'A'; // A급 (최우수/핵심품목 - 고회전율 & 충분한 판매볼륨)
-                } else if ((row.turnoverGrade === 'S' || row.turnoverGrade === 'A') && row.salesVolume < 50) {
-                    healthGrade = 'B'; // 회전율은 높지만 총 판매볼륨이 낮음
-                } else if (row.turnoverGrade === 'B' && row.salesVolume >= 10) {
-                    healthGrade = 'B'; // B급 (양호/안정적 - 꾸준한 볼륨)
-                } else if (row.shQty > 0 && row.recent60dSales === 0 && row.quoteCount === 0) {
-                    healthGrade = 'D'; // D급 (주의 - 최근 정체/견적없음)
-                } else if (row.turnoverGrade === 'C' || row.turnoverGrade === 'D') {
-                    healthGrade = 'C'; // C급 (보통/저회전)
-                } else {
-                    healthGrade = 'C';
-                }
-            } else if (row.shQty > 0) {
-                if (row.recent60dSales === 0 && row.quoteCount === 0) {
-                    healthGrade = 'D';
-                } else {
-                    healthGrade = 'C'; // 재고는 있는데 총 판매량이 0 (초기 입고 등)
-                }
-            } else {
-                healthGrade = 'N'; // No stock, no sales
+            const healthGrade = getHealthGradeFromScore(
+                compositeScore,
+                effectiveStock,
+                row.salesVolume,
+                row.quoteCount
+            );
+
+            // 등급별 목표재고 산출
+            const monthlyAvgSales = row.salesVolume / 12;
+            let targetStockByHealthGrade = getTargetStockByHealthGrade(healthGrade, monthlyAvgSales);
+
+            if (!isNaN(sizeNum)) {
+                if (sizeNum >= 400) targetStockByHealthGrade = Math.min(targetStockByHealthGrade, 30);
+                else if (sizeNum >= 300) targetStockByHealthGrade = Math.min(targetStockByHealthGrade, 50);
+                else if (sizeNum >= 200) targetStockByHealthGrade = Math.min(targetStockByHealthGrade, 80);
+                else if (sizeNum >= 150) targetStockByHealthGrade = Math.min(targetStockByHealthGrade, 150);
+                else if (sizeNum >= 100) targetStockByHealthGrade = Math.min(targetStockByHealthGrade, 300);
             }
+
+            // 악성재고: E급만
+            const isDeadStock = healthGrade === 'E';
+
+            // 과잉재고: E급 제외, 목표재고의 1.5배 초과
+            const isExcessStock = !isDeadStock
+                && targetStockByHealthGrade > 0
+                && row.shQty > (targetStockByHealthGrade * 1.5)
+                && row.recentPurchasePrice > 0;
+
+            let excessCategory: string | null = null;
+            if (isExcessStock) {
+                excessCategory =
+                    healthGrade === 'A' ? 'EXCESS_A' :
+                    healthGrade === 'B' ? 'EXCESS_B' :
+                    healthGrade === 'C' ? 'EXCESS_C' :
+                    healthGrade === 'D' ? 'EXCESS_D' : null;
+            }
+
+            // 발주 상태(statusCategory, statusLabel)를 새로운 등급/목표재고 기준으로 덮어쓰기
+            if (healthGrade === 'E') {
+                statusCategory = 'DEAD';
+                statusLabel = '☠️ 처분 대상 (악성재고)';
+            } else if (isExcessStock) {
+                statusCategory = 'EXCESS';
+                statusLabel = `📦 과잉재고 (${getExcessActionLabel(healthGrade)})`;
+            } else if (healthGrade === 'D' || healthGrade === 'N') {
+                statusCategory = 'SAFE';
+                statusLabel = '🟡 미발주 대상 (D/N등급)';
+            } else if (targetStockByHealthGrade > 0) {
+                if (effectiveStock <= 0) {
+                    if (row.ysQty <= 0 && row.salesVolume > 100 && row.salesFreq >= 10) {
+                        statusCategory = 'CRITICAL';
+                        statusLabel = '🚨 선발주 요망 (매입결품)';
+                    } else {
+                        statusCategory = 'WARNING';
+                        statusLabel = '⚠️ 일반 발주 필요 (재고부족)';
+                    }
+                } else if (effectiveStock < targetStockByHealthGrade) {
+                    statusCategory = 'WARNING';
+                    statusLabel = '⚠️ 적정재고 미달 (재고부족)';
+                } else {
+                    statusCategory = 'SAFE';
+                    statusLabel = '✅ 적정 유지중';
+                }
+            } else if (row.shQty > 0 || row.ysQty > 0) {
+                statusCategory = 'SAFE';
+                statusLabel = '✅ 미활동 보유품';
+            }
+
+            const finalDeficit = Math.max(0, targetStockByHealthGrade - effectiveStock);
 
             return {
                 ...row,
+                compositeScore,
+                healthGrade,
+                targetStockByHealthGrade,
+                excessCategory,
                 safeStock,
-                deficit: deficit > 0 ? deficit : 0,
+                deficit: finalDeficit,
                 effectiveStock,
                 statusCategory,
                 statusLabel,
@@ -805,7 +957,6 @@ export default function SihwaInventory() {
                 stockStatusByTurnover,
                 isDeadStock,
                 isExcessStock,
-                healthGrade
             };
         });
 
