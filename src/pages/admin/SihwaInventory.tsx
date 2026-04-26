@@ -1465,7 +1465,7 @@ export default function SihwaInventory() {
                         <BrainCircuit className="w-32 h-32" />
                     </div>
                     <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><TrendingUp className="w-5 h-5"/>견적 유입 & 결품 (기회손실)</h3>
-                    <p className="text-4xl font-black mb-1 z-10">{stats.missedOpportunities.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
+                    <p className="text-4xl font-black mb-1 z-10">{healthDiagnosis.missedDemandList.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
                     <p className="text-sm font-medium opacity-80 z-10 mt-auto">최근 60일 내 견적 문의가 있었으나 시화/대경 재고가 없어 판매 기회를 잃었을 가능성이 높은 품목입니다.</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col">
