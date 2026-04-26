@@ -93,13 +93,22 @@ function calcCompositeScore(row: {
         row.profitMarginRate >= 10 ? 50  :
         row.profitMarginRate >= 0  ? 25  : 0;
 
-    return Math.round(
+    let bonusScore = 0;
+    if (row.recent30dSales >= Math.max(10, row.salesVolume / 12 * 1.5)) bonusScore += 15; // 최근 30일 단기 급등
+    else if (row.recent60dSales > 0) bonusScore += 5; // 소량이라도 판매 유지 중
+
+    if (row.quoteCount >= 5) bonusScore += 10; // 최근 견적 급증
+
+    const finalScore = Math.round(
         salesFreqScore    * 0.25 +
         recentTrendScore  * 0.25 +
         quoteDemandScore  * 0.20 +
         salesVolumeScore  * 0.15 +
-        profitScore       * 0.15
+        profitScore       * 0.15 +
+        bonusScore
     );
+
+    return Math.min(100, finalScore);
 }
 
 /**
@@ -709,6 +718,26 @@ export default function SihwaInventory() {
 
         // Step 3: Run AI Rules for status computation
         const processedList = Object.values(comparisonMap).map(row => {
+            const effectiveStock = row.shQty + row.pendingOrderQty; 
+
+            // === 신규 건전성 등급 평가 로직 (100점 만점 복합 점수제) ===
+            const compositeScore = calcCompositeScore({
+                salesFreq:       row.salesFreq,
+                salesVolume:     row.salesVolume,
+                recent30dSales:  row.recent30dSales,
+                recent60dSales:  row.recent60dSales,
+                quoteCount:      row.quoteCount,
+                profitMarginRate: row.profitMarginRate,
+            });
+
+            const healthGrade = getHealthGradeFromScore(
+                compositeScore,
+                effectiveStock,
+                row.salesVolume,
+                row.quoteCount,
+                row.product.id
+            );
+
             // 통계 기반 안전재고 (σ)
             const dailyAvg = row.salesVolume / WORKING_DAYS;
             
@@ -754,6 +783,12 @@ export default function SihwaInventory() {
                 }
             }
 
+            // 6. 건전성 등급(Health Grade) 가중치에 따른 목표재고 증감 (A/B급 상향, D/E급 하향)
+            if (healthGrade === 'A') safeStock = Math.ceil(safeStock * 1.5);
+            else if (healthGrade === 'B') safeStock = Math.ceil(safeStock * 1.2);
+            else if (healthGrade === 'D') safeStock = Math.ceil(safeStock * 0.5);
+            else if (healthGrade === 'E') safeStock = 0;
+
             // 부피 제약 다단화
             const sizeStr = row.product.size || '';
             const sizeNum = parseInt(sizeStr.replace(/[^0-9]/g, ''), 10);
@@ -764,9 +799,6 @@ export default function SihwaInventory() {
                 else if (sizeNum >= 150) { if (safeStock > 150) safeStock = 150; }
                 else if (sizeNum >= 100) { if (safeStock > 300) safeStock = 300; }
             }
-
-            // REQUIREMENT 3: INCLUDE PENDING ORDERS as effective stock
-            const effectiveStock = row.shQty + row.pendingOrderQty; 
 
             let statusCategory = 'IDLE'; 
             let statusLabel = '대기/데이터없음';
@@ -812,24 +844,6 @@ export default function SihwaInventory() {
             const r_sigma = dailyAvgSales * r_cvEstimate;
             const safetyStockROP = Math.ceil(Z_VALUE * r_sigma * Math.sqrt(LEAD_TIME));
             const reorderPoint = Math.ceil(dailyAvgSales * LEAD_TIME + safetyStockROP);
-
-            // === 신규 건전성 등급 평가 로직 (100점 만점 복합 점수제) ===
-            const compositeScore = calcCompositeScore({
-                salesFreq:       row.salesFreq,
-                salesVolume:     row.salesVolume,
-                recent30dSales:  row.recent30dSales,
-                recent60dSales:  row.recent60dSales,
-                quoteCount:      row.quoteCount,
-                profitMarginRate: row.profitMarginRate,
-            });
-
-            const healthGrade = getHealthGradeFromScore(
-                compositeScore,
-                effectiveStock,
-                row.salesVolume,
-                row.quoteCount,
-                row.product.id
-            );
 
             // 악성재고: E급만
             const isDeadStock = healthGrade === 'E';
@@ -1651,7 +1665,12 @@ export default function SihwaInventory() {
                                                                         }}
                                                                     />
                                                                 </td>
-                                                                <td className="px-5 py-4 font-mono font-bold text-slate-900 text-sm">{row.product.id}</td>
+                                                                <td className="px-5 py-4">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
+                                                                        <span className="font-mono font-bold text-slate-900 text-sm">{row.product.id}</span>
+                                                                    </div>
+                                                                </td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-rose-600 bg-rose-50/30">0</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-slate-400">0</td>
                                                                 <td className="px-5 py-4 text-center font-bold text-slate-400">
@@ -1818,7 +1837,12 @@ export default function SihwaInventory() {
                                                                         className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
                                                                     />
                                                                 </td>
-                                                                <td className="px-5 py-4 font-mono font-bold text-slate-900 text-sm">{row.product.id}</td>
+                                                                <td className="px-5 py-4">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
+                                                                        <span className="font-mono font-bold text-slate-900 text-sm">{row.product.id}</span>
+                                                                    </div>
+                                                                </td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-amber-600 bg-amber-50 text-base">
                                                                     {row.shQty}
                                                                 </td>
@@ -1988,7 +2012,12 @@ export default function SihwaInventory() {
                                                                         }}
                                                                     />
                                                                 </td>
-                                                                <td className="px-5 py-4 font-mono font-bold text-slate-900 text-sm">{row.product.id}</td>
+                                                                <td className="px-5 py-4">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
+                                                                        <span className="font-mono font-bold text-slate-900 text-sm">{row.product.id}</span>
+                                                                    </div>
+                                                                </td>
                                                                 <td className="px-5 py-4 text-right font-mono text-indigo-500 text-sm">{row.safeStock}</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-indigo-600 bg-indigo-50 text-base">{row.shQty}</td>
                                                                 <td className="px-5 py-4 text-center text-xs font-medium text-slate-500">
@@ -2914,6 +2943,7 @@ export default function SihwaInventory() {
                 <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${m.count >= 3 ? 'bg-rose-200 text-rose-700' : 'bg-violet-200 text-violet-700'}`}>
                   {m.count}회 결품
                 </span>
+                {m.row && <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ml-auto ${m.row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : m.row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : m.row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : m.row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : m.row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{m.row.healthGrade}급</span>}
               </div>
               <div className="text-[10px] font-bold text-slate-800 font-mono leading-tight break-all mb-1">{m.id}</div>
               <div className="text-[9px] text-slate-500">추정손실 ₩{formatCur(Math.round(m.estimatedRevenue / 10000))}만</div>
