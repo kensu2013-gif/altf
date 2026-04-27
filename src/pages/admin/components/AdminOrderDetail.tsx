@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { Order, LineItem, Product, User as UserType } from '../../../types';
 // import { generateSku } from '../../../lib/sku'; // REMOVED: Managed in useInventoryIndex
 import { useStore } from '../../../store/useStore';
-import { X, AlertTriangle, Check, Calendar, Package, User, Trash2, Plus, Download, FileText, Minus, Equal, Send, SplitSquareHorizontal, Image } from 'lucide-react';
+import { X, AlertTriangle, Check, Calendar, Package, User, Trash2, Plus, Download, FileText, Minus, Equal, Send, SplitSquareHorizontal, Image, Printer } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { useInventoryIndex } from '../../../hooks/useInventoryIndex';
 
@@ -709,32 +709,53 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         }
     };
 
+    const [packingListModalOpen, setPackingListModalOpen] = useState(false);
+    const [packingListOptions, setPackingListOptions] = useState({
+        includeCustomer: true,
+        includeSupplier: true,
+        includeDetails: true,
+        supplierName: '알트에프',
+        supplierAddress: '부산광역시 사상구 낙동대로1330번길, 67',
+        supplierContact: '조현진 대표', // Will be overridden on open if needed
+        supplierTel: '051-303-3751'
+    });
+
     const handleDownloadPackingList = () => {
         if (selectedItems.length === 0) {
             alert('출력할 품목을 선택해주세요.');
             return;
         }
+        
+        // Update default contact
+        setPackingListOptions(prev => ({
+            ...prev,
+            supplierContact: buyerInfo.contact_name || user?.contactName || '조현진 대표'
+        }));
+        
+        setPackingListModalOpen(true);
+    };
 
-        const includeDetails = window.confirm('배송 요청사항과 거래처 상세정보(연락처/이메일/주소)를 포함하여 출력하시겠습니까?\\n\\n[확인]을 누르면 모두 표시되고, [취소]를 누르면 상호명과 담당자만 표시됩니다.');
-
+    const confirmDownloadPackingList = () => {
         const payload: DocumentPayload = {
             document_type: 'PACKING_LIST',
             meta: {
                 doc_no: `PK${order.id.slice(2, 8)}-${order.id.split('-')[1] || '000'}`,
                 created_at: new Date().toLocaleDateString(),
                 channel: 'WEB',
+                hide_supplier: !packingListOptions.includeSupplier,
+                hide_customer: !packingListOptions.includeCustomer,
             },
             supplier: {
-                company_name: '알트에프',
-                contact_name: buyerInfo.contact_name || user?.contactName || '조현진 대표',
-                tel: '051-303-3751',
+                company_name: packingListOptions.supplierName,
+                contact_name: packingListOptions.supplierContact,
+                tel: packingListOptions.supplierTel,
                 email: 'altf@altf.kr',
-                address: '부산광역시 사상구 낙동대로1330번길, 67'
+                address: packingListOptions.supplierAddress
             },
             customer: {
                 company_name: poEndCustomer || linkedUser?.companyName || order.customerName || '',
                 contact_name: editableCustomerInfo.contactName || "담당자님",
-                ...(includeDetails ? {
+                ...(packingListOptions.includeDetails ? {
                     tel: editableCustomerInfo.tel || linkedUser?.phone || customerInfo.tel,
                     email: editableCustomerInfo.email || linkedUser?.email || '',
                     address: editableCustomerInfo.address || linkedUser?.address || '',
@@ -762,6 +783,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             const html = renderDocumentHTML(payload);
             setPreviewHtml(html);
             setPreviewType('PACKING');
+            setPackingListModalOpen(false);
         } catch (e) {
             console.error('Error generating Packing List:', e);
             alert('문서 생성 중 오류가 발생했습니다.');
@@ -2949,6 +2971,137 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     />
                 )
             }
+
+            {/* Print Packing List Modal */}
+            {packingListModalOpen && (
+                <div className="fixed inset-0 z-[200] bg-slate-900/50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between mb-6 border-b pb-4">
+                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                <Package className="w-5 h-5 text-orange-500" />
+                                포장명세서 출력 옵션
+                            </h3>
+                            <button 
+                                onClick={() => setPackingListModalOpen(false)} 
+                                className="text-slate-400 hover:text-slate-600"
+                                aria-label="닫기"
+                                title="닫기"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-6">
+                            {/* Customer Option */}
+                            <div className="space-y-3 p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        className="w-5 h-5 accent-teal-600 rounded cursor-pointer"
+                                        checked={packingListOptions.includeCustomer}
+                                        onChange={e => setPackingListOptions(prev => ({ ...prev, includeCustomer: e.target.checked }))}
+                                    />
+                                    <span className="font-bold text-slate-700">공급받는자(고객) 정보 출력</span>
+                                </label>
+                                
+                                {packingListOptions.includeCustomer && (
+                                    <div className="ml-8">
+                                        <label className="flex items-center gap-2 cursor-pointer mt-2 text-sm">
+                                            <input 
+                                                type="checkbox" 
+                                                className="w-4 h-4 accent-slate-500 rounded cursor-pointer"
+                                                checked={packingListOptions.includeDetails}
+                                                onChange={e => setPackingListOptions(prev => ({ ...prev, includeDetails: e.target.checked }))}
+                                            />
+                                            <span className="text-slate-600">상세정보 (주소/연락처/배송메모) 포함</span>
+                                        </label>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Supplier Option */}
+                            <div className="space-y-3 p-4 bg-orange-50/50 rounded-lg border border-orange-100">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        className="w-5 h-5 accent-orange-600 rounded cursor-pointer"
+                                        checked={packingListOptions.includeSupplier}
+                                        onChange={e => setPackingListOptions(prev => ({ ...prev, includeSupplier: e.target.checked }))}
+                                    />
+                                    <span className="font-bold text-slate-700">공급자(알트에프) 정보 출력</span>
+                                </label>
+
+                                {packingListOptions.includeSupplier && (
+                                    <div className="ml-8 grid grid-cols-2 gap-3 mt-3">
+                                        <div className="col-span-2 sm:col-span-1">
+                                            <label htmlFor="po-supp-name" className="block text-[10px] font-bold text-slate-500 mb-1">상호명</label>
+                                            <input 
+                                                id="po-supp-name"
+                                                title="상호명"
+                                                placeholder="상호명을 입력하세요"
+                                                type="text" 
+                                                className="w-full text-sm border rounded px-2 py-1.5 focus:border-orange-400 outline-none"
+                                                value={packingListOptions.supplierName}
+                                                onChange={e => setPackingListOptions(prev => ({ ...prev, supplierName: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div className="col-span-2 sm:col-span-1">
+                                            <label htmlFor="po-supp-contact" className="block text-[10px] font-bold text-slate-500 mb-1">담당자</label>
+                                            <input 
+                                                id="po-supp-contact"
+                                                title="담당자"
+                                                placeholder="담당자 이름을 입력하세요"
+                                                type="text" 
+                                                className="w-full text-sm border rounded px-2 py-1.5 focus:border-orange-400 outline-none"
+                                                value={packingListOptions.supplierContact}
+                                                onChange={e => setPackingListOptions(prev => ({ ...prev, supplierContact: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div className="col-span-2 sm:col-span-1">
+                                            <label htmlFor="po-supp-tel" className="block text-[10px] font-bold text-slate-500 mb-1">연락처</label>
+                                            <input 
+                                                id="po-supp-tel"
+                                                title="연락처"
+                                                placeholder="연락처를 입력하세요"
+                                                type="text" 
+                                                className="w-full text-sm border rounded px-2 py-1.5 focus:border-orange-400 outline-none"
+                                                value={packingListOptions.supplierTel}
+                                                onChange={e => setPackingListOptions(prev => ({ ...prev, supplierTel: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label htmlFor="po-supp-address" className="block text-[10px] font-bold text-slate-500 mb-1">주소</label>
+                                            <input 
+                                                id="po-supp-address"
+                                                title="주소"
+                                                placeholder="주소를 입력하세요"
+                                                type="text" 
+                                                className="w-full text-sm border rounded px-2 py-1.5 focus:border-orange-400 outline-none"
+                                                value={packingListOptions.supplierAddress}
+                                                onChange={e => setPackingListOptions(prev => ({ ...prev, supplierAddress: e.target.value }))}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="mt-8 flex justify-end gap-3 border-t pt-5">
+                            <Button variant="outline" onClick={() => setPackingListModalOpen(false)}>
+                                취소
+                            </Button>
+                            <Button 
+                                className="bg-orange-600 hover:bg-orange-700 text-white font-bold px-6"
+                                onClick={confirmDownloadPackingList}
+                                disabled={!packingListOptions.includeCustomer && !packingListOptions.includeSupplier}
+                            >
+                                <Printer className="w-4 h-4 mr-2" /> 출력하기
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>,
         document.body
     );

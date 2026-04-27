@@ -32,6 +32,8 @@ export interface DocumentPayload {
         title?: string; // Custom Title Overwrite
         linkedQuoteId?: string; // Origin Quote ID
         end_customer?: string; // Actual end customer (for POs)
+        hide_supplier?: boolean; // Hide supplier info on print
+        hide_customer?: boolean; // Hide customer info on print
     };
     supplier: { // Sender Info (Us or Vendor)
         company_name: string;

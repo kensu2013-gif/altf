@@ -2037,6 +2037,7 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 text-center">판매/보충 이력</th>
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition text-center" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right">매입단가</th>
+                                                            <th className="px-5 py-3 text-center cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('healthGrade')}>건전성 등급 {sortConfig.key==='healthGrade' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right w-40">추천 발주량</th>
                                                             <th className="px-5 py-3">💡 분석 근거</th>
                                                         </tr>
@@ -2057,7 +2058,6 @@ export default function SihwaInventory() {
                                                                 </td>
                                                                 <td className="px-5 py-4">
                                                                     <div className="flex items-center gap-2">
-                                                                        <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
                                                                         <span className="font-mono font-bold text-slate-900 text-sm">{row.product.id}</span>
                                                                     </div>
                                                                 </td>
@@ -2070,6 +2070,25 @@ export default function SihwaInventory() {
                                                                     {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty}</span> : <span className="text-rose-400">0</span>}
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
+                                                                <td className="px-5 py-4 text-center">
+                                                                    <div className="flex flex-col items-center gap-1">
+                                                                        <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                                                                            row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                                            row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
+                                                                            row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
+                                                                            row.healthGrade === 'D' ? 'bg-rose-100 text-rose-600' :
+                                                                            'bg-slate-100 text-slate-400'
+                                                                        }`}>
+                                                                            {row.healthGrade === 'A' ? 'A급' :
+                                                                            row.healthGrade === 'B' ? 'B급' :
+                                                                            row.healthGrade === 'C' ? 'C급' :
+                                                                            row.healthGrade === 'D' ? 'D급' : '—'}
+                                                                        </span>
+                                                                        <span className="text-xs font-mono text-slate-500">
+                                                                            {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '—'}
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
                                                                 <td className="px-5 py-4 text-right font-black text-indigo-600 bg-indigo-50/30">
                                                                     {row.recommendedQty}
                                                                 </td>
@@ -2089,7 +2108,7 @@ export default function SihwaInventory() {
                                                     </tbody>
                                                     <tfoot className="bg-indigo-50/50 border-t-2 border-indigo-200">
                                                         <tr>
-                                                            <td colSpan={5} className="px-5 py-4">
+                                                            <td colSpan={6} className="px-5 py-4">
                                                                 <button onClick={() => handleCreateOrder(selectedRegularIds, 'REGULAR')} disabled={selectedRegularIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedRegularIds.size > 0 ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
                                                                     <span>선택 품목 발주서 만들기 ({selectedRegularIds.size}건)</span>
                                                                     <ChevronRight className="w-4 h-4" />
