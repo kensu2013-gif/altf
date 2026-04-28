@@ -2980,7 +2980,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             {/* Print Packing List Modal */}
             {packingListModalOpen && (
                 <div 
-                    className="fixed inset-0 z-[200] bg-slate-900/50 flex items-center justify-center p-4"
+                    className="fixed inset-0 z-[200] bg-slate-900/50 flex items-center justify-center p-4 pointer-events-auto"
                     onClick={(e) => {
                         e.stopPropagation();
                         setPackingListModalOpen(false);
