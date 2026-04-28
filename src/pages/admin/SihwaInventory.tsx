@@ -2552,7 +2552,7 @@ export default function SihwaInventory() {
                                                 <tr key={row.product.id} className="hover:bg-slate-50 group">
                                                 <td className="px-4 py-2 font-mono font-bold text-slate-700">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span>{row.product.id}</span>
+                                                        <span>{row.product.id === 'UNKNOWN' && row.product.name ? `UNKNOWN (${row.product.name})` : row.product.id}</span>
                                                         {rowTags.map((tag, idx) => (
                                                             <span key={idx} className={`text-[9px] px-1 py-0.5 rounded font-black tracking-tight ${tag.className}`}>
                                                                 {tag.label}
@@ -2627,8 +2627,8 @@ export default function SihwaInventory() {
                                                     </div>
                                                 </td>
                                             </tr>
-                                            ));
-                                        })()}
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                                 </div>
