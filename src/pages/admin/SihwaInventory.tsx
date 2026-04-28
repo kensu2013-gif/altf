@@ -2566,7 +2566,7 @@ export default function SihwaInventory() {
 
                                             if (activeTagFilters.length > 0) {
                                                 displayList = displayList.filter(row => {
-                                                    const tags = [];
+                                                    const tags: string[] = [];
                                                     if (criticalSet.has(row.product.id)) tags.push('선발주');
                                                     if (warningSet.has(row.product.id)) tags.push('일반');
                                                     if (regularSet.has(row.product.id)) tags.push('정기발주');
