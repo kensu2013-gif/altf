@@ -2512,7 +2512,7 @@ export default function SihwaInventory() {
                                             const warningSet = new Set(stats.warning.map(i => i.product.id));
                                             const regularSet = new Set(stats.regular.map(i => i.product.id));
 
-                                            const getStatusRank = (row: any) => {
+                                            const getStatusRank = (row: typeof analyzedInventory[0]) => {
                                                 if (criticalSet.has(row.product.id)) return 1;
                                                 if (warningSet.has(row.product.id)) return 2;
                                                 if (regularSet.has(row.product.id)) return 3;
@@ -2522,7 +2522,7 @@ export default function SihwaInventory() {
                                                 return 99;
                                             };
 
-                                            let displayList = [...analyzedInventory];
+                                            const displayList = [...analyzedInventory];
                                             
                                             // Apply statusRank sorting if selected
                                             if (sortConfig.key === 'statusRank') {
