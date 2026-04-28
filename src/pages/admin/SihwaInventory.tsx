@@ -2449,8 +2449,8 @@ export default function SihwaInventory() {
                                                                 </div>
                                                                 <div className="flex flex-col items-end shrink-0 pl-1">
                                                                     <div className="flex items-center gap-1 justify-end">
-                                                                        <span className="text-[9px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-bold">{item.salesFreq}회발생</span>
-                                                                        <span className="font-black text-slate-700 text-sm drop-shadow-sm">{item.recent30dSales} <span className="font-normal text-[10px] text-slate-400">개</span></span>
+                                                                        <span className="text-[9px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-bold">{item.salesFreq.toLocaleString()}회발생</span>
+                                                                        <span className="font-black text-slate-700 text-sm drop-shadow-sm">{item.recent30dSales.toLocaleString()} <span className="font-normal text-[10px] text-slate-400">개</span></span>
                                                                     </div>
                                                                     <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-[80px]" title={`기간누적매출 ${formatCur(item.recent30dSales * item.sellingPrice)}원`}>
                                                                         ₩{formatCur(item.recent30dSales * item.sellingPrice)}
@@ -2650,23 +2650,23 @@ export default function SihwaInventory() {
                                                 </td>
                                                 <td className="px-4 py-2 text-center text-slate-600">
                                                     <div className="flex flex-col items-center">
-                                                        <span className="font-black text-slate-800">{row.recent60dSales} <span className="text-[9px] text-slate-400">판매</span></span>
-                                                        <span className="font-bold text-indigo-500 text-[10px]">{row.quoteCount} <span className="text-[9px] text-indigo-300">견적</span></span>
+                                                        <span className="font-black text-slate-800">{row.recent60dSales.toLocaleString()} <span className="text-[9px] text-slate-400">개</span></span>
+                                                        <span className="font-bold text-indigo-500 text-[10px]">{row.quoteCount.toLocaleString()} <span className="text-[9px] text-indigo-300">건</span></span>
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-2 text-right text-slate-600">
                                                     {row.salesVolume > 0 ? (
-                                                        <span><span className="font-bold text-slate-800">{row.salesVolume}</span> <span className="text-[10px] text-slate-500">({row.salesFreq}회)</span></span>
+                                                        <span><span className="font-bold text-slate-800">{row.salesVolume.toLocaleString()}</span> <span className="text-[10px] text-slate-500">({row.salesFreq.toLocaleString()}회)</span></span>
                                                     ) : '-'}
                                                 </td>
                                                 <td className="px-4 py-2 text-right font-black font-mono text-indigo-600 bg-indigo-50/20">
-                                                    {row.shQty}
+                                                    {row.shQty.toLocaleString()}
                                                 </td>
                                                 <td className="px-4 py-2 text-right font-bold font-mono text-rose-500">
-                                                    {row.pendingOrderQty > 0 ? `+${row.pendingOrderQty}` : <span className="text-slate-300">0</span>}
+                                                    {row.pendingOrderQty > 0 ? `+${row.pendingOrderQty.toLocaleString()}` : <span className="text-slate-300">0</span>}
                                                 </td>
                                                 <td className="px-4 py-2 text-center font-bold font-mono text-slate-500">
-                                                    {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty}</span> : <span className="text-rose-400">0</span>}
+                                                    {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty.toLocaleString()}</span> : <span className="text-rose-400">0</span>}
                                                 </td>
                                                 <td className="px-4 py-2 text-right font-mono text-xs">
                                                 <span className={
@@ -2681,7 +2681,7 @@ export default function SihwaInventory() {
                                                 </span>
                                                 </td>
                                                 <td className="px-4 py-2 text-right font-black text-rose-600 bg-rose-50/30">
-                                                    {row.deficit > 0 ? `-${row.deficit}개` : <span className="text-slate-300 font-normal">충분</span>}
+                                                    {row.deficit > 0 ? `-${row.deficit.toLocaleString()}개` : <span className="text-slate-300 font-normal">충분</span>}
                                                 </td>
                                                 <td className="px-4 py-2 text-right">
                                                     <div className="flex flex-col items-end">
@@ -2887,9 +2887,9 @@ export default function SihwaInventory() {
                     <td className="px-4 py-2 text-right font-mono font-bold text-rose-600">
                       {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '0x'}
                     </td>
-                    <td className="px-4 py-2 text-right font-bold">{row.shQty}개</td>
+                    <td className="px-4 py-2 text-right font-bold">{row.shQty.toLocaleString()}개</td>
                     <td className="px-4 py-2 text-right font-black text-rose-600">{formatCur(itemValue)}원</td>
-                    <td className="px-4 py-2 text-right text-slate-400">{row.ysQty}개</td>
+                    <td className="px-4 py-2 text-right text-slate-400">{row.ysQty.toLocaleString()}개</td>
                     <td className="px-4 py-2">
                       <button 
                         onClick={() => {
@@ -2972,10 +2972,10 @@ export default function SihwaInventory() {
                               </div>
                           </div>
                       </td>
-                      <td className="px-4 py-2 text-right font-black text-orange-600">{row.shQty}개</td>
-                      <td className="px-4 py-2 text-right text-slate-400">{row.safeStock || row.safeStock}개</td>
+                      <td className="px-4 py-2 text-right font-black text-orange-600">{row.shQty.toLocaleString()}개</td>
+                      <td className="px-4 py-2 text-right text-slate-400">{row.safeStock.toLocaleString()}개</td>
                       <td className="px-4 py-2 text-right">
-                        <span className="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-[9px] font-bold">+{excessQty}개</span>
+                        <span className="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-[9px] font-bold">+{excessQty.toLocaleString()}개</span>
                       </td>
                       <td className="px-4 py-2 text-right font-bold text-orange-600">{formatCur(excessValue)}원</td>
                       <td className="px-4 py-2 text-right font-mono font-bold text-amber-600">
@@ -3050,7 +3050,7 @@ export default function SihwaInventory() {
                     <td className="px-4 py-2 text-right font-mono font-bold text-purple-600">
                       {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '0x'}
                     </td>
-                    <td className="px-4 py-2 text-right font-bold">{row.shQty}개</td>
+                    <td className="px-4 py-2 text-right font-bold">{row.shQty.toLocaleString()}개</td>
                     <td className="px-4 py-2 text-right font-black text-purple-600">{formatCur(itemValue)}원</td>
                     <td className="px-4 py-2 text-right font-mono font-bold text-amber-600">
                         {row.daysOnHand === 9999 ? '∞' : `${Math.round(row.daysOnHand)}일`}
@@ -3119,9 +3119,9 @@ export default function SihwaInventory() {
                         {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-right font-bold">{row.shQty}개</td>
+                    <td className="px-4 py-2 text-right font-bold">{row.shQty.toLocaleString()}개</td>
                     <td className="px-4 py-2 text-right font-black text-rose-600">{formatCur(itemValue)}원</td>
-                    <td className="px-4 py-2 text-right text-slate-400">{row.ysQty}개</td>
+                    <td className="px-4 py-2 text-right text-slate-400">{row.ysQty.toLocaleString()}개</td>
                     <td className="px-4 py-2">
                       <button 
                         onClick={() => {
