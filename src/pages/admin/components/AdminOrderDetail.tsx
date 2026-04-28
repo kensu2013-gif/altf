@@ -2938,10 +2938,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             </div>
             {
                 previewHtml && (
-                    <PreviewModal
-                        htmlContent={previewHtml}
-                        docType={previewType === 'PO' ? 'ORDER' : previewType === 'PACKING' ? 'PACKING_LIST' : 'TRANSACTION'}
-                        onClose={() => setPreviewHtml(null)}
+                    <div className="fixed inset-0 z-[300]" onClick={(e) => e.stopPropagation()}>
+                        <PreviewModal
+                            htmlContent={previewHtml}
+                            docType={previewType === 'PO' ? 'ORDER' : previewType === 'PACKING' ? 'PACKING_LIST' : 'TRANSACTION'}
+                            onClose={() => setPreviewHtml(null)}
                         onPrint={async () => {
                             if (previewType === 'SALES') {
                                 // Mark the selected items as transaction issued in the PO Items list
@@ -2977,8 +2978,17 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
             {/* Print Packing List Modal */}
             {packingListModalOpen && (
-                <div className="fixed inset-0 z-[200] bg-slate-900/50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 animate-in zoom-in-95 duration-200">
+                <div 
+                    className="fixed inset-0 z-[200] bg-slate-900/50 flex items-center justify-center p-4"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setPackingListModalOpen(false);
+                    }}
+                >
+                    <div 
+                        className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 animate-in zoom-in-95 duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="flex items-center justify-between mb-6 border-b pb-4">
                             <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                                 <Package className="w-5 h-5 text-orange-500" />
