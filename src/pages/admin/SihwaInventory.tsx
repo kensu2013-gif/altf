@@ -205,8 +205,6 @@ export default function SihwaInventory() {
     
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE' | 'HEALTH_DIAGNOSIS'>('AI_SUMMARY');
-    const [orderFilter, setOrderFilter] = useState<'ALL' | 'CRITICAL' | 'WARNING' | 'REGULAR'>('ALL');
-    const [healthFilter, setHealthFilter] = useState<'ALL' | 'DEFICIT' | 'EXCESS' | 'DEAD_STOCK'>('ALL');
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
         'CRITICAL': true,
         'WARNING': true,
@@ -223,11 +221,11 @@ export default function SihwaInventory() {
     const [expandedDailyGroups, setExpandedDailyGroups] = useState<Record<string, boolean>>({});
 
     const [sortConfig, setSortConfig] = useState<{ 
-        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade', 
+        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank', 
         direction: 'asc' | 'desc' 
     }>({ key: 'deficit', direction: 'desc' });
 
-    const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade') => {
+    const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank') => {
         setSortConfig(prev => ({
             key,
             direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
@@ -2462,83 +2460,19 @@ export default function SihwaInventory() {
                             {/* TAB 3: ALL TABLE WITH SORTING */}
                             {activeTab === 'ALL_TABLE' && (
                                 <div className="space-y-4">
-                                    <div className="flex flex-col gap-2 mb-2 p-3 bg-slate-50/50 border border-slate-200 rounded-lg">
-                                        {/* Group 1: Order Type */}
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-slate-500 w-20 shrink-0">발주 추천:</span>
-                                            <div className="flex flex-wrap gap-2">
-                                                {[
-                                                    { id: 'ALL', label: '전체', color: 'bg-slate-200 text-slate-700 hover:bg-slate-300' },
-                                                    { id: 'CRITICAL', label: '🚨 선발주', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200 border border-rose-200' },
-                                                    { id: 'WARNING', label: '⚠️ 일반', color: 'bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-200' },
-                                                    { id: 'REGULAR', label: '♻️ 정기발주', color: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border border-indigo-200' },
-                                                ].map(filter => (
-                                                    <button
-                                                        key={filter.id}
-                                                        onClick={() => setOrderFilter(filter.id as 'ALL' | 'CRITICAL' | 'WARNING' | 'REGULAR')}
-                                                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
-                                                            orderFilter === filter.id 
-                                                                ? 'ring-2 ring-indigo-500 shadow-sm scale-105 ' + filter.color.replace('hover:', 'hover-disabled:')
-                                                                : filter.color + ' opacity-70 hover:opacity-100'
-                                                        }`}
-                                                    >
-                                                        {filter.label}
-                                                        {orderFilter === filter.id && (
-                                                            <span className="ml-1.5 bg-white/50 px-1.5 py-0.5 rounded text-[10px]">
-                                                                {(() => {
-                                                                    if (filter.id === 'ALL') return analyzedInventory.length;
-                                                                    if (filter.id === 'CRITICAL') return stats.critical.length;
-                                                                    if (filter.id === 'WARNING') return stats.warning.length;
-                                                                    if (filter.id === 'REGULAR') return stats.regular.length;
-                                                                    return 0;
-                                                                })()}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        
-                                        {/* Group 2: Health Type */}
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-slate-500 w-20 shrink-0">재고 상태:</span>
-                                            <div className="flex flex-wrap gap-2">
-                                                {[
-                                                    { id: 'ALL', label: '전체', color: 'bg-slate-200 text-slate-700 hover:bg-slate-300' },
-                                                    { id: 'DEFICIT', label: '📉 부족', color: 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-100' },
-                                                    { id: 'EXCESS', label: '📦 과잉', color: 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-100' },
-                                                    { id: 'DEAD_STOCK', label: '💀 악성', color: 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200' },
-                                                ].map(filter => (
-                                                    <button
-                                                        key={filter.id}
-                                                        onClick={() => setHealthFilter(filter.id as 'ALL' | 'DEFICIT' | 'EXCESS' | 'DEAD_STOCK')}
-                                                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
-                                                            healthFilter === filter.id 
-                                                                ? 'ring-2 ring-indigo-500 shadow-sm scale-105 ' + filter.color.replace('hover:', 'hover-disabled:')
-                                                                : filter.color + ' opacity-70 hover:opacity-100'
-                                                        }`}
-                                                    >
-                                                        {filter.label}
-                                                        {healthFilter === filter.id && (
-                                                            <span className="ml-1.5 bg-white/50 px-1.5 py-0.5 rounded text-[10px]">
-                                                                {(() => {
-                                                                    if (filter.id === 'ALL') return analyzedInventory.length;
-                                                                    if (filter.id === 'DEFICIT') return analyzedInventory.filter(r => r.deficit > 0).length;
-                                                                    if (filter.id === 'EXCESS') return analyzedInventory.filter(r => r.isExcessStock).length;
-                                                                    if (filter.id === 'DEAD_STOCK') return analyzedInventory.filter(r => r.isDeadStock).length;
-                                                                    return 0;
-                                                                })()}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
                                 <table className="w-full text-left text-sm whitespace-nowrap">
                                     <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none">
                                         <tr>
-                                            <th className="px-4 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 ID {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                            <th className="px-4 py-3 group">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="cursor-pointer hover:text-slate-800 transition" onClick={() => handleSort('id')}>
+                                                        품목 ID {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}
+                                                    </span>
+                                                    <span className="text-[10px] bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded cursor-pointer hover:bg-indigo-100 transition border border-indigo-100" onClick={() => handleSort('statusRank')} title="태그(상태) 우선순위로 정렬합니다">
+                                                        태그정렬 {sortConfig.key==='statusRank' && (sortConfig.direction==='asc'?'↑':'↓')}
+                                                    </span>
+                                                </div>
+                                            </th>
                                             <th className="px-4 py-3 text-center group relative cursor-help">
                                                 등급 <span className="text-[10px] text-slate-400">ⓘ</span>
                                                 <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 bg-slate-800 text-white text-[11px] p-3 rounded shadow-lg hidden group-hover:block z-50 text-left font-normal whitespace-normal cursor-auto">
@@ -2574,38 +2508,57 @@ export default function SihwaInventory() {
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {(() => {
-                                            let filtered = analyzedInventory;
+                                            const criticalSet = new Set(stats.critical.map(i => i.product.id));
+                                            const warningSet = new Set(stats.warning.map(i => i.product.id));
+                                            const regularSet = new Set(stats.regular.map(i => i.product.id));
+
+                                            const getStatusRank = (row: any) => {
+                                                if (criticalSet.has(row.product.id)) return 1;
+                                                if (warningSet.has(row.product.id)) return 2;
+                                                if (regularSet.has(row.product.id)) return 3;
+                                                if (row.deficit > 0) return 4;
+                                                if (row.isExcessStock) return 5;
+                                                if (row.isDeadStock) return 6;
+                                                return 99;
+                                            };
+
+                                            let displayList = [...analyzedInventory];
                                             
-                                            // Apply Order Filter
-                                            if (orderFilter === 'CRITICAL') {
-                                                const set = new Set(stats.critical.map(i => i.product.id));
-                                                filtered = filtered.filter(r => set.has(r.product.id));
-                                            } else if (orderFilter === 'WARNING') {
-                                                const set = new Set(stats.warning.map(i => i.product.id));
-                                                filtered = filtered.filter(r => set.has(r.product.id));
-                                            } else if (orderFilter === 'REGULAR') {
-                                                const set = new Set(stats.regular.map(i => i.product.id));
-                                                filtered = filtered.filter(r => set.has(r.product.id));
+                                            // Apply statusRank sorting if selected
+                                            if (sortConfig.key === 'statusRank') {
+                                                const dir = sortConfig.direction === 'asc' ? 1 : -1;
+                                                displayList.sort((a, b) => {
+                                                    const rankA = getStatusRank(a);
+                                                    const rankB = getStatusRank(b);
+                                                    if (rankA !== rankB) return (rankA - rankB) * dir;
+                                                    return a.product.id.localeCompare(b.product.id);
+                                                });
                                             }
 
-                                            // Apply Health Filter
-                                            if (healthFilter === 'EXCESS') {
-                                                filtered = filtered.filter(r => r.isExcessStock);
-                                            } else if (healthFilter === 'DEFICIT') {
-                                                filtered = filtered.filter(r => r.deficit > 0);
-                                            } else if (healthFilter === 'DEAD_STOCK') {
-                                                filtered = filtered.filter(r => r.isDeadStock);
-                                            }
-                                            
-                                            if (filtered.length === 0) {
+                                            if (displayList.length === 0) {
                                                 return <tr><td colSpan={11} className="py-10 text-center text-slate-400 font-medium">해당 조건에 맞는 품목이 없습니다.</td></tr>;
                                             }
 
-                                            return filtered.slice(0, 500).map(row => (
+                                            return displayList.slice(0, 500).map(row => {
+                                                const rowTags = [];
+                                                if (criticalSet.has(row.product.id)) rowTags.push({ label: '선발주', className: 'bg-rose-100 text-rose-700 border border-rose-200' });
+                                                if (warningSet.has(row.product.id)) rowTags.push({ label: '일반', className: 'bg-amber-100 text-amber-700 border border-amber-200' });
+                                                if (regularSet.has(row.product.id)) rowTags.push({ label: '정기발주', className: 'bg-indigo-100 text-indigo-700 border border-indigo-200' });
+                                                if (row.deficit > 0) rowTags.push({ label: '부족', className: 'bg-red-50 text-red-600 border border-red-100' });
+                                                if (row.isExcessStock) rowTags.push({ label: '과잉', className: 'bg-orange-100 text-orange-600 border border-orange-100' });
+                                                if (row.isDeadStock) rowTags.push({ label: '악성', className: 'bg-slate-100 text-slate-500 border border-slate-200' });
+
+                                                return (
                                                 <tr key={row.product.id} className="hover:bg-slate-50 group">
                                                 <td className="px-4 py-2 font-mono font-bold text-slate-700">
-                                                    {row.product.id}
-                                                    {row.isExcessStock && <span className="ml-1 text-[9px] bg-orange-100 text-orange-600 px-1 rounded font-bold">과잉</span>}
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span>{row.product.id}</span>
+                                                        {rowTags.map((tag, idx) => (
+                                                            <span key={idx} className={`text-[9px] px-1 py-0.5 rounded font-black tracking-tight ${tag.className}`}>
+                                                                {tag.label}
+                                                            </span>
+                                                        ))}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-2 text-center">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-black ${
