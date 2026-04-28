@@ -84,17 +84,27 @@ export function useInventory() {
                         locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
                     }
                 } else {
-                    // Primary Location (location / ready_qty)
-                    if (item.location && item.ready_qty) {
-                        const newKey = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
-                        locationStock[newKey] = Number(item.ready_qty);
-                    }
-
-                    // Secondary Location (location1 / sh_qty)
+                    // 1. Process Secondary Location (Sihwa) first to get its quantity
+                    let secondaryQty = 0;
                     if (item.location1 && item.sh_qty) {
                         const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
-                        const qty1 = Number(item.sh_qty);
-                        locationStock[loc1] = (locationStock[loc1] || 0) + qty1;
+                        secondaryQty = Number(item.sh_qty);
+                        locationStock[loc1] = (locationStock[loc1] || 0) + secondaryQty;
+                    }
+
+                    // 2. Process Primary Location (Daekyung/Yangsan)
+                    if (item.location && item.ready_qty) {
+                        const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
+                        const totalQty = Number(item.ready_qty);
+                        
+                        // If primary is Daekyung/Yangsan and secondary is Sihwa, the ready_qty is the total sum.
+                        // We must subtract the secondary (Sihwa) quantity to get the true Daekyung quantity.
+                        if ((primaryLoc === '대경' || primaryLoc === '양산') && secondaryQty > 0) {
+                            locationStock[primaryLoc] = Math.max(0, totalQty - secondaryQty);
+                        } else {
+                            // Otherwise, just use the ready_qty or add it to existing
+                            locationStock[primaryLoc] = (locationStock[primaryLoc] || 0) + totalQty;
+                        }
                     }
                 }
 
