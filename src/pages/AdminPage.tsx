@@ -245,7 +245,7 @@ export default function AdminPage() {
                 let unitCost = 0;
                 
                 const displayCustomerForCheck = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
-                const isSeoulInventory = displayCustomerForCheck.includes('서울재고') || displayCustomerForCheck.includes('시화재고');
+                const isSeoulInventory = displayCustomerForCheck.includes('서울재고') || displayCustomerForCheck.includes('시화재고') || displayCustomerForCheck.includes('알트에프') || displayCustomerForCheck.toLowerCase().includes('altf');
 
                 if (!isSeoulInventory) {
                     if (item.supplierPriceOverride !== undefined) {
@@ -419,7 +419,7 @@ export default function AdminPage() {
                                             // Use PO Items if available (meaning supplier selection happened), else fallback to inventory cost estimation
                                             const targetItems = (order.po_items && order.po_items.length > 0) ? order.po_items : order.items;
                                             const displayCustomerForCheck = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
-                                            const isSeoulInventory = displayCustomerForCheck.includes('서울재고') || displayCustomerForCheck.includes('시화재고');
+                                            const isSeoulInventory = displayCustomerForCheck.includes('서울재고') || displayCustomerForCheck.includes('시화재고') || displayCustomerForCheck.includes('알트에프') || displayCustomerForCheck.toLowerCase().includes('altf');
                                             
                                             const totalBuyingCost = isSeoulInventory ? 0 : targetItems.reduce((acc, item) => {
                                                 // Optimized Lookup

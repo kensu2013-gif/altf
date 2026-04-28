@@ -578,7 +578,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     supplierPrice = Math.round((basePrice * (100 - supplierRate) / 100) / 10) * 10;
                 }
 
-                const isSeoulInventory = (poEndCustomer || order.customerName || '').includes('서울재고') || (poEndCustomer || order.customerName || '').includes('시화재고');
+                const custName = (poEndCustomer || order.customerName || '').toLowerCase();
+                const isSeoulInventory = custName.includes('서울재고') || custName.includes('시화재고') || custName.includes('알트에프') || custName.includes('altf');
                 const finalSupplierPrice = isSeoulInventory ? 0 : supplierPrice;
 
                 return {
@@ -604,9 +605,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 };
             }),
             totals: {
-                total_amount: ((poEndCustomer || order.customerName || '').includes('서울재고') || (poEndCustomer || order.customerName || '').includes('시화재고')) ? 0 : totalSupplierAmount,
+                total_amount: ((poEndCustomer || order.customerName || '').toLowerCase().includes('서울재고') || (poEndCustomer || order.customerName || '').toLowerCase().includes('시화재고') || (poEndCustomer || order.customerName || '').toLowerCase().includes('알트에프') || (poEndCustomer || order.customerName || '').toLowerCase().includes('altf')) ? 0 : totalSupplierAmount,
                 currency: 'KRW',
-                final_amount: ((poEndCustomer || order.customerName || '').includes('서울재고') || (poEndCustomer || order.customerName || '').includes('시화재고')) ? 0 : totalSupplierAmount // VAT excluded in display usually, but PO total fits here
+                final_amount: ((poEndCustomer || order.customerName || '').toLowerCase().includes('서울재고') || (poEndCustomer || order.customerName || '').toLowerCase().includes('시화재고') || (poEndCustomer || order.customerName || '').toLowerCase().includes('알트에프') || (poEndCustomer || order.customerName || '').toLowerCase().includes('altf')) ? 0 : totalSupplierAmount // VAT excluded in display usually, but PO total fits here
             },
             footer: {
                 message: '',
@@ -2583,7 +2584,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     실제 송금액(Payable)
                                                                 </div>
                                                                 <span className="text-xs font-bold text-indigo-700 mb-1"> 총 매입 금액(Supplier Total) </span>
-                                                                <span className="font-mono text-2xl font-bold text-indigo-700"> {formatCurrency(((poEndCustomer || order.customerName || '').includes('서울재고') || (poEndCustomer || order.customerName || '').includes('시화재고')) ? 0 : totalSupplierAmount)} </span>
+                                                                <span className="font-mono text-2xl font-bold text-indigo-700"> {formatCurrency(((poEndCustomer || order.customerName || '').toLowerCase().includes('서울재고') || (poEndCustomer || order.customerName || '').toLowerCase().includes('시화재고') || (poEndCustomer || order.customerName || '').toLowerCase().includes('알트에프') || (poEndCustomer || order.customerName || '').toLowerCase().includes('altf')) ? 0 : totalSupplierAmount)} </span>
                                                             </div>
 
                                                             {/* Equal Pattern */}

@@ -426,7 +426,8 @@ export default function Customers() {
         const freqs: Record<string, number> = {};
         orders.forEach(o => {
             if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN') return;
-            if ((o.customerName || '').includes('서울재고')) return;
+            const lowerName = (o.customerName || '').toLowerCase();
+            if (lowerName.includes('서울재고') || lowerName.includes('시화재고') || lowerName.includes('알트에프') || lowerName.includes('altf')) return;
             const stripped = stripCorp(o.customerName);
             freqs[stripped] = (freqs[stripped] || 0) + 1;
         });
@@ -458,7 +459,7 @@ export default function Customers() {
 
             // Exclude ALL internal stock orders (e.g. 서울재고)
             const fullCustomerName = (oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || '').toLowerCase();
-            if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
+            if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
             
             const cleanOrderName = stripCorp(o.customerName);
             const customer = customersList.find(c => {
@@ -574,7 +575,7 @@ export default function Customers() {
             
             // Rigorous check to exclude ALL internal stock orders (e.g. 서울재고)
             const fullCustomerName = (oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || '').toLowerCase();
-            if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
+            if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
             
             const cleanOrderName = stripCorp(o.customerName);
             const customer = customersList.find(c => {
@@ -666,7 +667,7 @@ export default function Customers() {
             if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN' || oExt.isDeleted) return;
 
             const fullCustomerName = (oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || '').toLowerCase();
-            if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
+            if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
             
             const cleanOrderName = stripCorp(o.customerName);
             const customer = customersList.find(c => {
@@ -773,7 +774,7 @@ export default function Customers() {
             if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN' || oExt.isDeleted) return;
 
             const fullCustomerName = (oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || '').toLowerCase();
-            if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
+            if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
             
             const cleanOrderName = stripCorp(o.customerName);
             const customer = customersList.find(c => {
@@ -959,6 +960,8 @@ export default function Customers() {
         if (
           fullCustomerName.includes('서울재고') ||
           fullCustomerName.includes('시화재고') ||
+          fullCustomerName.includes('알트에프') ||
+          fullCustomerName.includes('altf') ||
           fullCustomerName.includes('재고입고') ||
           fullCustomerName.includes('stock')
         ) return;
@@ -1231,6 +1234,7 @@ const actionIntel = useMemo(() => {
     ).toLowerCase();
     if (
       fullCust.includes('서울재고') || fullCust.includes('시화재고') ||
+      fullCust.includes('알트에프') || fullCust.includes('altf') ||
       fullCust.includes('재고입고') || fullCust.includes('stock')
     ) return;
 

@@ -1117,7 +1117,7 @@ export default function SihwaInventory() {
         if (o.isDeleted) return;
         // 내부 재고 이동 주문 제외
         const custStr = (o.poEndCustomer || o.customerName || '').toLowerCase();
-        if (custStr.includes('재고') || custStr.includes('시화') || custStr.includes('서울')) return;
+        if (custStr.includes('재고') || custStr.includes('시화') || custStr.includes('서울') || custStr.includes('알트에프') || custStr.includes('altf')) return;
 
         const items = o.po_items?.length ? o.po_items : o.items;
         items?.forEach(item => {
@@ -1256,7 +1256,7 @@ export default function SihwaInventory() {
             if (!map[dateKey]) map[dateKey] = {};
             
             const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
-            const isSihwaIncoming = customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화');
+            const isSihwaIncoming = customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf');
             
             const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
             if (!items) return;
@@ -1294,7 +1294,7 @@ export default function SihwaInventory() {
             const dateKey = kstDt.toISOString().split('T')[0];
             
             const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
-            const isSihwaIncoming = customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화');
+            const isSihwaIncoming = customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf');
             
             if (isSihwaIncoming) {
                 const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
@@ -1336,7 +1336,7 @@ export default function SihwaInventory() {
                 if (order.status === 'COMPLETED') return;
                 
                 const targetCustomer = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
-                const isSihwaIncoming = targetCustomer.includes('재고') || targetCustomer.includes('서울') || targetCustomer.includes('시화');
+                const isSihwaIncoming = targetCustomer.includes('재고') || targetCustomer.includes('서울') || targetCustomer.includes('시화') || targetCustomer.includes('알트에프') || targetCustomer.includes('altf');
                 
                 if (isSihwaIncoming) {
                     const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
