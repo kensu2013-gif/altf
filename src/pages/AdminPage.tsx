@@ -243,13 +243,19 @@ export default function AdminPage() {
 
                 // Buying Cost
                 let unitCost = 0;
-                if (item.supplierPriceOverride !== undefined) {
-                    unitCost = item.supplierPriceOverride;
-                } else if (item.supplierRate !== undefined) {
-                    unitCost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
-                } else {
-                    const rate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
-                    unitCost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+                
+                const displayCustomerForCheck = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
+                const isSeoulInventory = displayCustomerForCheck.includes('서울재고') || displayCustomerForCheck.includes('시화재고');
+
+                if (!isSeoulInventory) {
+                    if (item.supplierPriceOverride !== undefined) {
+                        unitCost = item.supplierPriceOverride;
+                    } else if (item.supplierRate !== undefined) {
+                        unitCost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
+                    } else {
+                        const rate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
+                        unitCost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+                    }
                 }
                 const totalCost = unitCost * item.quantity;
 
@@ -412,7 +418,10 @@ export default function AdminPage() {
                                             // Calculate Total Buying Cost
                                             // Use PO Items if available (meaning supplier selection happened), else fallback to inventory cost estimation
                                             const targetItems = (order.po_items && order.po_items.length > 0) ? order.po_items : order.items;
-                                            const totalBuyingCost = targetItems.reduce((acc, item) => {
+                                            const displayCustomerForCheck = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
+                                            const isSeoulInventory = displayCustomerForCheck.includes('서울재고') || displayCustomerForCheck.includes('시화재고');
+                                            
+                                            const totalBuyingCost = isSeoulInventory ? 0 : targetItems.reduce((acc, item) => {
                                                 // Optimized Lookup
                                                 const product = findProduct(item);
 

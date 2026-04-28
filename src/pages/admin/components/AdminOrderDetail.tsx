@@ -578,6 +578,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     supplierPrice = Math.round((basePrice * (100 - supplierRate) / 100) / 10) * 10;
                 }
 
+                const isSeoulInventory = (poEndCustomer || order.customerName || '').includes('서울재고') || (poEndCustomer || order.customerName || '').includes('시화재고');
+                const finalSupplierPrice = isSeoulInventory ? 0 : supplierPrice;
+
                 return {
                     no: idx + 1,
                     item_name: item.name || '',
@@ -586,8 +589,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     size: item.size || '',
                     material: item.material || '',
                     qty: item.quantity,
-                    unit_price: supplierPrice,
-                    amount: supplierPrice * item.quantity,
+                    unit_price: finalSupplierPrice,
+                    amount: finalSupplierPrice * item.quantity,
                     note: '',
                     stock_qty: product?.currentStock ?? item.currentStock ?? 0,
                     stock_status: (item.marking_wait_qty || 0) > 0
@@ -601,9 +604,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 };
             }),
             totals: {
-                total_amount: totalSupplierAmount,
+                total_amount: ((poEndCustomer || order.customerName || '').includes('서울재고') || (poEndCustomer || order.customerName || '').includes('시화재고')) ? 0 : totalSupplierAmount,
                 currency: 'KRW',
-                final_amount: totalSupplierAmount // VAT excluded in display usually, but PO total fits here
+                final_amount: ((poEndCustomer || order.customerName || '').includes('서울재고') || (poEndCustomer || order.customerName || '').includes('시화재고')) ? 0 : totalSupplierAmount // VAT excluded in display usually, but PO total fits here
             },
             footer: {
                 message: '',
@@ -2580,7 +2583,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     실제 송금액(Payable)
                                                                 </div>
                                                                 <span className="text-xs font-bold text-indigo-700 mb-1"> 총 매입 금액(Supplier Total) </span>
-                                                                <span className="font-mono text-2xl font-bold text-indigo-700"> {formatCurrency(totalSupplierAmount)} </span>
+                                                                <span className="font-mono text-2xl font-bold text-indigo-700"> {formatCurrency(((poEndCustomer || order.customerName || '').includes('서울재고') || (poEndCustomer || order.customerName || '').includes('시화재고')) ? 0 : totalSupplierAmount)} </span>
                                                             </div>
 
                                                             {/* Equal Pattern */}
