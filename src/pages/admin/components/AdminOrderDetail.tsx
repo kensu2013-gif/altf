@@ -2973,6 +2973,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                             }
                         }}
                     />
+                    </div>
                 )
             }
 
