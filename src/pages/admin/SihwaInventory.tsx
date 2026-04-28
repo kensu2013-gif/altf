@@ -2628,7 +2628,8 @@ export default function SihwaInventory() {
                                                 </td>
                                             </tr>
                                             );
-                                        })}
+                                        });
+                                        })()}
                                     </tbody>
                                 </table>
                                 </div>
