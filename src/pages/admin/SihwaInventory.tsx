@@ -13,7 +13,8 @@ import {
     Activity,
     Info,
     Download,
-    ShoppingCart
+    ShoppingCart,
+    Filter
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
@@ -230,6 +231,15 @@ export default function SihwaInventory() {
             key,
             direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
         }));
+    };
+
+    const [activeTagFilters, setActiveTagFilters] = useState<string[]>([]);
+    const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
+
+    const toggleTagFilter = (tag: string) => {
+        setActiveTagFilters(prev => 
+            prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+        );
     };
 
     const toggleGroup = (key: string) => {
@@ -2463,7 +2473,7 @@ export default function SihwaInventory() {
                                 <table className="w-full text-left text-sm whitespace-nowrap">
                                     <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none">
                                         <tr>
-                                            <th className="px-4 py-3 group">
+                                            <th className="px-4 py-3 group relative">
                                                 <div className="flex items-center gap-2">
                                                     <span className="cursor-pointer hover:text-slate-800 transition" onClick={() => handleSort('id')}>
                                                         품목 ID {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}
@@ -2471,6 +2481,36 @@ export default function SihwaInventory() {
                                                     <span className="text-[10px] bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded cursor-pointer hover:bg-indigo-100 transition border border-indigo-100" onClick={() => handleSort('statusRank')} title="태그(상태) 우선순위로 정렬합니다">
                                                         태그정렬 {sortConfig.key==='statusRank' && (sortConfig.direction==='asc'?'↑':'↓')}
                                                     </span>
+                                                    <div className="relative">
+                                                        <button 
+                                                            onClick={() => setIsTagFilterOpen(!isTagFilterOpen)}
+                                                            className={`p-1 rounded transition ${activeTagFilters.length > 0 ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400 hover:bg-slate-200'}`}
+                                                            title="태그로 필터링"
+                                                        >
+                                                            <Filter size={14} className={activeTagFilters.length > 0 ? 'fill-current' : ''} />
+                                                        </button>
+                                                        {isTagFilterOpen && (
+                                                            <div className="absolute top-full left-0 mt-1 w-36 bg-white border border-slate-200 shadow-xl rounded-lg py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
+                                                                <div className="px-3 pb-2 mb-2 border-b border-slate-100 flex justify-between items-center">
+                                                                    <span className="text-[10px] font-black text-slate-500">필터 선택</span>
+                                                                    {activeTagFilters.length > 0 && (
+                                                                        <span className="text-[9px] text-rose-500 cursor-pointer hover:underline" onClick={() => setActiveTagFilters([])}>초기화</span>
+                                                                    )}
+                                                                </div>
+                                                                {['선발주', '일반', '정기발주', '부족', '과잉', '악성'].map(tag => (
+                                                                    <label key={tag} className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs font-medium text-slate-700">
+                                                                        <input 
+                                                                            type="checkbox" 
+                                                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                                            checked={activeTagFilters.includes(tag)}
+                                                                            onChange={() => toggleTagFilter(tag)}
+                                                                        />
+                                                                        {tag}
+                                                                    </label>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </th>
                                             <th className="px-4 py-3 text-center group relative cursor-help">
@@ -2522,7 +2562,22 @@ export default function SihwaInventory() {
                                                 return 99;
                                             };
 
-                                            const displayList = [...analyzedInventory];
+                                            let displayList = [...analyzedInventory];
+
+                                            if (activeTagFilters.length > 0) {
+                                                displayList = displayList.filter(row => {
+                                                    const tags = [];
+                                                    if (criticalSet.has(row.product.id)) tags.push('선발주');
+                                                    if (warningSet.has(row.product.id)) tags.push('일반');
+                                                    if (regularSet.has(row.product.id)) tags.push('정기발주');
+                                                    if (row.deficit > 0) tags.push('부족');
+                                                    if (row.isExcessStock) tags.push('과잉');
+                                                    if (row.isDeadStock) tags.push('악성');
+                                                    
+                                                    // Show row if it has AT LEAST ONE of the active filters
+                                                    return activeTagFilters.some(filterTag => tags.includes(filterTag));
+                                                });
+                                            }
                                             
                                             // Apply statusRank sorting if selected
                                             if (sortConfig.key === 'statusRank') {
@@ -2554,7 +2609,15 @@ export default function SihwaInventory() {
                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                         <span>{row.product.id === 'UNKNOWN' && row.product.name ? `UNKNOWN (${row.product.name})` : row.product.id}</span>
                                                         {rowTags.map((tag, idx) => (
-                                                            <span key={idx} className={`text-[9px] px-1 py-0.5 rounded font-black tracking-tight ${tag.className}`}>
+                                                            <span 
+                                                                key={idx} 
+                                                                className={`text-[9px] px-1 py-0.5 rounded font-black tracking-tight cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-indigo-300 transition ${tag.className} ${activeTagFilters.includes(tag.label) ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    toggleTagFilter(tag.label);
+                                                                }}
+                                                                title="클릭하여 필터 토글"
+                                                            >
                                                                 {tag.label}
                                                             </span>
                                                         ))}
