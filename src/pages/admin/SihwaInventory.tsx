@@ -205,6 +205,7 @@ export default function SihwaInventory() {
     
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE' | 'HEALTH_DIAGNOSIS'>('AI_SUMMARY');
+    const [allTableFilter, setAllTableFilter] = useState<'ALL' | 'CRITICAL' | 'WARNING' | 'REGULAR' | 'EXCESS' | 'DEFICIT' | 'DEAD_STOCK'>('ALL');
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
         'CRITICAL': true,
         'WARNING': true,
@@ -1603,16 +1604,16 @@ export default function SihwaInventory() {
                             AI 요약보기 (발주 추천)
                         </button>
                         <button 
-                            className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'TOTAL_DASHBOARD' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            onClick={() => setActiveTab('TOTAL_DASHBOARD')}
-                        >
-                            월간·일간 변동 트렌드
-                        </button>
-                        <button 
                             className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'ALL_TABLE' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             onClick={() => setActiveTab('ALL_TABLE')}
                         >
                             전체 재고 리스트(정렬지원)
+                        </button>
+                        <button 
+                            className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'TOTAL_DASHBOARD' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            onClick={() => setActiveTab('TOTAL_DASHBOARD')}
+                        >
+                            월간·일간 변동 트렌드
                         </button>
                         <button
                           className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-1.5 ${
@@ -2459,6 +2460,44 @@ export default function SihwaInventory() {
 
                             {/* TAB 3: ALL TABLE WITH SORTING */}
                             {activeTab === 'ALL_TABLE' && (
+                                <div className="space-y-4">
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {[
+                                            { id: 'ALL', label: '전체 보기', color: 'bg-slate-200 text-slate-700 hover:bg-slate-300' },
+                                            { id: 'CRITICAL', label: '🚨 선발주', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200 border border-rose-200' },
+                                            { id: 'WARNING', label: '⚠️ 일반', color: 'bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-200' },
+                                            { id: 'REGULAR', label: '♻️ 정기발주', color: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border border-indigo-200' },
+                                            { id: 'DEFICIT', label: '📉 부족', color: 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-100' },
+                                            { id: 'EXCESS', label: '📦 과잉', color: 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-100' },
+                                            { id: 'DEAD_STOCK', label: '💀 악성', color: 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200' },
+                                        ].map(filter => (
+                                            <button
+                                                key={filter.id}
+                                                onClick={() => setAllTableFilter(filter.id as any)}
+                                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                                                    allTableFilter === filter.id 
+                                                        ? 'ring-2 ring-indigo-500 shadow-sm scale-105 ' + filter.color.replace('hover:', 'hover-disabled:')
+                                                        : filter.color + ' opacity-70 hover:opacity-100'
+                                                }`}
+                                            >
+                                                {filter.label}
+                                                {allTableFilter === filter.id && (
+                                                    <span className="ml-1.5 bg-white/50 px-1.5 py-0.5 rounded text-[10px]">
+                                                        {(() => {
+                                                            if (filter.id === 'ALL') return analyzedInventory.length;
+                                                            if (filter.id === 'CRITICAL') return stats.critical.length;
+                                                            if (filter.id === 'WARNING') return stats.warning.length;
+                                                            if (filter.id === 'REGULAR') return stats.regular.length;
+                                                            if (filter.id === 'DEFICIT') return analyzedInventory.filter(r => r.deficit > 0).length;
+                                                            if (filter.id === 'EXCESS') return analyzedInventory.filter(r => r.isExcessStock).length;
+                                                            if (filter.id === 'DEAD_STOCK') return analyzedInventory.filter(r => r.isDeadStock).length;
+                                                            return 0;
+                                                        })()}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
                                 <table className="w-full text-left text-sm whitespace-nowrap">
                                     <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none">
                                         <tr>
@@ -2497,8 +2536,31 @@ export default function SihwaInventory() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {analyzedInventory.slice(0, 500).map(row => (
-                                            <tr key={row.product.id} className="hover:bg-slate-50 group">
+                                        {(() => {
+                                            let filtered = analyzedInventory;
+                                            if (allTableFilter === 'CRITICAL') {
+                                                const set = new Set(stats.critical.map(i => i.product.id));
+                                                filtered = filtered.filter(r => set.has(r.product.id));
+                                            } else if (allTableFilter === 'WARNING') {
+                                                const set = new Set(stats.warning.map(i => i.product.id));
+                                                filtered = filtered.filter(r => set.has(r.product.id));
+                                            } else if (allTableFilter === 'REGULAR') {
+                                                const set = new Set(stats.regular.map(i => i.product.id));
+                                                filtered = filtered.filter(r => set.has(r.product.id));
+                                            } else if (allTableFilter === 'EXCESS') {
+                                                filtered = filtered.filter(r => r.isExcessStock);
+                                            } else if (allTableFilter === 'DEFICIT') {
+                                                filtered = filtered.filter(r => r.deficit > 0);
+                                            } else if (allTableFilter === 'DEAD_STOCK') {
+                                                filtered = filtered.filter(r => r.isDeadStock);
+                                            }
+                                            
+                                            if (filtered.length === 0) {
+                                                return <tr><td colSpan={11} className="py-10 text-center text-slate-400 font-medium">해당 조건에 맞는 품목이 없습니다.</td></tr>;
+                                            }
+
+                                            return filtered.slice(0, 500).map(row => (
+                                                <tr key={row.product.id} className="hover:bg-slate-50 group">
                                                 <td className="px-4 py-2 font-mono font-bold text-slate-700">
                                                     {row.product.id}
                                                     {row.isExcessStock && <span className="ml-1 text-[9px] bg-orange-100 text-orange-600 px-1 rounded font-bold">과잉</span>}
@@ -2570,9 +2632,11 @@ export default function SihwaInventory() {
                                                     </div>
                                                 </td>
                                             </tr>
-                                        ))}
+                                            ));
+                                        })()}
                                     </tbody>
                                 </table>
+                                </div>
                             )}
                             
 {/* ════════════════════════════════════════════════
