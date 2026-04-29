@@ -2678,9 +2678,15 @@ export default function SihwaInventory() {
                                                 ) : <span className="text-slate-200">—</span>}
                                                 </td>
                                                 <td className="px-4 py-2 text-center text-slate-600">
-                                                    <div className="flex flex-col items-center">
-                                                        <span className="font-black text-slate-800"><span className="text-[9px] text-slate-400 mr-1 font-bold">견적</span>{row.quoteCount.toLocaleString()} <span className="text-[9px] text-slate-400">회</span></span>
-                                                        <span className="font-bold text-indigo-500 text-[10px]"><span className="text-[9px] text-indigo-400 mr-1 font-bold">발주</span>{row.recent60dOrderCount.toLocaleString()} <span className="text-[9px] text-indigo-300">회</span></span>
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <span className="font-black text-slate-800 text-[12px]">
+                                                            {row.recent60dSales.toLocaleString()}<span className="text-[10px] text-slate-500 font-bold ml-0.5 mr-1">개 /</span>{row.recent60dOrderCount.toLocaleString()}<span className="text-[10px] text-slate-500 font-bold ml-0.5">회출고</span>
+                                                        </span>
+                                                        <div className="flex items-center gap-1 text-[10px] bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 shadow-sm">
+                                                            <span className="text-slate-500 font-bold">견적</span><span className="font-black text-indigo-600">{row.quoteCount.toLocaleString()}</span><span className="text-slate-400">건</span>
+                                                            <span className="w-px h-2.5 bg-slate-300 mx-0.5"></span>
+                                                            <span className="text-slate-500 font-bold">발주</span><span className="font-black text-emerald-600">{row.recent60dOrderCount.toLocaleString()}</span><span className="text-slate-400">건</span>
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-2 text-right text-slate-600">
