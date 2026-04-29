@@ -474,6 +474,7 @@ export default function SihwaInventory() {
         recent30dSales: number;
         recent60dSales: number;
         quoteCount: number;
+        recent60dOrderCount: number;
         daekyungDirectRatio: number;
         profitMarginRate: number;
         compositeScore: number;
@@ -569,10 +570,36 @@ export default function SihwaInventory() {
             const quoteDate = new Date(quote.createdAt).getTime();
             if (isNaN(quoteDate) || quoteDate < sixtyDaysAgo) return; // Only count recent 60 days
             
+            const customerStr = (quote.customerName || quote.customerInfo?.companyName || quote.customerInfo?.contactName || '').toLowerCase().replace(/\s+/g, '');
+            if (customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf')) return;
+
             quote.items.forEach(item => {
                 const id = item.productId || (item as { item_id?: string }).item_id;
                 if (!id) return;
                 quoteCountMap[id] = (quoteCountMap[id] || 0) + 1;
+            });
+        });
+
+        const recent60dOrderCountMap: Record<string, number> = {};
+        orders.forEach(order => {
+            if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
+            if (order.status !== 'COMPLETED') return;
+            
+            const orderDate = new Date(order.createdAt).getTime();
+            if (isNaN(orderDate) || orderDate < sixtyDaysAgo) return;
+
+            const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
+            if (customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf')) return;
+            
+            const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
+            if (!items) return;
+
+            items.forEach((item: Partial<LineItem> & { item_id?: string; qty?: number }) => {
+                const id = item.productId || item.item_id;
+                if (!id) return;
+                const qty = Number(item.quantity ?? item.qty ?? 0);
+                if (qty <= 0) return;
+                recent60dOrderCountMap[id] = (recent60dOrderCountMap[id] || 0) + 1;
             });
         });
 
@@ -630,6 +657,7 @@ export default function SihwaInventory() {
                     recent30dSales: recentSales.recent30d,
                     recent60dSales: recentSales.recent60d,
                     quoteCount: quoteCountMap[item.id] || 0,
+                    recent60dOrderCount: recent60dOrderCountMap[item.id] || 0,
                     daekyungDirectRatio,
                     profitMarginRate,
                     compositeScore: 0,
@@ -699,6 +727,7 @@ export default function SihwaInventory() {
                         recent30dSales: recentSales.recent30d,
                         recent60dSales: recentSales.recent60d,
                         quoteCount: quoteCountMap[id] || 0,
+                        recent60dOrderCount: recent60dOrderCountMap[id] || 0,
                         daekyungDirectRatio,
                         profitMarginRate,
                         compositeScore: 0,
@@ -2650,8 +2679,8 @@ export default function SihwaInventory() {
                                                 </td>
                                                 <td className="px-4 py-2 text-center text-slate-600">
                                                     <div className="flex flex-col items-center">
-                                                        <span className="font-black text-slate-800">{row.recent60dSales.toLocaleString()} <span className="text-[9px] text-slate-400">개</span></span>
-                                                        <span className="font-bold text-indigo-500 text-[10px]">{row.quoteCount.toLocaleString()} <span className="text-[9px] text-indigo-300">건</span></span>
+                                                        <span className="font-black text-slate-800"><span className="text-[9px] text-slate-400 mr-1 font-bold">견적</span>{row.quoteCount.toLocaleString()} <span className="text-[9px] text-slate-400">회</span></span>
+                                                        <span className="font-bold text-indigo-500 text-[10px]"><span className="text-[9px] text-indigo-400 mr-1 font-bold">발주</span>{row.recent60dOrderCount.toLocaleString()} <span className="text-[9px] text-indigo-300">회</span></span>
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-2 text-right text-slate-600">
