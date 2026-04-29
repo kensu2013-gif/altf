@@ -14,7 +14,8 @@ import {
     Info,
     Download,
     ShoppingCart,
-    Filter
+    Filter,
+    X
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
@@ -218,6 +219,7 @@ export default function SihwaInventory() {
     const [selectedCriticalIds, setSelectedCriticalIds] = useState<Set<string>>(new Set());
     const [selectedWarningIds, setSelectedWarningIds] = useState<Set<string>>(new Set());
     const [selectedRegularIds, setSelectedRegularIds] = useState<Set<string>>(new Set());
+    const [selectedAllTableIds, setSelectedAllTableIds] = useState<Set<string>>(new Set());
     
     const [expandedTrendItems, setExpandedTrendItems] = useState<Record<string, boolean>>({});
     const [expandedDailyGroups, setExpandedDailyGroups] = useState<Record<string, boolean>>({});
@@ -1139,6 +1141,35 @@ export default function SihwaInventory() {
         if (selectedCriticalIds.size > 0) processOrderSet(selectedCriticalIds, 'CRITICAL');
         if (selectedWarningIds.size > 0) processOrderSet(selectedWarningIds, 'WARNING');
         if (selectedRegularIds.size > 0) processOrderSet(selectedRegularIds, 'REGULAR');
+        navigate('/cart');
+    };
+
+    const handleCreateManualOrder = () => {
+        if (selectedAllTableIds.size === 0) return;
+        
+        analyzedInventory.forEach(row => {
+            if (selectedAllTableIds.has(row.product.id)) {
+                let qty = row.safeStock - (row.shQty + row.pendingOrderQty);
+                if (qty <= 0) qty = 10;
+                else qty = Math.ceil(qty / 10) * 10;
+                
+                addItem({
+                    id: crypto.randomUUID(),
+                    productId: row.product.id,
+                    name: row.product.name || '',
+                    thickness: row.product.thickness || '',
+                    size: row.product.size || '',
+                    material: row.product.material || '',
+                    quantity: qty,
+                    unitPrice: row.recentPurchasePrice > 0 ? row.recentPurchasePrice : row.sellingPrice,
+                    amount: (row.recentPurchasePrice > 0 ? row.recentPurchasePrice : row.sellingPrice) * qty,
+                    note: `[수동 추가]`,
+                    isVerified: false
+                });
+            }
+        });
+        
+        setSelectedAllTableIds(new Set());
         navigate('/cart');
     };
 
@@ -2533,8 +2564,11 @@ export default function SihwaInventory() {
                                 <div className="space-y-4">
                                 <table className="w-full text-left text-sm whitespace-nowrap">
                                     <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none">
-                                        <tr>
-                                            <th className="px-4 py-3 group relative">
+                                        <tr className="text-xs uppercase tracking-wider text-slate-500 font-bold border-b-2 border-slate-200">
+                                            <th className="px-3 py-3 w-10 text-center border-r border-slate-200">
+                                                <span className="text-[10px] text-slate-400">선택</span>
+                                            </th>
+                                            <th className="px-4 py-3 group relative text-left">
                                                 <div className="flex items-center gap-2">
                                                     <span className="cursor-pointer hover:text-slate-800 transition" onClick={() => handleSort('id')}>
                                                         품목 ID {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}
@@ -2676,7 +2710,23 @@ export default function SihwaInventory() {
                                                 if (row.isDeadStock) rowTags.push({ label: '악성', className: 'bg-slate-100 text-slate-500 border border-slate-200' });
 
                                                 return (
-                                                <tr key={row.product.id} className="hover:bg-slate-50 group">
+                                                <tr key={row.product.id} className={`hover:bg-slate-50 group ${selectedAllTableIds.has(row.product.id) ? 'bg-indigo-50/50' : ''}`}>
+                                                <td className="px-3 py-2 text-center border-r border-slate-100">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                        checked={selectedAllTableIds.has(row.product.id)}
+                                                        onChange={(e) => {
+                                                            setSelectedAllTableIds(prev => {
+                                                                const next = new Set(prev);
+                                                                if (e.target.checked) next.add(row.product.id);
+                                                                else next.delete(row.product.id);
+                                                                return next;
+                                                            });
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                </td>
                                                 <td className="px-4 py-2 font-mono font-bold text-slate-700">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                         <span>{row.product.id === 'UNKNOWN' && row.product.name ? `UNKNOWN (${row.product.name})` : row.product.id}</span>
@@ -2776,6 +2826,29 @@ export default function SihwaInventory() {
                                         })()}
                                     </tbody>
                                 </table>
+                                {selectedAllTableIds.size > 0 && (
+                                    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 rounded-full shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] border border-slate-700 px-6 py-3 flex items-center gap-6 z-[100] animate-in slide-in-from-bottom-10 fade-in duration-300">
+                                        <div className="font-bold text-white">
+                                            <span className="text-indigo-400 font-black text-xl">{selectedAllTableIds.size}</span>
+                                            <span className="text-slate-300 ml-2">개 품목 선택됨</span>
+                                        </div>
+                                        <div className="w-px h-6 bg-slate-600"></div>
+                                        <button 
+                                            onClick={handleCreateManualOrder}
+                                            className="bg-indigo-500 hover:bg-indigo-400 text-white font-bold px-6 py-2.5 rounded-full transition-colors shadow-lg flex items-center gap-2 border border-indigo-400"
+                                        >
+                                            <PackageSearch className="w-4 h-4" />
+                                            선택 품목 장바구니에 담기
+                                        </button>
+                                        <button 
+                                            onClick={() => setSelectedAllTableIds(new Set())}
+                                            className="text-slate-400 hover:text-white transition-colors"
+                                            title="선택 해제"
+                                        >
+                                            <X className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                )}
                                 </div>
                             )}
                             
