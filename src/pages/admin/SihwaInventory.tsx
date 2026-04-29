@@ -828,6 +828,18 @@ export default function SihwaInventory() {
                 safeStock = Math.round((safeStock * 0.7) / 10) * 10; // 1개월치 이상 대경 보유시 30% 삭감
             }
 
+            // 4.5. 최근 60일 실적(트렌드) 기반 동적 페널티
+            // 수요 급감 시 적정재고 삭감. 단, 연간 판매빈도/수량이 높거나 대경재고가 넉넉할 때는 덜 삭감함.
+            if (row.salesVolume > 0 && row.recent60dSales === 0 && row.quoteCount === 0 && row.recent60dOrderCount === 0) {
+                if ((row.salesFreq >= 30 && row.salesVolume >= 100) || row.ysQty >= 500) {
+                    safeStock = Math.round((safeStock * 0.4) / 10) * 10; // 60% 삭감
+                } else {
+                    safeStock = Math.round((safeStock * 0.2) / 10) * 10; // 80% 삭감
+                }
+            } else if (row.salesVolume > 0 && row.recent60dSales <= Math.ceil((row.salesVolume / 12) * 0.5) && row.quoteCount === 0) {
+                safeStock = Math.round((safeStock * 0.5) / 10) * 10; // 50% 삭감
+            }
+
             // 5. WP 및 Material Filter Rules
             const mat = (row.product.material || '').toUpperCase();
             if (mat.startsWith('WP') || mat.includes('CARBON')) {
@@ -2726,7 +2738,10 @@ export default function SihwaInventory() {
                                                     ) : '-'}
                                                 </td>
                                                 <td className="px-4 py-2 text-right font-black font-mono text-indigo-600 bg-indigo-50/20">
-                                                    {row.shQty.toLocaleString()}
+                                                    <div className="flex flex-col items-end gap-0.5">
+                                                        <span>{row.shQty.toLocaleString()}</span>
+                                                        <span className="text-[10px] font-normal tracking-tight text-slate-500">적정: {row.safeStock.toLocaleString()}개</span>
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-2 text-right font-bold font-mono text-rose-500">
                                                     {row.pendingOrderQty > 0 ? `+${row.pendingOrderQty.toLocaleString()}` : <span className="text-slate-300">0</span>}
