@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { Order, LineItem, Product, User as UserType } from '../../../types';
 // import { generateSku } from '../../../lib/sku'; // REMOVED: Managed in useInventoryIndex
 import { useStore } from '../../../store/useStore';
-import { X, AlertTriangle, Check, Calendar, Package, User, Trash2, Plus, Download, FileText, Minus, Equal, Send, SplitSquareHorizontal, Image, Printer } from 'lucide-react';
+import { X, AlertTriangle, Check, Calendar, Package, User, Trash2, Plus, Download, FileText, Minus, Equal, Send, SplitSquareHorizontal, Image, Printer, ListChecks } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { useInventoryIndex } from '../../../hooks/useInventoryIndex';
 
@@ -721,19 +721,21 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         supplierName: '알트에프',
         supplierAddress: '부산광역시 사상구 낙동대로1330번길, 67',
         supplierContact: '조현진 대표', // Will be overridden on open if needed
-        supplierTel: '051-303-3751'
+        supplierTel: '051-303-3751',
+        selectedItemIndices: [] as number[]
     });
 
     const handleDownloadPackingList = () => {
-        if (selectedItems.length === 0) {
-            alert('출력할 품목을 선택해주세요.');
+        if (displayedItems.length === 0) {
+            alert('출력할 품목이 없습니다.');
             return;
         }
         
-        // Update default contact
+        // Update default contact and reset item selection to ALL
         setPackingListOptions(prev => ({
             ...prev,
-            supplierContact: buyerInfo.contact_name || user?.contactName || '조현진 대표'
+            supplierContact: buyerInfo.contact_name || user?.contactName || '조현진 대표',
+            selectedItemIndices: displayedItems.map((_, i) => i)
         }));
         
         setPackingListModalOpen(true);
@@ -766,7 +768,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     memo: transactionTrackingNo ? `[제품송장 번호]: ${transactionTrackingNo}\\n${shippingMemo}` : shippingMemo
                 } : {})
             },
-            items: selectedItems.map((item, index) => ({
+            items: packingListOptions.selectedItemIndices
+                .sort((a,b) => a - b)
+                .map(idx => displayedItems[idx])
+                .filter(Boolean)
+                .map((item, index) => ({
                 no: index + 1,
                 item_name: item.name,
                 thickness: item.thickness,
@@ -3007,6 +3013,44 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         </div>
 
                         <div className="space-y-6">
+                            {/* Item Selection Option */}
+                            <div className="space-y-3 p-4 bg-blue-50/50 rounded-lg border border-blue-100">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="font-bold text-slate-700 flex items-center gap-2">
+                                        <ListChecks className="w-4 h-4 text-blue-600" />
+                                        포장명세서에 포함할 품목 선택
+                                    </h4>
+                                    <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+                                        선택됨: {packingListOptions.selectedItemIndices.length}개
+                                    </span>
+                                </div>
+                                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-2 border border-blue-100 bg-white rounded-lg p-2 shadow-inner">
+                                    {displayedItems.map((item, idx) => (
+                                        <label key={idx} className="flex items-center gap-3 cursor-pointer text-sm hover:bg-slate-50 p-1.5 rounded transition-colors group">
+                                            <input 
+                                                type="checkbox" 
+                                                className="w-4 h-4 accent-blue-600 rounded cursor-pointer"
+                                                checked={packingListOptions.selectedItemIndices.includes(idx)}
+                                                onChange={e => {
+                                                    setPackingListOptions(prev => {
+                                                        const newIndices = e.target.checked 
+                                                            ? [...prev.selectedItemIndices, idx] 
+                                                            : prev.selectedItemIndices.filter(i => i !== idx);
+                                                        return { ...prev, selectedItemIndices: newIndices };
+                                                    });
+                                                }}
+                                            />
+                                            <span className="text-slate-700 font-bold truncate flex-1 flex items-center gap-2">
+                                                <span>{item.name}</span>
+                                                <span className="text-slate-500 font-normal">{item.size} {item.thickness}</span>
+                                                <span className="text-indigo-500 text-[10px] font-normal border border-indigo-200 bg-indigo-50 px-1 rounded">{item.material}</span>
+                                            </span>
+                                            <span className="text-slate-500 font-mono font-bold text-xs bg-slate-100 px-1.5 py-0.5 rounded group-hover:bg-white transition-colors">{item.quantity}개</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
                             {/* Customer Option */}
                             <div className="space-y-3 p-4 bg-slate-50 rounded-lg border border-slate-100">
                                 <label className="flex items-center gap-3 cursor-pointer">
@@ -3108,7 +3152,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                             <Button 
                                 className="bg-orange-600 hover:bg-orange-700 text-white font-bold px-6"
                                 onClick={confirmDownloadPackingList}
-                                disabled={!packingListOptions.includeCustomer && !packingListOptions.includeSupplier}
+                                disabled={(!packingListOptions.includeCustomer && !packingListOptions.includeSupplier) || packingListOptions.selectedItemIndices.length === 0}
                             >
                                 <Printer className="w-4 h-4 mr-2" /> 출력하기
                             </Button>
