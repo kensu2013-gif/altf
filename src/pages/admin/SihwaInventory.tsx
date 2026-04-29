@@ -189,9 +189,10 @@ interface InventoryHistorySnapshot {
 }
 
 export default function SihwaInventory() {
-    const { orders, quotes, user, addItem } = useStore(useShallow(state => ({ 
+    const { orders, quotes, users, user, addItem } = useStore(useShallow(state => ({ 
         orders: state.orders, 
         quotes: state.quotes,
+        users: state.users,
         user: state.auth.user,
         addItem: state.addItem
     })));
@@ -307,6 +308,8 @@ export default function SihwaInventory() {
 
     // 1.5 Fetch Orders to sync with inventory
     const setOrders = useStore(state => state.setOrders);
+    const setQuotes = useStore(state => state.setQuotes);
+    const fetchUsers = useStore(state => state.fetchUsers);
     useEffect(() => {
         if (!user) return;
 
@@ -336,8 +339,22 @@ export default function SihwaInventory() {
                 .catch(console.error);
         };
 
+        const fetchQuotes = () => {
+            fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations?limit=2000`, { headers, cache: 'no-store' })
+                .then(res => {
+                    if (res.ok) return res.json();
+                    throw new Error('Failed to fetch quotes');
+                })
+                .then(data => {
+                    if (Array.isArray(data)) setQuotes(data);
+                })
+                .catch(console.error);
+        };
+
         fetchOrders();
-    }, [setOrders, user]);
+        fetchQuotes();
+        fetchUsers();
+    }, [setOrders, setQuotes, fetchUsers, user]);
 
     // Filter out irrelevant orders
     const activeOrders = useMemo(() => {
@@ -570,7 +587,8 @@ export default function SihwaInventory() {
             const quoteDate = new Date(quote.createdAt).getTime();
             if (isNaN(quoteDate) || quoteDate < sixtyDaysAgo) return; // Only count recent 60 days
             
-            const customerStr = (quote.customerName || quote.customerInfo?.companyName || quote.customerInfo?.contactName || '').toLowerCase().replace(/\s+/g, '');
+            const quoteUser = users.find(u => u.id === quote.userId);
+            const customerStr = (quote.customerName || quote.customerInfo?.companyName || quote.customerInfo?.contactName || quoteUser?.companyName || '').toLowerCase().replace(/\s+/g, '');
             if (customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf')) return;
 
             quote.items.forEach(item => {
@@ -985,7 +1003,7 @@ export default function SihwaInventory() {
                 default: return 0; // Fallback
             }
         });
-    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, searchTerm, sortConfig, historyData, liveSalesHistory, quotes, orders]);
+    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, searchTerm, sortConfig, historyData, liveSalesHistory, quotes, orders, users]);
 
     // Aggregate stats and Asset Valuation totals
     const stats = useMemo(() => {
