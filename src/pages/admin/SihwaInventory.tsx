@@ -2714,6 +2714,7 @@ export default function SihwaInventory() {
                                                 <td className="px-3 py-2 text-center border-r border-slate-100">
                                                     <input 
                                                         type="checkbox" 
+                                                        aria-label={`${row.product.id} 품목 선택`}
                                                         className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                                                         checked={selectedAllTableIds.has(row.product.id)}
                                                         onChange={(e) => {
