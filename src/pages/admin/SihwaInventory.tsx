@@ -222,11 +222,11 @@ export default function SihwaInventory() {
     const [expandedDailyGroups, setExpandedDailyGroups] = useState<Record<string, boolean>>({});
 
     const [sortConfig, setSortConfig] = useState<{ 
-        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank', 
+        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank' | 'quoteCount' | 'recent60dOrderCount', 
         direction: 'asc' | 'desc' 
     }>({ key: 'deficit', direction: 'desc' });
 
-    const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank') => {
+    const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank' | 'quoteCount' | 'recent60dOrderCount') => {
         setSortConfig(prev => ({
             key,
             direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
@@ -980,6 +980,8 @@ export default function SihwaInventory() {
                 case 'turnoverRate': return (a.turnoverRate - b.turnoverRate) * dir;
                 case 'daysOnHand': return (a.daysOnHand - b.daysOnHand) * dir;
                 case 'safeStock': return (a.safeStock - b.safeStock) * dir;
+                case 'quoteCount': return (a.quoteCount - b.quoteCount) * dir;
+                case 'recent60dOrderCount': return (a.recent60dOrderCount - b.recent60dOrderCount) * dir;
                 default: return 0; // Fallback
             }
         });
@@ -2558,7 +2560,18 @@ export default function SihwaInventory() {
                                                 </div>
                                             </th>
                                             <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('turnoverRate')}>회전율 {sortConfig.key==='turnoverRate' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-center">최근 실적(60일)</th>
+                                            <th className="px-4 py-3 text-center">
+                                                최근 실적(60일)
+                                                <div className="flex items-center justify-center gap-2 mt-1 text-[10px] font-bold">
+                                                    <span className={`cursor-pointer transition ${sortConfig.key === 'quoteCount' ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-600'}`} onClick={() => handleSort('quoteCount')}>
+                                                        견적순 {sortConfig.key==='quoteCount' && (sortConfig.direction==='asc'?'↑':'↓')}
+                                                    </span>
+                                                    <span className="text-slate-300">|</span>
+                                                    <span className={`cursor-pointer transition ${sortConfig.key === 'recent60dOrderCount' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'}`} onClick={() => handleSort('recent60dOrderCount')}>
+                                                        발주순 {sortConfig.key==='recent60dOrderCount' && (sortConfig.direction==='asc'?'↑':'↓')}
+                                                    </span>
+                                                </div>
+                                            </th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-amber-700" onClick={() => handleSort('salesVolume')}>판매이력 {sortConfig.key==='salesVolume' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-indigo-700" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-600" onClick={() => handleSort('pendingOrderQty')}>입고대기 {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
