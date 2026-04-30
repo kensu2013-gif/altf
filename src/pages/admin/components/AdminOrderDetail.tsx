@@ -1389,7 +1389,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                 </h3>
 
                                 {/* PO Number & Title Inputs */}
-                                <div className="grid grid-cols-2 gap-6 mb-4 pb-4 border-b border-indigo-100">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4 pb-4 border-b border-indigo-100">
                                     <div>
                                         <label className="block text-xs font-bold text-indigo-700 mb-1"> 발주 번호(PO No.) </label>
                                         <input
@@ -1423,13 +1423,13 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         )}
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                     {/* Vendor Info */}
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between mb-2">
                                             <h4 className="text-xs font-bold text-indigo-700 uppercase"> 공급자(Vendor) - 매입처 </h4>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <input
                                                 placeholder="상호 (Company)"
                                                 value={supplierInfo.company_name}
@@ -1552,7 +1552,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <input
                                                 placeholder="상호"
                                                 value={buyerInfo.company_name}
@@ -1586,7 +1586,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         </div>
                                     </div>
                                     <div className="col-span-2 pt-4 border-t border-indigo-100">
-                                        <div className="grid grid-cols-2 gap-6">
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                             {/* Left: Supplier PO File */}
                                             <div>
                                                 <h4 className="text-xs font-bold text-indigo-700 uppercase mb-2"> 매입발주서 첨부(Supplier PO) </h4>
@@ -1750,7 +1750,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                     <User className="w-4 h-4 text-teal-600" />
                                     주문 및 배송 정보(Order & Shipping Info)
                                 </h3>
-                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                                     <div className="col-span-2 text-[10px] text-teal-600 bg-teal-50 px-2 py-1.5 rounded -mb-1 shadow-inner border border-teal-100 flex items-center justify-center font-bold">
                                         💡 기본 고객 정보(CUSTOMER)를 변경하시면, 시스템 전체의 업체명 및 사업자번호 등이 업데이트됩니다.
                                     </div>
@@ -2025,8 +2025,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                             <Package className={`w-4 h-4 ${isSupplierMode ? 'text-indigo-600' : 'text-teal-600'}`} />
                             {isSupplierMode ? '매입 발주 품목 및 단가 설정' : '주문 품목 및 재고 확인'}
                         </h3>
-                        <div className={`border rounded-xl overflow-hidden shadow-sm ${isSupplierMode ? 'border-indigo-200' : 'border-slate-200'}`}>
-                            <table className="w-full text-sm text-left">
+                        <div className={`border rounded-xl overflow-x-auto shadow-sm ${isSupplierMode ? 'border-indigo-200' : 'border-slate-200'}`}>
+                            <table className="w-full min-w-[800px] text-sm text-left">
                                 <thead className={`${isSupplierMode ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-50 text-slate-600'} border-b ${isSupplierMode ? 'border-indigo-200' : 'border-slate-200'} text-sm font-bold uppercase`}>
                                     <tr>
                                         <th className="px-2 py-3 w-[2%] text-center">
@@ -3091,7 +3091,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                 </label>
 
                                 {packingListOptions.includeSupplier && (
-                                    <div className="ml-8 grid grid-cols-2 gap-3 mt-3">
+                                    <div className="ml-8 grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                                         <div className="col-span-2 sm:col-span-1">
                                             <label htmlFor="po-supp-name" className="block text-[10px] font-bold text-slate-500 mb-1">상호명</label>
                                             <input 

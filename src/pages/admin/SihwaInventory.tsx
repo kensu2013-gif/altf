@@ -2561,8 +2561,8 @@ export default function SihwaInventory() {
 
                             {/* TAB 3: ALL TABLE WITH SORTING */}
                             {activeTab === 'ALL_TABLE' && (
-                                <div className="space-y-4">
-                                <table className="w-full text-left text-sm whitespace-nowrap">
+                                <div className="space-y-4 overflow-x-auto pb-4">
+                                <table className="w-full text-left text-sm whitespace-nowrap min-w-[1000px]">
                                     <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none">
                                         <tr className="text-xs uppercase tracking-wider text-slate-500 font-bold border-b-2 border-slate-200">
                                             <th className="px-3 py-3 w-10 text-center border-r border-slate-200">
@@ -2942,7 +2942,7 @@ export default function SihwaInventory() {
           ))}
         </div>
         {/* KPI 3개 */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {[
             { label: '묶인 자금 (악성+과잉)', value: `₩${formatCur(Math.round(healthDiagnosis.lockedCapital / 10000))}만`, color: 'text-rose-600', note:'해소 시 발주 여력 확보' },
             { label: '매출 대비 재고 비율', value: `${(healthDiagnosis.its * 100).toFixed(1)}%`, color: healthDiagnosis.its > HEALTHY_ITS_MAX ? 'text-amber-600' : 'text-green-600', note:'쿠팡 기준 8~12%' },
