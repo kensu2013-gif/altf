@@ -1212,24 +1212,56 @@ export default function SihwaInventory() {
         });
       });
 
-      // ── 결품 기회손실: 대경+시화 모두 0일 때 주문→취소 이력 ────
+      // ── 결품 기회손실: 취소/철회, 미결 지연(5일↑), 견적 미전환 ────
       const missedDemandMap: Record<string, { count: number; estimatedRevenue: number }> = {};
+      
+      // 1. 주문 건 (취소/철회 및 5일 이상 장기 미결품)
       orders.forEach(o => {
-        if (!['CANCELLED', 'WITHDRAWN'].includes(o.status)) return;
         if (o.isDeleted) return;
-        // 내부 재고 이동 주문 제외
         const custStr = (o.poEndCustomer || o.customerName || '').toLowerCase().replace(/\s+/g, '');
         if (custStr.includes('재고') || custStr.includes('시화') || custStr.includes('서울') || custStr.includes('알트에프') || custStr.includes('altf')) return;
 
-        const items = o.po_items?.length ? o.po_items : o.items;
-        items?.forEach(item => {
+        const isCancelled = ['CANCELLED', 'WITHDRAWN'].includes(o.status);
+        const isDelayedPending = o.status === 'PROCESSING' && Math.floor((now - new Date(o.createdAt).getTime()) / 86400000) >= 5;
+
+        if (isCancelled || isDelayedPending) {
+          const items = o.po_items?.length ? o.po_items : o.items;
+          items?.forEach(item => {
+            if (isDelayedPending && item.transactionIssued) return; // 미결품이 아닌 것은 제외
+
+            const id = item.productId || (item as { item_id?: string }).item_id || '';
+            if (!id) return;
+            const row = analyzedInventory.find(r => r.product.id === id);
+            if (!row) return;
+
+            const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
+            // 전체 혹은 일부 수량 부족 판정 (재고 < 주문수량)
+            if (row.shQty + row.ysQty < qty || (isCancelled && row.shQty <= 0 && row.ysQty <= 0)) {
+              if (!missedDemandMap[id]) missedDemandMap[id] = { count: 0, estimatedRevenue: 0 };
+              missedDemandMap[id].count += 1;
+              missedDemandMap[id].estimatedRevenue += qty * row.sellingPrice;
+            }
+          });
+        }
+      });
+
+      // 2. 견적(Quotes) 건 (답변완료 후 발주 미전환, 재고 부족)
+      quotes?.forEach(q => {
+        if (q.isDeleted) return;
+        if (!['PROCESSED', 'COMPLETED'].includes(q.status)) return;
+        
+        // 발주 전환 여부 체크
+        const isConverted = orders.some(o => o.linkedQuoteId === q.id && !['CANCELLED', 'WITHDRAWN'].includes(o.status));
+        if (isConverted) return;
+
+        q.items?.forEach(item => {
           const id = item.productId || (item as { item_id?: string }).item_id || '';
           if (!id) return;
           const row = analyzedInventory.find(r => r.product.id === id);
           if (!row) return;
-          // 주문 시점에 시화+대경 모두 0이었을 가능성 높은 품목 (현재도 0이거나 critical인 경우)
-          if (row.shQty <= 0 && row.ysQty <= 0) {
-            const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
+          
+          const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
+          if (row.shQty + row.ysQty < qty) {
             if (!missedDemandMap[id]) missedDemandMap[id] = { count: 0, estimatedRevenue: 0 };
             missedDemandMap[id].count += 1;
             missedDemandMap[id].estimatedRevenue += qty * row.sellingPrice;
@@ -2964,7 +2996,7 @@ export default function SihwaInventory() {
         { id: 'DEAD', emoji:'☠️', label:'악성재고 품목', value:`${healthDiagnosis.deadStockItems.length}개`, sub:'90일+ 무판매 or 0.5x미만', color:'rose', border:'border-rose-400', amount: healthDiagnosis.deadStockValue },
         { id: 'EXCESS', emoji:'📦', label:'과잉재고 품목', value:`${healthDiagnosis.excessStockItems.length}개`, sub:'목표재고 200%+ 초과', color:'orange', border:'border-orange-400', amount: healthDiagnosis.excessStockValue },
         { id: 'SLOW', emoji:'🐌', label:'부진재고 품목', value:`${healthDiagnosis.slowMoveItems.length}개`, sub:'D등급·잔여 90~180일', color:'purple', border:'border-purple-400', amount: healthDiagnosis.slowMoveValue },
-        { id: 'MISSED', emoji:'🔍', label:'결품 기회손실', value:`${healthDiagnosis.missedDemandList.filter(m=>m.count>=2).length}건↑`, sub:'2회↑ 취소·철회 감지', color:'blue', border:'border-blue-400' },
+        { id: 'MISSED', emoji:'🔍', label:'결품 기회손실', value:`${healthDiagnosis.missedDemandList.length}건`, sub:'견적/미결/취소 종합', color:'blue', border:'border-blue-400' },
         { id: 'URGENT', emoji:'💡', label:'즉시 처분 권장', value:`${healthDiagnosis.urgentDisposalItems.length}개`, sub:'대경반품 or 단가인하', color:'teal', border:'border-teal-400' },
       ].map(k => (
         <button 
