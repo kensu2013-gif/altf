@@ -1304,7 +1304,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             <div className="w-full xl:max-w-[85vw] h-full bg-white shadow-2xl pointer-events-auto flex flex-col animate-in slide-in-from-right duration-300">
 
                 {/* Header */}
-                <div className={`flex items-center justify-between p-6 border-b shrink-0 ${isSupplierMode ? 'bg-indigo-50/50 border-indigo-100' : 'bg-slate-50/50 border-slate-100'}`
+                <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:p-6 border-b shrink-0 ${isSupplierMode ? 'bg-indigo-50/50 border-indigo-100' : 'bg-slate-50/50 border-slate-100'}`
                 }>
                     <div>
                         <div className="flex items-center gap-2 mb-1">
@@ -1315,7 +1315,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                             {isSupplierMode ? '매입 발주서 작성 (Supplier Order)' : '주문 상세 내역 (Customer Order)'}
                         </h2>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2 md:gap-3">
                         {isSupplierMode && (
                             <Button
                                 variant="outline"
@@ -2884,8 +2884,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-6 border-t border-slate-200 bg-white flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
+                <div className="p-4 md:p-6 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 md:gap-3 w-full sm:w-auto">
                         {!isSupplierMode && (
                             <Button
                                 variant="outline"
@@ -2911,7 +2911,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                             </Button>
                         )}
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 md:gap-3 w-full sm:w-auto">
                         <Button variant="outline" onClick={onClose}>
                             닫기
                         </Button>
