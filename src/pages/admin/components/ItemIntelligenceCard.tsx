@@ -31,20 +31,37 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
 
     // 1. Data Aggregation
     const itemQuotations = useMemo(() => {
-        return myQuotations.filter(q => 
+        const filtered = myQuotations.filter(q => 
             q.items && q.items.some(item => (item.productId === productId || item.item_id === productId || item.itemId === productId || item.name === productId))
-        ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        );
+
+        const uniqueQuotes = new Map<string, Quotation>();
+        filtered.forEach(q => uniqueQuotes.set(q.id, q));
+
+        return Array.from(uniqueQuotes.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }, [myQuotations, productId]);
 
     const itemOrders = useMemo(() => {
-        return orders.filter(o => {
+        const filtered = orders.filter(o => {
             const customerName = (o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '').toLowerCase();
             // 알트에프(자사) 등고/이동 발주는 매출 실적에서 제외
             if (customerName.includes('알트에프') || customerName.includes('alt.f') || customerName.includes('altf')) return false;
 
             const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
             return items && items.some(item => (item.productId === productId || item.item_id === productId || item.itemId === productId || item.name === productId));
-        }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        });
+
+        // Deduplicate by PO Number or ID to prevent exact UI duplicates
+        const uniqueOrders = new Map<string, Order>();
+        filtered.forEach(o => {
+            const customerName = o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '';
+            const key = o.poNumber ? `${customerName}-${o.poNumber}` : o.id;
+            if (!uniqueOrders.has(key)) {
+                uniqueOrders.set(key, o);
+            }
+        });
+
+        return Array.from(uniqueOrders.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }, [orders, productId]);
 
     // Metrics
