@@ -11,6 +11,7 @@ interface InventoryDataProps {
     ysQty?: number | string;
     profitMarginRate?: number;
     recentPurchasePrice?: number;
+    healthScore?: number;
     [key: string]: unknown;
 }
 
@@ -36,9 +37,20 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
 
     const itemOrders = useMemo(() => {
         return orders.filter(o => {
+            const customerName = (o.poEndCustomer || o.supplierInfo?.company_name || '').toLowerCase();
+            // 알트에프(자사) 등고/이동 발주는 매출 실적에서 제외
+            if (customerName.includes('알트에프') || customerName.includes('alt.f') || customerName.includes('altf')) return false;
+
             const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
             return items && items.some(item => (item.productId === productId || item.item_id === productId || item.itemId === productId || item.name === productId));
-        }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        }).sort((a, b) => {
+            // 1차 정렬: 업체명, 2차 정렬: 최신순
+            const nameA = a.poEndCustomer || a.supplierInfo?.company_name || '';
+            const nameB = b.poEndCustomer || b.supplierInfo?.company_name || '';
+            if (nameA < nameB) return -1;
+            if (nameA > nameB) return 1;
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
     }, [orders, productId]);
 
     // Metrics
@@ -59,6 +71,52 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
         
         return { siHwaCount, daekyungCount };
     }, [itemOrders]);
+
+    const aiMarketAnalysis = useMemo(() => {
+        if (itemOrders.length === 0) return { topCustomers: '데이터 부족', avgPrice: 0, topRegions: '데이터 부족' };
+        
+        const customerCounts: Record<string, number> = {};
+        const regionCounts: Record<string, number> = {};
+        let totalValidPrice = 0;
+        let validPriceCount = 0;
+
+        itemOrders.forEach(o => {
+            const customerName = o.poEndCustomer || o.supplierInfo?.company_name || '';
+            if (customerName) {
+                customerCounts[customerName] = (customerCounts[customerName] || 0) + 1;
+                const addr = (o.supplierInfo?.address || o.customerInfo?.address || customerName).toLowerCase();
+                if (addr.includes('경기') || addr.includes('시흥') || addr.includes('안산') || addr.includes('화성') || addr.includes('평택') || addr.includes('김포') || addr.includes('인천')) regionCounts['경기/수도권'] = (regionCounts['경기/수도권'] || 0) + 1;
+                if (addr.includes('경남') || addr.includes('부산') || addr.includes('김해') || addr.includes('창원') || addr.includes('울산') || addr.includes('경상')) regionCounts['경남/경상권'] = (regionCounts['경남/경상권'] || 0) + 1;
+                if (addr.includes('충청') || addr.includes('천안') || addr.includes('아산') || addr.includes('청주') || addr.includes('당진')) regionCounts['충청권'] = (regionCounts['충청권'] || 0) + 1;
+                if (addr.includes('전라') || addr.includes('광주') || addr.includes('전주') || addr.includes('광양') || addr.includes('여수')) regionCounts['전라권'] = (regionCounts['전라권'] || 0) + 1;
+                if (addr.includes('경북') || addr.includes('대구') || addr.includes('구미') || addr.includes('포항')) regionCounts['경북/대구권'] = (regionCounts['경북/대구권'] || 0) + 1;
+            }
+
+            const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
+            const match = items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
+            const p = match?.unitPrice || match?.price || match?.unit_price || match?.cost || 0;
+            if (p > 0) {
+                totalValidPrice += Number(p);
+                validPriceCount++;
+            }
+        });
+
+        const topCustomersList = Object.entries(customerCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(e => e[0]);
+
+        const topRegionsList = Object.entries(regionCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 2)
+            .map(e => e[0]);
+
+        return {
+            topCustomers: topCustomersList.length > 0 ? topCustomersList.join(', ') : '특정 고객 편중 없음',
+            topRegions: topRegionsList.length > 0 ? topRegionsList.join(', ') : '전국 (또는 지역 정보 없음)',
+            avgPrice: validPriceCount > 0 ? Math.round(totalValidPrice / validPriceCount) : 0
+        };
+    }, [itemOrders, productId]);
 
     return (
         <div className="fixed inset-0 z-[150] flex justify-end bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
@@ -175,7 +233,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                             <span className="text-[10px] text-slate-500 font-bold mb-1">건전성 등급</span>
                                             <div className="flex items-baseline gap-1">
                                                 <span className={`text-xl font-black ${inventoryData.healthGrade === 'A' ? 'text-emerald-600' : inventoryData.healthGrade === 'B' ? 'text-blue-600' : inventoryData.healthGrade === 'C' ? 'text-amber-600' : inventoryData.healthGrade === 'D' ? 'text-orange-600' : 'text-rose-600'}`}>{inventoryData.healthGrade}급</span>
-                                                <span className="text-xs text-slate-400 font-mono">({inventoryData.turnoverRate}x)</span>
+                                                <span className="text-xs text-slate-400 font-mono">({Math.round(Number(inventoryData.healthScore ?? 0))}점)</span>
                                             </div>
                                         </div>
                                         <div className="flex flex-col bg-slate-50 p-3 rounded-lg border border-slate-100">
@@ -221,6 +279,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                             {itemOrders.slice(0, 10).map(o => {
                                                 const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
                                                 const match = items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
+                                                const unitPrice = match?.unitPrice || match?.price || match?.unit_price || match?.cost || 0;
                                                 return (
                                                     <div key={o.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
                                                         <div className="flex flex-col gap-1">
@@ -236,7 +295,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                                         </div>
                                                         <div className="flex flex-col items-end">
                                                             <span className="font-black text-emerald-600">{match?.quantity}개</span>
-                                                            <span className="text-[10px] text-slate-400">단가 ₩{match?.unitPrice?.toLocaleString() || 0}</span>
+                                                            <span className="text-[10px] text-slate-400">단가 ₩{Number(unitPrice).toLocaleString()}</span>
                                                         </div>
                                                     </div>
                                                 );
@@ -259,6 +318,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                         <div className="divide-y divide-slate-100">
                                             {itemQuotations.slice(0, 10).map(q => {
                                                 const match = q.items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
+                                                const unitPrice = match?.unitPrice || match?.price || match?.unit_price || match?.cost || 0;
                                                 return (
                                                     <div key={q.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
                                                         <div className="flex flex-col gap-1">
@@ -272,7 +332,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                                         </div>
                                                         <div className="flex flex-col items-end">
                                                             <span className="font-black text-indigo-600">{match?.quantity}개</span>
-                                                            <span className="text-[10px] text-slate-400">제안단가 ₩{match?.unitPrice?.toLocaleString() || 0}</span>
+                                                            <span className="text-[10px] text-slate-400">제안단가 ₩{Number(unitPrice).toLocaleString()}</span>
                                                         </div>
                                                     </div>
                                                 );
@@ -307,15 +367,19 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                             <ul className="space-y-2 text-sm text-indigo-100">
                                                 <li className="flex gap-2">
                                                     <span className="text-purple-400 font-bold">•</span>
-                                                    <span>주요 타겟 고객층: <strong>{itemOrders.length > 0 ? Object.keys(itemOrders.reduce((acc, o) => { const n = o.poEndCustomer || o.supplierInfo?.company_name || ''; acc[n] = (acc[n]||0)+1; return acc; }, {} as Record<string,number>)).sort((a,b)=>itemOrders.reduce((acc, o) => { const n = o.poEndCustomer || o.supplierInfo?.company_name || ''; acc[n] = (acc[n]||0)+1; return acc; }, {} as Record<string,number>)[b] - itemOrders.reduce((acc, o) => { const n = o.poEndCustomer || o.supplierInfo?.company_name || ''; acc[n] = (acc[n]||0)+1; return acc; }, {} as Record<string,number>)[a])[0] || '데이터 부족' : '데이터 부족'}</strong></span>
+                                                    <span>주요 타겟 고객층: <strong className="text-xs">{aiMarketAnalysis.topCustomers}</strong></span>
+                                                </li>
+                                                <li className="flex gap-2">
+                                                    <span className="text-purple-400 font-bold">•</span>
+                                                    <span>주요 출고 지역: <strong>{aiMarketAnalysis.topRegions}</strong></span>
+                                                </li>
+                                                <li className="flex gap-2">
+                                                    <span className="text-purple-400 font-bold">•</span>
+                                                    <span>평균 출고 단가: <strong>₩{aiMarketAnalysis.avgPrice.toLocaleString()}</strong></span>
                                                 </li>
                                                 <li className="flex gap-2">
                                                     <span className="text-purple-400 font-bold">•</span>
                                                     <span>평균 견적-발주 전환율: <strong>{conversionRate}%</strong> (총 {totalQuotations}건 중 {totalOrders}건 수주)</span>
-                                                </li>
-                                                <li className="flex gap-2">
-                                                    <span className="text-purple-400 font-bold">•</span>
-                                                    <span>평균 수주 이익률: <strong>{inventoryData?.profitMarginRate ?? 0}%</strong></span>
                                                 </li>
                                             </ul>
                                         </div>
