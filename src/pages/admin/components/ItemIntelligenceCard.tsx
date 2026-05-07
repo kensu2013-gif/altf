@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { X, TrendingUp, PackageSearch, AlertCircle, CheckCircle2, Factory, Package } from 'lucide-react';
+import { X, TrendingUp, PackageSearch, AlertCircle, CheckCircle2, Factory, Package, Filter } from 'lucide-react';
 import { useStore, type AppState } from '../../../store/useStore';
-import type { Order, Quotation } from '../../../types';
+import type { Order, Quotation, User } from '../../../types';
 
 interface InventoryDataProps {
     healthGrade?: string;
@@ -19,12 +19,13 @@ interface ItemIntelligenceCardProps {
     productId: string;
     productName?: string;
     onClose: () => void;
-    inventoryData?: InventoryDataProps; // Rich stats from SihwaInventory
+    inventoryData?: InventoryDataProps;
 }
 
 export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ productId, productName, onClose, inventoryData }) => {
     const orders: Order[] = useStore((state: AppState) => state.orders);
     const myQuotations: Quotation[] = useStore((state: AppState) => state.quotes);
+    const users: User[] = useStore((state: AppState) => state.users);
     
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'HISTORY' | 'INSIGHTS'>('OVERVIEW');
 
@@ -37,28 +38,21 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
 
     const itemOrders = useMemo(() => {
         return orders.filter(o => {
-            const customerName = (o.poEndCustomer || o.supplierInfo?.company_name || '').toLowerCase();
+            const customerName = (o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '').toLowerCase();
             // 알트에프(자사) 등고/이동 발주는 매출 실적에서 제외
             if (customerName.includes('알트에프') || customerName.includes('alt.f') || customerName.includes('altf')) return false;
 
             const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
             return items && items.some(item => (item.productId === productId || item.item_id === productId || item.itemId === productId || item.name === productId));
-        }).sort((a, b) => {
-            // 1차 정렬: 업체명, 2차 정렬: 최신순
-            const nameA = a.poEndCustomer || a.supplierInfo?.company_name || '';
-            const nameB = b.poEndCustomer || b.supplierInfo?.company_name || '';
-            if (nameA < nameB) return -1;
-            if (nameA > nameB) return 1;
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        });
+        }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }, [orders, productId]);
 
     // Metrics
     const totalQuotations = itemQuotations.length;
     const totalOrders = itemOrders.length;
-    const conversionRate = totalQuotations > 0 ? ((totalOrders / totalQuotations) * 100).toFixed(1) : 0;
+    const conversionRate = totalQuotations > 0 ? ((totalOrders / totalQuotations) * 100).toFixed(1) : '0.0';
 
-    // Dispatch Analysis (Sihwa vs Daekyung)
+    // Dispatch Analysis
     const dispatchAnalysis = useMemo(() => {
         let siHwaCount = 0;
         let daekyungCount = 0;
@@ -72,6 +66,22 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
         return { siHwaCount, daekyungCount };
     }, [itemOrders]);
 
+    const getRegionTag = (addr: string = '') => {
+        if (!addr) return null;
+        const a = addr.toLowerCase();
+        if (a.includes('경기') || a.includes('시흥') || a.includes('안산') || a.includes('화성') || a.includes('평택') || a.includes('김포') || a.includes('인천') || a.includes('서울')) return { label: '수도권', color: 'bg-sky-100 text-sky-700' };
+        if (a.includes('경남') || a.includes('부산') || a.includes('김해') || a.includes('창원') || a.includes('울산') || a.includes('경상')) return { label: '경상권', color: 'bg-emerald-100 text-emerald-700' };
+        if (a.includes('충청') || a.includes('천안') || a.includes('아산') || a.includes('청주') || a.includes('당진')) return { label: '충청권', color: 'bg-amber-100 text-amber-700' };
+        if (a.includes('전라') || a.includes('광주') || a.includes('전주') || a.includes('광양') || a.includes('여수')) return { label: '전라권', color: 'bg-orange-100 text-orange-700' };
+        if (a.includes('경북') || a.includes('대구') || a.includes('구미') || a.includes('포항')) return { label: '경북권', color: 'bg-teal-100 text-teal-700' };
+        return null;
+    };
+
+    const getCompanyRegion = (companyName: string) => {
+        const user = users.find(u => u.companyName === companyName);
+        return getRegionTag(user?.address || '');
+    };
+
     const aiMarketAnalysis = useMemo(() => {
         if (itemOrders.length === 0) return { topCustomers: '데이터 부족', avgPrice: 0, topRegions: '데이터 부족' };
         
@@ -81,11 +91,16 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
         let validPriceCount = 0;
 
         itemOrders.forEach(o => {
-            const customerName = o.poEndCustomer || o.supplierInfo?.company_name || '';
+            const customerName = o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '';
             if (customerName) {
                 customerCounts[customerName] = (customerCounts[customerName] || 0) + 1;
                 const extO = o as typeof o & { customerInfo?: { address?: string }, customer?: { address?: string } };
-                const addr = (o.supplierInfo?.address || extO.customerInfo?.address || extO.customer?.address || customerName).toLowerCase();
+                let addr = (o.supplierInfo?.address || extO.customerInfo?.address || extO.customer?.address || o.customerAddress || '').toLowerCase();
+                if (!addr) {
+                    const u = users.find(user => user.companyName === customerName);
+                    if (u) addr = u.address;
+                }
+
                 if (addr.includes('경기') || addr.includes('시흥') || addr.includes('안산') || addr.includes('화성') || addr.includes('평택') || addr.includes('김포') || addr.includes('인천')) regionCounts['경기/수도권'] = (regionCounts['경기/수도권'] || 0) + 1;
                 if (addr.includes('경남') || addr.includes('부산') || addr.includes('김해') || addr.includes('창원') || addr.includes('울산') || addr.includes('경상')) regionCounts['경남/경상권'] = (regionCounts['경남/경상권'] || 0) + 1;
                 if (addr.includes('충청') || addr.includes('천안') || addr.includes('아산') || addr.includes('청주') || addr.includes('당진')) regionCounts['충청권'] = (regionCounts['충청권'] || 0) + 1;
@@ -118,10 +133,57 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
             topRegions: topRegionsList.length > 0 ? topRegionsList.join(', ') : '전국 (또는 지역 정보 없음)',
             avgPrice: validPriceCount > 0 ? Math.round(totalValidPrice / validPriceCount) : 0
         };
-    }, [itemOrders, productId]);
+    }, [itemOrders, productId, users]);
+
+    // History Filters
+    const [historyDays, setHistoryDays] = useState<number>(365);
+    const [historyCompany, setHistoryCompany] = useState<string>('ALL');
+
+    const filteredOrders = useMemo(() => {
+        return itemOrders.filter(o => {
+            if (historyDays !== 0) {
+                const days = (new Date().getTime() - new Date(o.createdAt).getTime()) / (1000 * 3600 * 24);
+                if (days > historyDays) return false;
+            }
+            const customerName = o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '알 수 없는 업체';
+            if (historyCompany !== 'ALL' && customerName !== historyCompany) return false;
+            return true;
+        });
+    }, [itemOrders, historyDays, historyCompany]);
+
+    const filteredQuotes = useMemo(() => {
+        return itemQuotations.filter(q => {
+            if (historyDays !== 0) {
+                const days = (new Date().getTime() - new Date(q.createdAt).getTime()) / (1000 * 3600 * 24);
+                if (days > historyDays) return false;
+            }
+            const customerName = q.customerInfo?.companyName || q.customerName || '알 수 없는 업체';
+            if (historyCompany !== 'ALL' && customerName !== historyCompany) return false;
+            return true;
+        });
+    }, [itemQuotations, historyDays, historyCompany]);
+
+    const allCompanies = useMemo(() => {
+        const set = new Set([
+            ...itemOrders.map(o => o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '알 수 없는 업체'),
+            ...itemQuotations.map(q => q.customerInfo?.companyName || q.customerName || '알 수 없는 업체')
+        ]);
+        return Array.from(set).sort();
+    }, [itemOrders, itemQuotations]);
+
+    // Grouping for Orders
+    const ordersByCompany = useMemo(() => {
+        const groups: Record<string, typeof filteredOrders> = {};
+        filteredOrders.forEach(o => {
+            const cName = o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '알 수 없는 업체';
+            if (!groups[cName]) groups[cName] = [];
+            groups[cName].push(o);
+        });
+        return groups;
+    }, [filteredOrders]);
 
     return (
-        <div className="fixed inset-0 z-[150] flex justify-end bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+        <div className="fixed inset-0 z-150 flex justify-end bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
             <div className="w-[800px] max-w-[90vw] h-full bg-slate-50 shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300" onClick={e => e.stopPropagation()}>
                 
                 {/* Header */}
@@ -129,7 +191,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                     <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
                     <div className="flex flex-col gap-1 z-10">
                         <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-black tracking-widest uppercase">품목 인텔리전스</span>
+                            <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-black tracking-widest uppercase">품목정보</span>
                             <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-bold tracking-widest uppercase flex items-center gap-1">
                                 <PackageSearch className="w-3 h-3" />
                                 심층 분석
@@ -267,38 +329,85 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
 
                     {activeTab === 'HISTORY' && (
                         <div className="space-y-6">
+                            {/* Filters */}
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-wrap items-center gap-4">
+                                <div className="flex items-center gap-2">
+                                    <Filter className="w-4 h-4 text-slate-400" />
+                                    <span className="text-xs font-bold text-slate-700">조회 필터</span>
+                                </div>
+                                <select 
+                                    className="text-xs border border-slate-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    value={historyDays}
+                                    onChange={(e) => setHistoryDays(Number(e.target.value))}
+                                    aria-label="조회 기간"
+                                    title="조회 기간 필터"
+                                >
+                                    <option value={30}>최근 30일</option>
+                                    <option value={90}>최근 90일</option>
+                                    <option value={180}>최근 180일</option>
+                                    <option value={365}>최근 1년</option>
+                                    <option value={0}>전체 기간</option>
+                                </select>
+                                <select 
+                                    className="text-xs border border-slate-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[200px]"
+                                    value={historyCompany}
+                                    onChange={(e) => setHistoryCompany(e.target.value)}
+                                    aria-label="조회 업체"
+                                    title="조회 업체 필터"
+                                >
+                                    <option value="ALL">전체 업체</option>
+                                    {allCompanies.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+
                             {/* Recent Orders */}
                             <div>
                                 <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                    최근 발주 이력
+                                    최근 발주 이력 ({filteredOrders.length}건)
                                 </h3>
                                 <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                                    {itemOrders.length === 0 ? (
+                                    {Object.keys(ordersByCompany).length === 0 ? (
                                         <div className="p-6 text-center text-sm text-slate-400">발주 이력이 없습니다.</div>
                                     ) : (
-                                        <div className="divide-y divide-slate-100">
-                                            {itemOrders.slice(0, 10).map(o => {
-                                                const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
-                                                const match = items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
-                                                const m = match as typeof match & { price?: number; unit_price?: number; cost?: number; };
-                                                const unitPrice = m?.unitPrice || m?.price || m?.unit_price || m?.cost || 0;
+                                        <div className="divide-y divide-slate-200">
+                                            {Object.entries(ordersByCompany).map(([companyName, compOrders]) => {
+                                                const region = getCompanyRegion(companyName);
                                                 return (
-                                                    <div key={o.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
-                                                        <div className="flex flex-col gap-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-bold text-slate-800 text-sm">{o.poEndCustomer || '알 수 없는 업체'}</span>
-                                                                {o.supplierInfo?.company_name?.includes('대경') ? (
-                                                                    <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">직발주</span>
-                                                                ) : (
-                                                                    <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">시화출고</span>
-                                                                )}
-                                                            </div>
-                                                            <span className="text-xs text-slate-500">{new Date(o.createdAt).toLocaleDateString()}</span>
+                                                    <div key={companyName} className="p-0">
+                                                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 flex items-center gap-2 sticky top-0">
+                                                            <span className="font-black text-slate-800 text-sm">{companyName}</span>
+                                                            {region && (
+                                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${region.color}`}>{region.label}</span>
+                                                            )}
+                                                            <span className="text-[10px] text-slate-400 font-medium ml-auto">{compOrders.length}건</span>
                                                         </div>
-                                                        <div className="flex flex-col items-end">
-                                                            <span className="font-black text-emerald-600">{match?.quantity}개</span>
-                                                            <span className="text-[10px] text-slate-400">단가 ₩{Number(unitPrice).toLocaleString()}</span>
+                                                        <div className="divide-y divide-slate-100">
+                                                            {compOrders.map(o => {
+                                                                const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
+                                                                const match = items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
+                                                                const m = match as typeof match & { price?: number; unit_price?: number; cost?: number; };
+                                                                const unitPrice = m?.unitPrice || m?.price || m?.unit_price || m?.cost || 0;
+                                                                return (
+                                                                    <div key={o.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center pl-6">
+                                                                        <div className="flex flex-col gap-1">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="font-mono text-[10px] text-slate-400" title="발주번호">{(o.poNumber || o.id).split('-').pop()}</span>
+                                                                                {o.supplierInfo?.company_name?.includes('대경') ? (
+                                                                                    <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">직발주</span>
+                                                                                ) : (
+                                                                                    <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">시화출고</span>
+                                                                                )}
+                                                                            </div>
+                                                                            <span className="text-xs font-bold text-slate-600">{new Date(o.createdAt).toLocaleDateString()}</span>
+                                                                        </div>
+                                                                        <div className="flex flex-col items-end">
+                                                                            <span className="font-black text-emerald-600">{match?.quantity}개</span>
+                                                                            <span className="text-[10px] text-slate-400">단가 ₩{Number(unitPrice).toLocaleString()}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
                                                 );
@@ -312,27 +421,36 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                             <div>
                                 <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                                     <AlertCircle className="w-4 h-4 text-indigo-500" />
-                                    최근 견적 이력
+                                    최근 견적 이력 ({filteredQuotes.length}건)
                                 </h3>
                                 <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                                    {itemQuotations.length === 0 ? (
+                                    {filteredQuotes.length === 0 ? (
                                         <div className="p-6 text-center text-sm text-slate-400">견적 이력이 없습니다.</div>
                                     ) : (
                                         <div className="divide-y divide-slate-100">
-                                            {itemQuotations.slice(0, 10).map(q => {
+                                            {filteredQuotes.map(q => {
                                                 const match = q.items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
                                                 const m = match as typeof match & { price?: number; unit_price?: number; cost?: number; };
                                                 const unitPrice = m?.unitPrice || m?.price || m?.unit_price || m?.cost || 0;
+                                                const customerName = q.customerInfo?.companyName || q.customerName || '알 수 없는 업체';
+                                                const region = getCompanyRegion(customerName);
+
                                                 return (
                                                     <div key={q.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
                                                         <div className="flex flex-col gap-1">
                                                             <div className="flex items-center gap-2">
-                                                                <span className="font-bold text-slate-800 text-sm">{q.customerInfo?.companyName || '알 수 없는 업체'}</span>
-                                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${q.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                                    {q.status === 'COMPLETED' ? '발주성공' : '견적제출'}
+                                                                <span className="font-bold text-slate-800 text-sm">{customerName}</span>
+                                                                {region && (
+                                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${region.color}`}>{region.label}</span>
+                                                                )}
+                                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${q.status === 'COMPLETED' || q.status === 'PROCESSED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                                    {q.status === 'COMPLETED' || q.status === 'PROCESSED' ? '발주성공' : '견적제출'}
                                                                 </span>
                                                             </div>
-                                                            <span className="text-xs text-slate-500">{new Date(q.createdAt).toLocaleDateString()}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-mono text-[10px] text-slate-400" title="견적번호">{q.id.split('-').pop()}</span>
+                                                                <span className="text-xs font-bold text-slate-600">{new Date(q.createdAt).toLocaleDateString()}</span>
+                                                            </div>
                                                         </div>
                                                         <div className="flex flex-col items-end">
                                                             <span className="font-black text-indigo-600">{match?.quantity}개</span>
@@ -351,7 +469,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                     {activeTab === 'INSIGHTS' && (
                         <div className="space-y-6 pb-20">
                             {/* AI Strategy Analysis */}
-                            <div className="bg-gradient-to-br from-indigo-900 to-purple-900 border border-indigo-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                            <div className="bg-linear-to-br from-indigo-900 to-purple-900 border border-indigo-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
                                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
                                 <div className="relative z-10 space-y-6">
                                     <div className="flex items-center gap-3 border-b border-indigo-800/50 pb-4">

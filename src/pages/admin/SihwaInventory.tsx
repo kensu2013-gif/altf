@@ -2871,7 +2871,7 @@ export default function SihwaInventory() {
                                     </tbody>
                                 </table>
                                 {selectedAllTableIds.size > 0 && (
-                                    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 rounded-full shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] border border-slate-700 px-6 py-3 flex items-center gap-6 z-[100] animate-in slide-in-from-bottom-10 fade-in duration-300">
+                                    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 rounded-full shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] border border-slate-700 px-6 py-3 flex items-center gap-6 z-100 animate-in slide-in-from-bottom-10 fade-in duration-300">
                                         <div className="font-bold text-white">
                                             <span className="text-indigo-400 font-black text-xl">{selectedAllTableIds.size}</span>
                                             <span className="text-slate-300 ml-2">개 품목 선택됨</span>
