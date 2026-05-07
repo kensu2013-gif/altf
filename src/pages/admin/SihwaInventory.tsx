@@ -22,6 +22,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Product, LineItem, Order } from '../../types';
 import salesHistoryRaw from '../../data/sales_history.json';
 import { COMPETITOR_DATA, getStrategicGrade, type StrategicGrade } from '../../../competitorData';
+import { ItemIntelligenceCard } from './components/ItemIntelligenceCard';
 
 const salesHistory = salesHistoryRaw as Record<string, { salesVolume: number, salesFreq: number }>;
 
@@ -214,6 +215,7 @@ export default function SihwaInventory() {
         'REGULAR': true
     });
     const [selectedHealthCategory, setSelectedHealthCategory] = useState<'DEAD' | 'EXCESS' | 'SLOW' | 'MISSED' | 'URGENT' | null>(null);
+    const [selectedIntelligenceItem, setSelectedIntelligenceItem] = useState<{ id: string, name?: string } | null>(null);
 
 
     const [selectedCriticalIds, setSelectedCriticalIds] = useState<Set<string>>(new Set());
@@ -2762,7 +2764,16 @@ export default function SihwaInventory() {
                                                 </td>
                                                 <td className="px-4 py-2 font-mono font-bold text-slate-700">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span>{row.product.id === 'UNKNOWN' && row.product.name ? `UNKNOWN (${row.product.name})` : row.product.id}</span>
+                                                        <span 
+                                                            className="cursor-pointer hover:text-indigo-600 hover:underline transition-colors"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedIntelligenceItem({ id: row.product.id, name: row.product.name });
+                                                            }}
+                                                            title="아이템 인텔리전스 분석 보기"
+                                                        >
+                                                            {row.product.id === 'UNKNOWN' && row.product.name ? `UNKNOWN (${row.product.name})` : row.product.id}
+                                                        </span>
                                                         {rowTags.map((tag, idx) => (
                                                             <span 
                                                                 key={idx} 
@@ -3460,6 +3471,13 @@ export default function SihwaInventory() {
                 return null;
             })()}
             
+            {selectedIntelligenceItem && (
+                <ItemIntelligenceCard
+                    productId={selectedIntelligenceItem.id}
+                    productName={selectedIntelligenceItem.name}
+                    onClose={() => setSelectedIntelligenceItem(null)}
+                />
+            )}
         </div>
     );
 }

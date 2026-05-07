@@ -40,7 +40,7 @@ export interface DeliveryInfo {
     additionalRequest?: string;
 }
 
-interface AppState {
+export interface AppState {
     auth: {
         user: User | null;
         token: string | null;

@@ -17,6 +17,7 @@ interface Customer {
     contactName: string;
     phone: string;
     email: string;
+    contacts?: { contactName: string; phone: string; email: string }[];
     isDeleted?: boolean;
 }
 
@@ -311,19 +312,40 @@ export default function Customers() {
                     const bizNum = (c.businessNumber || '').replace(/[^0-9]/g, '');
                     if (bizNum && bizNum.length >= 5) {
                         if (!uniqueMap.has(bizNum)) {
-                            uniqueMap.set(bizNum, { ...c });
+                            uniqueMap.set(bizNum, { 
+                                ...c, 
+                                contacts: c.contactName ? [{ contactName: c.contactName, phone: c.phone || '', email: c.email || '' }] : [] 
+                            });
                             uniqueData.push(uniqueMap.get(bizNum)!);
                         } else {
                             const existing = uniqueMap.get(bizNum)!;
                             if (!existing.region && c.region) existing.region = c.region;
                             if (!existing.address && c.address) existing.address = c.address;
-                            if (!existing.email && c.email) existing.email = c.email;
-                            if (!existing.phone && c.phone) existing.phone = c.phone;
                             if (!existing.ceo && c.ceo) existing.ceo = c.ceo;
-                            if (!existing.contactName && c.contactName) existing.contactName = c.contactName;
+                            
+                            // Keep primary contact intact, but add to contacts array if unique
+                            if (!existing.contactName && c.contactName) {
+                                existing.contactName = c.contactName;
+                                existing.phone = c.phone || '';
+                                existing.email = c.email || '';
+                            }
+                            
+                            if (c.contactName) {
+                                if (!existing.contacts) existing.contacts = [];
+                                const isDuplicateContact = existing.contacts.some(
+                                    contact => contact.contactName === c.contactName && contact.phone === c.phone
+                                );
+                                if (!isDuplicateContact) {
+                                    existing.contacts.push({ contactName: c.contactName, phone: c.phone || '', email: c.email || '' });
+                                }
+                            }
                         }
                     } else {
-                        uniqueData.push(c);
+                        // For empty bizNum, just initialize contacts
+                        uniqueData.push({
+                            ...c,
+                            contacts: c.contactName ? [{ contactName: c.contactName, phone: c.phone || '', email: c.email || '' }] : []
+                        });
                     }
                 });
                 

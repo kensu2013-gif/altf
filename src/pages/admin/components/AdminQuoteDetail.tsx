@@ -33,6 +33,7 @@ interface CrmCustomerOption {
     phone?: string;
     businessNumber?: string;
     address?: string;
+    contacts?: { contactName: string; phone: string; email: string }[];
     isDeleted?: boolean;
 }
 
@@ -74,18 +75,44 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         .then(data => {
             if (Array.isArray(data)) {
                 const uniqueData: CrmCustomerOption[] = [];
-                const bizNumSet = new Set<string>();
+                const uniqueMap = new Map<string, CrmCustomerOption>();
                 
                 data.forEach((c: CrmCustomerOption) => {
                     if (c.isDeleted) return;
                     const bizNum = (c.businessNumber || '').replace(/[^0-9]/g, '');
                     if (bizNum && bizNum.length >= 5) {
-                        if (!bizNumSet.has(bizNum)) {
-                            bizNumSet.add(bizNum);
-                            uniqueData.push(c);
+                        if (!uniqueMap.has(bizNum)) {
+                            uniqueMap.set(bizNum, {
+                                ...c,
+                                contacts: c.contactName ? [{ contactName: c.contactName, phone: c.phone || '', email: c.email || '' }] : []
+                            });
+                            uniqueData.push(uniqueMap.get(bizNum)!);
+                        } else {
+                            const existing = uniqueMap.get(bizNum)!;
+                            if (!existing.address && c.address) existing.address = c.address;
+                            if (!existing.ceo && c.ceo) existing.ceo = c.ceo;
+                            
+                            if (!existing.contactName && c.contactName) {
+                                existing.contactName = c.contactName;
+                                existing.phone = c.phone || '';
+                                existing.email = c.email || '';
+                            }
+                            
+                            if (c.contactName) {
+                                if (!existing.contacts) existing.contacts = [];
+                                const isDuplicateContact = existing.contacts.some(
+                                    contact => contact.contactName === c.contactName && contact.phone === c.phone
+                                );
+                                if (!isDuplicateContact) {
+                                    existing.contacts.push({ contactName: c.contactName, phone: c.phone || '', email: c.email || '' });
+                                }
+                            }
                         }
                     } else {
-                        uniqueData.push(c);
+                        uniqueData.push({
+                            ...c,
+                            contacts: c.contactName ? [{ contactName: c.contactName, phone: c.phone || '', email: c.email || '' }] : []
+                        });
                     }
                 });
                 setCrmCustomers(uniqueData);
@@ -96,15 +123,16 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
     const [showSuggestions, setShowSuggestions] = useState(false);
     
-    const handleCustomerSelect = (c: CrmCustomerOption) => {
+    const handleCustomerSelect = (c: CrmCustomerOption, selectedContact?: {contactName: string, phone: string, email: string}) => {
+        const targetContact = selectedContact || c;
         if (window.confirm(`[${c.companyName}]의 연락처, 이메일, 담당자 등 전체 정보를 자동으로 덮어씌울까요?\n(현대배관 등 여러 지점이 있는 업체의 경우 '취소'를 누르시면 상호명만 적용됩니다)`)) {
             setCustomerInfo(prev => ({
                 ...prev,
                 companyName: c.companyName,
                 address: c.address || prev.address,
-                contactName: c.contactName || c.ceo || prev.contactName,
-                email: c.email || prev.email,
-                phone: c.phone || prev.phone,
+                contactName: targetContact.contactName || c.ceo || prev.contactName,
+                email: targetContact.email || prev.email,
+                phone: targetContact.phone || prev.phone,
                 bizNo: c.businessNumber || prev.bizNo
             }));
         } else {
@@ -555,8 +583,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     }, []);
 
     const handleProcessing = async () => {
-        if (!customerInfo.companyName || !customerInfo.bizNo || !customerInfo.contactName || !customerInfo.phone || !customerInfo.address) {
-            alert("업체명, 사업자번호, 담당자명, 연락처, 주소를 모두 입력해야 합니다. (신규 거래처인 경우 정보를 모두 입력해 주세요.)");
+        if (!customerInfo.companyName || !customerInfo.contactName || !customerInfo.phone) {
+            alert("업체명, 담당자명, 연락처는 최소한 입력해야 합니다.");
             return;
         }
 
@@ -591,8 +619,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     };
 
     const handleSend = async () => {
-        if (!customerInfo.companyName || !customerInfo.bizNo || !customerInfo.contactName || !customerInfo.phone || !customerInfo.address) {
-            alert("업체명, 사업자번호, 담당자명, 연락처, 주소를 모두 입력해야 합니다. (신규 거래처인 경우 정보를 모두 입력해 주세요.)");
+        if (!customerInfo.companyName || !customerInfo.contactName || !customerInfo.phone) {
+            alert("업체명, 담당자명, 연락처는 최소한 입력해야 합니다.");
             return;
         }
 
@@ -800,14 +828,30 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             return (
                                                 <div className="absolute z-100 top-full left-0 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
                                                     {matches.map(c => (
-                                                        <button
-                                                            key={c.id || c.companyName}
-                                                            className="w-full text-left px-3 py-2 text-xs hover:bg-teal-50 focus:bg-teal-50 focus:outline-none transition-colors border-b border-slate-100 last:border-0"
-                                                            onClick={() => handleCustomerSelect(c)}
-                                                        >
-                                                            <div className="font-bold text-slate-800">{c.companyName}</div>
-                                                            <div className="text-slate-500 text-[10px] truncate">{c.address || c.businessNumber || '정보 없음'}</div>
-                                                        </button>
+                                                            <div className="w-full text-left px-3 py-2 text-xs hover:bg-teal-50 focus:bg-teal-50 focus:outline-none transition-colors border-b border-slate-100 last:border-0 cursor-pointer" onClick={() => handleCustomerSelect(c)}>
+                                                                <div className="font-bold text-slate-800 flex items-center justify-between">
+                                                                    <span>{c.companyName}</span>
+                                                                    <span className="text-[10px] text-slate-400 font-normal">{c.businessNumber || ''}</span>
+                                                                </div>
+                                                                
+                                                                {c.contacts && c.contacts.length > 0 ? (
+                                                                    <div className="mt-1 flex flex-col gap-1">
+                                                                        {c.contacts.map((contact, idx) => (
+                                                                            <div key={idx} className="flex items-center justify-between bg-white border border-slate-100 rounded px-2 py-1 hover:bg-teal-100 hover:border-teal-200 transition-colors"
+                                                                                onClick={(e) => { e.stopPropagation(); handleCustomerSelect(c, contact); setShowSuggestions(false); }}
+                                                                            >
+                                                                                <div className="flex flex-col">
+                                                                                    <span className="font-semibold text-slate-700 text-[10px]">{contact.contactName || '담당자'}</span>
+                                                                                    <span className="text-slate-400 text-[9px]">{contact.phone}</span>
+                                                                                </div>
+                                                                                <span className="text-[9px] text-teal-600 bg-teal-50 px-1 py-0.5 rounded">선택</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="text-slate-500 text-[10px] truncate mt-0.5">{c.address || c.businessNumber || '정보 없음'}</div>
+                                                                )}
+                                                            </div>
                                                     ))}
                                                 </div>
                                             );

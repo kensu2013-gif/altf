@@ -33,6 +33,7 @@ interface CrmCustomerOption {
     businessNumber?: string;
     address?: string;
     isDeleted?: boolean;
+    contacts?: { contactName: string; phone: string; email: string; }[];
 }
 
 
@@ -440,16 +441,17 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleCustomerSelect = (c: any) => {
+    const handleCustomerSelect = (c: any, selectedContact?: any) => {
+        const targetContact = selectedContact || c;
         if (window.confirm(`[${c.companyName}]의 연락처, 이메일, 담당자 등 전체 정보를 자동으로 덮어씌울까요?\n(현대배관 등 여러 지점이 있는 업체의 경우 '취소'를 누르시면 상호명만 적용됩니다)`)) {
             setPoEndCustomer(c.companyName);
             setEditableCustomerInfo(prev => ({
                 ...prev,
                 bizNo: c.businessNumber || '',
                 address: c.address || '',
-                contactName: c.contactName || c.ceo || '',
-                email: c.email || '',
-                tel: c.phone || ''
+                contactName: targetContact.contactName || c.ceo || '',
+                email: targetContact.email || '',
+                tel: targetContact.phone || ''
             }));
             const matchInfo = poNumber.match(/\d+$/);
             const seq = matchInfo ? matchInfo[0] : poNumber;
@@ -1557,8 +1559,28 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                             className="w-full text-left px-3 py-2 text-xs hover:bg-teal-50 focus:bg-teal-50 focus:outline-none transition-colors border-b border-slate-100 last:border-0"
                                                                             onClick={() => handleCustomerSelect(c)}
                                                                         >
-                                                                            <div className="font-bold text-slate-800">{c.companyName}</div>
-                                                                            <div className="text-slate-500 text-[10px] truncate">{c.address || c.businessNumber || '정보 없음'}</div>
+                                                                            <div className="font-bold text-slate-800 flex items-center justify-between">
+                                                                                <span>{c.companyName}</span>
+                                                                                <span className="text-[10px] text-slate-400 font-normal">{c.businessNumber || ''}</span>
+                                                                            </div>
+                                                                            
+                                                                            {c.contacts && c.contacts.length > 0 ? (
+                                                                                <div className="mt-1 flex flex-col gap-1">
+                                                                                    {c.contacts.map((contact: { contactName: string; phone: string; email: string }, idx: number) => (
+                                                                                        <div key={idx} className="flex items-center justify-between bg-white border border-slate-100 rounded px-2 py-1 hover:bg-teal-100 hover:border-teal-200 transition-colors"
+                                                                                            onClick={(e) => { e.stopPropagation(); handleCustomerSelect(c, contact); setShowCrmSuggestions(false); }}
+                                                                                        >
+                                                                                            <div className="flex flex-col">
+                                                                                                <span className="font-semibold text-slate-700 text-[10px]">{contact.contactName || '담당자'}</span>
+                                                                                                <span className="text-slate-400 text-[9px]">{contact.phone}</span>
+                                                                                            </div>
+                                                                                            <span className="text-[9px] text-teal-600 bg-teal-50 px-1 py-0.5 rounded">선택</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="text-slate-500 text-[10px] truncate mt-0.5">{c.address || c.businessNumber || '정보 없음'}</div>
+                                                                            )}
                                                                         </button>
                                                                     ))}
                                                                 </div>
@@ -1802,8 +1824,40 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     className="w-full text-left px-3 py-2 text-xs hover:bg-teal-50 focus:bg-teal-50 focus:outline-none transition-colors border-b border-slate-100 last:border-0"
                                                                     onClick={() => handleCustomerSelect(c)}
                                                                 >
-                                                                    <div className="font-bold text-slate-800">{c.companyName}</div>
-                                                                    <div className="text-slate-500 text-[10px] truncate">{c.address || c.businessNumber || '정보 없음'}</div>
+                                                                    <div className="font-bold text-slate-800 flex items-center justify-between">
+                                                                        <span>{c.companyName}</span>
+                                                                        <span className="text-[10px] text-slate-400 font-normal">{c.businessNumber || ''}</span>
+                                                                    </div>
+                                                                    
+                                                                    {c.contacts && c.contacts.length > 0 ? (
+                                                                        <div className="mt-1 flex flex-col gap-1">
+                                                                            {c.contacts.map((contact: { contactName: string; phone: string; email: string }, idx: number) => (
+                                                                                <div key={idx} className="flex items-center justify-between bg-white border border-slate-100 rounded px-2 py-1 hover:bg-teal-100 hover:border-teal-200 transition-colors"
+                                                                                    onClick={(e) => { 
+                                                                                        e.stopPropagation(); 
+                                                                                        setSupplierInfo(prev => ({
+                                                                                            ...prev,
+                                                                                            companyName: c.companyName,
+                                                                                            bizNo: c.businessNumber || '',
+                                                                                            address: c.address || '',
+                                                                                            contactName: contact.contactName || c.ceo || '',
+                                                                                            email: contact.email || '',
+                                                                                            tel: contact.phone || ''
+                                                                                        }));
+                                                                                        setShowCrmSuggestions(false); 
+                                                                                    }}
+                                                                                >
+                                                                                    <div className="flex flex-col">
+                                                                                        <span className="font-semibold text-slate-700 text-[10px]">{contact.contactName || '담당자'}</span>
+                                                                                        <span className="text-slate-400 text-[9px]">{contact.phone}</span>
+                                                                                    </div>
+                                                                                    <span className="text-[9px] text-teal-600 bg-teal-50 px-1 py-0.5 rounded">선택</span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="text-slate-500 text-[10px] truncate mt-0.5">{c.address || c.businessNumber || '정보 없음'}</div>
+                                                                    )}
                                                                 </button>
                                                             ))}
                                                         </div>
