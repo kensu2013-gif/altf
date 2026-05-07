@@ -215,7 +215,7 @@ export default function SihwaInventory() {
         'REGULAR': true
     });
     const [selectedHealthCategory, setSelectedHealthCategory] = useState<'DEAD' | 'EXCESS' | 'SLOW' | 'MISSED' | 'URGENT' | null>(null);
-    const [selectedIntelligenceItem, setSelectedIntelligenceItem] = useState<{ id: string, name?: string } | null>(null);
+    const [selectedIntelligenceItem, setSelectedIntelligenceItem] = useState<{ id: string, name?: string, row?: Record<string, unknown> } | null>(null);
 
 
     const [selectedCriticalIds, setSelectedCriticalIds] = useState<Set<string>>(new Set());
@@ -1375,7 +1375,7 @@ export default function SihwaInventory() {
         lockedCapital: deadStockValue + excessStockValue,
         totalIssueCount: analyzedInventory.filter(r => r.healthGrade === 'E' || r.excessCategory !== null).length,
       };
-    }, [analyzedInventory, historyData, orders]);
+    }, [analyzedInventory, historyData, orders, quotes]);
 
     const dailyOrderDiffMap = useMemo(() => {
         const map: Record<string, Record<string, number>> = {}; 
@@ -2768,7 +2768,7 @@ export default function SihwaInventory() {
                                                             className="cursor-pointer hover:text-indigo-600 hover:underline transition-colors"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                setSelectedIntelligenceItem({ id: row.product.id, name: row.product.name });
+                                                                setSelectedIntelligenceItem({ id: row.product.id, name: row.product.name, row: row });
                                                             }}
                                                             title="아이템 인텔리전스 분석 보기"
                                                         >
@@ -3475,6 +3475,7 @@ export default function SihwaInventory() {
                 <ItemIntelligenceCard
                     productId={selectedIntelligenceItem.id}
                     productName={selectedIntelligenceItem.name}
+                    inventoryData={selectedIntelligenceItem.row}
                     onClose={() => setSelectedIntelligenceItem(null)}
                 />
             )}

@@ -3,13 +3,25 @@ import { X, TrendingUp, PackageSearch, AlertCircle, CheckCircle2, Factory, Packa
 import { useStore, type AppState } from '../../../store/useStore';
 import type { Order, Quotation } from '../../../types';
 
+interface InventoryDataProps {
+    healthGrade?: string;
+    turnoverRate?: number | string;
+    shQty?: number | string;
+    pendingOrderQty?: number | string;
+    ysQty?: number | string;
+    profitMarginRate?: number;
+    recentPurchasePrice?: number;
+    [key: string]: unknown;
+}
+
 interface ItemIntelligenceCardProps {
     productId: string;
     productName?: string;
     onClose: () => void;
+    inventoryData?: InventoryDataProps; // Rich stats from SihwaInventory
 }
 
-export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ productId, productName, onClose }) => {
+export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ productId, productName, onClose, inventoryData }) => {
     const orders: Order[] = useStore((state: AppState) => state.orders);
     const myQuotations: Quotation[] = useStore((state: AppState) => state.quotes);
     
@@ -18,14 +30,15 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
     // 1. Data Aggregation
     const itemQuotations = useMemo(() => {
         return myQuotations.filter(q => 
-            q.items && q.items.some(item => (item.id === productId || item.name === productId))
+            q.items && q.items.some(item => (item.productId === productId || item.item_id === productId || item.itemId === productId || item.name === productId))
         ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }, [myQuotations, productId]);
 
     const itemOrders = useMemo(() => {
-        return orders.filter(o => 
-            o.items && o.items.some(item => (item.id === productId || item.name === productId))
-        ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        return orders.filter(o => {
+            const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
+            return items && items.some(item => (item.productId === productId || item.item_id === productId || item.itemId === productId || item.name === productId));
+        }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }, [orders, productId]);
 
     // Metrics
@@ -149,6 +162,46 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Inventory Comprehensive View */}
+                            {inventoryData && (
+                                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                                    <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                        <PackageSearch className="w-4 h-4" />
+                                        재고 및 수익성 종합 지표
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                        <div className="flex flex-col bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                            <span className="text-[10px] text-slate-500 font-bold mb-1">건전성 등급</span>
+                                            <div className="flex items-baseline gap-1">
+                                                <span className={`text-xl font-black ${inventoryData.healthGrade === 'A' ? 'text-emerald-600' : inventoryData.healthGrade === 'B' ? 'text-blue-600' : inventoryData.healthGrade === 'C' ? 'text-amber-600' : inventoryData.healthGrade === 'D' ? 'text-orange-600' : 'text-rose-600'}`}>{inventoryData.healthGrade}급</span>
+                                                <span className="text-xs text-slate-400 font-mono">({inventoryData.turnoverRate}x)</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                            <span className="text-[10px] text-slate-500 font-bold mb-1">시화 재고 / 입고 대기</span>
+                                            <div className="flex items-baseline gap-1">
+                                                <span className="text-xl font-black text-indigo-600">{inventoryData.shQty}</span>
+                                                <span className="text-xs text-slate-400 font-bold">/ +{inventoryData.pendingOrderQty}개</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                            <span className="text-[10px] text-slate-500 font-bold mb-1">대경 본사 재고</span>
+                                            <div className="flex items-baseline gap-1">
+                                                <span className="text-xl font-black text-slate-700">{inventoryData.ysQty}</span>
+                                                <span className="text-xs text-slate-400">개</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                            <span className="text-[10px] text-slate-500 font-bold mb-1">평균 이익률</span>
+                                            <div className="flex items-baseline gap-1">
+                                                <span className={`text-xl font-black ${(inventoryData.profitMarginRate ?? 0) <= 0 ? 'text-rose-500' : (inventoryData.profitMarginRate ?? 0) >= 30 ? 'text-emerald-600' : 'text-slate-700'}`}>{inventoryData.profitMarginRate ?? 0}%</span>
+                                                <span className="text-xs text-slate-400 font-mono">({inventoryData.recentPurchasePrice?.toLocaleString()}원)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     )}
 
