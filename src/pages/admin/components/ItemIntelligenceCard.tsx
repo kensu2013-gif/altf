@@ -94,7 +94,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
 
             const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
             const match = items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
-            const p = match?.unitPrice || match?.price || match?.unit_price || match?.cost || 0;
+            const p = match?.unitPrice || (match as any)?.price || (match as any)?.unit_price || (match as any)?.cost || 0;
             if (p > 0) {
                 totalValidPrice += Number(p);
                 validPriceCount++;
@@ -279,7 +279,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                             {itemOrders.slice(0, 10).map(o => {
                                                 const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
                                                 const match = items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
-                                                const unitPrice = match?.unitPrice || match?.price || match?.unit_price || match?.cost || 0;
+                                                const unitPrice = match?.unitPrice || (match as any)?.price || (match as any)?.unit_price || (match as any)?.cost || 0;
                                                 return (
                                                     <div key={o.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
                                                         <div className="flex flex-col gap-1">
@@ -318,7 +318,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                         <div className="divide-y divide-slate-100">
                                             {itemQuotations.slice(0, 10).map(q => {
                                                 const match = q.items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
-                                                const unitPrice = match?.unitPrice || match?.price || match?.unit_price || match?.cost || 0;
+                                                const unitPrice = match?.unitPrice || (match as any)?.price || (match as any)?.unit_price || (match as any)?.cost || 0;
                                                 return (
                                                     <div key={q.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
                                                         <div className="flex flex-col gap-1">
