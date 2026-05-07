@@ -84,7 +84,8 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
             const customerName = o.poEndCustomer || o.supplierInfo?.company_name || '';
             if (customerName) {
                 customerCounts[customerName] = (customerCounts[customerName] || 0) + 1;
-                const addr = (o.supplierInfo?.address || (o as any).customerInfo?.address || (o as any).customer?.address || customerName).toLowerCase();
+                const extO = o as typeof o & { customerInfo?: { address?: string }, customer?: { address?: string } };
+                const addr = (o.supplierInfo?.address || extO.customerInfo?.address || extO.customer?.address || customerName).toLowerCase();
                 if (addr.includes('경기') || addr.includes('시흥') || addr.includes('안산') || addr.includes('화성') || addr.includes('평택') || addr.includes('김포') || addr.includes('인천')) regionCounts['경기/수도권'] = (regionCounts['경기/수도권'] || 0) + 1;
                 if (addr.includes('경남') || addr.includes('부산') || addr.includes('김해') || addr.includes('창원') || addr.includes('울산') || addr.includes('경상')) regionCounts['경남/경상권'] = (regionCounts['경남/경상권'] || 0) + 1;
                 if (addr.includes('충청') || addr.includes('천안') || addr.includes('아산') || addr.includes('청주') || addr.includes('당진')) regionCounts['충청권'] = (regionCounts['충청권'] || 0) + 1;
@@ -94,7 +95,8 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
 
             const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
             const match = items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
-            const p = match?.unitPrice || (match as any)?.price || (match as any)?.unit_price || (match as any)?.cost || 0;
+            const m = match as typeof match & { price?: number; unit_price?: number; cost?: number; };
+            const p = m?.unitPrice || m?.price || m?.unit_price || m?.cost || 0;
             if (p > 0) {
                 totalValidPrice += Number(p);
                 validPriceCount++;
@@ -279,7 +281,8 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                             {itemOrders.slice(0, 10).map(o => {
                                                 const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
                                                 const match = items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
-                                                const unitPrice = match?.unitPrice || (match as any)?.price || (match as any)?.unit_price || (match as any)?.cost || 0;
+                                                const m = match as typeof match & { price?: number; unit_price?: number; cost?: number; };
+                                                const unitPrice = m?.unitPrice || m?.price || m?.unit_price || m?.cost || 0;
                                                 return (
                                                     <div key={o.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
                                                         <div className="flex flex-col gap-1">
@@ -318,7 +321,8 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                         <div className="divide-y divide-slate-100">
                                             {itemQuotations.slice(0, 10).map(q => {
                                                 const match = q.items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
-                                                const unitPrice = match?.unitPrice || (match as any)?.price || (match as any)?.unit_price || (match as any)?.cost || 0;
+                                                const m = match as typeof match & { price?: number; unit_price?: number; cost?: number; };
+                                                const unitPrice = m?.unitPrice || m?.price || m?.unit_price || m?.cost || 0;
                                                 return (
                                                     <div key={q.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
                                                         <div className="flex flex-col gap-1">
