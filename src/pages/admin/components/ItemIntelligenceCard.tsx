@@ -62,7 +62,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
 
     return (
         <div className="fixed inset-0 z-[150] flex justify-end bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
-            <div className="w-[500px] h-full bg-slate-50 shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300" onClick={e => e.stopPropagation()}>
+            <div className="w-[800px] max-w-[90vw] h-full bg-slate-50 shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300" onClick={e => e.stopPropagation()}>
                 
                 {/* Header */}
                 <div className="bg-white px-6 py-5 border-b border-slate-200 flex justify-between items-start shrink-0 relative overflow-hidden">
@@ -101,9 +101,9 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                     </button>
                     <button 
                         onClick={() => setActiveTab('INSIGHTS')}
-                        className={`py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'INSIGHTS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+                        className={`py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'INSIGHTS' ? 'border-purple-600 text-purple-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
                     >
-                        실패 분석/메모
+                        ✨ AI 전략 분석
                     </button>
                 </div>
 
@@ -219,7 +219,8 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                     ) : (
                                         <div className="divide-y divide-slate-100">
                                             {itemOrders.slice(0, 10).map(o => {
-                                                const match = o.items?.find(i => i.id === productId || i.name === productId);
+                                                const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
+                                                const match = items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
                                                 return (
                                                     <div key={o.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
                                                         <div className="flex flex-col gap-1">
@@ -257,7 +258,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                     ) : (
                                         <div className="divide-y divide-slate-100">
                                             {itemQuotations.slice(0, 10).map(q => {
-                                                const match = q.items?.find(i => i.id === productId || i.name === productId);
+                                                const match = q.items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
                                                 return (
                                                     <div key={q.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center">
                                                         <div className="flex flex-col gap-1">
@@ -284,31 +285,113 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                     )}
 
                     {activeTab === 'INSIGHTS' && (
-                        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-                            <h3 className="text-sm font-black text-slate-800 border-b border-slate-100 pb-3">실패 분석 (Lost Sales Tracking)</h3>
-                            <p className="text-xs text-slate-500 mb-4">견적이 발주로 이어지지 않은 이유를 관리하고 영업 자산으로 활용하세요.</p>
-                            
-                            <div className="space-y-4">
+                        <div className="space-y-6 pb-20">
+                            {/* AI Strategy Analysis */}
+                            <div className="bg-gradient-to-br from-indigo-900 to-purple-900 border border-indigo-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
+                                <div className="relative z-10 space-y-6">
+                                    <div className="flex items-center gap-3 border-b border-indigo-800/50 pb-4">
+                                        <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center border border-purple-500/30">
+                                            <TrendingUp className="w-5 h-5 text-purple-300" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-base font-black text-white">AI 인사이트 & 전략 평가</h3>
+                                            <p className="text-[11px] text-indigo-300">CRM 및 재고 빅데이터 기반 종합 판단</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {/* Market Insight */}
+                                        <div className="bg-slate-900/40 rounded-xl p-4 border border-indigo-800/50">
+                                            <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest block mb-2">시장 분석</span>
+                                            <ul className="space-y-2 text-sm text-indigo-100">
+                                                <li className="flex gap-2">
+                                                    <span className="text-purple-400 font-bold">•</span>
+                                                    <span>주요 타겟 고객층: <strong>{itemOrders.length > 0 ? Object.keys(itemOrders.reduce((acc, o) => { const n = o.poEndCustomer || o.supplierInfo?.company_name || ''; acc[n] = (acc[n]||0)+1; return acc; }, {} as Record<string,number>)).sort((a,b)=>itemOrders.reduce((acc, o) => { const n = o.poEndCustomer || o.supplierInfo?.company_name || ''; acc[n] = (acc[n]||0)+1; return acc; }, {} as Record<string,number>)[b] - itemOrders.reduce((acc, o) => { const n = o.poEndCustomer || o.supplierInfo?.company_name || ''; acc[n] = (acc[n]||0)+1; return acc; }, {} as Record<string,number>)[a])[0] || '데이터 부족' : '데이터 부족'}</strong></span>
+                                                </li>
+                                                <li className="flex gap-2">
+                                                    <span className="text-purple-400 font-bold">•</span>
+                                                    <span>평균 견적-발주 전환율: <strong>{conversionRate}%</strong> (총 {totalQuotations}건 중 {totalOrders}건 수주)</span>
+                                                </li>
+                                                <li className="flex gap-2">
+                                                    <span className="text-purple-400 font-bold">•</span>
+                                                    <span>평균 수주 이익률: <strong>{inventoryData?.profitMarginRate ?? 0}%</strong></span>
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        {/* Supply Chain Insight */}
+                                        <div className="bg-slate-900/40 rounded-xl p-4 border border-indigo-800/50">
+                                            <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest block mb-2">공급망 리드타임</span>
+                                            <ul className="space-y-2 text-sm text-indigo-100">
+                                                <li className="flex gap-2">
+                                                    <span className="text-emerald-400 font-bold">•</span>
+                                                    <span>시화 재고 출고 시: 평균 <strong>당일 ~ 1일</strong> 소요 (수주 우위 확보)</span>
+                                                </li>
+                                                <li className="flex gap-2">
+                                                    <span className="text-amber-400 font-bold">•</span>
+                                                    <span>대경 발주 출고 시: 평균 <strong>2~3일</strong> 소요</span>
+                                                </li>
+                                                <li className="flex gap-2">
+                                                    <span className="text-rose-400 font-bold">•</span>
+                                                    <span>현재 상태: <strong>{Number(inventoryData?.shQty) > 0 ? '당일 즉시 대응 가능 (단가 방어 유리)' : '재고 부족 상태 (단납기 수주 불리)'}</strong></span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                    {/* Strategy Suggestion */}
+                                    <div className="bg-white/10 rounded-xl p-4 border border-purple-500/30 backdrop-blur-sm">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center shrink-0">
+                                                <PackageSearch className="w-4 h-4 text-white" />
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] font-bold text-purple-200 uppercase tracking-widest block mb-1">AI 전략 코멘트</span>
+                                                <p className="text-sm font-medium text-white leading-relaxed">
+                                                    {inventoryData?.healthGrade === 'A' || inventoryData?.healthGrade === 'B' ? (
+                                                        Number(inventoryData?.shQty) < Number(inventoryData?.safeStock) ? 
+                                                        "수요 회전율이 높은 핵심 자재이나 현재 시화 재고가 안전재고 미달입니다. 결품 시 고객사 이탈 리스크가 높으므로 긴급 선발주가 요구되며, 현재 들어오는 견적은 납기를 보수적으로 잡아야 합니다." :
+                                                        "우수 핵심 자재로 현재 재고도 충분히 확보되어 있습니다. 타사 대비 당일 출고 프리미엄을 내세워 단가를 깎지 말고 마진율을 극대화하세요."
+                                                    ) : inventoryData?.healthGrade === 'D' || inventoryData?.healthGrade === 'E' ? (
+                                                        "수요 빈도가 낮은 둔착 및 장기 미판매 자재입니다. 악성 재고의 현금화가 우선이므로 마진을 포기하고 파격적인 단가 할인을 제안해서라도 신속히 털어내는 전략을 추천합니다."
+                                                    ) : (
+                                                        "시장 수요가 일정하게 유지되는 스탠다드 품목입니다. 시세에 맞춰 유연하게 견적을 대응하여 고객 이탈을 방지하고 안정적인 전환율을 유지하세요."
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Legacy Memo Block */}
+                            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                                <h3 className="text-sm font-black text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4 text-slate-400" />
+                                    품목 영업 메모 및 실패 분석
+                                </h3>
+                                <p className="text-xs text-slate-500">영업 담당자의 코멘트나 특정 고객의 피드백, 실주 사유 등을 자유롭게 기록하세요.</p>
+                                
                                 <div>
-                                    <label className="text-xs font-bold text-slate-700 mb-1.5 block">주요 실패 사유 (태그)</label>
+                                    <label className="text-xs font-bold text-slate-700 mb-1.5 block">주요 피드백 태그</label>
                                     <div className="flex gap-2">
                                         <button className="px-3 py-1.5 text-xs rounded-full border border-slate-200 bg-slate-50 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors font-medium">단가 경쟁력 부족</button>
-                                        <button className="px-3 py-1.5 text-xs rounded-full border border-slate-200 bg-slate-50 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors font-medium">재고 부족 (납기 문제)</button>
-                                        <button className="px-3 py-1.5 text-xs rounded-full border border-slate-200 bg-slate-50 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors font-medium">단순 비교/참고용</button>
+                                        <button className="px-3 py-1.5 text-xs rounded-full border border-slate-200 bg-slate-50 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors font-medium">재고 부족 (납기 지연)</button>
+                                        <button className="px-3 py-1.5 text-xs rounded-full border border-slate-200 bg-slate-50 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors font-medium">단순 비교/참고용 문의</button>
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label className="text-xs font-bold text-slate-700 mb-1.5 block">품목 영업 메모</label>
+                                    <label className="text-xs font-bold text-slate-700 mb-1.5 block">상세 영업 메모</label>
                                     <textarea 
-                                        className="w-full h-32 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
-                                        placeholder="이 품목에 대한 특이사항, 주요 수요처, 적정 마진 등을 기록해 두세요."
+                                        className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 h-24 resize-none"
+                                        placeholder="이 품목에 대한 특이사항, 타겟 수요처, 적정 마진 등을 기록해 두세요..."
                                     ></textarea>
                                 </div>
-
                                 <div className="flex justify-end pt-2">
                                     <button className="bg-slate-800 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-slate-700 transition-colors shadow-sm">
-                                        저장하기
+                                        코멘트 저장하기
                                     </button>
                                 </div>
                             </div>
