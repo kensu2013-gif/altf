@@ -93,7 +93,6 @@ interface CrmMatchableItem {
     poEndCustomer?: string | null;
     customerInfo?: { bizNo?: string; companyName?: string; company_name?: string; [key: string]: unknown } | null;
     customerName?: string | null;
-    [key: string]: unknown;
 }
 
 const matchCustomerToCrm = (item: CrmMatchableItem, customersList: Customer[]) => {
