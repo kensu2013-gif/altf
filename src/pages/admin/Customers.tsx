@@ -665,7 +665,6 @@ export default function Customers() {
             const fullCustomerName = (oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || '').toLowerCase();
             if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
             
-            const cleanOrderName = stripCorp(o.customerName);
             const customer = matchCustomerToCrm(oExt, customersList);
             const region = customer?.region || '미분류';
             const address = customer?.address || '';
@@ -753,7 +752,6 @@ export default function Customers() {
             const fullCustomerName = (oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || '').toLowerCase();
             if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
             
-            const cleanOrderName = stripCorp(o.customerName);
             const customer = matchCustomerToCrm(oExt, customersList);
             const region = customer?.region || '미분류/기타';
             const companyName = customer?.companyName || o.customerName || '미확인 업체';
@@ -856,7 +854,6 @@ export default function Customers() {
             const fullCustomerName = (oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || '').toLowerCase();
             if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
             
-            const cleanOrderName = stripCorp(o.customerName);
             const customer = matchCustomerToCrm(oExt, customersList);
             const companyName = customer?.companyName || o.customerName || '미확인 업체';
             const region = customer?.region || '미분류';
@@ -1038,7 +1035,6 @@ export default function Customers() {
           fullCustomerName.includes('stock')
         ) return;
 
-        const cleanOrderName = stripCorp(o.customerName);
         const customer = matchCustomerToCrm(oExt, customersList);
 
         const companyName = customer?.companyName || o.customerName || '미확인 업체';
@@ -1306,7 +1302,6 @@ const actionIntel = useMemo(() => {
       fullCust.includes('재고입고') || fullCust.includes('stock')
     ) return;
 
-    const cleanOrderName = stripCorp(o.customerName);
     const customer = matchCustomerToCrm(oExt, customersList);
 
     const companyName = customer?.companyName || o.customerName || '미확인 업체';
