@@ -84,7 +84,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
             const customerName = o.poEndCustomer || o.supplierInfo?.company_name || '';
             if (customerName) {
                 customerCounts[customerName] = (customerCounts[customerName] || 0) + 1;
-                const addr = (o.supplierInfo?.address || o.customerInfo?.address || customerName).toLowerCase();
+                const addr = (o.supplierInfo?.address || (o as any).customerInfo?.address || (o as any).customer?.address || customerName).toLowerCase();
                 if (addr.includes('경기') || addr.includes('시흥') || addr.includes('안산') || addr.includes('화성') || addr.includes('평택') || addr.includes('김포') || addr.includes('인천')) regionCounts['경기/수도권'] = (regionCounts['경기/수도권'] || 0) + 1;
                 if (addr.includes('경남') || addr.includes('부산') || addr.includes('김해') || addr.includes('창원') || addr.includes('울산') || addr.includes('경상')) regionCounts['경남/경상권'] = (regionCounts['경남/경상권'] || 0) + 1;
                 if (addr.includes('충청') || addr.includes('천안') || addr.includes('아산') || addr.includes('청주') || addr.includes('당진')) regionCounts['충청권'] = (regionCounts['충청권'] || 0) + 1;
