@@ -88,6 +88,51 @@ const stripCorp = (name: string) => {
                .trim();
 };
 
+interface CrmMatchableItem {
+    payload?: { customer?: { company_name?: string; business_no?: string; address?: string } } | null;
+    poEndCustomer?: string | null;
+    customerInfo?: { bizNo?: string; companyName?: string; company_name?: string; [key: string]: unknown } | null;
+    customerName?: string | null;
+    [key: string]: unknown;
+}
+
+const matchCustomerToCrm = (item: CrmMatchableItem, customersList: Customer[]) => {
+    let bizNo = '';
+    if (item.payload?.customer?.business_no) bizNo = item.payload.customer.business_no;
+    else if (item.customerInfo?.bizNo) bizNo = item.customerInfo.bizNo;
+    bizNo = bizNo.replace(/[^0-9]/g, '');
+
+    if (bizNo && bizNo.length >= 5) {
+        const matched = customersList.find(c => {
+            const crmBizNo = (c.businessNumber || '').replace(/[^0-9]/g, '');
+            return crmBizNo === bizNo;
+        });
+        if (matched) return matched;
+    }
+
+    let rawName = '';
+    if (item.poEndCustomer) rawName = item.poEndCustomer;
+    else if (item.payload?.customer?.company_name) rawName = item.payload.customer.company_name;
+    else if (item.customerInfo?.companyName) rawName = item.customerInfo.companyName;
+    else if (item.customerInfo?.company_name) rawName = item.customerInfo.company_name;
+    else if (item.customerName) rawName = item.customerName;
+
+    rawName = rawName.trim().toLowerCase();
+    if (rawName) {
+        const exactMatch = customersList.find(c => (c.companyName || '').trim().toLowerCase() === rawName);
+        if (exactMatch) return exactMatch;
+    }
+
+    const cleanOrderName = stripCorp(item.customerName || rawName);
+    if (!cleanOrderName) return undefined;
+
+    return customersList.find(c => {
+        const cleanCrm = stripCorp(c.companyName);
+        if (!cleanCrm) return false;
+        return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
+    });
+};
+
 const isInvalidCustomer = (c: Customer) => {
     const noAddr = !c.address || c.address.trim() === '';
     const noContact = !c.contactName || c.contactName.trim() === '';
@@ -510,11 +555,7 @@ export default function Customers() {
             if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
             
             const cleanOrderName = stripCorp(o.customerName);
-            const customer = customersList.find(c => {
-                const cleanCrm = stripCorp(c.companyName);
-                if (!cleanOrderName || !cleanCrm) return false;
-                return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
-            });
+            const customer = matchCustomerToCrm(oExt, customersList);
             const region = customer?.region || 'CRM 미등록/예외';
             
             if (!regionMap[region]) {
@@ -626,11 +667,7 @@ export default function Customers() {
             if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
             
             const cleanOrderName = stripCorp(o.customerName);
-            const customer = customersList.find(c => {
-                const cleanCrm = stripCorp(c.companyName);
-                if (!cleanOrderName || !cleanCrm) return false;
-                return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
-            });
+            const customer = matchCustomerToCrm(oExt, customersList);
             const region = customer?.region || '미분류';
             const address = customer?.address || '';
             const cluster = getCluster(region, address);
@@ -718,11 +755,7 @@ export default function Customers() {
             if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
             
             const cleanOrderName = stripCorp(o.customerName);
-            const customer = customersList.find(c => {
-                const cleanCrm = stripCorp(c.companyName);
-                if (!cleanOrderName || !cleanCrm) return false;
-                return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
-            });
+            const customer = matchCustomerToCrm(oExt, customersList);
             const region = customer?.region || '미분류/기타';
             const companyName = customer?.companyName || o.customerName || '미확인 업체';
 
@@ -825,11 +858,7 @@ export default function Customers() {
             if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
             
             const cleanOrderName = stripCorp(o.customerName);
-            const customer = customersList.find(c => {
-                const cleanCrm = stripCorp(c.companyName);
-                if (!cleanOrderName || !cleanCrm) return false;
-                return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
-            });
+            const customer = matchCustomerToCrm(oExt, customersList);
             const companyName = customer?.companyName || o.customerName || '미확인 업체';
             const region = customer?.region || '미분류';
 
@@ -934,11 +963,7 @@ export default function Customers() {
         if ((q.status as string) === 'TRASH' || q.isDeleted) return;
         const custName = q.customerName || (q.customerInfo ? (q.customerInfo.companyName || (q.customerInfo as Record<string, unknown>).company_name as string) : '');
         const cleanOrderName = stripCorp(custName);
-        const customer = customersList.find(c => {
-          const cleanCrm = stripCorp(c.companyName);
-          if (!cleanOrderName || !cleanCrm) return false;
-          return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
-        });
+        const customer = matchCustomerToCrm(q, customersList);
 
         const companyName = customer ? customer.companyName : (cleanOrderName || '미확인 업체');
         if (!cardMap[companyName]) {
@@ -1015,11 +1040,7 @@ export default function Customers() {
         ) return;
 
         const cleanOrderName = stripCorp(o.customerName);
-        const customer = customersList.find(c => {
-          const cleanCrm = stripCorp(c.companyName);
-          if (!cleanOrderName || !cleanCrm) return false;
-          return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
-        });
+        const customer = matchCustomerToCrm(oExt, customersList);
 
         const companyName = customer?.companyName || o.customerName || '미확인 업체';
         const region = customer?.region || '미분류';
@@ -1287,11 +1308,7 @@ const actionIntel = useMemo(() => {
     ) return;
 
     const cleanOrderName = stripCorp(o.customerName);
-    const customer = customersList.find(c => {
-      const cleanCrm = stripCorp(c.companyName);
-      if (!cleanOrderName || !cleanCrm) return false;
-      return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
-    });
+    const customer = matchCustomerToCrm(oExt, customersList);
 
     const companyName = customer?.companyName || o.customerName || '미확인 업체';
     const region      = customer?.region      || '미분류';
