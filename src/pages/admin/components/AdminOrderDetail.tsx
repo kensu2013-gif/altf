@@ -84,7 +84,24 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         })
         .then(res => res.json())
         .then(data => {
-            if (Array.isArray(data)) setCrmCustomers(data.filter((c: CrmCustomerOption) => !c.isDeleted));
+            if (Array.isArray(data)) {
+                const uniqueData: CrmCustomerOption[] = [];
+                const bizNumSet = new Set<string>();
+                
+                data.forEach((c: CrmCustomerOption) => {
+                    if (c.isDeleted) return;
+                    const bizNum = (c.businessNumber || '').replace(/[^0-9]/g, '');
+                    if (bizNum && bizNum.length >= 5) {
+                        if (!bizNumSet.has(bizNum)) {
+                            bizNumSet.add(bizNum);
+                            uniqueData.push(c);
+                        }
+                    } else {
+                        uniqueData.push(c);
+                    }
+                });
+                setCrmCustomers(uniqueData);
+            }
         })
         .catch(console.error);
     }, [user]);

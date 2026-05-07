@@ -258,7 +258,32 @@ export default function Customers() {
             const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, { headers });
             if (res.ok) {
                 const data = await res.json();
-                setCustomersList(data.filter((c: Customer) => !c.isDeleted && !isInvalidCustomer(c)));
+                
+                const uniqueMap = new Map<string, Customer>();
+                const uniqueData: Customer[] = [];
+                
+                data.forEach((c: Customer) => {
+                    if (c.isDeleted || isInvalidCustomer(c)) return;
+                    const bizNum = (c.businessNumber || '').replace(/[^0-9]/g, '');
+                    if (bizNum && bizNum.length >= 5) {
+                        if (!uniqueMap.has(bizNum)) {
+                            uniqueMap.set(bizNum, { ...c });
+                            uniqueData.push(uniqueMap.get(bizNum)!);
+                        } else {
+                            const existing = uniqueMap.get(bizNum)!;
+                            if (!existing.region && c.region) existing.region = c.region;
+                            if (!existing.address && c.address) existing.address = c.address;
+                            if (!existing.email && c.email) existing.email = c.email;
+                            if (!existing.phone && c.phone) existing.phone = c.phone;
+                            if (!existing.ceo && c.ceo) existing.ceo = c.ceo;
+                            if (!existing.contactName && c.contactName) existing.contactName = c.contactName;
+                        }
+                    } else {
+                        uniqueData.push(c);
+                    }
+                });
+                
+                setCustomersList(uniqueData);
             }
         } catch (e) {
             console.error(e);
@@ -276,7 +301,30 @@ export default function Customers() {
                 if (res.ok) {
                     const data = await res.json();
                     if (isMounted) {
-                        setCustomersList(data.filter((c: Customer) => !c.isDeleted && !isInvalidCustomer(c)));
+                        const uniqueMap = new Map<string, Customer>();
+                        const uniqueData: Customer[] = [];
+                        
+                        data.forEach((c: Customer) => {
+                            if (c.isDeleted || isInvalidCustomer(c)) return;
+                            const bizNum = (c.businessNumber || '').replace(/[^0-9]/g, '');
+                            if (bizNum && bizNum.length >= 5) {
+                                if (!uniqueMap.has(bizNum)) {
+                                    uniqueMap.set(bizNum, { ...c });
+                                    uniqueData.push(uniqueMap.get(bizNum)!);
+                                } else {
+                                    const existing = uniqueMap.get(bizNum)!;
+                                    if (!existing.region && c.region) existing.region = c.region;
+                                    if (!existing.address && c.address) existing.address = c.address;
+                                    if (!existing.email && c.email) existing.email = c.email;
+                                    if (!existing.phone && c.phone) existing.phone = c.phone;
+                                    if (!existing.ceo && c.ceo) existing.ceo = c.ceo;
+                                    if (!existing.contactName && c.contactName) existing.contactName = c.contactName;
+                                }
+                            } else {
+                                uniqueData.push(c);
+                            }
+                        });
+                        setCustomersList(uniqueData);
                     }
                 }
                 
@@ -1351,7 +1399,7 @@ const actionIntel = useMemo(() => {
         ? parseFloat((((c.totalAmount - c.totalCost) / c.totalAmount) * 100).toFixed(1)) : 0;
       const avgOrderAmt = c.totalOrders > 0
         ? Math.round(c.totalAmount / c.totalOrders) : 0;
-      const ltv12 = last12.reduce((s, m) => s + (c.monthMap[m]?.amount || 0), 0);
+      const ltv12 = last12.reduce((sum, m) => sum + (c.monthMap[m]?.amount || 0), 0);
 
       // 월별 데이터
       const monthlyData = last12.map(m => ({
@@ -2228,15 +2276,15 @@ const actionIntel = useMemo(() => {
                     </select>
                     {/* 정렬 */}
                     <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-inner">
-                      {(['amount', 'qty', 'orders', 'conversion'] as const).map(s => (
+                      {(['amount', 'qty', 'orders', 'conversion'] as const).map(sortOpt => (
                         <button
-                          key={s}
-                          onClick={() => setCompanyCardSortBy(s)}
+                          key={sortOpt}
+                          onClick={() => setCompanyCardSortBy(sortOpt)}
                           className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                            companyCardSortBy === s ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                            companyCardSortBy === sortOpt ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                           }`}
                         >
-                          {s === 'amount' ? '매출순' : s === 'qty' ? '수량순' : s === 'orders' ? '거래건수' : '전환율'}
+                          {sortOpt === 'amount' ? '매출순' : sortOpt === 'qty' ? '수량순' : sortOpt === 'orders' ? '거래건수' : '전환율'}
                         </button>
                       ))}
                     </div>
@@ -2260,10 +2308,10 @@ const actionIntel = useMemo(() => {
                     (companyCardRegion === 'ALL' || c.region === companyCardRegion) &&
                     (!companyCardSearch || c.companyName.toLowerCase().includes(companyCardSearch.toLowerCase()))
                   );
-                  const totalRevenue = visibleCards.reduce((s, c) => s + c.totalAmount, 0);
+                  const totalRevenue = visibleCards.reduce((sum, c) => sum + c.totalAmount, 0);
                   const churnRisk = visibleCards.filter(c => c.status === 'CHURN_RISK').length;
                   const avgConversion = visibleCards.length > 0
-                    ? (visibleCards.reduce((s, c) => s + c.conversionRate, 0) / visibleCards.length).toFixed(1)
+                    ? (visibleCards.reduce((sum, c) => sum + c.conversionRate, 0) / visibleCards.length).toFixed(1)
                     : '0';
                   return (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -2557,15 +2605,15 @@ const actionIntel = useMemo(() => {
                                         주력 품목 TOP {Math.min(card.topItems.length, 10)}
                                       </div>
                                       <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 gap-0.5">
-                                        {(['amount', 'qty', 'freq'] as const).map(s => (
+                                        {(['amount', 'qty', 'freq'] as const).map(sortOpt => (
                                           <button
-                                            key={s}
-                                            onClick={e => { e.stopPropagation(); setCardItemSortBy(s); }}
+                                            key={sortOpt}
+                                            onClick={e => { e.stopPropagation(); setCardItemSortBy(sortOpt); }}
                                             className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${
-                                              cardItemSortBy === s ? 'bg-violet-100 text-violet-700' : 'text-slate-400 hover:text-slate-600'
+                                              cardItemSortBy === sortOpt ? 'bg-violet-100 text-violet-700' : 'text-slate-400 hover:text-slate-600'
                                             }`}
                                           >
-                                            {s === 'amount' ? '매출' : s === 'qty' ? '수량' : '빈도'}
+                                            {sortOpt === 'amount' ? '매출' : sortOpt === 'qty' ? '수량' : '빈도'}
                                           </button>
                                         ))}
                                       </div>
