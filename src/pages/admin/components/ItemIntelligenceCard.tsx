@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { X, TrendingUp, PackageSearch, AlertCircle, CheckCircle2, Factory, Package, Filter } from 'lucide-react';
+import { X, TrendingUp, PackageSearch, AlertCircle, CheckCircle2, Factory, Package, Filter, BrainCircuit } from 'lucide-react';
 import { useStore, type AppState } from '../../../store/useStore';
 import type { Order, Quotation, User } from '../../../types';
 
@@ -12,6 +12,12 @@ interface InventoryDataProps {
     profitMarginRate?: number;
     recentPurchasePrice?: number;
     healthScore?: number;
+    compositeScore?: number;
+    salesFreq?: number;
+    salesVolume?: number;
+    recent30dSales?: number;
+    recent60dSales?: number;
+    quoteCount?: number;
     [key: string]: unknown;
 }
 
@@ -28,6 +34,75 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
     const users: User[] = useStore((state: AppState) => state.users);
     
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'HISTORY' | 'INSIGHTS'>('OVERVIEW');
+
+    // Composite Score Breakdown
+    const scoreDetails = useMemo(() => {
+        if (!inventoryData) return null;
+        
+        const row = {
+            salesFreq: Number(inventoryData.salesFreq || 0),
+            salesVolume: Number(inventoryData.salesVolume || 0),
+            recent30dSales: Number(inventoryData.recent30dSales || 0),
+            recent60dSales: Number(inventoryData.recent60dSales || 0),
+            quoteCount: Number(inventoryData.quoteCount || 0),
+            profitMarginRate: Number(inventoryData.profitMarginRate || 0),
+        };
+
+        const salesFreqScore =
+            row.salesFreq >= 30 ? 100 :
+            row.salesFreq >= 10 ? 70  :
+            row.salesFreq >= 5  ? 40  :
+            row.salesFreq >= 1  ? 15  : 0;
+
+        const monthlyExpected = row.salesVolume / 12;
+        const trendRatio = monthlyExpected > 0 ? (row.recent30dSales / monthlyExpected) : 0;
+        const recentTrendScore = Math.min(100,
+            trendRatio >= 1.0 ? 100 :
+            trendRatio >= 0.5 ? 80  :
+            trendRatio >= 0.2 ? 50  :
+            row.recent60dSales > 0 ? 30 : 0
+        );
+
+        const quoteDemandScore =
+            row.quoteCount >= 3 ? 100 :
+            row.quoteCount >= 1 ? 60  : 0;
+
+        const salesVolumeScore =
+            row.salesVolume >= 500  ? 100 :
+            row.salesVolume >= 200  ? 75  :
+            row.salesVolume >= 50   ? 50  :
+            row.salesVolume >= 10   ? 25  : 0;
+
+        const profitScore =
+            row.profitMarginRate >= 30 ? 100 :
+            row.profitMarginRate >= 20 ? 75  :
+            row.profitMarginRate >= 10 ? 50  :
+            row.profitMarginRate >= 0  ? 25  : 0;
+
+        let bonusScore = 0;
+        if (row.recent30dSales >= Math.max(10, row.salesVolume / 12 * 1.5)) bonusScore += 15;
+        else if (row.recent60dSales > 0) bonusScore += 5;
+
+        if (row.quoteCount >= 5) bonusScore += 10;
+
+        const weightedFreq = salesFreqScore * 0.25;
+        const weightedTrend = recentTrendScore * 0.25;
+        const weightedQuote = quoteDemandScore * 0.20;
+        const weightedVolume = salesVolumeScore * 0.15;
+        const weightedProfit = profitScore * 0.15;
+
+        return {
+            weighted: {
+                freq: weightedFreq,
+                trend: weightedTrend,
+                quote: weightedQuote,
+                volume: weightedVolume,
+                profit: weightedProfit,
+                bonus: bonusScore,
+                total: Math.min(100, Math.round(weightedFreq + weightedTrend + weightedQuote + weightedVolume + weightedProfit + bonusScore))
+            }
+        };
+    }, [inventoryData]);
 
     // 1. Data Aggregation
     const itemQuotations = useMemo(() => {
@@ -314,7 +389,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                             <span className="text-[10px] text-slate-500 font-bold mb-1">건전성 등급</span>
                                             <div className="flex items-baseline gap-1">
                                                 <span className={`text-xl font-black ${inventoryData.healthGrade === 'A' ? 'text-emerald-600' : inventoryData.healthGrade === 'B' ? 'text-blue-600' : inventoryData.healthGrade === 'C' ? 'text-amber-600' : inventoryData.healthGrade === 'D' ? 'text-orange-600' : 'text-rose-600'}`}>{inventoryData.healthGrade}급</span>
-                                                <span className="text-xs text-slate-400 font-mono">({Math.round(Number(inventoryData.healthScore ?? 0))}점)</span>
+                                                <span className="text-xs text-slate-400 font-mono">({Math.round(Number(inventoryData.healthScore ?? inventoryData.compositeScore ?? 0))}점)</span>
                                             </div>
                                         </div>
                                         <div className="flex flex-col bg-slate-50 p-3 rounded-lg border border-slate-100">
@@ -339,6 +414,58 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                             </div>
                                         </div>
                                     </div>
+                                    
+                                    {scoreDetails && (
+                                        <div className="mt-4 pt-4 border-t border-slate-100">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><BrainCircuit className="w-3 h-3 text-indigo-400" /> 건전성 등급 세부 산출내역</span>
+                                                <span className="text-[9px] text-slate-400 font-mono bg-slate-50 px-1.5 py-0.5 rounded">총 100점 만점 기준</span>
+                                            </div>
+                                            <div className="grid grid-cols-5 gap-2">
+                                                <div className="bg-slate-50 p-2 rounded border border-slate-100 flex flex-col items-center justify-center text-center">
+                                                    <span className="text-[9px] text-slate-500 font-bold mb-0.5">판매빈도</span>
+                                                    <div className="flex items-baseline">
+                                                        <span className="text-sm font-black text-slate-700">{scoreDetails.weighted.freq.toFixed(1)}</span>
+                                                        <span className="text-[9px] font-medium text-slate-400 ml-0.5">/25</span>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-slate-50 p-2 rounded border border-slate-100 flex flex-col items-center justify-center text-center">
+                                                    <span className="text-[9px] text-slate-500 font-bold mb-0.5">판매규모</span>
+                                                    <div className="flex items-baseline">
+                                                        <span className="text-sm font-black text-slate-700">{scoreDetails.weighted.volume.toFixed(1)}</span>
+                                                        <span className="text-[9px] font-medium text-slate-400 ml-0.5">/15</span>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-slate-50 p-2 rounded border border-slate-100 flex flex-col items-center justify-center text-center">
+                                                    <span className="text-[9px] text-slate-500 font-bold mb-0.5">최근트렌드</span>
+                                                    <div className="flex items-baseline">
+                                                        <span className="text-sm font-black text-slate-700">{scoreDetails.weighted.trend.toFixed(1)}</span>
+                                                        <span className="text-[9px] font-medium text-slate-400 ml-0.5">/25</span>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-slate-50 p-2 rounded border border-slate-100 flex flex-col items-center justify-center text-center">
+                                                    <span className="text-[9px] text-slate-500 font-bold mb-0.5">견적유입</span>
+                                                    <div className="flex items-baseline">
+                                                        <span className="text-sm font-black text-slate-700">{scoreDetails.weighted.quote.toFixed(1)}</span>
+                                                        <span className="text-[9px] font-medium text-slate-400 ml-0.5">/20</span>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-slate-50 p-2 rounded border border-slate-100 flex flex-col items-center justify-center text-center">
+                                                    <span className="text-[9px] text-slate-500 font-bold mb-0.5">이익률</span>
+                                                    <div className="flex items-baseline">
+                                                        <span className="text-sm font-black text-slate-700">{scoreDetails.weighted.profit.toFixed(1)}</span>
+                                                        <span className="text-[9px] font-medium text-slate-400 ml-0.5">/15</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {scoreDetails.weighted.bonus > 0 && (
+                                                <div className="mt-2 text-[10px] font-bold text-indigo-600 flex justify-end items-center gap-1">
+                                                    <TrendingUp className="w-3 h-3" />
+                                                    보정 가점 +{scoreDetails.weighted.bonus}점
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </>
