@@ -584,6 +584,14 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             supplier: supplierInfo, // Vendor
             customer: {
                 ...buyerInfo, // Defaults to ALTF or Manager Info
+                contact_name: (() => {
+                    const poManager = buyerInfo.contact_name || '';
+                    const salesManager = currentManagers && currentManagers.length > 0 ? currentManagers.map(m => m.name).join(', ') : '';
+                    if (salesManager && salesManager !== poManager && !salesManager.includes(poManager)) {
+                        return `${poManager} / 영업담당자: ${salesManager}`;
+                    }
+                    return poManager;
+                })(),
                 address: buyerInfo.address,
                 memo: shippingMemo // Keep memo if it's used elsewhere, but we'll prioritize footer.note below
             },    // Buyer (ALTF)
@@ -1240,7 +1248,17 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         tel: supplierInfo.tel,
                         email: supplierInfo.email || "dksales@daekyungbend.com"
                     },
-                    buyer: { ...buyerInfo },
+                    buyer: { 
+                        ...buyerInfo,
+                        contact_name: (() => {
+                            const poManager = buyerInfo.contact_name || '';
+                            const salesManager = currentManagers && currentManagers.length > 0 ? currentManagers.map(m => m.name).join(', ') : '';
+                            if (salesManager && salesManager !== poManager && !salesManager.includes(poManager)) {
+                                return `${poManager} / 영업담당자: ${salesManager}`;
+                            }
+                            return poManager;
+                        })()
+                    },
                     shipping: { memo: shippingMemo },
                     email: {
                         from: "ALTF@ALTF.KR",
@@ -1442,48 +1460,50 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         )}
                                 </div>
 
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                                     {/* Vendor Info */}
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between mb-2">
                                             <h4 className="text-xs font-bold text-indigo-700 uppercase"> 공급자(Vendor) - 매입처 </h4>
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            <input
-                                                placeholder="상호 (Company)"
-                                                value={supplierInfo.company_name}
-                                                onChange={e => setSupplierInfo({ ...supplierInfo, company_name: e.target.value })}
-                                                className="px-2 py-1.5 text-sm border rounded"
-                                            />
-                                            <input
-                                                placeholder="담당자 (Contact)"
-                                                value={supplierInfo.contact_name}
-                                                onChange={e => setSupplierInfo({ ...supplierInfo, contact_name: e.target.value })}
-                                                className="px-2 py-1.5 text-sm border rounded"
-                                            />
-                                            <input
-                                                placeholder="연락처 (Tel)"
-                                                value={supplierInfo.tel}
-                                                onChange={e => setSupplierInfo({ ...supplierInfo, tel: e.target.value })}
-                                                className="px-2 py-1.5 text-sm border rounded"
-                                            />
-                                            <input
-                                                placeholder="이메일 (Email)"
-                                                value={supplierInfo.email}
-                                                onChange={e => setSupplierInfo({ ...supplierInfo, email: e.target.value })}
-                                                className="px-2 py-1.5 text-sm border rounded"
-                                            />
+                                        <div className="flex flex-col gap-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <input
+                                                    placeholder="상호 (Company)"
+                                                    value={supplierInfo.company_name}
+                                                    onChange={e => setSupplierInfo({ ...supplierInfo, company_name: e.target.value })}
+                                                    className="px-2 py-1.5 text-sm border rounded"
+                                                />
+                                                <input
+                                                    placeholder="담당자 (Contact)"
+                                                    value={supplierInfo.contact_name}
+                                                    onChange={e => setSupplierInfo({ ...supplierInfo, contact_name: e.target.value })}
+                                                    className="px-2 py-1.5 text-sm border rounded"
+                                                />
+                                                <input
+                                                    placeholder="연락처 (Tel)"
+                                                    value={supplierInfo.tel}
+                                                    onChange={e => setSupplierInfo({ ...supplierInfo, tel: e.target.value })}
+                                                    className="px-2 py-1.5 text-sm border rounded"
+                                                />
+                                                <input
+                                                    placeholder="이메일 (Email)"
+                                                    value={supplierInfo.email}
+                                                    onChange={e => setSupplierInfo({ ...supplierInfo, email: e.target.value })}
+                                                    className="px-2 py-1.5 text-sm border rounded"
+                                                />
+                                            </div>
                                             <input
                                                 placeholder="주소 (Address)"
                                                 value={supplierInfo.address}
                                                 onChange={e => setSupplierInfo({ ...supplierInfo, address: e.target.value })}
-                                                className="col-span-2 px-2 py-1.5 text-sm border rounded"
+                                                className="w-full px-2 py-1.5 text-sm border rounded"
                                             />
                                             <textarea
                                                 placeholder="비고 (Note)"
                                                 value={supplierInfo.note}
                                                 onChange={e => setSupplierInfo({ ...supplierInfo, note: e.target.value })}
-                                                className="col-span-2 px-2 py-1.5 text-sm border rounded h-16 resize-none"
+                                                className="w-full px-2 py-1.5 text-sm border rounded h-20 resize-none"
                                             />
                                         </div>
                                     </div>
@@ -1591,36 +1611,38 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            <input
-                                                placeholder="상호"
-                                                value={buyerInfo.company_name}
-                                                onChange={e => setBuyerInfo({ ...buyerInfo, company_name: e.target.value })}
-                                                className="px-2 py-1.5 text-sm border rounded bg-slate-50"
-                                            />
-                                            <input
-                                                placeholder="담당자 (Contact)"
-                                                value={buyerInfo.contact_name}
-                                                onChange={e => setBuyerInfo({ ...buyerInfo, contact_name: e.target.value })}
-                                                className="px-2 py-1.5 text-sm border rounded bg-slate-50"
-                                            />
-                                            <input
-                                                placeholder="연락처"
-                                                value={buyerInfo.tel}
-                                                onChange={e => setBuyerInfo({ ...buyerInfo, tel: e.target.value })}
-                                                className="px-2 py-1.5 text-sm border rounded bg-slate-50"
-                                            />
-                                            <input
-                                                placeholder="이메일"
-                                                value={buyerInfo.email}
-                                                onChange={e => setBuyerInfo({ ...buyerInfo, email: e.target.value })}
-                                                className="px-2 py-1.5 text-sm border rounded bg-slate-50"
-                                            />
+                                        <div className="flex flex-col gap-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <input
+                                                    placeholder="상호"
+                                                    value={buyerInfo.company_name}
+                                                    onChange={e => setBuyerInfo({ ...buyerInfo, company_name: e.target.value })}
+                                                    className="px-2 py-1.5 text-sm border rounded bg-slate-50"
+                                                />
+                                                <input
+                                                    placeholder="담당자 (Contact)"
+                                                    value={buyerInfo.contact_name}
+                                                    onChange={e => setBuyerInfo({ ...buyerInfo, contact_name: e.target.value })}
+                                                    className="px-2 py-1.5 text-sm border rounded bg-slate-50"
+                                                />
+                                                <input
+                                                    placeholder="연락처"
+                                                    value={buyerInfo.tel}
+                                                    onChange={e => setBuyerInfo({ ...buyerInfo, tel: e.target.value })}
+                                                    className="px-2 py-1.5 text-sm border rounded bg-slate-50"
+                                                />
+                                                <input
+                                                    placeholder="이메일"
+                                                    value={buyerInfo.email}
+                                                    onChange={e => setBuyerInfo({ ...buyerInfo, email: e.target.value })}
+                                                    className="px-2 py-1.5 text-sm border rounded bg-slate-50"
+                                                />
+                                            </div>
                                             <input
                                                 placeholder="주소"
                                                 value={buyerInfo.address}
                                                 onChange={e => setBuyerInfo({ ...buyerInfo, address: e.target.value })}
-                                                className="col-span-2 px-2 py-1.5 text-sm border rounded bg-slate-50"
+                                                className="w-full px-2 py-1.5 text-sm border rounded bg-slate-50"
                                             />
                                         </div>
                                     </div>
@@ -3016,7 +3038,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             </div>
             {
                 previewHtml && (
-                    <div className="fixed inset-0 z-[300]" onClick={(e) => e.stopPropagation()}>
+                    <div className="fixed inset-0 z-300" onClick={(e) => e.stopPropagation()}>
                         <PreviewModal
                             htmlContent={previewHtml}
                             docType={previewType === 'PO' ? 'ORDER' : previewType === 'PACKING' ? 'PACKING_LIST' : 'TRANSACTION'}
@@ -3058,7 +3080,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             {/* Print Packing List Modal */}
             {packingListModalOpen && (
                 <div 
-                    className="fixed inset-0 z-[200] bg-slate-900/50 flex items-center justify-center p-4 pointer-events-auto"
+                    className="fixed inset-0 z-200 bg-slate-900/50 flex items-center justify-center p-4 pointer-events-auto"
                     onClick={(e) => {
                         e.stopPropagation();
                         setPackingListModalOpen(false);
