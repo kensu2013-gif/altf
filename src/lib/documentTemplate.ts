@@ -7,6 +7,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
     const { document_type, meta, supplier, customer, items, totals, footer } = payload;
 
     const formatPriceScale = (val: number | undefined) => {
+        if (val === undefined || val === null) return '-';
         const fmt = formatCurrency(val);
         if (!fmt || fmt === '-') return fmt;
         const len = fmt.length;
