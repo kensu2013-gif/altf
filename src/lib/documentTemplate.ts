@@ -6,8 +6,16 @@ import logoDaekyung from '../assets/logo_daekyung.png.png';
 export const renderDocumentHTML = (payload: DocumentPayload): string => {
     const { document_type, meta, supplier, customer, items, totals, footer } = payload;
 
-    // ... keeping the rest the same up to header
-    // wait, replace_file_content needs precisely the replaced block. Let's make it simpler.
+    const formatPriceScale = (val: number | undefined) => {
+        const fmt = formatCurrency(val);
+        if (!fmt || fmt === '-') return fmt;
+        const len = fmt.length;
+        if (len >= 14) return `<span style="font-size: 0.75em; letter-spacing: -1px;">${fmt}</span>`;
+        if (len >= 12) return `<span style="font-size: 0.82em; letter-spacing: -0.8px;">${fmt}</span>`;
+        if (len >= 11) return `<span style="font-size: 0.88em; letter-spacing: -0.6px;">${fmt}</span>`;
+        if (len >= 10) return `<span style="font-size: 0.94em; letter-spacing: -0.3px;">${fmt}</span>`;
+        return fmt;
+    };
 
     // Unified Template Logic
     const isPurchaseOrder = document_type === 'PURCHASE_ORDER';
@@ -423,8 +431,8 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                             ${isPackingList ? `
                             <td contenteditable="true" class="col-remark text-center" placeholder="비고를 입력하세요" spellcheck="false" style="color: #475569; outline: none;">${item.note || ''}</td>
                             ` : `
-                            <td class="col-price text-right">${formatCurrency(item.unit_price)}</td>
-                            <td class="col-amt text-right">${formatCurrency(item.amount)}</td>
+                            <td class="col-price text-right">${formatPriceScale(item.unit_price)}</td>
+                            <td class="col-amt text-right">${formatPriceScale(item.amount)}</td>
                             `}
                         </tr>
                         `).join('')}
