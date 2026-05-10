@@ -806,21 +806,28 @@ export default function SihwaInventory() {
             const sigma = dailyAvg * cvEstimate;
             const safetyStockSigma = Math.ceil(Z_VALUE * sigma * Math.sqrt(LEAD_TIME));
             
-            // 1. 기초 계산식 축소: 안전재고 + 2주치(10일) 평균
+            // 1. 기초 계산식: 안전재고 + 2주치(10일) 평균
             let safeStock = safetyStockSigma + Math.ceil(dailyAvg * 10);
             
-            // 2. 1회 평균 주문량(Average Order Size) 기반 강력한 캡 (1.5배)
+            // 2. 1회 평균 주문량(Average Order Size) 기반 보정 (하한선 보장 및 상한선 캡)
             if (row.salesFreq > 0) {
                 const avgOrderSize = row.salesVolume / row.salesFreq;
-                safeStock = Math.min(safeStock, Math.ceil(avgOrderSize * 1.5));
+                
+                // [수정] 하한선 보장: 한 번 주문 들어올 때 출고되는 평균 수량은 방어할 수 있도록 함
+                safeStock = Math.max(safeStock, Math.ceil(avgOrderSize));
+
+                // 상한선 캡: 1회 평균 주문량의 2배를 넘지 않도록 하여 과잉 재고 방지
+                safeStock = Math.min(safeStock, Math.ceil(avgOrderSize * 2.0));
             }
             
             // 3. 주문 횟수(Freq) 및 견적(Quote) 기반 제한
             if (row.salesFreq < 12 && row.quoteCount < 2) {
-                safeStock = Math.min(safeStock, Math.ceil(dailyAvg * 5)); // 최대 1주일 치
+                // [수정] 월 1회 미만 판매 & 견적 거의 없는 품목도, 무조건 0으로 수렴시키는 대신 
+                // 1회 평균 주문량만큼은 캡을 씌워 남겨둠 (한 번 나갈 때를 대비)
+                safeStock = Math.min(safeStock, Math.ceil(row.salesVolume / Math.max(row.salesFreq, 1)));
             }
             if (row.salesVolume < 50 && row.salesFreq < 5) {
-                safeStock = 0;
+                safeStock = 0; // 극소량, 극저빈도 품목은 재고 미보유 원칙 유지
             }
 
             safeStock = safeStock > 0 ? Math.max(10, Math.round(safeStock / 10) * 10) : 0;
@@ -857,10 +864,20 @@ export default function SihwaInventory() {
             }
 
             // 6. 건전성 등급(Health Grade) 가중치에 따른 목표재고 증감 (A/B급 상향, D/E급 하향)
-            if (healthGrade === 'A') safeStock = Math.ceil(safeStock * 1.5);
-            else if (healthGrade === 'B') safeStock = Math.ceil(safeStock * 1.2);
-            else if (healthGrade === 'D') safeStock = Math.ceil(safeStock * 0.5);
-            else if (healthGrade === 'E') safeStock = 0;
+            if (healthGrade === 'A') {
+                safeStock = Math.ceil(safeStock * 1.5);
+            } else if (healthGrade === 'B') {
+                safeStock = Math.ceil(safeStock * 1.2);
+            } else if (healthGrade === 'D') {
+                safeStock = Math.ceil(safeStock * 0.5);
+                // [수정] D등급이라도 최소 1회 나가는 물량은 방어해주되, 과잉을 막기위해 1회 출고량까지만 보장
+                if (row.salesFreq > 0) {
+                    const avgOrderSize = row.salesVolume / row.salesFreq;
+                    safeStock = Math.max(safeStock, Math.ceil(avgOrderSize));
+                }
+            } else if (healthGrade === 'E') {
+                safeStock = 0;
+            }
 
             // 부피 제약 다단화
             const sizeStr = row.product.size || '';
