@@ -1802,9 +1802,10 @@ export default function SihwaInventory() {
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100">
                                                         {stats.critical.map(row => (
-                                                            <tr key={row.product.id} className="hover:bg-slate-50">
+                                                            <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
                                                                 <td className="px-5 py-4 text-center">
                                                                     <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-600"
+                                                                        onClick={(e) => e.stopPropagation()}
                                                                         checked={selectedCriticalIds.has(row.product.id)}
                                                                         onChange={(e) => {
                                                                             const newSet = new Set(selectedCriticalIds);
@@ -1984,7 +1985,7 @@ export default function SihwaInventory() {
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100">
                                                         {stats.warning.map(row => (
-                                                            <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={(e) => toggleWarningSelection(row.product.id, e)}>
+                                                            <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
                                                                 <td className="px-4 py-4 text-center">
                                                                     <input 
                                                                         type="checkbox"
@@ -2168,9 +2169,10 @@ export default function SihwaInventory() {
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100">
                                                         {stats.regular.map(row => (
-                                                            <tr key={row.product.id} className="hover:bg-slate-50">
+                                                            <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
                                                                 <td className="px-5 py-4 text-center">
                                                                     <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                                                                        onClick={(e) => e.stopPropagation()}
                                                                         checked={selectedRegularIds.has(row.product.id)}
                                                                         onChange={(e) => {
                                                                             const newSet = new Set(selectedRegularIds);
@@ -2741,7 +2743,7 @@ export default function SihwaInventory() {
                                                 if (row.isDeadStock) rowTags.push({ label: '악성', className: 'bg-slate-100 text-slate-500 border border-slate-200' });
 
                                                 return (
-                                                <tr key={row.product.id} className={`hover:bg-slate-50 group ${selectedAllTableIds.has(row.product.id) ? 'bg-indigo-50/50' : ''}`}>
+                                                <tr key={row.product.id} className={`hover:bg-slate-50 group cursor-pointer ${selectedAllTableIds.has(row.product.id) ? 'bg-indigo-50/50' : ''}`} onClick={() => setSelectedIntelligenceItem(row)}>
                                                 <td className="px-3 py-2 text-center border-r border-slate-100">
                                                     <input 
                                                         type="checkbox" 
@@ -2761,7 +2763,16 @@ export default function SihwaInventory() {
                                                 </td>
                                                 <td className="px-4 py-2 font-mono font-bold text-slate-700">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span>{row.product.id === 'UNKNOWN' && row.product.name ? `UNKNOWN (${row.product.name})` : row.product.id}</span>
+                                                        <button 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedIntelligenceItem(row);
+                                                            }}
+                                                            className="font-mono font-bold text-slate-900 text-sm hover:text-indigo-600 transition-colors flex items-center gap-1 group text-left"
+                                                        >
+                                                            {row.product.id === 'UNKNOWN' && row.product.name ? `UNKNOWN (${row.product.name})` : row.product.id}
+                                                            <Info className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                        </button>
                                                         {rowTags.map((tag, idx) => (
                                                             <span 
                                                                 key={idx} 
@@ -3059,7 +3070,7 @@ export default function SihwaInventory() {
                   : 'bg-amber-100 text-amber-700 hover:bg-amber-200';
 
                 return (
-                  <tr key={row.product.id} className="hover:bg-slate-50">
+                  <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
                     <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
                             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
@@ -3141,7 +3152,7 @@ export default function SihwaInventory() {
                     : 'bg-blue-100 text-blue-700 hover:bg-blue-200';
 
                   return (
-                    <tr key={row.product.id} className="hover:bg-slate-50">
+                    <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
                       <td className="px-4 py-2">
                           <div className="flex items-center gap-2">
                               <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
@@ -3222,7 +3233,7 @@ export default function SihwaInventory() {
                 const itemValue = row.shQty * row.recentPurchasePrice;
 
                 return (
-                  <tr key={row.product.id} className="hover:bg-slate-50">
+                  <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
                     <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
                             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
@@ -3294,7 +3305,7 @@ export default function SihwaInventory() {
                   : 'bg-amber-100 text-amber-700 hover:bg-amber-200';
 
                 return (
-                  <tr key={row.product.id} className="hover:bg-slate-50">
+                  <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
                     <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
                             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>

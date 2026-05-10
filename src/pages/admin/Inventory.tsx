@@ -1,10 +1,13 @@
 import { useInventory } from '../../hooks/useInventory';
 import { RefreshCw, Database } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { ItemIntelligenceCard } from './components/ItemIntelligenceCard';
+import { useState } from 'react';
 
 export default function AdminInventory() {
     // Use the hook which handles SWR fetching and data mapping automatically
     const { inventory, lastModified, isLoading, isValidating } = useInventory();
+    const [selectedItem, setSelectedItem] = useState<{ id: string, name: string } | null>(null);
 
     // For refresh, we can just reload the page or rely on SWR's focus revalidation, 
     // but the button suggests manual action. Since useInventory uses SWR, 
@@ -78,7 +81,7 @@ export default function AdminInventory() {
                                 inventory.slice(0, 100).map((item) => {
                                     const price = item.unitPrice;
                                     return (
-                                        <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                                        <tr key={item.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setSelectedItem({ id: item.id, name: item.name })}>
                                             <td className="px-4 py-3 font-mono text-slate-400">{item.id.slice(0, 8)}...</td>
                                             <td className="px-4 py-3 font-bold text-slate-800">
                                                 {item.name}
@@ -127,6 +130,14 @@ export default function AdminInventory() {
                     </span>
                 </div>
             </div>
+
+            {selectedItem && (
+                <ItemIntelligenceCard
+                    productId={selectedItem.id}
+                    productName={selectedItem.name}
+                    onClose={() => setSelectedItem(null)}
+                />
+            )}
         </div>
     );
 }
