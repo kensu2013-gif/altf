@@ -2,10 +2,12 @@ import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { useInventory } from '../../hooks/useInventory';
 import { 
+    Factory, 
     CalendarDays, 
     TrendingUp, 
     AlertTriangle,
     PackageSearch,
+    Box,
     History,
     BrainCircuit,
     ChevronDown,
@@ -13,16 +15,13 @@ import {
     Activity,
     Info,
     Download,
-    ShoppingCart,
-    Filter,
-    X
+    ShoppingCart
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
-import type { Product, LineItem, Order } from '../../types';
+import type { Product, LineItem } from '../../types';
 import salesHistoryRaw from '../../data/sales_history.json';
 import { COMPETITOR_DATA, getStrategicGrade, type StrategicGrade } from '../../../competitorData';
-import { ItemIntelligenceCard } from './components/ItemIntelligenceCard';
 
 const salesHistory = salesHistoryRaw as Record<string, { salesVolume: number, salesFreq: number }>;
 
@@ -45,9 +44,24 @@ const WORKING_DAYS = 250;      // 연간 영업일수
 const LEAD_TIME = 5;           // 리드타임 (대경 → 시화, 영업일 기준)
 const Z_VALUE = 1.645;         // 목표 서비스율 95% (데이터 충분하면 2.33 = 99%로 상향)
 
+// 회전율 등급 기준
+const TURNOVER_THRESHOLDS = {
+  S: 12,   // 월 1회 이상 소진 — 즉시발주 우선
+  A: 6,    // 2개월 이내 소진 — 정기발주 (2개월치)
+  B: 3,    // 4개월 이내 소진 — 분기 발주
+  C: 1,    // 연 1회 이상 소진 — 반기 발주
+  // C 미만 = D등급: 과잉재고 경고
+} as const;
 
-
-
+// 회전등급별 목표재고 산출 배수 (연판매 ÷ 이 숫자 = 목표재고)
+const TARGET_STOCK_DIVISOR: Record<string, number> = {
+  S: 8,   // 연판매 ÷ 8  = 약 1.5개월치 목표 (빠르게 소진되므로 자주 소량 보충)
+  A: 6,   // 연판매 ÷ 6  = 약 2개월치 목표
+  B: 4,   // 연판매 ÷ 4  = 약 3개월치 목표
+  C: 2,   // 연판매 ÷ 2  = 약 6개월치 목표
+  D: 0,   // 발주 중단 — 기존 재고 소진 우선
+  N: 0,   // 판매 없음 — 제외
+};
 
 // ══════════════════════════════════════════════════════════════
 // ★ 새 등급 시스템: 5개 지표 복합 점수 (100점 만점)
@@ -66,28 +80,31 @@ function calcCompositeScore(row: {
     profitMarginRate: number;
 }): number {
     const salesFreqScore =
-        row.salesFreq >= 30 ? 100 :
-        row.salesFreq >= 10 ? 70  :
-        row.salesFreq >= 5  ? 40  :
-        row.salesFreq >= 1  ? 15  : 0;
+        row.salesFreq >= 50 ? 100 :
+        row.salesFreq >= 20 ? 70  :
+        row.salesFreq >= 10 ? 45  :
+        row.salesFreq >= 5  ? 25  :
+        row.salesFreq >= 1  ? 10  : 0;
 
     const monthlyExpected = row.salesVolume / 12;
     const trendRatio = monthlyExpected > 0 ? (row.recent30dSales / monthlyExpected) : 0;
     const recentTrendScore = Math.min(100,
-        trendRatio >= 1.0 ? 100 :
-        trendRatio >= 0.5 ? 80  :
-        trendRatio >= 0.2 ? 50  :
-        row.recent60dSales > 0 ? 30 : 0
+        trendRatio >= 1.5 ? 100 :
+        trendRatio >= 1.0 ? 80  :
+        trendRatio >= 0.5 ? 50  :
+        trendRatio >= 0.2 ? 25  :
+        row.recent60dSales > 0 ? 15 : 0
     );
 
     const quoteDemandScore =
-        row.quoteCount >= 3 ? 100 :
-        row.quoteCount >= 1 ? 60  : 0;
+        row.quoteCount >= 5 ? 100 :
+        row.quoteCount >= 3 ? 70  :
+        row.quoteCount >= 1 ? 40  : 0;
 
     const salesVolumeScore =
-        row.salesVolume >= 500  ? 100 :
-        row.salesVolume >= 200  ? 75  :
-        row.salesVolume >= 50   ? 50  :
+        row.salesVolume >= 1000 ? 100 :
+        row.salesVolume >= 500  ? 75  :
+        row.salesVolume >= 100  ? 50  :
         row.salesVolume >= 10   ? 25  : 0;
 
     const profitScore =
@@ -96,52 +113,47 @@ function calcCompositeScore(row: {
         row.profitMarginRate >= 10 ? 50  :
         row.profitMarginRate >= 0  ? 25  : 0;
 
-    let bonusScore = 0;
-    if (row.recent30dSales >= Math.max(10, row.salesVolume / 12 * 1.5)) bonusScore += 15; // 최근 30일 단기 급등
-    else if (row.recent60dSales > 0) bonusScore += 5; // 소량이라도 판매 유지 중
-
-    if (row.quoteCount >= 5) bonusScore += 10; // 최근 견적 급증
-
-    const finalScore = Math.round(
+    return Math.round(
         salesFreqScore    * 0.25 +
         recentTrendScore  * 0.25 +
         quoteDemandScore  * 0.20 +
         salesVolumeScore  * 0.15 +
-        profitScore       * 0.15 +
-        bonusScore
+        profitScore       * 0.15
     );
-
-    return Math.min(100, finalScore);
 }
 
 /**
  * 복합 점수 → 건전성 등급 변환
- * A(핵심) ≥65 | B(안정) 45~64 | C(관망) 25~44 | D(부진) 10~24 | E(처분) <10 & 재고있음 | N(평가불가)
+ * A(핵심) ≥75 | B(안정) 55~74 | C(관망) 35~54 | D(부진) 15~34 | E(처분) <15 & 재고있음 | N(평가불가)
  */
 function getHealthGradeFromScore(
     score: number,
     effectiveStock: number,
     salesVolume: number,
-    quoteCount: number,
-    productId: string
+    quoteCount: number
 ): 'A' | 'B' | 'C' | 'D' | 'E' | 'N' {
     if (salesVolume === 0 && quoteCount === 0 && effectiveStock === 0) return 'N';
-    if (score >= 65) return 'A';
-    if (score >= 45) return 'B';
-    if (score >= 25) return 'C';
-    if (score >= 10) return 'D';
-    if (score < 10 && effectiveStock > 0) {
-        const idLower = productId.toLowerCase();
-        if (idLower.includes('composite') || idLower.includes('lateral') || idLower.includes('stubend') ||
-            idLower.includes('32205') || idLower.includes('stsb-s') || idLower.includes('310-s') || idLower.includes('904l')) {
-            return 'D'; // 예외 품목은 악성재고(E)에서 제외
-        }
-        return 'E';
-    }
+    if (score >= 75) return 'A';
+    if (score >= 55) return 'B';
+    if (score >= 35) return 'C';
+    if (score >= 15) return 'D';
+    if (score < 15 && effectiveStock > 0) return 'E'; // E급: 점수가 매우 낮고 재고가 있는 경우만 → 악성재고
     return 'D';
 }
 
-
+/**
+ * 등급별 목표재고 산출
+ * A: 월평균 × 2.0 | B: × 1.5 | C: × 1.0 | D/E: 0 (추가발주 금지)
+ */
+function getTargetStockByHealthGrade(grade: string, monthlyAvgSales: number): number {
+    const multiplier =
+        grade === 'A' ? 2.0 :
+        grade === 'B' ? 1.5 :
+        grade === 'C' ? 1.0 : 0;
+    return multiplier > 0
+        ? Math.max(10, Math.ceil(monthlyAvgSales * multiplier / 10) * 10)
+        : 0;
+}
 
 /**
  * 과잉재고 등급별 처분 전략 라벨
@@ -155,9 +167,26 @@ function getExcessActionLabel(grade: string): string {
     return '발주 중단';
 }
 
+// 재고 회전율 등급 반환
+function getTurnoverGrade(rate: number, salesVolume: number) {
+  if (salesVolume === 0) return 'N';
+  if (rate >= TURNOVER_THRESHOLDS.S) return 'S';
+  if (rate >= TURNOVER_THRESHOLDS.A) return 'A';
+  if (rate >= TURNOVER_THRESHOLDS.B) return 'B';
+  if (rate >= TURNOVER_THRESHOLDS.C) return 'C';
+  return 'D';
+}
 
-
-
+// 회전율 기반 재고 상태 반환
+function getStockStatusByTurnover(currentStock: number, targetStock: number, daysOnHand: number, grade: string) {
+  if (grade === 'N') return 'DEAD';
+  if (currentStock === 0) return 'CRITICAL';
+  if (daysOnHand <= LEAD_TIME * 2) return 'CRITICAL';
+  if (currentStock < targetStock * 0.5) return 'LOW';
+  if (currentStock <= targetStock * 1.3) return 'OPTIMAL';
+  if (daysOnHand > 365) return 'DEAD';
+  return 'EXCESS';
+}
 
 // Helper: Calculate Fallback Purchase Price based on item rules
 const calculateFallbackPurchasePrice = (id: string, basePrice: number): number => {
@@ -191,10 +220,9 @@ interface InventoryHistorySnapshot {
 }
 
 export default function SihwaInventory() {
-    const { orders, quotes, users, user, addItem } = useStore(useShallow(state => ({ 
+    const { orders, quotes, user, addItem } = useStore(useShallow(state => ({ 
         orders: state.orders, 
         quotes: state.quotes,
-        users: state.users,
         user: state.auth.user,
         addItem: state.addItem
     })));
@@ -215,36 +243,25 @@ export default function SihwaInventory() {
         'REGULAR': true
     });
     const [selectedHealthCategory, setSelectedHealthCategory] = useState<'DEAD' | 'EXCESS' | 'SLOW' | 'MISSED' | 'URGENT' | null>(null);
-    const [selectedIntelligenceItem, setSelectedIntelligenceItem] = useState<{ id: string, name?: string, row?: Record<string, unknown> } | null>(null);
 
 
     const [selectedCriticalIds, setSelectedCriticalIds] = useState<Set<string>>(new Set());
     const [selectedWarningIds, setSelectedWarningIds] = useState<Set<string>>(new Set());
     const [selectedRegularIds, setSelectedRegularIds] = useState<Set<string>>(new Set());
-    const [selectedAllTableIds, setSelectedAllTableIds] = useState<Set<string>>(new Set());
     
     const [expandedTrendItems, setExpandedTrendItems] = useState<Record<string, boolean>>({});
     const [expandedDailyGroups, setExpandedDailyGroups] = useState<Record<string, boolean>>({});
 
     const [sortConfig, setSortConfig] = useState<{ 
-        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank' | 'quoteCount' | 'recent60dOrderCount', 
+        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock', 
         direction: 'asc' | 'desc' 
     }>({ key: 'deficit', direction: 'desc' });
 
-    const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank' | 'quoteCount' | 'recent60dOrderCount') => {
+    const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock') => {
         setSortConfig(prev => ({
             key,
             direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
         }));
-    };
-
-    const [activeTagFilters, setActiveTagFilters] = useState<string[]>([]);
-    const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
-
-    const toggleTagFilter = (tag: string) => {
-        setActiveTagFilters(prev => 
-            prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-        );
     };
 
     const toggleGroup = (key: string) => {
@@ -312,8 +329,6 @@ export default function SihwaInventory() {
 
     // 1.5 Fetch Orders to sync with inventory
     const setOrders = useStore(state => state.setOrders);
-    const setQuotes = useStore(state => state.setQuotes);
-    const fetchUsers = useStore(state => state.fetchUsers);
     useEffect(() => {
         if (!user) return;
 
@@ -343,22 +358,8 @@ export default function SihwaInventory() {
                 .catch(console.error);
         };
 
-        const fetchQuotes = () => {
-            fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations?limit=2000`, { headers, cache: 'no-store' })
-                .then(res => {
-                    if (res.ok) return res.json();
-                    throw new Error('Failed to fetch quotes');
-                })
-                .then(data => {
-                    if (Array.isArray(data)) setQuotes(data);
-                })
-                .catch(console.error);
-        };
-
         fetchOrders();
-        fetchQuotes();
-        fetchUsers();
-    }, [setOrders, setQuotes, fetchUsers, user]);
+    }, [setOrders, user]);
 
     // Filter out irrelevant orders
     const activeOrders = useMemo(() => {
@@ -495,12 +496,11 @@ export default function SihwaInventory() {
         recent30dSales: number;
         recent60dSales: number;
         quoteCount: number;
-        recent60dOrderCount: number;
         daekyungDirectRatio: number;
         profitMarginRate: number;
         compositeScore: number;
         healthGrade: 'A' | 'B' | 'C' | 'D' | 'E' | 'N'; // A(핵심) B(안정) C(관망) D(부진) E(악성/처분) N(평가불가)
-
+        targetStockByHealthGrade: number;
         excessCategory: string | null;
         compSales: number;
         compFreq: number;
@@ -509,9 +509,12 @@ export default function SihwaInventory() {
         strategicGrade: StrategicGrade;
         volumeNegoFlag: boolean;
         turnoverRate: number;
+        turnoverGrade: 'S' | 'A' | 'B' | 'C' | 'D' | 'N';
         daysOnHand: number;
         dailyAvgSales: number;
         reorderPoint: number;
+        targetStockByTurnover: number;
+        stockStatusByTurnover: 'CRITICAL' | 'LOW' | 'OPTIMAL' | 'EXCESS' | 'DEAD';
         deficit: number;
         effectiveStock: number;
         statusCategory: string;
@@ -530,7 +533,7 @@ export default function SihwaInventory() {
             
             const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
             // Exclude internal stock transfers
-            if (customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf')) return;
+            if (customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화')) return;
             
             const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
             if (!items) return;
@@ -591,37 +594,10 @@ export default function SihwaInventory() {
             const quoteDate = new Date(quote.createdAt).getTime();
             if (isNaN(quoteDate) || quoteDate < sixtyDaysAgo) return; // Only count recent 60 days
             
-            const quoteUser = users.find(u => u.id === quote.userId);
-            const customerStr = (quote.customerName || quote.customerInfo?.companyName || quote.customerInfo?.contactName || quoteUser?.companyName || '').toLowerCase().replace(/\s+/g, '');
-            if (customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf')) return;
-
             quote.items.forEach(item => {
                 const id = item.productId || (item as { item_id?: string }).item_id;
                 if (!id) return;
                 quoteCountMap[id] = (quoteCountMap[id] || 0) + 1;
-            });
-        });
-
-        const recent60dOrderCountMap: Record<string, number> = {};
-        orders.forEach(order => {
-            if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
-            if (order.status !== 'COMPLETED') return;
-            
-            const orderDate = new Date(order.createdAt).getTime();
-            if (isNaN(orderDate) || orderDate < sixtyDaysAgo) return;
-
-            const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
-            if (customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf')) return;
-            
-            const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
-            if (!items) return;
-
-            items.forEach((item: Partial<LineItem> & { item_id?: string; qty?: number }) => {
-                const id = item.productId || item.item_id;
-                if (!id) return;
-                const qty = Number(item.quantity ?? item.qty ?? 0);
-                if (qty <= 0) return;
-                recent60dOrderCountMap[id] = (recent60dOrderCountMap[id] || 0) + 1;
             });
         });
 
@@ -679,12 +655,11 @@ export default function SihwaInventory() {
                     recent30dSales: recentSales.recent30d,
                     recent60dSales: recentSales.recent60d,
                     quoteCount: quoteCountMap[item.id] || 0,
-                    recent60dOrderCount: recent60dOrderCountMap[item.id] || 0,
                     daekyungDirectRatio,
                     profitMarginRate,
                     compositeScore: 0,
                     healthGrade: 'N',
-                    
+                    targetStockByHealthGrade: 0,
                     excessCategory: null,
                     compSales: compData.compSales,
                     compFreq: compData.compFreq,
@@ -693,9 +668,12 @@ export default function SihwaInventory() {
                     strategicGrade: getStrategicGrade(salesData.salesVolume, compData.compSales, marketShare),
                     volumeNegoFlag: false,
                     turnoverRate: 0,
+                    turnoverGrade: 'N',
                     daysOnHand: 0,
                     dailyAvgSales: 0,
                     reorderPoint: 0,
+                    targetStockByTurnover: 0,
+                    stockStatusByTurnover: 'DEAD',
                     deficit: 0,
                     effectiveStock: 0,
                     statusCategory: 'IDLE',
@@ -749,12 +727,11 @@ export default function SihwaInventory() {
                         recent30dSales: recentSales.recent30d,
                         recent60dSales: recentSales.recent60d,
                         quoteCount: quoteCountMap[id] || 0,
-                        recent60dOrderCount: recent60dOrderCountMap[id] || 0,
                         daekyungDirectRatio,
                         profitMarginRate,
                         compositeScore: 0,
                         healthGrade: 'N',
-                        
+                        targetStockByHealthGrade: 0,
                         excessCategory: null,
                         compSales: compData.compSales,
                         compFreq: compData.compFreq,
@@ -763,9 +740,12 @@ export default function SihwaInventory() {
                         strategicGrade: getStrategicGrade(salesData.salesVolume, compData.compSales, marketShare),
                         volumeNegoFlag: false,
                         turnoverRate: 0,
+                        turnoverGrade: 'N',
                         daysOnHand: 0,
                         dailyAvgSales: 0,
                         reorderPoint: 0,
+                        targetStockByTurnover: 0,
+                        stockStatusByTurnover: 'DEAD',
                         deficit: 0,
                         effectiveStock: 0,
                         statusCategory: 'IDLE',
@@ -779,26 +759,6 @@ export default function SihwaInventory() {
 
         // Step 3: Run AI Rules for status computation
         const processedList = Object.values(comparisonMap).map(row => {
-            const effectiveStock = row.shQty + row.pendingOrderQty; 
-
-            // === 신규 건전성 등급 평가 로직 (100점 만점 복합 점수제) ===
-            const compositeScore = calcCompositeScore({
-                salesFreq:       row.salesFreq,
-                salesVolume:     row.salesVolume,
-                recent30dSales:  row.recent30dSales,
-                recent60dSales:  row.recent60dSales,
-                quoteCount:      row.quoteCount,
-                profitMarginRate: row.profitMarginRate,
-            });
-
-            const healthGrade = getHealthGradeFromScore(
-                compositeScore,
-                effectiveStock,
-                row.salesVolume,
-                row.quoteCount,
-                row.product.id
-            );
-
             // 통계 기반 안전재고 (σ)
             const dailyAvg = row.salesVolume / WORKING_DAYS;
             
@@ -806,76 +766,19 @@ export default function SihwaInventory() {
             const sigma = dailyAvg * cvEstimate;
             const safetyStockSigma = Math.ceil(Z_VALUE * sigma * Math.sqrt(LEAD_TIME));
             
-            // 1. 기초 계산식: 안전재고 + 2주치(10일) 평균
-            let safeStock = safetyStockSigma + Math.ceil(dailyAvg * 10);
-            
-            // 2. 1회 평균 주문량(Average Order Size) 기반 보정 (하한선 보장 및 상한선 캡)
-            if (row.salesFreq > 0) {
-                const avgOrderSize = row.salesVolume / row.salesFreq;
-                
-                // [수정] 하한선 보장: 한 번 주문 들어올 때 출고되는 평균 수량은 방어할 수 있도록 함
-                safeStock = Math.max(safeStock, Math.ceil(avgOrderSize));
-
-                // 상한선 캡: 1회 평균 주문량의 2배를 넘지 않도록 하여 과잉 재고 방지
-                safeStock = Math.min(safeStock, Math.ceil(avgOrderSize * 2.0));
-            }
-            
-            // 3. 주문 횟수(Freq) 및 견적(Quote) 기반 제한
-            if (row.salesFreq < 12 && row.quoteCount < 2) {
-                // [수정] 월 1회 미만 판매 & 견적 거의 없는 품목도, 무조건 0으로 수렴시키는 대신 
-                // 1회 평균 주문량만큼은 캡을 씌워 남겨둠 (한 번 나갈 때를 대비)
-                safeStock = Math.min(safeStock, Math.ceil(row.salesVolume / Math.max(row.salesFreq, 1)));
-            }
-            if (row.salesVolume < 50 && row.salesFreq < 5) {
-                safeStock = 0; // 극소량, 극저빈도 품목은 재고 미보유 원칙 유지
-            }
-
+            let safeStock = safetyStockSigma + Math.ceil(dailyAvg * 14);
             safeStock = safeStock > 0 ? Math.max(10, Math.round(safeStock / 10) * 10) : 0;
             
-            // 4. 대경 재고(ysQty) 기반 페널티
-            if (row.ysQty > dailyAvg * 60) {
-                safeStock = Math.round((safeStock * 0.4) / 10) * 10; // 3개월치 이상 대경 보유시 60% 삭감
-            } else if (row.ysQty > dailyAvg * 20) {
-                safeStock = Math.round((safeStock * 0.7) / 10) * 10; // 1개월치 이상 대경 보유시 30% 삭감
-            }
-
-            // 4.5. 최근 60일 실적(트렌드) 기반 동적 페널티
-            // 수요 급감 시 적정재고 삭감. 단, 연간 판매빈도/수량이 높거나 대경재고가 넉넉할 때는 덜 삭감함.
-            if (row.salesVolume > 0 && row.recent60dSales === 0 && row.quoteCount === 0 && row.recent60dOrderCount === 0) {
-                if ((row.salesFreq >= 30 && row.salesVolume >= 100) || row.ysQty >= 500) {
-                    safeStock = Math.round((safeStock * 0.4) / 10) * 10; // 60% 삭감
-                } else {
-                    safeStock = Math.round((safeStock * 0.2) / 10) * 10; // 80% 삭감
-                }
-            } else if (row.salesVolume > 0 && row.recent60dSales <= Math.ceil((row.salesVolume / 12) * 0.5) && row.quoteCount === 0) {
-                safeStock = Math.round((safeStock * 0.5) / 10) * 10; // 50% 삭감
-            }
-
-            // 5. WP 및 Material Filter Rules
+            // AI Filter Rules
             const mat = (row.product.material || '').toUpperCase();
             if (mat.startsWith('WP') || mat.includes('CARBON')) {
-                // WP/CARBON은 기본적으로 시화재고에서 제외 (0개)
-                // 단, 월 3회 이상(연 36회) 초고빈도 필수 품목은 최대 20개까지만 예외 허용
-                if (row.salesFreq >= 36 && row.salesVolume >= 500) {
-                    safeStock = Math.min(safeStock, 20); 
-                } else {
+                if (row.salesVolume < 200 || row.salesFreq < 10) {
                     safeStock = 0;
+                } else {
+                    safeStock = Math.min(safeStock, 50); // WP는 최대 50개 캡
                 }
             }
-
-            // 6. 건전성 등급(Health Grade) 가중치에 따른 목표재고 증감 (A/B급 상향, D/E급 하향)
-            if (healthGrade === 'A') {
-                safeStock = Math.ceil(safeStock * 1.5);
-            } else if (healthGrade === 'B') {
-                safeStock = Math.ceil(safeStock * 1.2);
-            } else if (healthGrade === 'D') {
-                safeStock = Math.ceil(safeStock * 0.5);
-                // [수정] D등급이라도 최소 1회 나가는 물량은 방어해주되, 과잉을 막기위해 1회 출고량까지만 보장
-                if (row.salesFreq > 0) {
-                    const avgOrderSize = row.salesVolume / row.salesFreq;
-                    safeStock = Math.max(safeStock, Math.ceil(avgOrderSize));
-                }
-            } else if (healthGrade === 'E') {
+            if (row.salesFreq < 10) {
                 safeStock = 0;
             }
 
@@ -889,6 +792,9 @@ export default function SihwaInventory() {
                 else if (sizeNum >= 150) { if (safeStock > 150) safeStock = 150; }
                 else if (sizeNum >= 100) { if (safeStock > 300) safeStock = 300; }
             }
+
+            // REQUIREMENT 3: INCLUDE PENDING ORDERS as effective stock
+            const effectiveStock = row.shQty + row.pendingOrderQty; 
 
             let statusCategory = 'IDLE'; 
             let statusLabel = '대기/데이터없음';
@@ -924,6 +830,7 @@ export default function SihwaInventory() {
             const dailyAvgSales = row.salesVolume > 0 ? row.salesVolume / WORKING_DAYS : 0;
             const avgStock = row.shQty > 0 ? row.shQty : (row.salesVolume > 0 ? row.salesVolume / 12 : 0);
             const turnoverRate = avgStock > 0 ? parseFloat((row.salesVolume / avgStock).toFixed(2)) : 0;
+            const turnoverGrade = getTurnoverGrade(turnoverRate, row.salesVolume) as AnalyzedItem['turnoverGrade'];
             
             const daysOnHand = dailyAvgSales > 0 && row.shQty > 0
                 ? parseFloat((row.shQty / dailyAvgSales).toFixed(1))
@@ -935,13 +842,57 @@ export default function SihwaInventory() {
             const safetyStockROP = Math.ceil(Z_VALUE * r_sigma * Math.sqrt(LEAD_TIME));
             const reorderPoint = Math.ceil(dailyAvgSales * LEAD_TIME + safetyStockROP);
 
+            const divisor = TARGET_STOCK_DIVISOR[turnoverGrade] || 0;
+            let targetStockByTurnover = divisor > 0 ? Math.ceil(row.salesVolume / divisor / 10) * 10 : 0;
+
+            if (!isNaN(sizeNum)) {
+                if (sizeNum >= 400) targetStockByTurnover = Math.min(targetStockByTurnover, 30);
+                else if (sizeNum >= 300) targetStockByTurnover = Math.min(targetStockByTurnover, 50);
+                else if (sizeNum >= 200) targetStockByTurnover = Math.min(targetStockByTurnover, 80);
+                else if (sizeNum >= 150) targetStockByTurnover = Math.min(targetStockByTurnover, 150);
+                else if (sizeNum >= 100) targetStockByTurnover = Math.min(targetStockByTurnover, 300);
+            }
+
+            const stockStatusByTurnover = getStockStatusByTurnover(
+                row.shQty, targetStockByTurnover, daysOnHand, turnoverGrade
+            ) as AnalyzedItem['stockStatusByTurnover'];
+
+            // === 신규 건전성 등급 평가 로직 (100점 만점 복합 점수제) ===
+            const compositeScore = calcCompositeScore({
+                salesFreq:       row.salesFreq,
+                salesVolume:     row.salesVolume,
+                recent30dSales:  row.recent30dSales,
+                recent60dSales:  row.recent60dSales,
+                quoteCount:      row.quoteCount,
+                profitMarginRate: row.profitMarginRate,
+            });
+
+            const healthGrade = getHealthGradeFromScore(
+                compositeScore,
+                effectiveStock,
+                row.salesVolume,
+                row.quoteCount
+            );
+
+            // 등급별 목표재고 산출
+            const monthlyAvgSales = row.salesVolume / 12;
+            let targetStockByHealthGrade = getTargetStockByHealthGrade(healthGrade, monthlyAvgSales);
+
+            if (!isNaN(sizeNum)) {
+                if (sizeNum >= 400) targetStockByHealthGrade = Math.min(targetStockByHealthGrade, 30);
+                else if (sizeNum >= 300) targetStockByHealthGrade = Math.min(targetStockByHealthGrade, 50);
+                else if (sizeNum >= 200) targetStockByHealthGrade = Math.min(targetStockByHealthGrade, 80);
+                else if (sizeNum >= 150) targetStockByHealthGrade = Math.min(targetStockByHealthGrade, 150);
+                else if (sizeNum >= 100) targetStockByHealthGrade = Math.min(targetStockByHealthGrade, 300);
+            }
+
             // 악성재고: E급만
             const isDeadStock = healthGrade === 'E';
 
-            // 과잉재고: E급 제외, 목표재고(safeStock)의 1.5배 초과
+            // 과잉재고: E급 제외, 목표재고의 1.5배 초과
             const isExcessStock = !isDeadStock
-                && safeStock > 0
-                && row.shQty > (safeStock * 1.5)
+                && targetStockByHealthGrade > 0
+                && row.shQty > (targetStockByHealthGrade * 1.5)
                 && row.recentPurchasePrice > 0;
 
             let excessCategory: string | null = null;
@@ -963,17 +914,16 @@ export default function SihwaInventory() {
             } else if (healthGrade === 'D' || healthGrade === 'N') {
                 statusCategory = 'SAFE';
                 statusLabel = '🟡 미발주 대상 (D/N등급)';
-            } else if (safeStock > 0) {
+            } else if (targetStockByHealthGrade > 0) {
                 if (effectiveStock <= 0) {
-                    // 선발주 요망(CRITICAL) 조건: 대경 재고가 없으면서, A/B급 핵심 품목이거나 일정 수준 이상 팔리는 품목
-                    if (row.ysQty <= 0 && (healthGrade === 'A' || healthGrade === 'B' || (row.salesVolume >= 30 && row.salesFreq >= 5))) {
+                    if (row.ysQty <= 0 && row.salesVolume > 100 && row.salesFreq >= 10) {
                         statusCategory = 'CRITICAL';
                         statusLabel = '🚨 선발주 요망 (매입결품)';
                     } else {
                         statusCategory = 'WARNING';
                         statusLabel = '⚠️ 일반 발주 필요 (재고부족)';
                     }
-                } else if (effectiveStock < safeStock) {
+                } else if (effectiveStock < targetStockByHealthGrade) {
                     statusCategory = 'WARNING';
                     statusLabel = '⚠️ 적정재고 미달 (재고부족)';
                 } else {
@@ -985,13 +935,13 @@ export default function SihwaInventory() {
                 statusLabel = '✅ 미활동 보유품';
             }
 
-            const finalDeficit = Math.max(0, safeStock - effectiveStock);
+            const finalDeficit = Math.max(0, targetStockByHealthGrade - effectiveStock);
 
             return {
                 ...row,
                 compositeScore,
                 healthGrade,
-
+                targetStockByHealthGrade,
                 excessCategory,
                 safeStock,
                 deficit: finalDeficit,
@@ -999,9 +949,12 @@ export default function SihwaInventory() {
                 statusCategory,
                 statusLabel,
                 turnoverRate,
+                turnoverGrade,
                 daysOnHand,
                 dailyAvgSales,
                 reorderPoint,
+                targetStockByTurnover,
+                stockStatusByTurnover,
                 isDeadStock,
                 isExcessStock,
             };
@@ -1031,56 +984,38 @@ export default function SihwaInventory() {
                 case 'turnoverRate': return (a.turnoverRate - b.turnoverRate) * dir;
                 case 'daysOnHand': return (a.daysOnHand - b.daysOnHand) * dir;
                 case 'safeStock': return (a.safeStock - b.safeStock) * dir;
-                case 'quoteCount': return (a.quoteCount - b.quoteCount) * dir;
-                case 'recent60dOrderCount': return (a.recent60dOrderCount - b.recent60dOrderCount) * dir;
                 default: return 0; // Fallback
             }
         });
-    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, searchTerm, sortConfig, historyData, liveSalesHistory, quotes, orders, users]);
+    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, searchTerm, sortConfig, historyData, liveSalesHistory, quotes]);
 
     // Aggregate stats and Asset Valuation totals
     const stats = useMemo(() => {
         const regular = analyzedInventory
             .filter(r => r.statusCategory === 'SAFE' && r.salesFreq >= 20)
             .filter(r => !(r.product.material || '').toLowerCase().startsWith('wp'))
-            // [수정] 건전성 등급이 A, B급인 우량 품목만 정기 발주 대상으로 한정
-            .filter(r => r.healthGrade === 'A' || r.healthGrade === 'B')
             .map(r => {
-                // A급은 3개월치(60영업일), B급은 2개월치(40영업일) 예상 소요량 확보
-                const targetDays = r.healthGrade === 'A' ? 60 : 40;
-                let targetDemand = Math.ceil(r.dailyAvgSales * targetDays);
+                const rawRecommended = r.targetStockByTurnover - r.effectiveStock;
+                let recommendedQty = 0;
                 
-                // 1회 출고량(Average Order Size)을 하한선으로 고려
-                if (r.salesFreq > 0) {
-                    const avgOrderSize = r.salesVolume / r.salesFreq;
-                    targetDemand = Math.max(targetDemand, Math.ceil(avgOrderSize * (r.healthGrade === 'A' ? 2 : 1.5)));
+                // 과잉재고인 경우 발주 추천 차단
+                if (r.isExcessStock) {
+                    recommendedQty = 0;
                 }
-
-                let recommendedQty = targetDemand - r.effectiveStock;
-                
-                // 과잉재고인 경우이거나 대경 재고가 이미 많은 경우 발주 추천 차단
-                if (r.isExcessStock || r.ysQty >= 300) {
+                // 대경 창고에 이미 500개 이상 대량 스탁이 있다면 굳이 시화에 벌크로 미리 들여놓을 필요 없음
+                else if (r.ysQty >= 500) {
                     recommendedQty = 0;
-                } else if (recommendedQty > 0) {
-                    // 기본 10단위 반올림
-                    recommendedQty = Math.ceil(recommendedQty / 10) * 10;
-                    if (recommendedQty === 0) recommendedQty = 10;
-                    
-                    const sizeNum = parseInt((r.product.size || '').replace(/[^0-9]/g, ''), 10);
-                    
-                    // 큰 구경 (100A 이상) - 비현실적인 대량 구매 방지
-                    if (!isNaN(sizeNum) && sizeNum >= 100) {
-                        const maxCap = sizeNum >= 300 ? 10 : sizeNum >= 200 ? 20 : sizeNum >= 150 ? 30 : 50;
-                        if (recommendedQty > maxCap) recommendedQty = maxCap;
-                    } else {
-                        // 작은 구경 (100A 미만) - A급 품목은 묶음 구매 장려 (최소 30개)
-                        if (r.healthGrade === 'A' && recommendedQty < 30) {
-                            recommendedQty = 30;
-                        }
-                        if (recommendedQty > 500) recommendedQty = 500; // 절대 캡 유지
+                } else if (rawRecommended > 0) {
+                    recommendedQty = Math.ceil(rawRecommended / 10) * 10;
+                    if (recommendedQty < 0) {
+                         recommendedQty = 0;
                     }
-                } else {
-                    recommendedQty = 0;
+                }
+                
+                const sizeNum = parseInt((r.product.size || '').replace(/[^0-9]/g, ''), 10);
+                if (!isNaN(sizeNum) && sizeNum >= 100) {
+                    const dynamicCap = Math.max(300, Math.ceil(r.salesVolume / 4));
+                    recommendedQty = recommendedQty > 0 ? Math.min(dynamicCap, recommendedQty) : 0;
                 }
                 
                 return { ...r, recommendedQty };
@@ -1129,7 +1064,7 @@ export default function SihwaInventory() {
             if (listType === 'REGULAR') {
                 qty = 'recommendedQty' in row ? (row as { recommendedQty?: number }).recommendedQty || 0 : 0;
             } else if (listType === 'WARNING') {
-                const targetQty = row.safeStock - (row.shQty + row.pendingOrderQty);
+                const targetQty = row.targetStockByTurnover - (row.shQty + row.pendingOrderQty);
                 qty = targetQty > 0 ? targetQty : (row.deficit > 0 ? row.deficit : 0);
                 qty = Math.ceil(qty / 10) * 10;
                 const sizeNum = parseInt((row.product.size || '').replace(/[^0-9]/g, ''), 10);
@@ -1138,7 +1073,7 @@ export default function SihwaInventory() {
                     qty = qty > 0 ? Math.min(dynamicCap, qty) : 0;
                 }
             } else {
-                const targetQty = row.safeStock - (row.shQty + row.pendingOrderQty);
+                const targetQty = row.targetStockByTurnover - (row.shQty + row.pendingOrderQty);
                 qty = targetQty > 0 ? targetQty : (row.deficit > 0 ? row.deficit : 0);
                 qty = Math.ceil(qty / 10) * 10;
                 const sizeNum = parseInt((row.product.size || '').replace(/[^0-9]/g, ''), 10);
@@ -1181,35 +1116,6 @@ export default function SihwaInventory() {
         navigate('/cart');
     };
 
-    const handleCreateManualOrder = () => {
-        if (selectedAllTableIds.size === 0) return;
-        
-        analyzedInventory.forEach(row => {
-            if (selectedAllTableIds.has(row.product.id)) {
-                let qty = row.safeStock - (row.shQty + row.pendingOrderQty);
-                if (qty <= 0) qty = 10;
-                else qty = Math.ceil(qty / 10) * 10;
-                
-                addItem({
-                    id: crypto.randomUUID(),
-                    productId: row.product.id,
-                    name: row.product.name || '',
-                    thickness: row.product.thickness || '',
-                    size: row.product.size || '',
-                    material: row.product.material || '',
-                    quantity: qty,
-                    unitPrice: row.recentPurchasePrice > 0 ? row.recentPurchasePrice : row.sellingPrice,
-                    amount: (row.recentPurchasePrice > 0 ? row.recentPurchasePrice : row.sellingPrice) * qty,
-                    note: `[수동 추가]`,
-                    isVerified: false
-                });
-            }
-        });
-        
-        setSelectedAllTableIds(new Set());
-        navigate('/cart');
-    };
-
     const totalsMap = useMemo(() => {
         let totalCurrentStockValue = 0;
         let totalCurrentStockCost = 0;
@@ -1249,56 +1155,24 @@ export default function SihwaInventory() {
         });
       });
 
-      // ── 결품 기회손실: 취소/철회, 미결 지연(5일↑), 견적 미전환 ────
+      // ── 결품 기회손실: 대경+시화 모두 0일 때 주문→취소 이력 ────
       const missedDemandMap: Record<string, { count: number; estimatedRevenue: number }> = {};
-      
-      // 1. 주문 건 (취소/철회 및 5일 이상 장기 미결품)
       orders.forEach(o => {
+        if (!['CANCELLED', 'WITHDRAWN'].includes(o.status)) return;
         if (o.isDeleted) return;
-        const custStr = (o.poEndCustomer || o.customerName || '').toLowerCase().replace(/\s+/g, '');
-        if (custStr.includes('재고') || custStr.includes('시화') || custStr.includes('서울') || custStr.includes('알트에프') || custStr.includes('altf')) return;
+        // 내부 재고 이동 주문 제외
+        const custStr = (o.poEndCustomer || o.customerName || '').toLowerCase();
+        if (custStr.includes('재고') || custStr.includes('시화') || custStr.includes('서울')) return;
 
-        const isCancelled = ['CANCELLED', 'WITHDRAWN'].includes(o.status);
-        const isDelayedPending = o.status === 'PROCESSING' && Math.floor((now - new Date(o.createdAt).getTime()) / 86400000) >= 5;
-
-        if (isCancelled || isDelayedPending) {
-          const items = o.po_items?.length ? o.po_items : o.items;
-          items?.forEach(item => {
-            if (isDelayedPending && item.transactionIssued) return; // 미결품이 아닌 것은 제외
-
-            const id = item.productId || (item as { item_id?: string }).item_id || '';
-            if (!id) return;
-            const row = analyzedInventory.find(r => r.product.id === id);
-            if (!row) return;
-
-            const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
-            // 전체 혹은 일부 수량 부족 판정 (재고 < 주문수량)
-            if (row.shQty + row.ysQty < qty || (isCancelled && row.shQty <= 0 && row.ysQty <= 0)) {
-              if (!missedDemandMap[id]) missedDemandMap[id] = { count: 0, estimatedRevenue: 0 };
-              missedDemandMap[id].count += 1;
-              missedDemandMap[id].estimatedRevenue += qty * row.sellingPrice;
-            }
-          });
-        }
-      });
-
-      // 2. 견적(Quotes) 건 (답변완료 후 발주 미전환, 재고 부족)
-      quotes?.forEach(q => {
-        if (q.isDeleted) return;
-        if (!['PROCESSED', 'COMPLETED'].includes(q.status)) return;
-        
-        // 발주 전환 여부 체크
-        const isConverted = orders.some(o => o.linkedQuoteId === q.id && !['CANCELLED', 'WITHDRAWN'].includes(o.status));
-        if (isConverted) return;
-
-        q.items?.forEach(item => {
+        const items = o.po_items?.length ? o.po_items : o.items;
+        items?.forEach(item => {
           const id = item.productId || (item as { item_id?: string }).item_id || '';
           if (!id) return;
           const row = analyzedInventory.find(r => r.product.id === id);
           if (!row) return;
-          
-          const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
-          if (row.shQty + row.ysQty < qty) {
+          // 주문 시점에 시화+대경 모두 0이었을 가능성 높은 품목 (현재도 0이거나 critical인 경우)
+          if (row.shQty <= 0 && row.ysQty <= 0) {
+            const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
             if (!missedDemandMap[id]) missedDemandMap[id] = { count: 0, estimatedRevenue: 0 };
             missedDemandMap[id].count += 1;
             missedDemandMap[id].estimatedRevenue += qty * row.sellingPrice;
@@ -1335,7 +1209,7 @@ export default function SihwaInventory() {
         const isDeadStock = row.isDeadStock === true;
 
         // 과잉재고 판단 (악성이 아닌 것 중에서)
-        const targetStock = row.safeStock > 0 ? row.safeStock : row.safeStock;
+        const targetStock = row.targetStockByTurnover > 0 ? row.targetStockByTurnover : row.safeStock;
         const excessQty = targetStock > 0 ? row.shQty - targetStock : 0;
         const isExcessStock = row.isExcessStock === true;
 
@@ -1408,9 +1282,8 @@ export default function SihwaInventory() {
         missedDemandList,
         urgentDisposalItems,
         lockedCapital: deadStockValue + excessStockValue,
-        totalIssueCount: analyzedInventory.filter(r => r.healthGrade === 'E' || r.excessCategory !== null).length,
       };
-    }, [analyzedInventory, historyData, orders, quotes]);
+    }, [analyzedInventory, historyData, orders]);
 
     const dailyOrderDiffMap = useMemo(() => {
         const map: Record<string, Record<string, number>> = {}; 
@@ -1427,7 +1300,7 @@ export default function SihwaInventory() {
             if (!map[dateKey]) map[dateKey] = {};
             
             const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
-            const isSihwaIncoming = customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf');
+            const isSihwaIncoming = customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화');
             
             const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
             if (!items) return;
@@ -1444,45 +1317,6 @@ export default function SihwaInventory() {
                 
                 map[dateKey][id] = (map[dateKey][id] || 0) + change;
             });
-        });
-        return map;
-    }, [orders]);
-
-    const dailyPendingMap = useMemo(() => {
-        const map: Record<string, Array<{
-            order: Order;
-            item: Partial<LineItem> & { item_id?: string; qty?: number; transactionIssued?: boolean; name?: string };
-            id: string;
-            qty: number;
-        }>> = {}; 
-        orders.forEach(order => {
-            if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
-            if (order.status === 'COMPLETED') return; 
-            
-            const dateStr = order.adminResponse?.deliveryDate || order.createdAt;
-            const dt = new Date(dateStr);
-            const kstDt = new Date(dt.getTime() + 9 * 60 * 60 * 1000);
-            const dateKey = kstDt.toISOString().split('T')[0];
-            
-            const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
-            const isSihwaIncoming = customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf');
-            
-            if (isSihwaIncoming) {
-                const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
-                if (!items) return;
-                items.forEach((item: Partial<LineItem> & { item_id?: string; qty?: number; transactionIssued?: boolean }) => {
-                    if (item.transactionIssued) return;
-                    const id = item.productId || item.item_id;
-                    if (!id) return;
-                    if (!map[dateKey]) map[dateKey] = [];
-                    map[dateKey].push({
-                        order,
-                        item,
-                        id,
-                        qty: Number(item.quantity ?? item.qty ?? 0)
-                    });
-                });
-            }
         });
         return map;
     }, [orders]);
@@ -1504,15 +1338,11 @@ export default function SihwaInventory() {
 
             orders.forEach(order => {
                 if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
-                if (order.status === 'COMPLETED') return;
+                const targetCustomer = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
                 
-                const targetCustomer = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
-                const isSihwaIncoming = targetCustomer.includes('재고') || targetCustomer.includes('서울') || targetCustomer.includes('시화') || targetCustomer.includes('알트에프') || targetCustomer.includes('altf');
-                
-                if (isSihwaIncoming) {
-                    const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
-                    items?.forEach((poItem: Partial<LineItem> & { transactionIssued?: boolean; poSent?: boolean }) => {
-                        if (!poItem.transactionIssued) {
+                if (targetCustomer.includes('서울재고')) {
+                    order.po_items?.forEach(poItem => {
+                        if (poItem.poSent && !poItem.transactionIssued) {
                             if (
                                 poItem.name === specName &&
                                 (poItem.thickness || '') === specThick &&
@@ -1646,15 +1476,15 @@ export default function SihwaInventory() {
                     <p className="text-4xl font-black mb-1 z-10">{stats.critical.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
                     <p className="text-sm font-medium opacity-80 z-10 break-keep mt-auto">현재고 및 대경 재고가 바닥났으며, 연 판매량(100↑)이 많아 선발주 관리가 필요한 품목입니다.</p>
                 </div>
-
+                
                 <div 
                     onClick={() => { setActiveTab('AI_SUMMARY'); setExpandedGroups(prev => ({...prev, WARNING: true})); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
-                    className="bg-linear-to-br from-amber-500 to-orange-500 rounded-2xl p-5 shadow-lg shadow-amber-200 text-white flex flex-col relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 active:scale-95"
+                    className="bg-linear-to-br from-amber-400 to-orange-500 rounded-2xl p-5 shadow-lg shadow-amber-200 text-white flex flex-col relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 active:scale-95"
                 >
-                    <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-20 transform group-hover:scale-110 transition-transform duration-500">
-                        <PackageSearch className="w-32 h-32" />
+                    <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-20 transform group-hover:rotate-12 transition-transform duration-500">
+                        <Box className="w-32 h-32" />
                     </div>
-                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><PackageSearch className="w-5 h-5"/>일반 발주 필요 (적정재고 미달)</h3>
+                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><Factory className="w-5 h-5"/>일반 발주 필요 (적정재고 미달)</h3>
                     <p className="text-4xl font-black mb-1 z-10">{stats.warning.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
                     <p className="text-sm font-medium opacity-80 z-10 mt-auto">대경 재고를 통해 조달하거나 목표수량에 미달되어 일반발주(최소 100개)가 필요한 품목입니다.</p>
                 </div>
@@ -1679,13 +1509,13 @@ export default function SihwaInventory() {
                         <BrainCircuit className="w-32 h-32" />
                     </div>
                     <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><TrendingUp className="w-5 h-5"/>견적 유입 & 결품 (기회손실)</h3>
-                    <p className="text-4xl font-black mb-1 z-10">{healthDiagnosis.missedDemandList.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
+                    <p className="text-4xl font-black mb-1 z-10">{stats.missedOpportunities.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
                     <p className="text-sm font-medium opacity-80 z-10 mt-auto">최근 60일 내 견적 문의가 있었으나 시화/대경 재고가 없어 판매 기회를 잃었을 가능성이 높은 품목입니다.</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col">
                     <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-2 z-10 opacity-90">
                         <Activity className="w-5 h-5 text-purple-500" />
-                        재고 건전성 등급 분포 (A~E) <span className="text-xs text-slate-400 font-normal ml-1">(총 {analyzedInventory.filter(r => r.healthGrade !== 'N').length}개 품목)</span>
+                        재고 건전성 등급 분포 (A~E)
                     </h3>
                     <p className="text-4xl font-black text-slate-800 mb-2 invisible h-0">0</p>
                     
@@ -1695,7 +1525,7 @@ export default function SihwaInventory() {
                             r.healthGrade === grade
                         ).length;
                         const total = analyzedInventory.filter(r => r.healthGrade !== 'N').length;
-                        const pct = total > 0 ? (count / total * 100).toFixed(1) : 0;
+                        const pct = total > 0 ? Math.round(count / total * 100) : 0;
                         const labels: Record<string, string> = {
                             A: 'A급 최우수 (핵심)',
                             B: 'B급 양호 (안정적)',
@@ -1717,48 +1547,12 @@ export default function SihwaInventory() {
                                 {...{ style: { width: `${pct}%`, background: colors[grade] } }}
                                 />
                             </div>
-                            <span className="text-[11px] font-bold text-slate-500 w-12 text-right shrink-0 whitespace-nowrap">
-                                {count}품목
+                            <span className="text-[11px] font-bold text-slate-500 w-8 text-right shrink-0">
+                                {count}개
                             </span>
                             </div>
                         );
                         })}
-                    </div>
-                </div>
-
-                <div className="bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-700 flex flex-col text-white">
-                    <h3 className="font-bold text-slate-100 flex items-center gap-2 mb-3 z-10 opacity-90 text-[13px] border-b border-slate-600 pb-2">
-                        <Info className="w-4 h-4 text-sky-400" />
-                        건전성 점수 산출 가이드 (100점 만점)
-                    </h3>
-                    <div className="text-[11px] text-slate-300 space-y-2.5 leading-tight mt-auto">
-                        <p><strong className="text-emerald-400">A급 (65점↑)</strong>: 초고회전, 핵심 매출</p>
-                        <p><strong className="text-blue-400">B급 (45점↑)</strong>: 안정적 유지, 지속 매출</p>
-                        <p><strong className="text-amber-400">C급 (25점↑)</strong>: 간헐적 매출, 관망 필요</p>
-                        <p><strong className="text-orange-400">D급 (10점↑)</strong>: 과잉/무발주, 정체 품목</p>
-                        <p><strong className="text-rose-400">E급 (10점↓)</strong>: 장기 무매출, 악성재고</p>
-                        <div className="border-t border-slate-700 pt-2.5 mt-2.5 text-slate-400 text-[10px]">
-                            <span className="block mb-1.5 font-bold text-slate-300 text-[11px]">항목별 가중치 (배점)</span>
-                            판매빈도(25) + 판매규모(15) + <br/>최근트렌드(25) + 견적유입(20) + <br/>이익률(15)
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-700 flex flex-col text-white">
-                    <h3 className="font-bold text-slate-100 flex items-center gap-2 mb-3 z-10 opacity-90 text-[13px] border-b border-slate-600 pb-2">
-                        <Activity className="w-4 h-4 text-emerald-400" />
-                        세부 항목별 산출 기준표
-                    </h3>
-                    <div className="text-[11px] text-slate-300 space-y-2.5 leading-tight mt-auto">
-                        <p><strong className="text-indigo-400">판매빈도(25)</strong>: 최근 6개월 내 판매 발생 월수. 매달 꾸준한 수요가 있는가?</p>
-                        <p><strong className="text-teal-400">판매규모(15)</strong>: 연간 총 판매액 기여도. 전체 매출에 얼마나 도움이 되는가?</p>
-                        <p><strong className="text-amber-400">최근트렌드(25)</strong>: 최근 60일 내 판매량이 연평균 대비 증가했는가? 최근 수요 유지 여부.</p>
-                        <p><strong className="text-rose-400">견적유입(20)</strong>: 최근 60일 내 견적 문의 횟수. 실제 판매가 없어도 시장 관심도가 있는가?</p>
-                        <p><strong className="text-blue-400">이익률(15)</strong>: 대경 원가 대비 시화의 추정 영업 이익률. 고수익 품목인가?</p>
-                        <div className="border-t border-slate-700 pt-2.5 mt-2.5 text-slate-400 text-[10px]">
-                            <span className="block mb-1.5 font-bold text-slate-300 text-[11px]">보정 및 예외</span>
-                            재고 0인 상태는 점수 0점(N등급). 과잉재고 및 악성재고 패널티는 점수에서 차감.
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1771,19 +1565,19 @@ export default function SihwaInventory() {
                             className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'AI_SUMMARY' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             onClick={() => setActiveTab('AI_SUMMARY')}
                         >
-                            AI 요약보기 (발주 추천)
-                        </button>
-                        <button 
-                            className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'ALL_TABLE' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            onClick={() => setActiveTab('ALL_TABLE')}
-                        >
-                            전체 재고 리스트(정렬지원)
+                            AI 요약보기 (Action Items)
                         </button>
                         <button 
                             className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'TOTAL_DASHBOARD' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             onClick={() => setActiveTab('TOTAL_DASHBOARD')}
                         >
                             월간·일간 변동 트렌드
+                        </button>
+                        <button 
+                            className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'ALL_TABLE' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            onClick={() => setActiveTab('ALL_TABLE')}
+                        >
+                            전체 재고 리스트(정렬지원)
                         </button>
                         <button
                           className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-1.5 ${
@@ -1797,7 +1591,7 @@ export default function SihwaInventory() {
                           {/* 악성재고 경고 배지 */}
                           {healthDiagnosis.deadStockItems.length > 0 && (
                             <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
-                              {healthDiagnosis.totalIssueCount}
+                              {healthDiagnosis.deadStockItems.length}
                             </span>
                           )}
                         </button>
@@ -1860,7 +1654,7 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 text-right">매입단가</th>
                                                             <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
                                                             <th className="px-5 py-3 text-right">경쟁사 연판매</th>
-                                                            <th className="px-5 py-3 text-center">건전성 등급</th>
+                                                            <th className="px-5 py-3 text-center">회전율</th>
                                                             <th className="px-5 py-3 text-right">잔여일수</th>
                                                             <th className="px-5 py-3">🚨 분석 근거 (명확성)</th>
                                                         </tr>
@@ -1879,12 +1673,7 @@ export default function SihwaInventory() {
                                                                         }}
                                                                     />
                                                                 </td>
-                                                                <td className="px-5 py-4">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
-                                                                        <span className="font-mono font-bold text-slate-900 text-sm">{row.product.id}</span>
-                                                                    </div>
-                                                                </td>
+                                                                <td className="px-5 py-4 font-mono font-bold text-slate-900 text-sm">{row.product.id}</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-rose-600 bg-rose-50/30">0</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-slate-400">0</td>
                                                                 <td className="px-5 py-4 text-center font-bold text-slate-400">
@@ -1900,16 +1689,18 @@ export default function SihwaInventory() {
                                                                 <td className="px-5 py-4 text-center border-l border-slate-100">
                                                                     <div className="flex flex-col items-center gap-1">
                                                                         <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
-                                                                            row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
-                                                                            row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
-                                                                            row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
-                                                                            row.healthGrade === 'D' ? 'bg-rose-100 text-rose-600' :
+                                                                            row.turnoverGrade === 'S' ? 'bg-purple-100 text-purple-700' :
+                                                                            row.turnoverGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                                            row.turnoverGrade === 'B' ? 'bg-amber-100 text-amber-700' :
+                                                                            row.turnoverGrade === 'C' ? 'bg-blue-100 text-blue-600' :
+                                                                            row.turnoverGrade === 'D' ? 'bg-rose-100 text-rose-600' :
                                                                             'bg-slate-100 text-slate-400'
                                                                         }`}>
-                                                                            {row.healthGrade === 'A' ? 'A급' :
-                                                                            row.healthGrade === 'B' ? 'B급' :
-                                                                            row.healthGrade === 'C' ? 'C급' :
-                                                                            row.healthGrade === 'D' ? 'D급' : '—'}
+                                                                            {row.turnoverGrade === 'S' ? 'S급' :
+                                                                            row.turnoverGrade === 'A' ? 'A급' :
+                                                                            row.turnoverGrade === 'B' ? 'B급' :
+                                                                            row.turnoverGrade === 'C' ? 'C급' :
+                                                                            row.turnoverGrade === 'D' ? 'D급' : '—'}
                                                                         </span>
                                                                         <span className="text-xs font-mono text-slate-500">
                                                                             {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '—'}
@@ -1944,9 +1735,9 @@ export default function SihwaInventory() {
                                                                             연 {row.salesVolume}개 판매 / 목표 {row.safeStock}개
                                                                         </div>
                                                                         <div className="text-xs text-slate-400 pl-5">
-                                                                            ROP: {row.reorderPoint}개 도달 시 발주 | 목표적정: {row.safeStock}개
+                                                                            ROP: {row.reorderPoint}개 도달 시 발주 | 목표적정: {row.targetStockByTurnover}개
                                                                             {row.isExcessStock && (
-                                                                                <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.safeStock > 0 ? row.shQty - row.safeStock : row.shQty}개 초과]</span>
+                                                                                <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.targetStockByTurnover > 0 ? row.shQty - row.targetStockByTurnover : row.shQty}개 초과]</span>
                                                                             )}
                                                                             {row.isDeadStock && (
                                                                                 <span className="text-slate-400 ml-1">[사장재고 의심 — 소진 후 재평가]</span>
@@ -2033,7 +1824,7 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 text-right">매입단가</th>
                                                             <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
                                                             <th className="px-5 py-3 text-right">경쟁사 연판매</th>
-                                                            <th className="px-5 py-3 text-center cursor-pointer hover:bg-slate-200" onClick={() => handleSort('healthGrade')}>건전성 등급 {sortConfig.key==='healthGrade' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+                                                            <th className="px-5 py-3 text-center cursor-pointer hover:bg-slate-200" onClick={() => handleSort('turnoverRate')}>회전율 {sortConfig.key==='turnoverRate' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => handleSort('daysOnHand')}>잔여일수 {sortConfig.key==='daysOnHand' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3">💡 분석 근거</th>
                                                         </tr>
@@ -2051,12 +1842,7 @@ export default function SihwaInventory() {
                                                                         className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
                                                                     />
                                                                 </td>
-                                                                <td className="px-5 py-4">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
-                                                                        <span className="font-mono font-bold text-slate-900 text-sm">{row.product.id}</span>
-                                                                    </div>
-                                                                </td>
+                                                                <td className="px-5 py-4 font-mono font-bold text-slate-900 text-sm">{row.product.id}</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-amber-600 bg-amber-50 text-base">
                                                                     {row.shQty}
                                                                 </td>
@@ -2080,16 +1866,18 @@ export default function SihwaInventory() {
                                                                 <td className="px-5 py-4 text-center border-l border-slate-100">
                                                                     <div className="flex flex-col items-center gap-1">
                                                                         <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
-                                                                            row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
-                                                                            row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
-                                                                            row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
-                                                                            row.healthGrade === 'D' ? 'bg-rose-100 text-rose-600' :
+                                                                            row.turnoverGrade === 'S' ? 'bg-purple-100 text-purple-700' :
+                                                                            row.turnoverGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                                            row.turnoverGrade === 'B' ? 'bg-amber-100 text-amber-700' :
+                                                                            row.turnoverGrade === 'C' ? 'bg-blue-100 text-blue-600' :
+                                                                            row.turnoverGrade === 'D' ? 'bg-rose-100 text-rose-600' :
                                                                             'bg-slate-100 text-slate-400'
                                                                         }`}>
-                                                                            {row.healthGrade === 'A' ? 'A급' :
-                                                                            row.healthGrade === 'B' ? 'B급' :
-                                                                            row.healthGrade === 'C' ? 'C급' :
-                                                                            row.healthGrade === 'D' ? 'D급' : '—'}
+                                                                            {row.turnoverGrade === 'S' ? 'S급' :
+                                                                            row.turnoverGrade === 'A' ? 'A급' :
+                                                                            row.turnoverGrade === 'B' ? 'B급' :
+                                                                            row.turnoverGrade === 'C' ? 'C급' :
+                                                                            row.turnoverGrade === 'D' ? 'D급' : '—'}
                                                                         </span>
                                                                         <span className="text-xs font-mono text-slate-500">
                                                                             {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '—'}
@@ -2121,14 +1909,14 @@ export default function SihwaInventory() {
                                                                             재고부족 <span className="text-rose-600">-{row.deficit}</span>개
                                                                         </div>
                                                                         <div className="text-xs text-slate-500 pl-5">
-                                                                            등급: <strong className={`font-black ${row.healthGrade === 'A' ? 'text-emerald-600' : row.healthGrade === 'B' ? 'text-blue-600' : row.healthGrade === 'C' ? 'text-amber-500' : 'text-rose-500'}`}>{row.healthGrade}급</strong> | 최근 판매: <strong className="text-indigo-600">{row.recent60dSales}개(60일)</strong> / 연 총 {row.salesVolume}개
+                                                                            연판매 {row.salesFreq}회 / 적정재고 {row.safeStock}개
                                                                         </div>
-                                                                        <div className="text-[11px] text-slate-400 pl-5 mt-0.5">
-                                                                            목표 재고 {row.safeStock}개 대비 현재 {row.shQty}개 보유 중 (ROP: {row.reorderPoint}개)
-                                                                            {row.isExcessStock && (
-                                                                                <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.safeStock > 0 ? row.shQty - row.safeStock : row.shQty}개 초과]</span>
+                                                                        <div className="text-xs text-slate-400 pl-5">
+                                                                            ROP: {row.reorderPoint}개 도달 시 발주 | 목표적정: {row.targetStockByTurnover}개
+                                                                            {row.stockStatusByTurnover === 'EXCESS' && (
+                                                                                <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.targetStockByTurnover}개 초과]</span>
                                                                             )}
-                                                                            {row.isDeadStock && (
+                                                                            {row.stockStatusByTurnover === 'DEAD' && (
                                                                                 <span className="text-slate-400 ml-1">[사장재고 의심 — 소진 후 재평가]</span>
                                                                             )}
                                                                         </div>
@@ -2180,7 +1968,7 @@ export default function SihwaInventory() {
                                                     <span>♻️ 정기 발주 예측</span>
                                                     <span className="text-sm font-medium text-indigo-500">(우량 품목 2개월분 선주문 권장)</span>
                                                     <span className="text-sm font-bold bg-indigo-100/70 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200 tracking-tight">
-                                                        [산출식: 2개월 예상소요량 - 현재고 | 발주단위: 50~500개 (Size≥100A는 별도캡)]
+                                                        [산출식: 빈도≥20 & 추천량=((연판매/6)-현재고) | 발주단위: 최소 500개 (Size≥100A는 최대 300캡)]
                                                     </span>
                                                 </h3>
                                             </div>
@@ -2208,7 +1996,6 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 text-center">판매/보충 이력</th>
                                                             <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition text-center" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right">매입단가</th>
-                                                            <th className="px-5 py-3 text-center cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('healthGrade')}>건전성 등급 {sortConfig.key==='healthGrade' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                                             <th className="px-5 py-3 text-right w-40">추천 발주량</th>
                                                             <th className="px-5 py-3">💡 분석 근거</th>
                                                         </tr>
@@ -2227,12 +2014,8 @@ export default function SihwaInventory() {
                                                                         }}
                                                                     />
                                                                 </td>
-                                                                <td className="px-5 py-4">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="font-mono font-bold text-slate-900 text-sm">{row.product.id}</span>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-5 py-4 text-right font-mono text-indigo-500 text-sm">{row.safeStock}</td>
+                                                                <td className="px-5 py-4 font-mono font-bold text-slate-900 text-sm">{row.product.id}</td>
+                                                                <td className="px-5 py-4 text-right font-mono text-indigo-500 text-sm">{row.targetStockByTurnover}</td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-indigo-600 bg-indigo-50 text-base">{row.shQty}</td>
                                                                 <td className="px-5 py-4 text-center text-xs font-medium text-slate-500">
                                                                     연 {row.salesFreq}회 판매 / 누적 {row.salesVolume}개
@@ -2241,25 +2024,6 @@ export default function SihwaInventory() {
                                                                     {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty}</span> : <span className="text-rose-400">0</span>}
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
-                                                                <td className="px-5 py-4 text-center">
-                                                                    <div className="flex flex-col items-center gap-1">
-                                                                        <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
-                                                                            row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
-                                                                            row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
-                                                                            row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
-                                                                            row.healthGrade === 'D' ? 'bg-rose-100 text-rose-600' :
-                                                                            'bg-slate-100 text-slate-400'
-                                                                        }`}>
-                                                                            {row.healthGrade === 'A' ? 'A급' :
-                                                                            row.healthGrade === 'B' ? 'B급' :
-                                                                            row.healthGrade === 'C' ? 'C급' :
-                                                                            row.healthGrade === 'D' ? 'D급' : '—'}
-                                                                        </span>
-                                                                        <span className="text-xs font-mono text-slate-500">
-                                                                            {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '—'}
-                                                                        </span>
-                                                                    </div>
-                                                                </td>
                                                                 <td className="px-5 py-4 text-right font-black text-indigo-600 bg-indigo-50/30">
                                                                     {row.recommendedQty}
                                                                 </td>
@@ -2279,7 +2043,7 @@ export default function SihwaInventory() {
                                                     </tbody>
                                                     <tfoot className="bg-indigo-50/50 border-t-2 border-indigo-200">
                                                         <tr>
-                                                            <td colSpan={6} className="px-5 py-4">
+                                                            <td colSpan={5} className="px-5 py-4">
                                                                 <button onClick={() => handleCreateOrder(selectedRegularIds, 'REGULAR')} disabled={selectedRegularIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedRegularIds.size > 0 ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
                                                                     <span>선택 품목 발주서 만들기 ({selectedRegularIds.size}건)</span>
                                                                     <ChevronRight className="w-4 h-4" />
@@ -2394,15 +2158,13 @@ export default function SihwaInventory() {
                                                             const isGroupExpanded = expandedDailyGroups[snap.date] ?? (idx === 0);
 
                                                                             const itemsToRender = snap.diff || [];
-                                                                            const pendingItemsToRender = dailyPendingMap[snap.date] || [];
-                                                                            const totalChangeCount = itemsToRender.length + pendingItemsToRender.length;
 
                                                                             return (
                                                                                 <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
                                                                                     <div className="flex flex-col gap-2 mb-3">
                                                                                         <div className="flex items-center justify-between">
                                                                                             <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono font-bold hover:bg-slate-300 cursor-pointer transition-colors" onClick={() => toggleDailyGroup(snap.date)}>{snap.date}</span>
-                                                                                            <span className="text-slate-500 font-medium text-xs">총 변동/대기 {totalChangeCount}건 <span className="text-rose-500 ml-1 font-bold">{validCount > 0 ? `(순수 수기 ${validCount}건)` : ''}</span></span>
+                                                                                            <span className="text-slate-500 font-medium text-xs">총 변동 {itemsToRender.length}건 <span className="text-rose-500 ml-1 font-bold">{validCount > 0 ? `(순수 수기 ${validCount}건)` : ''}</span></span>
                                                                                         </div>
                                                                         
                                                                         {(dailyRevenue > 0 || dailyCost > 0) && (
@@ -2424,49 +2186,8 @@ export default function SihwaInventory() {
                                                                         )}
                                                                     </div>
                                                                     {isGroupExpanded && (
-                                                                        totalChangeCount > 0 ? (
+                                                                        itemsToRender.length > 0 ? (
                                                                             <div className="grid grid-cols-1 gap-2 mt-2">
-                                                                                {pendingItemsToRender.map((pi, piIdx) => {
-                                                                                    const rowKey = `${snap.date}-pending-${pi.id}-${piIdx}`;
-                                                                                    const analysis = pi.id ? analyzedInventory.find(ai => ai.product.id === pi.id) : null;
-                                                                                    const isExpanded = !!expandedTrendItems[rowKey];
-                                                                                    
-                                                                                    return (
-                                                                                        <div key={rowKey} className="bg-rose-50 rounded-lg border border-rose-200 shadow-sm overflow-hidden flex flex-col">
-                                                                                            <div 
-                                                                                                className="flex items-center justify-between p-3 cursor-pointer hover:bg-rose-100/50 transition-colors bg-white/50"
-                                                                                                onClick={() => toggleTrendItem(rowKey)}
-                                                                                            >
-                                                                                                <div className="flex items-center gap-3">
-                                                                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-500 text-white">입고 대기</span>
-                                                                                                    <div className="font-mono text-xs font-black text-slate-800">
-                                                                                                        {pi.item.name || pi.id}
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                                <div className="flex items-center gap-2">
-                                                                                                    <div className="flex gap-1">
-                                                                                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold text-rose-700 bg-white border border-rose-200 shadow-sm">
-                                                                                                            예정 +{pi.qty}개
-                                                                                                        </span>
-                                                                                                    </div>
-                                                                                                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                                                                                </div>
-                                                                                            </div>
-                                                                                            {isExpanded && (
-                                                                                                <div className="p-3 bg-white border-t border-rose-100 flex flex-col gap-2">
-                                                                                                    <div className="flex justify-between items-center text-xs">
-                                                                                                        <span className="text-slate-500 font-bold">주문 고객</span>
-                                                                                                        <span className="font-medium text-slate-700">{pi.order.poEndCustomer || pi.order.customerName || '알 수 없음'}</span>
-                                                                                                    </div>
-                                                                                                    <div className="flex justify-between items-center text-xs">
-                                                                                                        <span className="text-slate-500 font-bold">예상 매입 단가</span>
-                                                                                                        <span className="font-mono font-bold text-slate-700">₩{formatCur(analysis ? analysis.recentPurchasePrice : 0)}</span>
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    );
-                                                                                })}
                                                                                 {[...itemsToRender].sort((a, b) => {
                                                                                     const aiA = a.id ? analyzedInventory.find(ai => ai.product.id === a.id) : null;
                                                                                     const aiB = b.id ? analyzedInventory.find(ai => ai.product.id === b.id) : null;
@@ -2610,8 +2331,8 @@ export default function SihwaInventory() {
                                                                 </div>
                                                                 <div className="flex flex-col items-end shrink-0 pl-1">
                                                                     <div className="flex items-center gap-1 justify-end">
-                                                                        <span className="text-[9px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-bold">{item.salesFreq.toLocaleString()}회발생</span>
-                                                                        <span className="font-black text-slate-700 text-sm drop-shadow-sm">{item.recent30dSales.toLocaleString()} <span className="font-normal text-[10px] text-slate-400">개</span></span>
+                                                                        <span className="text-[9px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-bold">{item.salesFreq}회발생</span>
+                                                                        <span className="font-black text-slate-700 text-sm drop-shadow-sm">{item.recent30dSales} <span className="font-normal text-[10px] text-slate-400">개</span></span>
                                                                     </div>
                                                                     <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-[80px]" title={`기간누적매출 ${formatCur(item.recent30dSales * item.sellingPrice)}원`}>
                                                                         ₩{formatCur(item.recent30dSales * item.sellingPrice)}
@@ -2630,53 +2351,10 @@ export default function SihwaInventory() {
 
                             {/* TAB 3: ALL TABLE WITH SORTING */}
                             {activeTab === 'ALL_TABLE' && (
-                                <div className="space-y-4 overflow-x-auto pb-4">
-                                <table className="w-full text-left text-sm whitespace-nowrap min-w-[1000px]">
+                                <table className="w-full text-left text-sm whitespace-nowrap">
                                     <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none">
-                                        <tr className="text-xs uppercase tracking-wider text-slate-500 font-bold border-b-2 border-slate-200">
-                                            <th className="px-3 py-3 w-10 text-center border-r border-slate-200">
-                                                <span className="text-[10px] text-slate-400">선택</span>
-                                            </th>
-                                            <th className="px-4 py-3 group relative text-left">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="cursor-pointer hover:text-slate-800 transition" onClick={() => handleSort('id')}>
-                                                        품목 ID {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}
-                                                    </span>
-                                                    <span className="text-[10px] bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded cursor-pointer hover:bg-indigo-100 transition border border-indigo-100" onClick={() => handleSort('statusRank')} title="태그(상태) 우선순위로 정렬합니다">
-                                                        태그정렬 {sortConfig.key==='statusRank' && (sortConfig.direction==='asc'?'↑':'↓')}
-                                                    </span>
-                                                    <div className="relative">
-                                                        <button 
-                                                            onClick={() => setIsTagFilterOpen(!isTagFilterOpen)}
-                                                            className={`p-1 rounded transition ${activeTagFilters.length > 0 ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400 hover:bg-slate-200'}`}
-                                                            title="태그로 필터링"
-                                                        >
-                                                            <Filter size={14} className={activeTagFilters.length > 0 ? 'fill-current' : ''} />
-                                                        </button>
-                                                        {isTagFilterOpen && (
-                                                            <div className="absolute top-full left-0 mt-1 w-36 bg-white border border-slate-200 shadow-xl rounded-lg py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
-                                                                <div className="px-3 pb-2 mb-2 border-b border-slate-100 flex justify-between items-center">
-                                                                    <span className="text-[10px] font-black text-slate-500">필터 선택</span>
-                                                                    {activeTagFilters.length > 0 && (
-                                                                        <span className="text-[9px] text-rose-500 cursor-pointer hover:underline" onClick={() => setActiveTagFilters([])}>초기화</span>
-                                                                    )}
-                                                                </div>
-                                                                {['선발주', '일반', '정기발주', '부족', '과잉', '악성'].map(tag => (
-                                                                    <label key={tag} className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs font-medium text-slate-700">
-                                                                        <input 
-                                                                            type="checkbox" 
-                                                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                                                            checked={activeTagFilters.includes(tag)}
-                                                                            onChange={() => toggleTagFilter(tag)}
-                                                                        />
-                                                                        {tag}
-                                                                    </label>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </th>
+                                        <tr>
+                                            <th className="px-4 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 ID {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-center group relative cursor-help">
                                                 등급 <span className="text-[10px] text-slate-400">ⓘ</span>
                                                 <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 bg-slate-800 text-white text-[11px] p-3 rounded shadow-lg hidden group-hover:block z-50 text-left font-normal whitespace-normal cursor-auto">
@@ -2693,21 +2371,9 @@ export default function SihwaInventory() {
                                                 </div>
                                             </th>
                                             <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('turnoverRate')}>회전율 {sortConfig.key==='turnoverRate' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-center">
-                                                최근 실적(60일)
-                                                <div className="flex items-center justify-center gap-2 mt-1 text-[10px] font-bold">
-                                                    <span className={`cursor-pointer transition ${sortConfig.key === 'quoteCount' ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-600'}`} onClick={() => handleSort('quoteCount')}>
-                                                        견적순 {sortConfig.key==='quoteCount' && (sortConfig.direction==='asc'?'↑':'↓')}
-                                                    </span>
-                                                    <span className="text-slate-300">|</span>
-                                                    <span className={`cursor-pointer transition ${sortConfig.key === 'recent60dOrderCount' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'}`} onClick={() => handleSort('recent60dOrderCount')}>
-                                                        발주순 {sortConfig.key==='recent60dOrderCount' && (sortConfig.direction==='asc'?'↑':'↓')}
-                                                    </span>
-                                                </div>
-                                            </th>
+                                            <th className="px-4 py-3 text-center">최근 실적(60일)</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-amber-700" onClick={() => handleSort('salesVolume')}>판매이력 {sortConfig.key==='salesVolume' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-indigo-700" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-600" onClick={() => handleSort('pendingOrderQty')}>입고대기 {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200" onClick={() => handleSort('ysQty')}>대경 재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
                                             <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition group relative" onClick={() => handleSort('daysOnHand')}>
                                                 잔여일 {sortConfig.key==='daysOnHand' && (sortConfig.direction==='asc'?'↑':'↓')}
@@ -2722,107 +2388,11 @@ export default function SihwaInventory() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {(() => {
-                                            const criticalSet = new Set(stats.critical.map(i => i.product.id));
-                                            const warningSet = new Set(stats.warning.map(i => i.product.id));
-                                            const regularSet = new Set(stats.regular.map(i => i.product.id));
-
-                                            const getStatusRank = (row: typeof analyzedInventory[0]) => {
-                                                if (criticalSet.has(row.product.id)) return 1;
-                                                if (warningSet.has(row.product.id)) return 2;
-                                                if (regularSet.has(row.product.id)) return 3;
-                                                if (row.deficit > 0) return 4;
-                                                if (row.isExcessStock) return 5;
-                                                if (row.isDeadStock) return 6;
-                                                return 99;
-                                            };
-
-                                            let displayList = [...analyzedInventory];
-
-                                            if (activeTagFilters.length > 0) {
-                                                displayList = displayList.filter(row => {
-                                                    const tags: string[] = [];
-                                                    if (criticalSet.has(row.product.id)) tags.push('선발주');
-                                                    if (warningSet.has(row.product.id)) tags.push('일반');
-                                                    if (regularSet.has(row.product.id)) tags.push('정기발주');
-                                                    if (row.deficit > 0) tags.push('부족');
-                                                    if (row.isExcessStock) tags.push('과잉');
-                                                    if (row.isDeadStock) tags.push('악성');
-                                                    
-                                                    // Show row if it has AT LEAST ONE of the active filters
-                                                    return activeTagFilters.some(filterTag => tags.includes(filterTag));
-                                                });
-                                            }
-                                            
-                                            // Apply statusRank sorting if selected
-                                            if (sortConfig.key === 'statusRank') {
-                                                const dir = sortConfig.direction === 'asc' ? 1 : -1;
-                                                displayList.sort((a, b) => {
-                                                    const rankA = getStatusRank(a);
-                                                    const rankB = getStatusRank(b);
-                                                    if (rankA !== rankB) return (rankA - rankB) * dir;
-                                                    return a.product.id.localeCompare(b.product.id);
-                                                });
-                                            }
-
-                                            if (displayList.length === 0) {
-                                                return <tr><td colSpan={11} className="py-10 text-center text-slate-400 font-medium">해당 조건에 맞는 품목이 없습니다.</td></tr>;
-                                            }
-
-                                            return displayList.slice(0, 500).map(row => {
-                                                const rowTags = [];
-                                                if (criticalSet.has(row.product.id)) rowTags.push({ label: '선발주', className: 'bg-rose-100 text-rose-700 border border-rose-200' });
-                                                if (warningSet.has(row.product.id)) rowTags.push({ label: '일반', className: 'bg-amber-100 text-amber-700 border border-amber-200' });
-                                                if (regularSet.has(row.product.id)) rowTags.push({ label: '정기발주', className: 'bg-indigo-100 text-indigo-700 border border-indigo-200' });
-                                                if (row.deficit > 0) rowTags.push({ label: '부족', className: 'bg-red-50 text-red-600 border border-red-100' });
-                                                if (row.isExcessStock) rowTags.push({ label: '과잉', className: 'bg-orange-100 text-orange-600 border border-orange-100' });
-                                                if (row.isDeadStock) rowTags.push({ label: '악성', className: 'bg-slate-100 text-slate-500 border border-slate-200' });
-
-                                                return (
-                                                <tr key={row.product.id} className={`hover:bg-slate-50 group ${selectedAllTableIds.has(row.product.id) ? 'bg-indigo-50/50' : ''}`}>
-                                                <td className="px-3 py-2 text-center border-r border-slate-100">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        aria-label={`${row.product.id} 품목 선택`}
-                                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                                                        checked={selectedAllTableIds.has(row.product.id)}
-                                                        onChange={(e) => {
-                                                            setSelectedAllTableIds(prev => {
-                                                                const next = new Set(prev);
-                                                                if (e.target.checked) next.add(row.product.id);
-                                                                else next.delete(row.product.id);
-                                                                return next;
-                                                            });
-                                                        }}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    />
-                                                </td>
+                                        {analyzedInventory.slice(0, 500).map(row => (
+                                            <tr key={row.product.id} className="hover:bg-slate-50 group">
                                                 <td className="px-4 py-2 font-mono font-bold text-slate-700">
-                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span 
-                                                            className="cursor-pointer hover:text-indigo-600 hover:underline transition-colors"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setSelectedIntelligenceItem({ id: row.product.id, name: row.product.name, row: row });
-                                                            }}
-                                                            title="아이템 인텔리전스 분석 보기"
-                                                        >
-                                                            {row.product.id === 'UNKNOWN' && row.product.name ? `UNKNOWN (${row.product.name})` : row.product.id}
-                                                        </span>
-                                                        {rowTags.map((tag, idx) => (
-                                                            <span 
-                                                                key={idx} 
-                                                                className={`text-[9px] px-1 py-0.5 rounded font-black tracking-tight cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-indigo-300 transition ${tag.className} ${activeTagFilters.includes(tag.label) ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    toggleTagFilter(tag.label);
-                                                                }}
-                                                                title="클릭하여 필터 토글"
-                                                            >
-                                                                {tag.label}
-                                                            </span>
-                                                        ))}
-                                                    </div>
+                                                    {row.product.id}
+                                                    {row.isExcessStock && <span className="ml-1 text-[9px] bg-orange-100 text-orange-600 px-1 rounded font-bold">과잉</span>}
                                                 </td>
                                                 <td className="px-4 py-2 text-center">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-black ${
@@ -2835,14 +2405,15 @@ export default function SihwaInventory() {
                                                     }`} title="종합 건전성 등급">{row.healthGrade}급</span>
                                                 </td>
                                                 <td className="px-4 py-2 text-center">
-                                                {row.healthGrade !== 'N' ? (
+                                                {row.turnoverGrade !== 'N' ? (
                                                     <div className="flex flex-col items-center">
                                                     <span className={`text-[10px] font-black px-1.5 rounded ${
-                                                        row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
-                                                        row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
-                                                        row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
+                                                        row.turnoverGrade === 'S' ? 'bg-purple-100 text-purple-700' :
+                                                        row.turnoverGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                        row.turnoverGrade === 'B' ? 'bg-amber-100 text-amber-700' :
+                                                        row.turnoverGrade === 'C' ? 'bg-blue-100 text-blue-600' :
                                                         'bg-rose-100 text-rose-500'
-                                                    }`}>{row.healthGrade}급</span>
+                                                    }`}>{row.turnoverGrade}급</span>
                                                     <span className="text-[10px] font-mono text-slate-400 mt-0.5">
                                                         {row.turnoverRate > 0 ? `${row.turnoverRate}x` : ''}
                                                     </span>
@@ -2850,33 +2421,22 @@ export default function SihwaInventory() {
                                                 ) : <span className="text-slate-200">—</span>}
                                                 </td>
                                                 <td className="px-4 py-2 text-center text-slate-600">
-                                                    <div className="flex flex-col items-center gap-1">
-                                                        <span className="font-black text-slate-800 text-[12px]">
-                                                            {row.recent60dSales.toLocaleString()}<span className="text-[10px] text-slate-500 font-bold ml-0.5 mr-1">개 /</span>{row.recent60dOrderCount.toLocaleString()}<span className="text-[10px] text-slate-500 font-bold ml-0.5">회출고</span>
-                                                        </span>
-                                                        <div className="flex items-center gap-1 text-[10px] bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 shadow-sm">
-                                                            <span className="text-slate-500 font-bold">견적</span><span className="font-black text-indigo-600">{row.quoteCount.toLocaleString()}</span><span className="text-slate-400">건</span>
-                                                            <span className="w-px h-2.5 bg-slate-300 mx-0.5"></span>
-                                                            <span className="text-slate-500 font-bold">발주</span><span className="font-black text-emerald-600">{row.recent60dOrderCount.toLocaleString()}</span><span className="text-slate-400">건</span>
-                                                        </div>
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="font-black text-slate-800">{row.recent60dSales} <span className="text-[9px] text-slate-400">판매</span></span>
+                                                        <span className="font-bold text-indigo-500 text-[10px]">{row.quoteCount} <span className="text-[9px] text-indigo-300">견적</span></span>
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-2 text-right text-slate-600">
                                                     {row.salesVolume > 0 ? (
-                                                        <span><span className="font-bold text-slate-800">{row.salesVolume.toLocaleString()}</span> <span className="text-[10px] text-slate-500">({row.salesFreq.toLocaleString()}회)</span></span>
+                                                        <span><span className="font-bold text-slate-800">{row.salesVolume}</span> <span className="text-[10px] text-slate-500">({row.salesFreq}회)</span></span>
                                                     ) : '-'}
                                                 </td>
                                                 <td className="px-4 py-2 text-right font-black font-mono text-indigo-600 bg-indigo-50/20">
-                                                    <div className="flex flex-col items-end gap-0.5">
-                                                        <span>{row.shQty.toLocaleString()}</span>
-                                                        <span className="text-[10px] font-normal tracking-tight text-slate-500">적정: {row.safeStock.toLocaleString()}개</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-2 text-right font-bold font-mono text-rose-500">
-                                                    {row.pendingOrderQty > 0 ? `+${row.pendingOrderQty.toLocaleString()}` : <span className="text-slate-300">0</span>}
+                                                    {row.shQty}
+                                                    {row.pendingOrderQty > 0 && <span className="text-[9px] text-rose-400 ml-1">(+{row.pendingOrderQty})</span>}
                                                 </td>
                                                 <td className="px-4 py-2 text-center font-bold font-mono text-slate-500">
-                                                    {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty.toLocaleString()}</span> : <span className="text-rose-400">0</span>}
+                                                    {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty}</span> : <span className="text-rose-400">0</span>}
                                                 </td>
                                                 <td className="px-4 py-2 text-right font-mono text-xs">
                                                 <span className={
@@ -2891,7 +2451,7 @@ export default function SihwaInventory() {
                                                 </span>
                                                 </td>
                                                 <td className="px-4 py-2 text-right font-black text-rose-600 bg-rose-50/30">
-                                                    {row.deficit > 0 ? `-${row.deficit.toLocaleString()}개` : <span className="text-slate-300 font-normal">충분</span>}
+                                                    {row.deficit > 0 ? `-${row.deficit}개` : <span className="text-slate-300 font-normal">충분</span>}
                                                 </td>
                                                 <td className="px-4 py-2 text-right">
                                                     <div className="flex flex-col items-end">
@@ -2900,39 +2460,13 @@ export default function SihwaInventory() {
                                                     </div>
                                                 </td>
                                             </tr>
-                                            );
-                                        });
-                                        })()}
+                                        ))}
                                     </tbody>
                                 </table>
-                                {selectedAllTableIds.size > 0 && (
-                                    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 rounded-full shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] border border-slate-700 px-6 py-3 flex items-center gap-6 z-100 animate-in slide-in-from-bottom-10 fade-in duration-300">
-                                        <div className="font-bold text-white">
-                                            <span className="text-indigo-400 font-black text-xl">{selectedAllTableIds.size}</span>
-                                            <span className="text-slate-300 ml-2">개 품목 선택됨</span>
-                                        </div>
-                                        <div className="w-px h-6 bg-slate-600"></div>
-                                        <button 
-                                            onClick={handleCreateManualOrder}
-                                            className="bg-indigo-500 hover:bg-indigo-400 text-white font-bold px-6 py-2.5 rounded-full transition-colors shadow-lg flex items-center gap-2 border border-indigo-400"
-                                        >
-                                            <PackageSearch className="w-4 h-4" />
-                                            선택 품목 장바구니에 담기
-                                        </button>
-                                        <button 
-                                            onClick={() => setSelectedAllTableIds(new Set())}
-                                            className="text-slate-400 hover:text-white transition-colors"
-                                            title="선택 해제"
-                                        >
-                                            <X className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                )}
-                                </div>
                             )}
                             
 {/* ════════════════════════════════════════════════
-    🩺 악성·과잉 재고 진단 탭
+    🩺 재고 건전성 진단 탭
 ════════════════════════════════════════════════ */}
 {activeTab === 'HEALTH_DIAGNOSIS' && (
   <div className="space-y-5 p-4 md:p-0 pb-8 animate-in fade-in duration-300">
@@ -3020,7 +2554,7 @@ export default function SihwaInventory() {
           ))}
         </div>
         {/* KPI 3개 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {[
             { label: '묶인 자금 (악성+과잉)', value: `₩${formatCur(Math.round(healthDiagnosis.lockedCapital / 10000))}만`, color: 'text-rose-600', note:'해소 시 발주 여력 확보' },
             { label: '매출 대비 재고 비율', value: `${(healthDiagnosis.its * 100).toFixed(1)}%`, color: healthDiagnosis.its > HEALTHY_ITS_MAX ? 'text-amber-600' : 'text-green-600', note:'쿠팡 기준 8~12%' },
@@ -3042,7 +2576,7 @@ export default function SihwaInventory() {
         { id: 'DEAD', emoji:'☠️', label:'악성재고 품목', value:`${healthDiagnosis.deadStockItems.length}개`, sub:'90일+ 무판매 or 0.5x미만', color:'rose', border:'border-rose-400', amount: healthDiagnosis.deadStockValue },
         { id: 'EXCESS', emoji:'📦', label:'과잉재고 품목', value:`${healthDiagnosis.excessStockItems.length}개`, sub:'목표재고 200%+ 초과', color:'orange', border:'border-orange-400', amount: healthDiagnosis.excessStockValue },
         { id: 'SLOW', emoji:'🐌', label:'부진재고 품목', value:`${healthDiagnosis.slowMoveItems.length}개`, sub:'D등급·잔여 90~180일', color:'purple', border:'border-purple-400', amount: healthDiagnosis.slowMoveValue },
-        { id: 'MISSED', emoji:'🔍', label:'결품 기회손실', value:`${healthDiagnosis.missedDemandList.length}건`, sub:'견적/미결/취소 종합', color:'blue', border:'border-blue-400' },
+        { id: 'MISSED', emoji:'🔍', label:'결품 기회손실', value:`${healthDiagnosis.missedDemandList.filter(m=>m.count>=2).length}건↑`, sub:'2회↑ 취소·철회 감지', color:'blue', border:'border-blue-400' },
         { id: 'URGENT', emoji:'💡', label:'즉시 처분 권장', value:`${healthDiagnosis.urgentDisposalItems.length}개`, sub:'대경반품 or 단가인하', color:'teal', border:'border-teal-400' },
       ].map(k => (
         <button 
@@ -3106,12 +2640,7 @@ export default function SihwaInventory() {
 
                 return (
                   <tr key={row.product.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2">
-                        <div className="flex items-center gap-2">
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
-                            <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
-                        </div>
-                    </td>
+                    <td className="px-4 py-2 font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</td>
                     <td className="px-4 py-2 text-right">
                       <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${daysSince > 180 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
                         {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
@@ -3120,9 +2649,9 @@ export default function SihwaInventory() {
                     <td className="px-4 py-2 text-right font-mono font-bold text-rose-600">
                       {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '0x'}
                     </td>
-                    <td className="px-4 py-2 text-right font-bold">{row.shQty.toLocaleString()}개</td>
+                    <td className="px-4 py-2 text-right font-bold">{row.shQty}개</td>
                     <td className="px-4 py-2 text-right font-black text-rose-600">{formatCur(itemValue)}원</td>
-                    <td className="px-4 py-2 text-right text-slate-400">{row.ysQty.toLocaleString()}개</td>
+                    <td className="px-4 py-2 text-right text-slate-400">{row.ysQty}개</td>
                     <td className="px-4 py-2">
                       <button 
                         onClick={() => {
@@ -3163,8 +2692,7 @@ export default function SihwaInventory() {
           <table className="w-full text-xs text-left whitespace-nowrap">
             <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100">
               <tr>
-                <th className="px-4 py-2">품목코드 (등급)</th>
-                <th className="px-4 py-2">분석근거 (과잉 사유)</th>
+                <th className="px-4 py-2">품목코드</th>
                 <th className="px-4 py-2 text-right">현재고</th>
                 <th className="px-4 py-2 text-right">목표재고</th>
                 <th className="px-4 py-2 text-right">초과량</th>
@@ -3179,36 +2707,20 @@ export default function SihwaInventory() {
                 .map(row => {
                   const excessQty   = (row._excessQty   || 0);
                   const excessValue = (row._excessValue  || 0);
-                  const action = excessQty > row.safeStock
+                  const action = excessQty > row.targetStockByTurnover
                     ? '장기 발주 중단'
                     : '이번 달 발주 보류';
-                  const actionColor = excessQty > row.safeStock
+                  const actionColor = excessQty > row.targetStockByTurnover
                     ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
                     : 'bg-blue-100 text-blue-700 hover:bg-blue-200';
 
                   return (
                     <tr key={row.product.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-2">
-                          <div className="flex items-center gap-2">
-                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
-                              <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
-                          </div>
-                      </td>
-                      <td className="px-4 py-2">
-                          <div className="flex flex-col gap-0.5">
-                              <div className="text-[11px] font-bold text-orange-700 flex items-center gap-1">
-                                  <Info className="w-3 h-3" />
-                                  {row.daysOnHand > 180 ? '장기 체화 (잔여 180일 초과)' : `목표재고(${row.safeStock}개) 대비 과잉`}
-                              </div>
-                              <div className="text-[10px] text-slate-500">
-                                  최근 판매: <strong className="text-indigo-600">{row.recent60dSales}개(60일)</strong> / 연 총 {row.salesVolume}개
-                              </div>
-                          </div>
-                      </td>
-                      <td className="px-4 py-2 text-right font-black text-orange-600">{row.shQty.toLocaleString()}개</td>
-                      <td className="px-4 py-2 text-right text-slate-400">{row.safeStock.toLocaleString()}개</td>
+                      <td className="px-4 py-2 font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</td>
+                      <td className="px-4 py-2 text-right font-black text-orange-600">{row.shQty}개</td>
+                      <td className="px-4 py-2 text-right text-slate-400">{row.targetStockByTurnover || row.safeStock}개</td>
                       <td className="px-4 py-2 text-right">
-                        <span className="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-[9px] font-bold">+{excessQty.toLocaleString()}개</span>
+                        <span className="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-[9px] font-bold">+{excessQty}개</span>
                       </td>
                       <td className="px-4 py-2 text-right font-bold text-orange-600">{formatCur(excessValue)}원</td>
                       <td className="px-4 py-2 text-right font-mono font-bold text-amber-600">
@@ -3243,8 +2755,8 @@ export default function SihwaInventory() {
       <div className="bg-white rounded-2xl border border-purple-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3 bg-purple-50 border-b border-purple-200 flex items-center justify-between">
           <div>
-            <div className="text-sm font-black text-purple-800">🐌 정체재고 상세 (장기 미판매)</div>
-            <div className="text-[10px] text-purple-500 mt-0.5">D등급이면서 잔여일 90일~180일 품목 (악성재고 전환 주의)</div>
+            <div className="text-sm font-black text-purple-800">🐌 부진재고 상세</div>
+            <div className="text-[10px] text-purple-500 mt-0.5">D등급이면서 잔여일 90일~180일 품목</div>
           </div>
           <span className="bg-purple-200 text-purple-800 font-black px-3 py-1 rounded-full text-xs">
             {healthDiagnosis.slowMoveItems.length}건
@@ -3269,12 +2781,7 @@ export default function SihwaInventory() {
 
                 return (
                   <tr key={row.product.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2">
-                        <div className="flex items-center gap-2">
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
-                            <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
-                        </div>
-                    </td>
+                    <td className="px-4 py-2 font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</td>
                     <td className="px-4 py-2 text-right">
                       <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700`}>
                         {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
@@ -3283,7 +2790,7 @@ export default function SihwaInventory() {
                     <td className="px-4 py-2 text-right font-mono font-bold text-purple-600">
                       {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '0x'}
                     </td>
-                    <td className="px-4 py-2 text-right font-bold">{row.shQty.toLocaleString()}개</td>
+                    <td className="px-4 py-2 text-right font-bold">{row.shQty}개</td>
                     <td className="px-4 py-2 text-right font-black text-purple-600">{formatCur(itemValue)}원</td>
                     <td className="px-4 py-2 text-right font-mono font-bold text-amber-600">
                         {row.daysOnHand === 9999 ? '∞' : `${Math.round(row.daysOnHand)}일`}
@@ -3341,20 +2848,15 @@ export default function SihwaInventory() {
 
                 return (
                   <tr key={row.product.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2">
-                        <div className="flex items-center gap-2">
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
-                            <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
-                        </div>
-                    </td>
+                    <td className="px-4 py-2 font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</td>
                     <td className="px-4 py-2 text-right">
                       <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${daysSince > 180 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
                         {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-right font-bold">{row.shQty.toLocaleString()}개</td>
+                    <td className="px-4 py-2 text-right font-bold">{row.shQty}개</td>
                     <td className="px-4 py-2 text-right font-black text-rose-600">{formatCur(itemValue)}원</td>
-                    <td className="px-4 py-2 text-right text-slate-400">{row.ysQty.toLocaleString()}개</td>
+                    <td className="px-4 py-2 text-right text-slate-400">{row.ysQty}개</td>
                     <td className="px-4 py-2">
                       <button 
                         onClick={() => {
@@ -3382,7 +2884,7 @@ export default function SihwaInventory() {
 
     {/* ── 섹션 4: 결품 기회손실 ── */}
     {(!selectedHealthCategory || selectedHealthCategory === 'MISSED') && healthDiagnosis.missedDemandList.length > 0 && (
-      <div id="missed-demand-section" className="bg-white rounded-2xl border border-violet-200 shadow-sm overflow-hidden mt-4">
+      <div className="bg-white rounded-2xl border border-violet-200 shadow-sm overflow-hidden mt-4">
         <div className="px-5 py-3 bg-violet-50 border-b border-violet-200 flex items-center justify-between">
           <div>
             <div className="text-sm font-black text-violet-800">
@@ -3407,7 +2909,6 @@ export default function SihwaInventory() {
                 <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${m.count >= 3 ? 'bg-rose-200 text-rose-700' : 'bg-violet-200 text-violet-700'}`}>
                   {m.count}회 결품
                 </span>
-                {m.row && <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ml-auto ${m.row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : m.row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : m.row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : m.row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : m.row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{m.row.healthGrade}급</span>}
               </div>
               <div className="text-[10px] font-bold text-slate-800 font-mono leading-tight break-all mb-1">{m.id}</div>
               <div className="text-[9px] text-slate-500">추정손실 ₩{formatCur(Math.round(m.estimatedRevenue / 10000))}만</div>
@@ -3506,14 +3007,6 @@ export default function SihwaInventory() {
                 return null;
             })()}
             
-            {selectedIntelligenceItem && (
-                <ItemIntelligenceCard
-                    productId={selectedIntelligenceItem.id}
-                    productName={selectedIntelligenceItem.name}
-                    inventoryData={selectedIntelligenceItem.row}
-                    onClose={() => setSelectedIntelligenceItem(null)}
-                />
-            )}
         </div>
     );
 }
