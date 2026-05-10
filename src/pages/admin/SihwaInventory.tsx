@@ -1043,26 +1043,44 @@ export default function SihwaInventory() {
         const regular = analyzedInventory
             .filter(r => r.statusCategory === 'SAFE' && r.salesFreq >= 20)
             .filter(r => !(r.product.material || '').toLowerCase().startsWith('wp'))
+            // [수정] 건전성 등급이 A, B급인 우량 품목만 정기 발주 대상으로 한정
+            .filter(r => r.healthGrade === 'A' || r.healthGrade === 'B')
             .map(r => {
-                // 정기발주 예측은 2달(40영업일) 정도의 소요량을 계산하여 볼륨네고를 하기 위해 필요한 수량
-                const twoMonthDemand = Math.ceil(r.dailyAvgSales * 40);
-                let recommendedQty = twoMonthDemand - r.effectiveStock;
+                // A급은 3개월치(60영업일), B급은 2개월치(40영업일) 예상 소요량 확보
+                const targetDays = r.healthGrade === 'A' ? 60 : 40;
+                let targetDemand = Math.ceil(r.dailyAvgSales * targetDays);
+                
+                // 1회 출고량(Average Order Size)을 하한선으로 고려
+                if (r.salesFreq > 0) {
+                    const avgOrderSize = r.salesVolume / r.salesFreq;
+                    targetDemand = Math.max(targetDemand, Math.ceil(avgOrderSize * (r.healthGrade === 'A' ? 2 : 1.5)));
+                }
+
+                let recommendedQty = targetDemand - r.effectiveStock;
                 
                 // 과잉재고인 경우이거나 대경 재고가 이미 많은 경우 발주 추천 차단
-                if (r.isExcessStock || r.ysQty >= 500) {
+                if (r.isExcessStock || r.ysQty >= 300) {
                     recommendedQty = 0;
                 } else if (recommendedQty > 0) {
+                    // 기본 10단위 반올림
                     recommendedQty = Math.ceil(recommendedQty / 10) * 10;
-                    if (recommendedQty < 50) recommendedQty = 50;
-                    if (recommendedQty > 500) recommendedQty = 500;
+                    if (recommendedQty === 0) recommendedQty = 10;
+                    
+                    const sizeNum = parseInt((r.product.size || '').replace(/[^0-9]/g, ''), 10);
+                    
+                    // 큰 구경 (100A 이상) - 비현실적인 대량 구매 방지
+                    if (!isNaN(sizeNum) && sizeNum >= 100) {
+                        const maxCap = sizeNum >= 300 ? 10 : sizeNum >= 200 ? 20 : sizeNum >= 150 ? 30 : 50;
+                        if (recommendedQty > maxCap) recommendedQty = maxCap;
+                    } else {
+                        // 작은 구경 (100A 미만) - A급 품목은 묶음 구매 장려 (최소 30개)
+                        if (r.healthGrade === 'A' && recommendedQty < 30) {
+                            recommendedQty = 30;
+                        }
+                        if (recommendedQty > 500) recommendedQty = 500; // 절대 캡 유지
+                    }
                 } else {
                     recommendedQty = 0;
-                }
-                
-                const sizeNum = parseInt((r.product.size || '').replace(/[^0-9]/g, ''), 10);
-                if (!isNaN(sizeNum) && sizeNum >= 100) {
-                    const dynamicCap = Math.max(100, Math.ceil(r.salesVolume / 4));
-                    recommendedQty = recommendedQty > 0 ? Math.min(dynamicCap, recommendedQty) : 0;
                 }
                 
                 return { ...r, recommendedQty };
