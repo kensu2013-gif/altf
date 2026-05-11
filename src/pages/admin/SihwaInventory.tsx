@@ -404,37 +404,59 @@ export default function SihwaInventory() {
         const monthlyOrders = sihwaOrders.filter(o => new Date(o.createdAt).toISOString().slice(0, 7) === selectedMonth);
 
         let completedCost = 0;
-        let pendingCost = 0;
         let completedCount = 0;
-        let pendingCount = 0;
 
         monthlyOrders.forEach(o => {
             const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
 
             items.forEach(item => {
-                const id = item.productId || (item as { item_id?: string }).item_id || '';
-                const product = inventoryMap.get(id);
-                const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
-                let cost = 0;
-                if (item.supplierRate !== undefined) {
-                    cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
-                } else if (product) {
-                    const rate = product.rate_act2 ?? product.rate_act ?? product.rate_pct ?? 0;
-                    cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
-                }
-                const itemQty = Number(item.quantity ?? item.qty ?? 0);
-
                 if (o.status === 'COMPLETED' || item.transactionIssued) {
+                    const id = item.productId || (item as { item_id?: string }).item_id || '';
+                    const product = inventoryMap.get(id);
+                    const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
+                    let cost = 0;
+                    if (item.supplierRate !== undefined) {
+                        cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
+                    } else if (product) {
+                        const rate = product.rate_act2 ?? product.rate_act ?? product.rate_pct ?? 0;
+                        cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+                    }
+                    const itemQty = Number(item.quantity ?? item.qty ?? 0);
                     completedCost += (cost * itemQty);
-                } else {
-                    pendingCost += (cost * itemQty);
                 }
             });
 
             if (o.status === 'COMPLETED' || (items.length > 0 && items.every(i => i.transactionIssued))) {
                 completedCount++;
-            } else {
+            }
+        });
+
+        // Pending cost and count should reflect ALL outstanding orders, not just the selected month.
+        let pendingCost = 0;
+        let pendingCount = 0;
+        
+        sihwaOrders.forEach(o => {
+            const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
+            const isOrderFullyCompleted = o.status === 'COMPLETED' || (items.length > 0 && items.every(i => i.transactionIssued));
+            
+            if (!isOrderFullyCompleted) {
                 pendingCount++;
+                items.forEach(item => {
+                    if (o.status !== 'COMPLETED' && !item.transactionIssued) {
+                        const id = item.productId || (item as { item_id?: string }).item_id || '';
+                        const product = inventoryMap.get(id);
+                        const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
+                        let cost = 0;
+                        if (item.supplierRate !== undefined) {
+                            cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
+                        } else if (product) {
+                            const rate = product.rate_act2 ?? product.rate_act ?? product.rate_pct ?? 0;
+                            cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+                        }
+                        const itemQty = Number(item.quantity ?? item.qty ?? 0);
+                        pendingCost += (cost * itemQty);
+                    }
+                });
             }
         });
 
@@ -2303,7 +2325,7 @@ export default function SihwaInventory() {
                                                 <div className="bg-white p-4 rounded-xl border border-rose-100 shadow-sm relative overflow-hidden">
                                                     <div className="flex items-center gap-2 mb-2 text-rose-500">
                                                         <TrendingUp className="w-4 h-4" />
-                                                        <span className="font-bold text-sm">발주 대기 (PENDING - 입고예정)</span>
+                                                        <span className="font-bold text-sm">전체 발주 대기 (PENDING - 누적)</span>
                                                     </div>
                                                     <div className="text-3xl font-black text-rose-600 mb-1">
                                                         {formatCur(monthData.pendingCost)} <span className="text-lg text-rose-300 tracking-normal">원</span>
