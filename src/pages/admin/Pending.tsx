@@ -61,13 +61,13 @@ export default function PendingOrders() {
 
     // --- TEMPORARY DATA RECOVERY FOR 1102 and 817 ---
     const handleFixData = async () => {
-        if (!confirm('1102번과 817번 주문의 미결 데이터를 수정하시겠습니까?')) return;
+        if (!confirm('1102번과 817번 주문의 미결 데이터를 보정하시겠습니까?')) return;
         let count = 0;
         
         const o1102 = orders.find(o => o.poNumber?.endsWith('1102'));
         if (o1102 && o1102.po_items) {
             const updatedPoItems = o1102.po_items.map(item => {
-                if (item.name === 'R(C)' && item.quantity === 20 && item.transactionIssued) {
+                if (item.quantity === 20 && (item.size?.includes('50A X 40A') || item.size?.includes('80A X 50A'))) {
                     return { ...item, transactionIssued: false };
                 }
                 return item;
@@ -397,7 +397,7 @@ export default function PendingOrders() {
                     </h1>
                     {user?.role === 'MASTER' && (
                         <button onClick={handleFixData} className="px-3 py-1 bg-rose-600 text-white text-xs rounded shadow hover:bg-rose-700 transition-colors">
-                            오류데이터 복구 (1102, 817)
+                            데이터 보정 (1102, 817)
                         </button>
                     )}
                 </div>
