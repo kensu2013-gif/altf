@@ -62,36 +62,42 @@ export default function PendingOrders() {
     // --- TEMPORARY DATA RECOVERY FOR 1102 and 817 ---
     const handleFixData = async () => {
         if (!confirm('1102번과 817번 주문의 미결 데이터를 보정하시겠습니까?')) return;
-        let count = 0;
-        
-        const o1102 = orders.find(o => o.poNumber?.endsWith('1102'));
-        if (o1102 && o1102.po_items) {
-            const updatedPoItems = o1102.po_items.map(item => {
-                if (item.quantity === 20 && (item.size?.includes('50A X 40A') || item.size?.includes('80A X 50A'))) {
-                    return { ...item, transactionIssued: false };
-                }
-                return item;
-            });
-            const newStatus = o1102.poSent ? 'SHIPPED' : 'PROCESSING';
-            await updateOrder(o1102.id, { po_items: updatedPoItems, status: newStatus });
-            count++;
-        }
+        try {
+            let count = 0;
+            
+            const o1102 = orders.find(o => o.poNumber?.endsWith('1102'));
+            if (o1102 && o1102.po_items) {
+                const updatedPoItems = o1102.po_items.map(item => {
+                    const specString = `${item.name || ''} ${item.size || ''}`.toUpperCase();
+                    if (item.quantity === 20 && (specString.includes('50A X 40A') || specString.includes('80A X 50A'))) {
+                        return { ...item, transactionIssued: false };
+                    }
+                    return item;
+                });
+                const newStatus = o1102.poSent ? 'SHIPPED' : 'PROCESSING';
+                await updateOrder(o1102.id, { po_items: updatedPoItems, status: newStatus });
+                count++;
+            }
 
-        const o817 = orders.find(o => o.poNumber?.endsWith('817'));
-        if (o817 && o817.po_items) {
-            const updatedPoItems = o817.po_items.map(item => {
-                if (item.name.toLowerCase().includes('r(e)') && item.size?.includes('5') && item.size?.includes('4') && !item.transactionIssued) {
-                    return { ...item, transactionIssued: true };
-                }
-                return item;
-            });
-            const allTxIssued = updatedPoItems.length > 0 && updatedPoItems.every(i => i.transactionIssued);
-            const newStatus = (allTxIssued && o817.poSent) ? 'COMPLETED' : o817.status;
-            await updateOrder(o817.id, { po_items: updatedPoItems, status: newStatus });
-            count++;
+            const o817 = orders.find(o => o.poNumber?.endsWith('817'));
+            if (o817 && o817.po_items) {
+                const updatedPoItems = o817.po_items.map(item => {
+                    if ((item.name || '').toLowerCase().includes('r(e)') && item.size?.includes('5') && item.size?.includes('4') && !item.transactionIssued) {
+                        return { ...item, transactionIssued: true };
+                    }
+                    return item;
+                });
+                const allTxIssued = updatedPoItems.length > 0 && updatedPoItems.every(i => i.transactionIssued);
+                const newStatus = (allTxIssued && o817.poSent) ? 'COMPLETED' : o817.status;
+                await updateOrder(o817.id, { po_items: updatedPoItems, status: newStatus });
+                count++;
+            }
+            
+            alert(`데이터 보정 완료 (${count}건 수정됨). 변경된 내용이 반영될 수 있도록 잠시 후 페이지를 새로고침해주세요.`);
+        } catch (error: any) {
+            console.error(error);
+            alert(`오류 발생: ${error.message}`);
         }
-        
-        alert(`데이터 복구 완료 (${count}건 수정됨). 새로고침해주세요.`);
     };
     // ------------------------------------------------
     const [newComment, setNewComment] = useState('');
