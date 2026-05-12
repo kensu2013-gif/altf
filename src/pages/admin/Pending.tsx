@@ -94,9 +94,9 @@ export default function PendingOrders() {
             }
             
             alert(`데이터 보정 완료 (${count}건 수정됨). 변경된 내용이 반영될 수 있도록 잠시 후 페이지를 새로고침해주세요.`);
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            alert(`오류 발생: ${error.message}`);
+            alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
         }
     };
     // ------------------------------------------------
