@@ -2355,12 +2355,18 @@ export default function SihwaInventory() {
 
                                                             const filteredDiff = (snap.diff || []).filter(d => {
                                                                 const product = inventory.find(p => p.id === d.id);
-                                                                return product && product.location === '시화' && product.maker === '대경';
+                                                                if (!product) return false;
+                                                                const isSihwa = product.location === '시화' || product.location1 === '시화';
+                                                                const isDaekyung = product.maker === '대경' || product.maker1 === '대경';
+                                                                return isSihwa && isDaekyung;
                                                             });
 
                                                             const filteredPending = (dailyPendingMap[snap.date] || []).filter(pi => {
                                                                 const product = inventory.find(p => p.id === pi.id);
-                                                                return product && product.location === '시화' && product.maker === '대경';
+                                                                if (!product) return false;
+                                                                const isSihwa = product.location === '시화' || product.location1 === '시화';
+                                                                const isDaekyung = product.maker === '대경' || product.maker1 === '대경';
+                                                                return isSihwa && isDaekyung;
                                                             });
 
                                                             let validCount = 0;
