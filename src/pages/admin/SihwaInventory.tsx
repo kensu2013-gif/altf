@@ -2353,9 +2353,19 @@ export default function SihwaInventory() {
                                                             let dailyRevenue = 0;
                                                             let dailyCost = 0;
 
+                                                            const filteredDiff = (snap.diff || []).filter(d => {
+                                                                const product = inventory.find(p => p.id === d.id);
+                                                                return product && product.location === '시화' && product.maker === '대경';
+                                                            });
+
+                                                            const filteredPending = (dailyPendingMap[snap.date] || []).filter(pi => {
+                                                                const product = inventory.find(p => p.id === pi.id);
+                                                                return product && product.location === '시화' && product.maker === '대경';
+                                                            });
+
                                                             let validCount = 0;
-                                                            if (snap.diff) {
-                                                                snap.diff.forEach((d: InventoryDiffItem) => {
+                                                            if (filteredDiff.length > 0) {
+                                                                filteredDiff.forEach((d: InventoryDiffItem) => {
                                                                     const orderImpact = dailyOrderDiffMap[snap.date]?.[d.id] || 0;
                                                                     const pureManualChange = d.change - orderImpact;
 
@@ -2363,7 +2373,6 @@ export default function SihwaInventory() {
 
                                                                     const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
 
-                                                                    // Use actual physical change `d.change` for revenue and cost
                                                                     const physicalChange = d.change;
                                                                     const effectiveSales = d.sales !== undefined ? d.sales : (physicalChange < 0 ? Math.abs(physicalChange) : 0);
                                                                     if (effectiveSales > 0) {
@@ -2379,9 +2388,9 @@ export default function SihwaInventory() {
 
                                                             const isGroupExpanded = expandedDailyGroups[snap.date] ?? (idx === 0);
 
-                                                                            const itemsToRender = snap.diff || [];
-                                                                            const pendingItemsToRender = dailyPendingMap[snap.date] || [];
-                                                                            const totalChangeCount = itemsToRender.length + pendingItemsToRender.length;
+                                                            const itemsToRender = filteredDiff;
+                                                            const pendingItemsToRender = filteredPending;
+                                                            const totalChangeCount = itemsToRender.length + pendingItemsToRender.length;
 
                                                                             return (
                                                                                 <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
