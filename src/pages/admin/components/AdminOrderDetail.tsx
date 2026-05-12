@@ -516,7 +516,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     };
 
     const handleAddItem = () => {
-        setDisplayedItems([...displayedItems, {
+        const newItem = {
             id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             productId: null,
             name: '',
@@ -527,13 +527,25 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             unitPrice: 0,
             amount: 0,
             isVerified: false
-        }]);
+        };
+        setDisplayedItems([...displayedItems, newItem]);
+        if (isSupplierMode) {
+            setItems(prev => [...prev, newItem]);
+        } else {
+            setPoItems(prev => [...prev, newItem]);
+        }
     };
 
     const handleRemoveItem = (index: number) => {
         if (confirm('품목을 삭제하시겠습니까? (저장 시 반영됩니다)')) {
             const newItems = displayedItems.filter((_, i) => i !== index);
             setDisplayedItems(newItems);
+            
+            if (isSupplierMode) {
+                setItems(prev => prev.filter((_, i) => i !== index));
+            } else {
+                setPoItems(prev => prev.filter((_, i) => i !== index));
+            }
         }
     };
 
@@ -569,6 +581,27 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         // Insert the split item right after the original item
         newItems.splice(index + 1, 0, splitItem);
         setDisplayedItems(newItems);
+        
+        // --- SYNC STRUCTURAL CHANGES TO THE OTHER ARRAY ---
+        if (isSupplierMode) {
+            const newOtherItems = [...items];
+            if (newOtherItems[index]) {
+                const otherItem = newOtherItems[index];
+                newOtherItems[index] = { ...otherItem, quantity: newOriginalQty, amount: otherItem.unitPrice * newOriginalQty };
+                const otherSplitItem = { ...otherItem, id: splitItemId, quantity: splitQty, amount: otherItem.unitPrice * splitQty, transactionIssued: false };
+                newOtherItems.splice(index + 1, 0, otherSplitItem);
+                setItems(newOtherItems);
+            }
+        } else {
+            const newOtherItems = [...poItems];
+            if (newOtherItems[index]) {
+                const otherItem = newOtherItems[index];
+                newOtherItems[index] = { ...otherItem, quantity: newOriginalQty, amount: otherItem.unitPrice * newOriginalQty };
+                const otherSplitItem = { ...otherItem, id: splitItemId, quantity: splitQty, amount: otherItem.unitPrice * splitQty, transactionIssued: false };
+                newOtherItems.splice(index + 1, 0, otherSplitItem);
+                setPoItems(newOtherItems);
+            }
+        }
     };
 
     const handleDownloadPO = () => {
@@ -3048,7 +3081,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                 // Mark the selected items as transaction issued in the PO Items list
                                 const updatedPoItems = enrichedPoItems.map(poItem => {
                                     const isSelectedInCurrentTx = selectedItems.some(si =>
-                                        si.productId === poItem.productId && si.name === poItem.name
+                                        si.id === poItem.id
                                     );
                                     if (isSelectedInCurrentTx) {
                                         return { ...poItem, transactionIssued: true };

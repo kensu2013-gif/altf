@@ -58,6 +58,42 @@ export default function PendingOrders() {
 
     // Comment State
     const [activeCommentItemId, setActiveCommentItemId] = useState<string | null>(null);
+
+    // --- TEMPORARY DATA RECOVERY FOR 1102 and 817 ---
+    const handleFixData = async () => {
+        if (!confirm('1102번과 817번 주문의 미결 데이터를 수정하시겠습니까?')) return;
+        let count = 0;
+        
+        const o1102 = orders.find(o => o.poNumber?.endsWith('1102'));
+        if (o1102 && o1102.po_items) {
+            const updatedPoItems = o1102.po_items.map(item => {
+                if (item.name === 'R(C)' && item.quantity === 20 && item.transactionIssued) {
+                    return { ...item, transactionIssued: false };
+                }
+                return item;
+            });
+            const newStatus = o1102.poSent ? 'SHIPPED' : 'PROCESSING';
+            await updateOrder(o1102.id, { po_items: updatedPoItems, status: newStatus });
+            count++;
+        }
+
+        const o817 = orders.find(o => o.poNumber?.endsWith('817'));
+        if (o817 && o817.po_items) {
+            const updatedPoItems = o817.po_items.map(item => {
+                if (item.name.toLowerCase().includes('r(e)') && item.size?.includes('5') && item.size?.includes('4') && !item.transactionIssued) {
+                    return { ...item, transactionIssued: true };
+                }
+                return item;
+            });
+            const allTxIssued = updatedPoItems.length > 0 && updatedPoItems.every(i => i.transactionIssued);
+            const newStatus = (allTxIssued && o817.poSent) ? 'COMPLETED' : o817.status;
+            await updateOrder(o817.id, { po_items: updatedPoItems, status: newStatus });
+            count++;
+        }
+        
+        alert(`데이터 복구 완료 (${count}건 수정됨). 새로고침해주세요.`);
+    };
+    // ------------------------------------------------
     const [newComment, setNewComment] = useState('');
 
     // Expand State
@@ -354,10 +390,17 @@ export default function PendingOrders() {
     return (
         <CalmPageShell>
             <div className="mb-6 flex flex-col gap-1">
-                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                    <FileText className="w-6 h-6 text-teal-600" />
-                    미결 관리 (Pending Orders)
-                </h1>
+                <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                        <FileText className="w-6 h-6 text-teal-600" />
+                        미결 관리 (Pending Orders)
+                    </h1>
+                    {user?.role === 'MASTER' && (
+                        <button onClick={handleFixData} className="px-3 py-1 bg-rose-600 text-white text-xs rounded shadow hover:bg-rose-700 transition-colors">
+                            오류데이터 복구 (1102, 817)
+                        </button>
+                    )}
+                </div>
                 <p className="text-sm text-slate-500">
                     매입발주서는 발송 완료되었으나 아직 거래명세서가 발행되지 않은 품목(납기 대기) 목록입니다. 납기 임박순으로 표시됩니다.
                 </p>
