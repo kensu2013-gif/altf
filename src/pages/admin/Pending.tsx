@@ -24,6 +24,7 @@ interface PendingItem {
     deliveryDate: string; // Used for "납기 임박" calculation
     comments?: { author: string; timestamp: string; content: string; authorId?: string }[];
     tags?: string[]; // [NEW] Sticker tags
+    isCompleted?: boolean;
 }
 
 interface PendingOrderGroup {
@@ -55,6 +56,7 @@ export default function PendingOrders() {
     const [dateFilter, setDateFilter] = useState<'ALL' | 'URGENT' | 'URGENT_NO_COMMENT'>('URGENT'); // URGENT = <= 7 days
     const [tagFilter, setTagFilter] = useState<string>('ALL'); // [NEW] Tag FILTER
     const [searchManager, setSearchManager] = useState<string>('all');
+    const [includeCompleted, setIncludeCompleted] = useState<boolean>(false);
 
     // Comment State
     const [activeCommentItemId, setActiveCommentItemId] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export default function PendingOrders() {
             if (o1102 && o1102.po_items) {
                 const updatedPoItems = o1102.po_items.map(item => {
                     const specString = `${item.name || ''} ${item.size || ''}`.toUpperCase();
-                    if (item.quantity === 20 && (specString.includes('50A X 40A') || specString.includes('80A X 50A'))) {
+                    if (specString.includes('50A X 40A') || specString.includes('80A X 50A')) {
                         return { ...item, transactionIssued: false };
                     }
                     return item;
@@ -167,7 +169,7 @@ export default function PendingOrders() {
             const targetCustomer = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName;
 
             order.po_items.forEach(poItem => {
-                if (poItem.poSent && !poItem.transactionIssued) {
+                if (poItem.poSent && (includeCompleted || !poItem.transactionIssued)) {
                     itemsList.push({
                         orderId: order.id,
                         poNumber: order.poNumber || 'N/A',
@@ -184,7 +186,8 @@ export default function PendingOrders() {
                         createdAt: order.createdAt,
                         deliveryDate: deliveryDateStr,
                         comments: poItem.comments || [],
-                        tags: poItem.tags || []
+                        tags: poItem.tags || [],
+                        isCompleted: poItem.transactionIssued || false
                     });
                 }
             });
@@ -247,7 +250,7 @@ export default function PendingOrders() {
 
         // Sort by 납기 임박순 (Delivery Date ascending)
         return groups.sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
-    }, [orders, deferredSearchCustomer, deferredSearchPo, dateFilter, tagFilter, searchManager]);
+    }, [orders, deferredSearchCustomer, deferredSearchPo, dateFilter, tagFilter, searchManager, includeCompleted]);
 
     // Handlers
     const handleUpdateManagersForCustomer = async (targetCustomerName: string, managers: { id: string; name: string }[]) => {
@@ -478,7 +481,13 @@ export default function PendingOrders() {
                         ))}
                     </select>
                 </div>
-                <div className="ml-auto">
+                <div className="flex items-center gap-2 shrink-0 ml-auto">
+                    <button
+                        onClick={() => setIncludeCompleted(!includeCompleted)}
+                        className={`px-3 py-1.5 text-xs rounded-lg border transition-colors shadow-sm font-bold flex items-center gap-1.5 ${includeCompleted ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                    >
+                        {includeCompleted ? '완료 항목 숨기기' : '완료 항목 포함 (백업조회)'}
+                    </button>
                     <button
                         onClick={handleExportCSV}
                         className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
@@ -592,6 +601,11 @@ export default function PendingOrders() {
                                                                     <div className="font-bold text-slate-800 text-sm flex items-center gap-1.5 flex-wrap justify-end w-full">
                                                                         {!isFirstRow && <span className="text-slate-300 font-normal absolute left-3 top-4">└</span>}
 
+                                                                        {item.isCompleted && (
+                                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border bg-slate-200 text-slate-500 border-slate-300">
+                                                                                발행 완료
+                                                                            </span>
+                                                                        )}
                                                                         {/* Tags Display */}
                                                                         {item.tags && item.tags.length > 0 && item.tags.map(tag => (
                                                                             <span key={tag} className={`text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border ${tag === '관리' ? 'bg-red-50 text-red-700 border-red-200' : tag === '재고품' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : tag === '사급' ? 'bg-amber-50 text-amber-700 border-amber-200' : tag === '생산중' ? 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' : tag === '출고대기' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
