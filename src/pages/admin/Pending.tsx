@@ -61,46 +61,24 @@ export default function PendingOrders() {
     // Comment State
     const [activeCommentItemId, setActiveCommentItemId] = useState<string | null>(null);
 
-    // --- TEMPORARY DATA RECOVERY FOR 1102 and 817 ---
-    const handleFixData = async () => {
-        if (!confirm('1102번과 817번 주문의 미결 데이터를 보정하시겠습니까?')) return;
+    // Delete Item (MASTER only)
+    const handleDeleteItem = async (orderId: string, itemId: string) => {
+        if (!confirm('정말 이 품목을 미결 발주에서 완전히 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+        
+        const order = orders.find(o => o.id === orderId);
+        if (!order || !order.po_items) return;
+        
+        const updatedPoItems = order.po_items.filter(item => item.id !== itemId);
+        
         try {
-            let count = 0;
-            
-            const o1102 = orders.find(o => o.poNumber?.endsWith('1102'));
-            if (o1102 && o1102.po_items) {
-                const updatedPoItems = o1102.po_items.map(item => {
-                    const specString = `${item.name || ''} ${item.size || ''}`.toUpperCase();
-                    if (specString.includes('50A X 40A') || specString.includes('80A X 50A')) {
-                        return { ...item, transactionIssued: false };
-                    }
-                    return item;
-                });
-                const newStatus = o1102.poSent ? 'SHIPPED' : 'PROCESSING';
-                await updateOrder(o1102.id, { po_items: updatedPoItems, status: newStatus });
-                count++;
-            }
-
-            const o817 = orders.find(o => o.poNumber?.endsWith('817'));
-            if (o817 && o817.po_items) {
-                const updatedPoItems = o817.po_items.map(item => {
-                    if ((item.name || '').toLowerCase().includes('r(e)') && item.size?.includes('5') && item.size?.includes('4') && !item.transactionIssued) {
-                        return { ...item, transactionIssued: true };
-                    }
-                    return item;
-                });
-                const allTxIssued = updatedPoItems.length > 0 && updatedPoItems.every(i => i.transactionIssued);
-                const newStatus = (allTxIssued && o817.poSent) ? 'COMPLETED' : o817.status;
-                await updateOrder(o817.id, { po_items: updatedPoItems, status: newStatus });
-                count++;
-            }
-            
-            alert(`데이터 보정 완료 (${count}건 수정됨). 변경된 내용이 반영될 수 있도록 잠시 후 페이지를 새로고침해주세요.`);
+            await updateOrder(orderId, { po_items: updatedPoItems });
+            alert('성공적으로 삭제되었습니다.');
         } catch (error) {
             console.error(error);
-            alert(`오류 발생: ${error instanceof Error ? error.message : String(error)}`);
+            alert(`삭제 중 오류가 발생했습니다: ${error instanceof Error ? error.message : String(error)}`);
         }
     };
+
     // ------------------------------------------------
     const [newComment, setNewComment] = useState('');
 
@@ -404,11 +382,6 @@ export default function PendingOrders() {
                         <FileText className="w-6 h-6 text-teal-600" />
                         미결 관리 (Pending Orders)
                     </h1>
-                    {user?.role === 'MASTER' && (
-                        <button onClick={handleFixData} className="px-3 py-1 bg-rose-600 text-white text-xs rounded shadow hover:bg-rose-700 transition-colors">
-                            데이터 보정 (1102, 817)
-                        </button>
-                    )}
                 </div>
                 <p className="text-sm text-slate-500">
                     매입발주서는 발송 완료되었으나 아직 거래명세서가 발행되지 않은 품목(납기 대기) 목록입니다. 납기 임박순으로 표시됩니다.
@@ -643,7 +616,18 @@ export default function PendingOrders() {
 
                                                             {/* Quantity */}
                                                             <td className={`px-5 py-4 text-center font-bold text-slate-900 font-mono text-lg ${!isFirstRow ? 'border-t border-slate-100/50' : ''}`}>
-                                                                {item.quantity.toLocaleString()}
+                                                                <div className="flex items-center justify-center gap-2">
+                                                                    {item.quantity.toLocaleString()}
+                                                                    {user?.role === 'MASTER' && (
+                                                                        <button
+                                                                            onClick={() => handleDeleteItem(group.orderId, item.itemId)}
+                                                                            className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                                                            title="품목 완전 삭제 (MASTER)"
+                                                                        >
+                                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             </td>
 
                                                             {/* Comments System */}
