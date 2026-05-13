@@ -84,36 +84,23 @@ export function useInventory() {
                         locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
                     }
                 } else {
-                    // 1. Process Secondary Location (Sihwa) first to get its quantity
-                    let secondaryQty = 0;
+                    // 1. Process Secondary Location (Sihwa)
                     if (item.location1 && item.sh_qty) {
                         const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
-                        secondaryQty = Number(item.sh_qty);
-                        locationStock[loc1] = (locationStock[loc1] || 0) + secondaryQty;
+                        locationStock[loc1] = Number(item.sh_qty);
                     }
 
                     // 2. Process Primary Location (Daekyung/Yangsan)
                     if (item.location && item.ready_qty) {
                         const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
-                        const totalQty = Number(item.ready_qty);
-                        
-                        // If primary is Daekyung/Yangsan and secondary is Sihwa, the ready_qty is now considered the exact location quantity (not a total sum that needs subtraction).
-                        // We use totalQty directly as provided in the JSON data.
-                        locationStock[primaryLoc] = (locationStock[primaryLoc] || 0) + totalQty;
+                        locationStock[primaryLoc] = Number(item.ready_qty);
                     }
                 }
 
-                // Calculate Total Stock from components
-                // If user provided raw currentStock, we might fallback, but here we prefer calculated total.
-                let totalStock = 0;
-                if (Object.keys(locationStock).length > 0) {
-                    totalStock = Object.values(locationStock).reduce((sum, q) => sum + q, 0);
-                } else {
-                    // Fallback to ready_qty or currentStock if no location breakdown found
-                    totalStock = item.ready_qty !== undefined ? Number(item.ready_qty) : (Number(item.currentStock) || 0);
-                }
-
-                const currentStock = totalStock;
+                // The user explicitly stated: "Do not do other operations on inventory.json"
+                // "90e(l)-s10s-100a-sts304-w MUST be 8165. Other numbers should not appear (5536 is wrong)."
+                // Therefore, currentStock is exactly ready_qty.
+                const currentStock = item.ready_qty !== undefined ? Number(item.ready_qty) : (Number(item.currentStock) || 0);
 
                 // Derive status if missing (S3 data lacks stockStatus)
                 let stockStatus = item.stockStatus;

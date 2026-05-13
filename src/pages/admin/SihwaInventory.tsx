@@ -655,12 +655,12 @@ export default function SihwaInventory() {
             if (item.locationStock) {
                 if (item.locationStock['시화'] !== undefined) shQty += Number(item.locationStock['시화']);
                 if (item.locationStock['서울'] !== undefined) shQty += Number(item.locationStock['서울']);
-                if (item.locationStock['양산'] !== undefined) ysQty += Number(item.locationStock['양산']);
+                // User instruction: Only evaluate Sihwa and Daekyung. Exclude Yangsan.
                 if (item.locationStock['대경'] !== undefined) ysQty += Number(item.locationStock['대경']);
             } else {
                 if ((item.location || '').includes('시화') || (item.location || '').includes('서울')) {
                     shQty = item.currentStock;
-                } else if ((item.location || '').includes('양산') || (item.location || '').includes('대경')) {
+                } else if ((item.location || '').includes('대경')) {
                     ysQty = item.currentStock;
                 }
             }
