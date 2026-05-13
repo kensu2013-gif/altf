@@ -97,14 +97,9 @@ export function useInventory() {
                         const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
                         const totalQty = Number(item.ready_qty);
                         
-                        // If primary is Daekyung/Yangsan and secondary is Sihwa, the ready_qty is the total sum.
-                        // We must subtract the secondary (Sihwa) quantity to get the true Daekyung quantity.
-                        if ((primaryLoc === '대경' || primaryLoc === '양산') && secondaryQty > 0) {
-                            locationStock[primaryLoc] = Math.max(0, totalQty - secondaryQty);
-                        } else {
-                            // Otherwise, just use the ready_qty or add it to existing
-                            locationStock[primaryLoc] = (locationStock[primaryLoc] || 0) + totalQty;
-                        }
+                        // If primary is Daekyung/Yangsan and secondary is Sihwa, the ready_qty is now considered the exact location quantity (not a total sum that needs subtraction).
+                        // We use totalQty directly as provided in the JSON data.
+                        locationStock[primaryLoc] = (locationStock[primaryLoc] || 0) + totalQty;
                     }
                 }
 
