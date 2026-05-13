@@ -954,18 +954,28 @@ export default function SihwaInventory() {
                 statusCategory = 'SAFE';
                 statusLabel = '🟡 미발주 대상 (D/N등급)';
             } else if (safeStock > 0) {
+                const isLowDemandCGrade = healthGrade === 'C' && row.quoteCount === 0 && row.recent60dOrderCount === 0 && row.salesFreq < 10;
+
                 if (effectiveStock <= 0) {
                     // 선발주 요망(CRITICAL) 조건: 대경 재고가 없으면서, A/B급 핵심 품목이거나 일정 수준 이상 팔리는 품목
                     if (row.ysQty <= 0 && (healthGrade === 'A' || healthGrade === 'B' || (row.salesVolume >= 30 && row.salesFreq >= 5))) {
                         statusCategory = 'CRITICAL';
                         statusLabel = '🚨 선발주 요망 (매입결품)';
+                    } else if (isLowDemandCGrade) {
+                        statusCategory = 'SAFE';
+                        statusLabel = '🟡 관망 (C등급/최근수요없음)';
                     } else {
                         statusCategory = 'WARNING';
                         statusLabel = '⚠️ 일반 발주 필요 (재고부족)';
                     }
                 } else if (effectiveStock < safeStock) {
-                    statusCategory = 'WARNING';
-                    statusLabel = '⚠️ 적정재고 미달 (재고부족)';
+                    if (isLowDemandCGrade) {
+                        statusCategory = 'SAFE';
+                        statusLabel = '🟡 관망 (C등급/최근수요없음)';
+                    } else {
+                        statusCategory = 'WARNING';
+                        statusLabel = '⚠️ 적정재고 미달 (재고부족)';
+                    }
                 } else {
                     statusCategory = 'SAFE';
                     statusLabel = '✅ 적정 유지중';
