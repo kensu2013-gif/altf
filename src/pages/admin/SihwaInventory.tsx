@@ -955,7 +955,7 @@ export default function SihwaInventory() {
                 statusLabel = '🟡 미발주 대상 (D/N등급)';
             } else if (safeStock > 0) {
                 const isLowDemandCGrade = healthGrade === 'C' && row.quoteCount === 0 && row.recent60dOrderCount === 0 && row.salesFreq < 10;
-                const isRecentZeroSales = row.recent60dSales === 0;
+                const isRecentZeroSales = row.recent60dSales === 0 && healthGrade !== 'A' && healthGrade !== 'B';
                 const shouldSkipWarning = isLowDemandCGrade || isRecentZeroSales;
 
                 if (effectiveStock <= 0) {
