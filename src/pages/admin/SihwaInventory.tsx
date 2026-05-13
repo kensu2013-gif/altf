@@ -293,7 +293,7 @@ export default function SihwaInventory() {
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    const ignoreDates = ['2026-04-14', '2026-04-15', '2026-04-16'];
+                    const ignoreDates = ['2026-04-14', '2026-04-15', '2026-04-16', '2026-05-11', '2026-05-12', '2026-05-13'];
                     if (data.inventoryHistory) {
                         const filteredHistory = data.inventoryHistory.filter((h: { date: string }) => !ignoreDates.includes(h.date));
                         setHistoryData({ ...data, inventoryHistory: filteredHistory });
@@ -2356,17 +2356,19 @@ export default function SihwaInventory() {
                                                             const filteredDiff = (snap.diff || []).filter(d => {
                                                                 const product = inventory.find(p => p.id === d.id);
                                                                 if (!product) return false;
-                                                                const isSihwa = product.location === '시화' || product.location1 === '시화';
+                                                                // User instruction: "Evaluate only Sihwa Daekyung inventory. Exclude Yangsan/Daekyung materials."
+                                                                // This means the primary location must be Sihwa, not Yangsan.
+                                                                const isSihwaPrimary = product.location === '시화' || product.location === '서울' || product.location === '서울재고';
                                                                 const isDaekyung = product.maker === '대경' || product.maker1 === '대경';
-                                                                return isSihwa && isDaekyung;
+                                                                return isSihwaPrimary && isDaekyung;
                                                             });
 
                                                             const filteredPending = (dailyPendingMap[snap.date] || []).filter(pi => {
                                                                 const product = inventory.find(p => p.id === pi.id);
                                                                 if (!product) return false;
-                                                                const isSihwa = product.location === '시화' || product.location1 === '시화';
+                                                                const isSihwaPrimary = product.location === '시화' || product.location === '서울' || product.location === '서울재고';
                                                                 const isDaekyung = product.maker === '대경' || product.maker1 === '대경';
-                                                                return isSihwa && isDaekyung;
+                                                                return isSihwaPrimary && isDaekyung;
                                                             });
 
                                                             let validCount = 0;
