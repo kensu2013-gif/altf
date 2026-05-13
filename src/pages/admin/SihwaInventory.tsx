@@ -1080,7 +1080,7 @@ export default function SihwaInventory() {
     // Aggregate stats and Asset Valuation totals
     const stats = useMemo(() => {
         const regular = analyzedInventory
-            .filter(r => r.statusCategory === 'SAFE' && r.salesFreq >= 20 && (r as any).recommendedQty > 0)
+            .filter(r => r.statusCategory === 'SAFE' && r.salesFreq >= 20 && r.recommendedQty > 0)
             .filter(r => !(r.product.material || '').toLowerCase().startsWith('wp'));
 
         // 견적 문의가 많으나 재고가 없는 경우 기회손실 (결품)
@@ -1121,7 +1121,7 @@ export default function SihwaInventory() {
         const itemsToAdd = listItems.filter(item => selectedSet.has(item.product.id) && !(item as { canTransfer?: boolean }).canTransfer);
 
         itemsToAdd.forEach(row => {
-            const qty = 'recommendedQty' in row ? (row as any).recommendedQty || 0 : 0;
+            const qty = 'recommendedQty' in row ? row.recommendedQty || 0 : 0;
 
             if (qty > 0) {
                 addItem({
@@ -2034,7 +2034,7 @@ export default function SihwaInventory() {
                                                                     {row.shQty}
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right font-black font-mono text-indigo-600">
-                                                                    {(row as any).recommendedQty}
+                                                                    {row.recommendedQty}
                                                                     <div className="text-[10px] font-normal text-slate-400 mt-1">/ 총판매:{row.salesVolume}</div>
                                                                 </td>
                                                                 <td className="px-5 py-4 text-center font-bold text-slate-500">
@@ -2044,7 +2044,7 @@ export default function SihwaInventory() {
                                                                     <span className="px-2 py-1 bg-teal-50 text-teal-700 font-extrabold font-mono rounded-lg border border-teal-200 shadow-sm">{row.ysQty}</span>
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
-                                                                <td className="px-5 py-4 text-right font-black text-amber-700 bg-amber-50/30">{formatCur(row.recentPurchasePrice * ((row as any).recommendedQty > 0 ? (row as any).recommendedQty : 1))}</td>
+                                                                <td className="px-5 py-4 text-right font-black text-amber-700 bg-amber-50/30">{formatCur(row.recentPurchasePrice * (row.recommendedQty > 0 ? row.recommendedQty : 1))}</td>
                                                                 <td className="px-5 py-4 text-right font-mono text-slate-400 text-xs">
                                                                     {row.compSales > 0 ? (
                                                                         <span>{row.compSales.toLocaleString()}</span>
@@ -2074,7 +2074,7 @@ export default function SihwaInventory() {
                                                                     <div className="flex flex-col gap-0.5">
                                                                         <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
                                                                             <Info className="w-4 h-4 text-amber-500" />
-                                                                            <span className="text-rose-600">권장발주량 {(row as any).recommendedQty}개</span> (결품 {row.deficit}개)
+                                                                            <span className="text-rose-600">권장발주량 {row.recommendedQty}개</span> (결품 {row.deficit}개)
                                                                         </div>
                                                                         <div className="text-xs text-slate-500 pl-5">
                                                                             등급: <strong className={`font-black ${row.healthGrade === 'A' ? 'text-emerald-600' : row.healthGrade === 'B' ? 'text-blue-600' : row.healthGrade === 'C' ? 'text-amber-500' : 'text-rose-500'}`}>{row.healthGrade}급</strong> | 최근 판매: <strong className="text-indigo-600">{row.recent60dSales}개(60일)</strong> / 연 총 {row.salesVolume}개
