@@ -17,7 +17,8 @@ interface InventoryDataProps {
     salesVolume?: number;
     recent30dSales?: number;
     recent60dSales?: number;
-    quoteCount?: number;
+    statusCategory?: string;
+    statusLabel?: string;
     [key: string]: unknown;
 }
 
@@ -282,12 +283,23 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                 <div className="bg-white px-6 py-5 border-b border-slate-200 flex justify-between items-start shrink-0 relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
                     <div className="flex flex-col gap-1 z-10">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-black tracking-widest uppercase">품목정보</span>
                             <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-bold tracking-widest uppercase flex items-center gap-1">
                                 <PackageSearch className="w-3 h-3" />
                                 심층 분석
                             </span>
+                            {inventoryData?.statusLabel && (
+                                <span className={`text-[10px] px-2 py-0.5 rounded font-black tracking-widest uppercase ml-1 ${
+                                    inventoryData.statusCategory === 'CRITICAL' ? 'bg-rose-100 text-rose-700 ring-1 ring-rose-200' :
+                                    inventoryData.statusCategory === 'WARNING' ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-200' :
+                                    inventoryData.statusCategory === 'EXCESS' ? 'bg-orange-100 text-orange-700 ring-1 ring-orange-200' :
+                                    inventoryData.statusCategory === 'DEAD' ? 'bg-slate-200 text-slate-700 ring-1 ring-slate-300' :
+                                    'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200'
+                                }`}>
+                                    {inventoryData.statusLabel}
+                                </span>
+                            )}
                         </div>
                         <h2 className="text-xl font-black text-slate-800 break-all">{productId}</h2>
                         {productName && productName !== productId && (
@@ -587,8 +599,8 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                                                 {region && (
                                                                     <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${region.color}`}>{region.label}</span>
                                                                 )}
-                                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${q.status === 'COMPLETED' || q.status === 'PROCESSED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                                    {q.status === 'COMPLETED' || q.status === 'PROCESSED' ? '발주성공' : '견적제출'}
+                                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${q.status === 'COMPLETED' || q.status === 'PROCESSED' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                                    {q.status === 'COMPLETED' || q.status === 'PROCESSED' ? '답변완료' : '견적제출'}
                                                                 </span>
                                                             </div>
                                                             <div className="flex items-center gap-2">

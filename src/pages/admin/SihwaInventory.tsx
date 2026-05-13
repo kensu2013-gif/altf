@@ -861,14 +861,9 @@ export default function SihwaInventory() {
                 safeStock = safeStock > 0 ? Math.max(10, Math.round(safeStock / 10) * 10) : 0;
             }
 
-            // 4. 대경 재고(ysQty) 기반 강력한 페널티 (목표재고 대비 대경 재고 비율)
-            if (safeStock > 0) {
-                if (row.ysQty > safeStock * 3) {
-                    safeStock = Math.round((safeStock * 0.2) / 10) * 10; // 대경 재고가 목표의 3배 이상이면 80% 삭감
-                } else if (row.ysQty > safeStock * 1.5) {
-                    safeStock = Math.round((safeStock * 0.5) / 10) * 10; // 대경 재고가 목표의 1.5배 이상이면 50% 삭감
-                }
-            }
+            // 4. 대경 재고(ysQty) 기반 페널티는 여기서 제외합니다. 
+            // 목표재고(safeStock) 자체를 깎아버리면 정상적인 재고가 '과잉'으로 오탐지되므로,
+            // 대경 재고가 많을 때 발주를 막는 로직은 하단의 '정기발주' 계산에서만 처리합니다.
 
             // 4.5. 최근 60일 실적(트렌드) 기반 동적 페널티
             // 수요 급감 시 적정재고 삭감. 단, 연간 판매빈도/수량이 높거나 대경재고가 넉넉할 때는 덜 삭감함.
@@ -883,7 +878,12 @@ export default function SihwaInventory() {
             }
 
             // 4.6 최근 견적/발주 집중 시 적정재고 상향 (결품 예방)
-            if (!isMostlyDropShipped && (row.quoteCount >= 2 || row.recent60dOrderCount >= 3)) {
+            // 단, 실제 판매량(salesFreq)이 아예 없거나(0), 300A 이상의 대형 사이즈(주문제작 위주)인 경우 무조건 10개로 올리지 않음
+            const sizeStr = row.product.size || '';
+            const sizeNum = parseInt(sizeStr.replace(/[^0-9]/g, ''), 10);
+            const isLargeSize = !isNaN(sizeNum) && sizeNum >= 300;
+
+            if (!isMostlyDropShipped && row.salesFreq > 0 && !isLargeSize && (row.quoteCount >= 2 || row.recent60dOrderCount >= 3)) {
                 const trendDemand = Math.max(10, Math.ceil((row.recent60dSales > 0 ? row.recent60dSales : (row.salesVolume / 6)) * 1.2));
                 safeStock = Math.max(safeStock, Math.round(trendDemand / 10) * 10);
             }
@@ -913,8 +913,6 @@ export default function SihwaInventory() {
             else if (healthGrade === 'E') safeStock = 0;
 
             // 부피 제약 다단화
-            const sizeStr = row.product.size || '';
-            const sizeNum = parseInt(sizeStr.replace(/[^0-9]/g, ''), 10);
             if (!isNaN(sizeNum)) {
                 if (sizeNum >= 400) { if (safeStock > 30)  safeStock = 30; }
                 else if (sizeNum >= 300) { if (safeStock > 50)  safeStock = 50; }
@@ -926,10 +924,11 @@ export default function SihwaInventory() {
             // 악성재고: E급만
             const isDeadStock = healthGrade === 'E';
 
-            // 과잉재고: E급 제외, 목표재고(safeStock)의 1.5배 초과
+            // 과잉재고: E급 제외, 안전재고의 3배 이상이거나 최소 6개월치(120영업일) 이상 보유 시 과잉으로 판정
+            // 시화에서 보통 한 번에 200~300개씩 입고하므로, 단순히 safeStock의 1.5배로 잡으면 대다수가 과잉으로 오탐지됨
             const isExcessStock = !isDeadStock
                 && safeStock > 0
-                && row.shQty > (safeStock * 1.5)
+                && row.shQty > Math.max(safeStock * 3, Math.ceil(sihwaDailySales * 120))
                 && row.recentPurchasePrice > 0;
 
             let excessCategory: string | null = null;
