@@ -851,7 +851,14 @@ export default function SihwaInventory() {
                 safeStock = 0; // 극소량, 극저빈도 품목은 재고 미보유
             }
 
-            safeStock = safeStock > 0 ? Math.max(10, Math.round(safeStock / 10) * 10) : 0;
+            // 3.5. 대경 직발주 비중이 압도적으로 높고 시화 출고가 없는 경우, 기초 재고 10개 강제 보류 해제
+            const isMostlyDropShipped = row.recent60dOrderCount > 0 && row.recent60dSales === 0;
+            
+            if (isMostlyDropShipped) {
+                safeStock = safeStock > 0 ? Math.round(safeStock / 10) * 10 : 0;
+            } else {
+                safeStock = safeStock > 0 ? Math.max(10, Math.round(safeStock / 10) * 10) : 0;
+            }
 
             // 4. 대경 재고(ysQty) 기반 페널티
             if (row.ysQty > dailyAvgSales * 60) {
@@ -870,6 +877,12 @@ export default function SihwaInventory() {
                 }
             } else if (row.salesVolume > 0 && row.recent60dSales <= Math.ceil((row.salesVolume / 12) * 0.5) && row.quoteCount === 0) {
                 safeStock = Math.round((safeStock * 0.5) / 10) * 10; // 50% 삭감
+            }
+
+            // 4.6 최근 견적/발주 집중 시 적정재고 상향 (결품 예방)
+            if (!isMostlyDropShipped && (row.quoteCount >= 2 || row.recent60dOrderCount >= 3)) {
+                const trendDemand = Math.max(10, Math.ceil((row.recent60dSales > 0 ? row.recent60dSales : (row.salesVolume / 6)) * 1.2));
+                safeStock = Math.max(safeStock, Math.round(trendDemand / 10) * 10);
             }
 
             // 5. WP 및 Material Filter Rules
@@ -1801,7 +1814,7 @@ export default function SihwaInventory() {
                                             <div className="bg-white border-t border-rose-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
                                                 {stats.critical.length > 0 ? (
                                                 <table className="w-full text-sm text-left whitespace-nowrap">
-                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none">
+                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
                                                         <tr>
                                                             <th className="px-5 py-3 w-12 text-center">
                                                                 <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-600" 
@@ -1820,7 +1833,7 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
                                                             <th className="px-5 py-3 text-right">경쟁사 연판매</th>
                                                             <th className="px-5 py-3 text-center">건전성 등급</th>
-                                                            <th className="px-5 py-3 text-right">잔여일수</th>
+
                                                             <th className="px-5 py-3">🚨 분석 근거 (명확성)</th>
                                                         </tr>
                                                     </thead>
@@ -1885,24 +1898,7 @@ export default function SihwaInventory() {
                                                                         </span>
                                                                     </div>
                                                                 </td>
-                                                                <td className="px-5 py-4 text-right border-r border-slate-100/50">
-                                                                    {row.daysOnHand > 0 ? (
-                                                                        <div className="flex flex-col items-end gap-0.5">
-                                                                        <span className={`font-black text-sm ${
-                                                                            row.daysOnHand <= 10  ? 'text-rose-600' :
-                                                                            row.daysOnHand <= 30  ? 'text-amber-500' :
-                                                                            row.daysOnHand <= 90  ? 'text-slate-700' :
-                                                                            row.daysOnHand > 365  ? 'text-slate-400' :
-                                                                            'text-emerald-600'
-                                                                        }`}>
-                                                                            {row.daysOnHand === 9999 ? '∞' : `${Math.round(row.daysOnHand)}일`}
-                                                                        </span>
-                                                                        {row.daysOnHand <= 5 * 2 && row.daysOnHand !== 9999 && (
-                                                                            <span className="text-[10px] text-rose-500 font-bold">즉시발주!</span>
-                                                                        )}
-                                                                        </div>
-                                                                    ) : <span className="text-rose-500 font-bold text-sm">0일</span>}
-                                                                </td>
+
                                                                 <td className="px-5 py-4">
                                                                     <div className="flex flex-col gap-0.5">
                                                                         <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
@@ -1983,7 +1979,7 @@ export default function SihwaInventory() {
                                             <div className="bg-white border-t border-amber-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
                                                 {stats.warning.length > 0 ? (
                                                 <table className="w-full text-sm text-left whitespace-nowrap">
-                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none">
+                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
                                                         <tr>
                                                             <th className="px-4 py-3 w-10 text-center">
                                                                 <input 
@@ -2003,7 +1999,7 @@ export default function SihwaInventory() {
                                                             <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
                                                             <th className="px-5 py-3 text-right">경쟁사 연판매</th>
                                                             <th className="px-5 py-3 text-center cursor-pointer hover:bg-slate-200" onClick={() => handleSort('healthGrade')}>건전성 등급 {sortConfig.key==='healthGrade' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                                            <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200" onClick={() => handleSort('daysOnHand')}>잔여일수 {sortConfig.key==='daysOnHand' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
+
                                                             <th className="px-5 py-3">💡 분석 근거</th>
                                                         </tr>
                                                     </thead>
@@ -2074,24 +2070,7 @@ export default function SihwaInventory() {
                                                                         </span>
                                                                     </div>
                                                                 </td>
-                                                                <td className="px-5 py-4 text-right border-r border-slate-100/50">
-                                                                    {row.daysOnHand > 0 ? (
-                                                                        <div className="flex flex-col items-end gap-0.5">
-                                                                        <span className={`font-black text-sm ${
-                                                                            row.daysOnHand <= 10  ? 'text-rose-600' :
-                                                                            row.daysOnHand <= 30  ? 'text-amber-500' :
-                                                                            row.daysOnHand <= 90  ? 'text-slate-700' :
-                                                                            row.daysOnHand > 365  ? 'text-slate-400' :
-                                                                            'text-emerald-600'
-                                                                        }`}>
-                                                                            {row.daysOnHand === 9999 ? '∞' : `${Math.round(row.daysOnHand)}일`}
-                                                                        </span>
-                                                                        {row.daysOnHand <= 5 * 2 && row.daysOnHand !== 9999 && (
-                                                                            <span className="text-[10px] text-rose-500 font-bold">즉시발주!</span>
-                                                                        )}
-                                                                        </div>
-                                                                    ) : <span className="text-rose-500 font-bold text-sm">0일</span>}
-                                                                </td>
+
                                                                 <td className="px-5 py-4">
                                                                     <div className="flex flex-col gap-0.5">
                                                                         <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
@@ -2169,7 +2148,7 @@ export default function SihwaInventory() {
                                             <div className="bg-white border-t border-indigo-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
                                                 {stats.regular.length > 0 ? (
                                                 <table className="w-full text-sm text-left whitespace-nowrap">
-                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none">
+                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
                                                         <tr>
                                                             <th className="px-5 py-3 w-12 text-center">
                                                                 <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600" 
@@ -2650,7 +2629,7 @@ export default function SihwaInventory() {
                             {activeTab === 'ALL_TABLE' && (
                                 <div className="space-y-4 overflow-x-auto pb-4">
                                 <table className="w-full text-left text-sm whitespace-nowrap min-w-[1000px]">
-                                    <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none">
+                                    <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none sticky top-0 z-10 shadow-sm">
                                         <tr className="text-xs uppercase tracking-wider text-slate-500 font-bold border-b-2 border-slate-200">
                                             <th className="px-3 py-3 w-10 text-center border-r border-slate-200">
                                                 <span className="text-[10px] text-slate-400">선택</span>
@@ -3097,7 +3076,7 @@ export default function SihwaInventory() {
         </div>
         <div className="overflow-auto max-h-80">
           <table className="w-full text-xs text-left whitespace-nowrap">
-            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100">
+            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 sticky top-0 z-10 shadow-sm">
               <tr>
                 <th className="px-4 py-2">품목코드</th>
                 <th className="px-4 py-2 text-right">무판매</th>
@@ -3180,7 +3159,7 @@ export default function SihwaInventory() {
         </div>
         <div className="overflow-auto max-h-80">
           <table className="w-full text-xs text-left whitespace-nowrap">
-            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100">
+            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 sticky top-0 z-10 shadow-sm">
               <tr>
                 <th className="px-4 py-2">품목코드 (등급)</th>
                 <th className="px-4 py-2">분석근거 (과잉 사유)</th>
@@ -3271,7 +3250,7 @@ export default function SihwaInventory() {
         </div>
         <div className="overflow-auto max-h-80">
           <table className="w-full text-xs text-left whitespace-nowrap">
-            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100">
+            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 sticky top-0 z-10 shadow-sm">
               <tr>
                 <th className="px-4 py-2">품목코드</th>
                 <th className="px-4 py-2 text-right">무판매</th>
@@ -3333,7 +3312,7 @@ export default function SihwaInventory() {
         </div>
         <div className="overflow-auto max-h-80">
           <table className="w-full text-xs text-left whitespace-nowrap">
-            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100">
+            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 sticky top-0 z-10 shadow-sm">
               <tr>
                 <th className="px-4 py-2">품목코드</th>
                 <th className="px-4 py-2 text-right">무판매</th>
