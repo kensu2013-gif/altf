@@ -80,14 +80,11 @@ export default function QuotationEditor() {
     });
 
     // --- Success Info Dialog State ---
-    const [successConfig, setSuccessConfig] = useState<{
-        isOpen: boolean;
-        title: string;
-        description: string;
-    }>({
+    const [successConfig, setSuccessConfig] = useState({
         isOpen: false,
         title: '',
-        description: ''
+        description: '',
+        navigateOnConfirm: true
     });
 
     // Standalone Customer Info for Quotation
@@ -318,7 +315,7 @@ export default function QuotationEditor() {
         };
     };
 
-    const handleSaveQuotation = async (extraMemo?: string, suppressSuccessModal: boolean = false) => {
+    const handleSaveQuotation = async (extraMemo?: string, silentSave: boolean = false) => {
         if (!user) return;
 
         try {
@@ -360,11 +357,20 @@ export default function QuotationEditor() {
 
             useStore.getState().addQuotation(payloadData);
 
-            if (!suppressSuccessModal) {
+            if (silentSave) {
+                // Instead of completely suppressing, show notification but do NOT navigate away
                 setSuccessConfig({
                     isOpen: true,
                     title: '견적서 저장 완료',
-                    description: '견적서가 성공적으로 저장되었습니다.\n나의 페이지에서 확인하실 수 있습니다.'
+                    description: '견적서가 성공적으로 저장되었습니다.\n나의 페이지에서 확인하실 수 있습니다.',
+                    navigateOnConfirm: false
+                });
+            } else {
+                setSuccessConfig({
+                    isOpen: true,
+                    title: '견적서 저장 완료',
+                    description: '견적서가 성공적으로 저장되었습니다.\n나의 페이지에서 확인하실 수 있습니다.',
+                    navigateOnConfirm: true
                 });
             }
         } catch (error) {
@@ -1007,7 +1013,9 @@ export default function QuotationEditor() {
                 confirmVariant="primary"
                 onConfirm={() => {
                     setSuccessConfig(prev => ({ ...prev, isOpen: false }));
-                    navigate('/my');
+                    if (successConfig.navigateOnConfirm) {
+                        navigate('/my');
+                    }
                 }}
             // No onCancel provided -> Renders single OK button
             />
