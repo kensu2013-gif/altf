@@ -126,11 +126,11 @@ function getHealthGradeFromScore(
     productId: string
 ): 'A' | 'B' | 'C' | 'D' | 'E' | 'N' {
     if (salesVolume === 0 && quoteCount === 0 && effectiveStock === 0) return 'N';
-    if (score >= 65) return 'A';
-    if (score >= 45) return 'B';
-    if (score >= 25) return 'C';
-    if (score >= 10) return 'D';
-    if (score < 10 && effectiveStock > 0) {
+    if (score >= 70) return 'A';
+    if (score >= 50) return 'B';
+    if (score >= 30) return 'C';
+    if (score >= 15) return 'D';
+    if (score < 15 && effectiveStock > 0) {
         const idLower = productId.toLowerCase();
         if (idLower.includes('composite') || idLower.includes('lateral') || idLower.includes('stubend') ||
             idLower.includes('32205') || idLower.includes('stsb-s') || idLower.includes('310-s') || idLower.includes('904l')) {
@@ -828,24 +828,25 @@ export default function SihwaInventory() {
             // 통계 기반 기초 계산 (σ)
             const dailyAvgSales = row.salesVolume / WORKING_DAYS;
             
-            const cvEstimate = row.salesFreq >= 100 ? 0.20 : row.salesFreq >= 50 ? 0.30 : row.salesFreq >= 20 ? 0.40 : 0.50;
-            const sigma = dailyAvgSales * cvEstimate;
-            const safetyStockSigma = Math.ceil(Z_VALUE * sigma * Math.sqrt(LEAD_TIME));
-            const reorderPoint = Math.ceil(dailyAvgSales * LEAD_TIME + safetyStockSigma);
+            // 시화의 실제 평균 출고량 추정 (최근 60일 시화 출고량 기준)
+            const sihwaDailySales = row.recent60dSales > 0 ? (row.recent60dSales / 40) : (dailyAvgSales * 0.2); // 출고 없으면 연간의 20%만 잡음
             
-            // 1. 기초 안전재고 축소: 안전재고 + 10일치 평균
-            let safeStock = safetyStockSigma + Math.ceil(dailyAvgSales * 10);
+            const cvEstimate = row.salesFreq >= 100 ? 0.20 : row.salesFreq >= 50 ? 0.30 : row.salesFreq >= 20 ? 0.40 : 0.50;
+            // 안전재고(버퍼)는 시화 실판매량 기준으로 계산
+            const sigma = sihwaDailySales * cvEstimate;
+            const safetyStockSigma = Math.ceil(Z_VALUE * sigma * Math.sqrt(LEAD_TIME));
+            const reorderPoint = Math.ceil(sihwaDailySales * LEAD_TIME + safetyStockSigma);
+            
+            // 1. 기초 안전재고 축소: 안전재고 + 20일치 평균 (약 1개월)
+            let safeStock = safetyStockSigma + Math.ceil(sihwaDailySales * 20);
 
-            // 2. 1회 평균 주문량(Average Order Size) 기반 강력한 캡 (1.5배) 및 보장 (1배)
-            if (row.salesFreq > 0) {
-                const avgOrderSize = row.salesVolume / row.salesFreq;
-                safeStock = Math.min(safeStock, Math.ceil(avgOrderSize * 1.5));
-                safeStock = Math.max(safeStock, Math.ceil(avgOrderSize));
-            }
+            // 2. 최대 발주 상한선 캡 (시화에서 한 번에 나가는 물량은 보통 200~300개를 넘지 않으므로 최대 500개 캡, 단, 월판매량이 아주 큰 경우는 2개월치 허용)
+            const absoluteMax = Math.max(500, Math.ceil(sihwaDailySales * 40));
+            safeStock = Math.min(safeStock, absoluteMax);
 
             // 3. 주문 횟수(Freq) 및 견적(Quote) 기반 제한
             if (row.salesFreq < 12 && row.quoteCount < 2) {
-                safeStock = Math.min(safeStock, Math.ceil(dailyAvgSales * 5)); // 최대 1주일 치
+                safeStock = Math.min(safeStock, Math.ceil(sihwaDailySales * 10)); // 최대 2주 치
             }
             if (row.salesVolume < 50 && row.salesFreq < 5) {
                 safeStock = 0; // 극소량, 극저빈도 품목은 재고 미보유
@@ -860,11 +861,13 @@ export default function SihwaInventory() {
                 safeStock = safeStock > 0 ? Math.max(10, Math.round(safeStock / 10) * 10) : 0;
             }
 
-            // 4. 대경 재고(ysQty) 기반 페널티
-            if (row.ysQty > dailyAvgSales * 60) {
-                safeStock = Math.round((safeStock * 0.4) / 10) * 10; // 3개월치 이상 대경 보유시 60% 삭감
-            } else if (row.ysQty > dailyAvgSales * 20) {
-                safeStock = Math.round((safeStock * 0.7) / 10) * 10; // 1개월치 이상 대경 보유시 30% 삭감
+            // 4. 대경 재고(ysQty) 기반 강력한 페널티 (목표재고 대비 대경 재고 비율)
+            if (safeStock > 0) {
+                if (row.ysQty > safeStock * 3) {
+                    safeStock = Math.round((safeStock * 0.2) / 10) * 10; // 대경 재고가 목표의 3배 이상이면 80% 삭감
+                } else if (row.ysQty > safeStock * 1.5) {
+                    safeStock = Math.round((safeStock * 0.5) / 10) * 10; // 대경 재고가 목표의 1.5배 이상이면 50% 삭감
+                }
             }
 
             // 4.5. 최근 60일 실적(트렌드) 기반 동적 페널티
@@ -1032,15 +1035,21 @@ export default function SihwaInventory() {
             .filter(r => !(r.product.material || '').toLowerCase().startsWith('wp'))
             .map(r => {
                 // 정기발주 예측은 2달(40영업일) 정도의 소요량을 계산하여 볼륨네고를 하기 위해 필요한 수량
-                const twoMonthDemand = Math.ceil(r.dailyAvgSales * 40);
-                let recommendedQty = twoMonthDemand - r.effectiveStock;
+                const sihwaDailySales = r.recent60dSales > 0 ? (r.recent60dSales / 40) : (r.salesVolume / WORKING_DAYS * 0.2);
+                const twoMonthDemand = Math.ceil(sihwaDailySales * 40);
+                
+                let baseDemand = Math.round(twoMonthDemand / 10) * 10;
+                if (twoMonthDemand < 10) baseDemand = twoMonthDemand; // 월평균이 아주 작으면 10단위 강제 올림 해제
+
+                let recommendedQty = baseDemand - r.effectiveStock;
 
                 // 과잉재고인 경우이거나 대경 재고가 이미 많은 경우 발주 추천 차단
-                if (r.isExcessStock || r.ysQty >= 500) {
+                if (r.isExcessStock || r.ysQty >= baseDemand * 2) {
                     recommendedQty = 0;
                 } else if (recommendedQty > 0) {
-                    recommendedQty = Math.ceil(recommendedQty / 10) * 10;
-                    if (recommendedQty < 50) recommendedQty = 50;
+                    if (baseDemand >= 10) {
+                        recommendedQty = Math.ceil(recommendedQty / 10) * 10; // 10단위 맞춤
+                    }
                     if (recommendedQty > 500) recommendedQty = 500;
                 } else {
                     recommendedQty = 0;
