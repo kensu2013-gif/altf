@@ -293,7 +293,7 @@ export default function SihwaInventory() {
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    const ignoreDates = ['2026-04-14', '2026-04-15', '2026-04-16', '2026-05-11', '2026-05-12', '2026-05-13'];
+                    const ignoreDates = ['2026-04-14', '2026-04-15', '2026-04-16'];
                     if (data.inventoryHistory) {
                         const filteredHistory = data.inventoryHistory.filter((h: { date: string }) => !ignoreDates.includes(h.date));
                         setHistoryData({ ...data, inventoryHistory: filteredHistory });
@@ -655,12 +655,14 @@ export default function SihwaInventory() {
             if (item.locationStock) {
                 if (item.locationStock['시화'] !== undefined) shQty += Number(item.locationStock['시화']);
                 if (item.locationStock['서울'] !== undefined) shQty += Number(item.locationStock['서울']);
-                // User instruction: Only evaluate Sihwa and Daekyung. Exclude Yangsan.
+                // Restore Yangsan inventory into ysQty to ensure "대경재고" column accurately reflects factory stock
+                // and matches Quote/Order system numbers.
+                if (item.locationStock['양산'] !== undefined) ysQty += Number(item.locationStock['양산']);
                 if (item.locationStock['대경'] !== undefined) ysQty += Number(item.locationStock['대경']);
             } else {
                 if ((item.location || '').includes('시화') || (item.location || '').includes('서울')) {
                     shQty = item.currentStock;
-                } else if ((item.location || '').includes('대경')) {
+                } else if ((item.location || '').includes('양산') || (item.location || '').includes('대경')) {
                     ysQty = item.currentStock;
                 }
             }
@@ -2356,19 +2358,22 @@ export default function SihwaInventory() {
                                                             const filteredDiff = (snap.diff || []).filter(d => {
                                                                 const product = inventory.find(p => p.id === d.id);
                                                                 if (!product) return false;
-                                                                // User instruction: "Evaluate only Sihwa Daekyung inventory. Exclude Yangsan/Daekyung materials."
-                                                                // This means the primary location must be Sihwa, not Yangsan.
                                                                 const isSihwaPrimary = product.location === '시화' || product.location === '서울' || product.location === '서울재고';
+                                                                const isSihwaSecondary = product.location1 === '시화';
+                                                                // User instruction: Keep past data intact, but evaluate only Sihwa primary stock for recent changes.
+                                                                const isSihwa = snap.date >= '2026-05-11' ? isSihwaPrimary : (isSihwaPrimary || isSihwaSecondary);
                                                                 const isDaekyung = product.maker === '대경' || product.maker1 === '대경';
-                                                                return isSihwaPrimary && isDaekyung;
+                                                                return isSihwa && isDaekyung;
                                                             });
 
                                                             const filteredPending = (dailyPendingMap[snap.date] || []).filter(pi => {
                                                                 const product = inventory.find(p => p.id === pi.id);
                                                                 if (!product) return false;
                                                                 const isSihwaPrimary = product.location === '시화' || product.location === '서울' || product.location === '서울재고';
+                                                                const isSihwaSecondary = product.location1 === '시화';
+                                                                const isSihwa = snap.date >= '2026-05-11' ? isSihwaPrimary : (isSihwaPrimary || isSihwaSecondary);
                                                                 const isDaekyung = product.maker === '대경' || product.maker1 === '대경';
-                                                                return isSihwaPrimary && isDaekyung;
+                                                                return isSihwa && isDaekyung;
                                                             });
 
                                                             let validCount = 0;
