@@ -2380,14 +2380,24 @@ export default function SihwaInventory() {
                                                             if (filteredDiff.length > 0) {
                                                                 filteredDiff.forEach((d: InventoryDiffItem) => {
                                                                     const orderImpact = dailyOrderDiffMap[snap.date]?.[d.id] || 0;
-                                                                    const pureManualChange = d.change - orderImpact;
+                                                                    
+                                                                    let physicalChange = d.change;
+                                                                    // Fix for artificial spikes on 5/11 - 5/13 caused by system currentStock definition changes.
+                                                                    // We override the physical change to be exactly the known order impact (true sales).
+                                                                    if (['2026-05-11', '2026-05-12', '2026-05-13'].includes(snap.date)) {
+                                                                        physicalChange = orderImpact;
+                                                                    }
+                                                                    
+                                                                    const pureManualChange = physicalChange - orderImpact;
 
                                                                     if (pureManualChange !== 0) validCount++;
 
                                                                     const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
 
-                                                                    const physicalChange = d.change;
-                                                                    const effectiveSales = d.sales !== undefined ? d.sales : (physicalChange < 0 ? Math.abs(physicalChange) : 0);
+                                                                    const effectiveSales = d.sales !== undefined && !['2026-05-11', '2026-05-12', '2026-05-13'].includes(snap.date) 
+                                                                        ? d.sales 
+                                                                        : (physicalChange < 0 ? Math.abs(physicalChange) : 0);
+                                                                        
                                                                     if (effectiveSales > 0) {
                                                                         dailyRevenue += effectiveSales * (analysis ? analysis.sellingPrice : 0);
                                                                     }
