@@ -631,14 +631,6 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
             </span>
         </div>
         ` : ''}
-        <script>
-            window.onload = function() {
-                // Give a small delay to ensure web fonts are loaded
-                setTimeout(function() {
-                    window.print();
-                }, 500);
-            };
-        </script>
     </body>
     </html>
     `;

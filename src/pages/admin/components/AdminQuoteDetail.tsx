@@ -635,7 +635,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         // The quote document itself will retain the edited customer info.
 
         // 2. Upload Admin Attachments to S3
-        const uploadedAttachments: { name: string, url: string }[] = quote.adminAttachments || [];
+        const uploadedAttachments: { name: string, url: string }[] = [...(quote.adminAttachments || [])];
         for (const file of adminAttachmentFiles) {
             const refId = quote.id + '_admin';
             const res = await uploadFile(file, 'quote', refId);
@@ -663,17 +663,9 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             customerInfo: customerInfo // [NEW] Explicitly isolate custom info fields
         };
 
-        // 3. Update Local Store
-        updateQuotation(quote.id, updatePayload); // This also attempts save under the hood, but we explicitly do it here for UX.
-
-        // 4. API Call
+        // 4. Update Local Store & DB (updateQuotation handles both)
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quote.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatePayload)
-            });
-            if (!res.ok) throw new Error(`Server returned ${res.status}`);
+            await updateQuotation(quote.id, updatePayload); 
 
             alert('견적서가 전송되었습니다.');
             onSuccess?.(); // Notify parent to update view
@@ -1397,7 +1389,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             syncCustomerToCRM();
 
                                         // 1. Upload Admin Attachments to S3
-                                        const uploadedAttachments: { name: string, url: string }[] = quote.adminAttachments || [];
+                                        const uploadedAttachments: { name: string, url: string }[] = [...(quote.adminAttachments || [])];
                                         for (const file of adminAttachmentFiles) {
                                             const refId = quote.id + '_admin';
                                             const res = await uploadFile(file, 'quote', refId);
@@ -1418,14 +1410,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             customerInfo: customerInfo // [FIX] Isolate save
                                         };
 
-                                        updateQuotation(quote.id, updatePayload); // Local Update
-
-                                        const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quote.id}`, {
-                                            method: 'PATCH',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify(updatePayload)
-                                        });
-                                        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+                                        await updateQuotation(quote.id, updatePayload); // Local Update & API Fetch
+                                        setAdminAttachmentFiles([]); // 첨부파일 비우기
                                         alert('수정사항이 저장되었습니다.');
                                     } catch (error) {
                                         console.error(error);

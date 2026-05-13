@@ -318,7 +318,7 @@ export default function QuotationEditor() {
         };
     };
 
-    const handleSaveQuotation = async (extraMemo?: string) => {
+    const handleSaveQuotation = async (extraMemo?: string, suppressSuccessModal: boolean = false) => {
         if (!user) return;
 
         try {
@@ -360,11 +360,13 @@ export default function QuotationEditor() {
 
             useStore.getState().addQuotation(payloadData);
 
-            setSuccessConfig({
-                isOpen: true,
-                title: '견적서 저장 완료',
-                description: '견적서가 성공적으로 저장되었습니다.\n나의 페이지에서 확인하실 수 있습니다.'
-            });
+            if (!suppressSuccessModal) {
+                setSuccessConfig({
+                    isOpen: true,
+                    title: '견적서 저장 완료',
+                    description: '견적서가 성공적으로 저장되었습니다.\n나의 페이지에서 확인하실 수 있습니다.'
+                });
+            }
         } catch (error) {
             console.error('Failed to save quotation:', error);
         }
@@ -392,6 +394,8 @@ export default function QuotationEditor() {
             setPreviewDocType(type);
             const html = renderDocumentHTML(payload);
             setPreviewContent(html);
+            // 견적서 발급 시 즉시 뒷단(서버)에 저장되도록 변경
+            handleSaveQuotation(undefined, true);
         } else {
             setPendingDocType(type);
             setIsDeliveryModalOpen(true);
@@ -534,7 +538,7 @@ export default function QuotationEditor() {
                                 onClose={() => setPreviewContent(null)}
                                 docType={previewDocType}
                                 onSend={previewDocType === 'ORDER' ? () => handleSendOrder() : undefined}
-                                onPrint={previewDocType === 'QUOTATION' ? () => handleSaveQuotation() : undefined}
+                                onPrint={undefined}
                                 memo={quotationMemo}
                                 onMemoChange={handlePreviewMemoChange}
                             />
