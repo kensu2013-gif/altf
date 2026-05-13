@@ -1369,7 +1369,7 @@ export default function SihwaInventory() {
         lockedCapital: deadStockValue + excessStockValue,
         totalIssueCount: analyzedInventory.filter(r => r.healthGrade === 'E' || r.excessCategory !== null).length,
       };
-    }, [analyzedInventory, historyData, orders]);
+    }, [analyzedInventory, historyData, orders, quotes]);
 
     const dailyOrderDiffMap = useMemo(() => {
         const map: Record<string, Record<string, number>> = {}; 
