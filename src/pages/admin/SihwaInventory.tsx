@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
-import type { Product, LineItem, Order } from '../../types';
+import type { Product, LineItem } from '../../types';
 import salesHistoryRaw from '../../data/sales_history.json';
 import { COMPETITOR_DATA, getStrategicGrade, type StrategicGrade } from '../../../competitorData';
 import { ItemIntelligenceCard } from './components/ItemIntelligenceCard';
@@ -1391,80 +1391,7 @@ export default function SihwaInventory() {
       };
     }, [analyzedInventory, historyData, orders, quotes]);
 
-    const dailyOrderDiffMap = useMemo(() => {
-        const map: Record<string, Record<string, number>> = {}; 
-        orders.forEach(order => {
-            if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
-            if (order.status !== 'COMPLETED') return; 
 
-            const dateStr = order.adminResponse?.deliveryDate || order.createdAt;
-            // Parse order dates as KST to match backend snapshot dates
-            const dt = new Date(dateStr);
-            const kstDt = new Date(dt.getTime() + 9 * 60 * 60 * 1000);
-            const dateKey = kstDt.toISOString().split('T')[0];
-
-            if (!map[dateKey]) map[dateKey] = {};
-
-            const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
-            const isSihwaIncoming = customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf');
-
-            const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
-            if (!items) return;
-
-            items.forEach((item: LineItem) => {
-                const id = item.productId || item.item_id;
-                if (!id) return;
-                const qty = Number(item.quantity ?? item.qty ?? 0);
-
-                // 시화재고에서 +는 '서울재고/시화' 발주분만 연산되어야 함
-                // 주문관리의 일반 출고(-)는 시화재고에서 직접 차감되지 않음
-                if (!isSihwaIncoming) return;
-                const change = qty;
-
-                map[dateKey][id] = (map[dateKey][id] || 0) + change;
-            });
-        });
-        return map;
-    }, [orders]);
-
-    const dailyPendingMap = useMemo(() => {
-        const map: Record<string, Array<{
-            order: Order;
-            item: Partial<LineItem> & { item_id?: string; qty?: number; transactionIssued?: boolean; name?: string };
-            id: string;
-            qty: number;
-        }>> = {}; 
-        orders.forEach(order => {
-            if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
-            if (order.status === 'COMPLETED') return; 
-
-            const dateStr = order.adminResponse?.deliveryDate || order.createdAt;
-            const dt = new Date(dateStr);
-            const kstDt = new Date(dt.getTime() + 9 * 60 * 60 * 1000);
-            const dateKey = kstDt.toISOString().split('T')[0];
-
-            const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
-            const isSihwaIncoming = customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf');
-
-            if (isSihwaIncoming) {
-                const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
-                if (!items) return;
-                items.forEach((item: Partial<LineItem> & { item_id?: string; qty?: number; transactionIssued?: boolean }) => {
-                    if (item.transactionIssued) return;
-                    const id = item.productId || item.item_id;
-                    if (!id) return;
-                    if (!map[dateKey]) map[dateKey] = [];
-                    map[dateKey].push({
-                        order,
-                        item,
-                        id,
-                        qty: Number(item.quantity ?? item.qty ?? 0)
-                    });
-                });
-            }
-        });
-        return map;
-    }, [orders]);
 
     const handleExportSihwaSummary = () => {
         const headers = ['품목', '두께', '사이즈', '재질', '현재재고(시화)', '입고예정(미결결과)', '발주서번호(들)', '발주날짜(들)', '입고예정일'];
@@ -2329,77 +2256,37 @@ export default function SihwaInventory() {
                                                     <div className="p-8 text-center text-slate-400">최근 변동 이력이 없습니다.</div>
                                                 ) : (
                                                     <div className="p-0">
-                                                        {historyData.inventoryHistory.slice(-10).reverse().map((snap: InventoryHistorySnapshot, idx: number) => {
+                                                        {[...historyData.inventoryHistory].reverse().map((snap: InventoryHistorySnapshot, idx: number) => {
+                                                            const filteredDiff = (snap.diff || []).filter((d: InventoryDiffItem) => {
+                                                                const product = inventory.find(p => p.id === d.id);
+                                                                if (!product) return false;
+                                                                // 평가 기준: 시화 & 대경
+                                                                return product.location === '시화' && product.maker === '대경';
+                                                            });
+
+                                                            if (filteredDiff.length === 0) return null; // 시화 대경 품목의 변동이 없으면 렌더링하지 않음
+
                                                             let dailyRevenue = 0;
                                                             let dailyCost = 0;
 
-                                                            const filteredDiff = (snap.diff || []).filter(d => {
-                                                                const product = inventory.find(p => p.id === d.id);
-                                                                if (!product) return false;
-                                                                const isSihwaPrimary = product.location === '시화' || product.location === '서울' || product.location === '서울재고';
-                                                                const isSihwaSecondary = product.location1 === '시화';
-                                                                // User instruction: Keep past data intact, but evaluate only Sihwa primary stock for recent changes.
-                                                                const isSihwa = snap.date >= '2026-05-11' ? isSihwaPrimary : (isSihwaPrimary || isSihwaSecondary);
-                                                                const isDaekyung = product.maker === '대경' || product.maker1 === '대경';
-                                                                return isSihwa && isDaekyung;
+                                                            filteredDiff.forEach((d: InventoryDiffItem) => {
+                                                                const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
+                                                                if (d.change < 0) { // 출고
+                                                                    dailyRevenue += Math.abs(d.change) * (analysis ? analysis.sellingPrice : 0);
+                                                                } else if (d.change > 0) { // 입고
+                                                                    dailyCost += d.change * (analysis ? analysis.recentPurchasePrice : 0);
+                                                                }
                                                             });
-
-                                                            const filteredPending = (dailyPendingMap[snap.date] || []).filter(pi => {
-                                                                const product = inventory.find(p => p.id === pi.id);
-                                                                if (!product) return false;
-                                                                const isSihwaPrimary = product.location === '시화' || product.location === '서울' || product.location === '서울재고';
-                                                                const isSihwaSecondary = product.location1 === '시화';
-                                                                const isSihwa = snap.date >= '2026-05-11' ? isSihwaPrimary : (isSihwaPrimary || isSihwaSecondary);
-                                                                const isDaekyung = product.maker === '대경' || product.maker1 === '대경';
-                                                                return isSihwa && isDaekyung;
-                                                            });
-
-                                                            let validCount = 0;
-                                                            if (filteredDiff.length > 0) {
-                                                                filteredDiff.forEach((d: InventoryDiffItem) => {
-                                                                    const orderImpact = dailyOrderDiffMap[snap.date]?.[d.id] || 0;
-                                                                    
-                                                                    let physicalChange = d.change;
-                                                                    // Fix for artificial spikes on 5/11 - 5/13 caused by system currentStock definition changes.
-                                                                    // We override the physical change to be exactly the known order impact (true sales).
-                                                                    if (['2026-05-11', '2026-05-12', '2026-05-13'].includes(snap.date)) {
-                                                                        physicalChange = orderImpact;
-                                                                    }
-                                                                    
-                                                                    const pureManualChange = physicalChange - orderImpact;
-
-                                                                    if (pureManualChange !== 0) validCount++;
-
-                                                                    const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
-
-                                                                    const effectiveSales = d.sales !== undefined && !['2026-05-11', '2026-05-12', '2026-05-13'].includes(snap.date) 
-                                                                        ? d.sales 
-                                                                        : (physicalChange < 0 ? Math.abs(physicalChange) : 0);
-                                                                        
-                                                                    if (effectiveSales > 0) {
-                                                                        dailyRevenue += effectiveSales * (analysis ? analysis.sellingPrice : 0);
-                                                                    }
-
-                                                                    const effectiveRestock = physicalChange + effectiveSales;
-                                                                    if (effectiveRestock > 0) {
-                                                                        dailyCost += effectiveRestock * (analysis ? analysis.recentPurchasePrice : 0);
-                                                                    }
-                                                                });
-                                                            }
 
                                                             const isGroupExpanded = expandedDailyGroups[snap.date] ?? (idx === 0);
 
-                                                            const itemsToRender = filteredDiff;
-                                                            const pendingItemsToRender = filteredPending;
-                                                            const totalChangeCount = itemsToRender.length + pendingItemsToRender.length;
-
-                                                                            return (
-                                                                                <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
-                                                                                    <div className="flex flex-col gap-2 mb-3">
-                                                                                        <div className="flex items-center justify-between">
-                                                                                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono font-bold hover:bg-slate-300 cursor-pointer transition-colors" onClick={() => toggleDailyGroup(snap.date)}>{snap.date}</span>
-                                                                                            <span className="text-slate-500 font-medium text-xs">총 변동/대기 {totalChangeCount}건 <span className="text-rose-500 ml-1 font-bold">{validCount > 0 ? `(순수 수기 ${validCount}건)` : ''}</span></span>
-                                                                                        </div>
+                                                            return (
+                                                                <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
+                                                                    <div className="flex flex-col gap-2 mb-3">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono font-bold hover:bg-slate-300 cursor-pointer transition-colors" onClick={() => toggleDailyGroup(snap.date)}>{snap.date}</span>
+                                                                            <span className="text-slate-500 font-medium text-xs">총 변동 {filteredDiff.length}건</span>
+                                                                        </div>
 
                                                                         {(dailyRevenue > 0 || dailyCost > 0) && (
                                                                             <div 
@@ -2407,12 +2294,12 @@ export default function SihwaInventory() {
                                                                                 onClick={() => toggleDailyGroup(snap.date)}
                                                                             >
                                                                                 <div className="flex flex-col flex-1 pl-2 border-l-4 border-blue-400">
-                                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-tight">출고액</span>
+                                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-tight">출고액(추정)</span>
                                                                                     <span className="text-sm font-black text-blue-700">₩{formatCur(dailyRevenue)}</span>
                                                                                 </div>
                                                                                 <div className="w-px h-8 bg-slate-200"></div>
                                                                                 <div className="flex flex-col flex-1 pl-2 border-l-4 border-emerald-400">
-                                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-tight">입고액</span>
+                                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-tight">입고액(추정)</span>
                                                                                     <span className="text-sm font-black text-emerald-700">₩{formatCur(dailyCost)}</span>
                                                                                 </div>
                                                                                 <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isGroupExpanded ? 'rotate-180' : ''}`} />
@@ -2420,88 +2307,40 @@ export default function SihwaInventory() {
                                                                         )}
                                                                     </div>
                                                                     {isGroupExpanded && (
-                                                                        totalChangeCount > 0 ? (
+                                                                        filteredDiff.length > 0 ? (
                                                                             <div className="grid grid-cols-1 gap-2 mt-2">
-                                                                                {pendingItemsToRender.map((pi, piIdx) => {
-                                                                                    const rowKey = `${snap.date}-pending-${pi.id}-${piIdx}`;
-                                                                                    const analysis = pi.id ? analyzedInventory.find(ai => ai.product.id === pi.id) : null;
-                                                                                    const isExpanded = !!expandedTrendItems[rowKey];
-
-                                                                                    return (
-                                                                                        <div key={rowKey} className="bg-rose-50 rounded-lg border border-rose-200 shadow-sm overflow-hidden flex flex-col">
-                                                                                            <div 
-                                                                                                className="flex items-center justify-between p-3 cursor-pointer hover:bg-rose-100/50 transition-colors bg-white/50"
-                                                                                                onClick={() => toggleTrendItem(rowKey)}
-                                                                                            >
-                                                                                                <div className="flex items-center gap-3">
-                                                                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-500 text-white">입고 대기</span>
-                                                                                                    <div className="font-mono text-xs font-black text-slate-800">
-                                                                                                        {pi.item.name || pi.id}
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                                <div className="flex items-center gap-2">
-                                                                                                    <div className="flex gap-1">
-                                                                                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold text-rose-700 bg-white border border-rose-200 shadow-sm">
-                                                                                                            예정 +{pi.qty}개
-                                                                                                        </span>
-                                                                                                    </div>
-                                                                                                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                                                                                </div>
-                                                                                            </div>
-                                                                                            {isExpanded && (
-                                                                                                <div className="p-3 bg-white border-t border-rose-100 flex flex-col gap-2">
-                                                                                                    <div className="flex justify-between items-center text-xs">
-                                                                                                        <span className="text-slate-500 font-bold">주문 고객</span>
-                                                                                                        <span className="font-medium text-slate-700">{pi.order.poEndCustomer || pi.order.customerName || '알 수 없음'}</span>
-                                                                                                    </div>
-                                                                                                    <div className="flex justify-between items-center text-xs">
-                                                                                                        <span className="text-slate-500 font-bold">예상 매입 단가</span>
-                                                                                                        <span className="font-mono font-bold text-slate-700">₩{formatCur(analysis ? analysis.recentPurchasePrice : 0)}</span>
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    );
-                                                                                })}
-                                                                                {[...itemsToRender].sort((a, b) => {
+                                                                                {[...filteredDiff].sort((a, b) => {
                                                                                     const aiA = a.id ? analyzedInventory.find(ai => ai.product.id === a.id) : null;
                                                                                     const aiB = b.id ? analyzedInventory.find(ai => ai.product.id === b.id) : null;
                                                                                     return (aiB ? aiB.deficit : 0) - (aiA ? aiA.deficit : 0);
                                                                                 }).map((d, dIdx) => {
                                                                                     const rowKey = `${snap.date}-${d.id || d.name}-${dIdx}`;
-                                                                                    const orderImpact = dailyOrderDiffMap[snap.date]?.[d.id] || 0;
-                                                                                    const pureManualChange = d.change - orderImpact;
-
                                                                                     const isExpanded = !!expandedTrendItems[rowKey];
                                                                                     const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
+                                                                                    
                                                                                     const sellingPrice = analysis ? analysis.sellingPrice : 0;
                                                                                     const purchasePrice = analysis ? analysis.recentPurchasePrice : 0;
 
-                                                                                    const physicalChange = d.change;
-                                                                                    const effectiveSales = d.sales !== undefined ? d.sales : (physicalChange < 0 ? Math.abs(physicalChange) : 0);
-                                                                                    const effectiveRestock = physicalChange + effectiveSales;
-
                                                                                     const valueChips = [];
-                                                                                    if (effectiveSales > 0) {
+                                                                                    if (d.change < 0) {
                                                                                         valueChips.push({
-                                                                                            label: `출고수량 ${effectiveSales}개`,
-                                                                                            amt: `출고액 ${formatCur(effectiveSales * sellingPrice)}원`,
+                                                                                            label: `출고수량 ${Math.abs(d.change)}개`,
+                                                                                            amt: `출고액 ${formatCur(Math.abs(d.change) * sellingPrice)}원`,
                                                                                             style: 'text-blue-700 bg-blue-50 border border-blue-200'
                                                                                         });
                                                                                     }
-                                                                                    if (effectiveRestock > 0) {
+                                                                                    if (d.change > 0) {
                                                                                         valueChips.push({
-                                                                                            label: `입고수량 ${effectiveRestock}개`,
-                                                                                            amt: `입고액 ${formatCur(effectiveRestock * purchasePrice)}원`,
+                                                                                            label: `입고수량 ${d.change}개`,
+                                                                                            amt: `입고액 ${formatCur(d.change * purchasePrice)}원`,
                                                                                             style: 'text-emerald-700 bg-emerald-50 border border-emerald-200'
                                                                                         });
                                                                                     }
 
                                                                                     const finalId = d.id || d.name || '알수없음';
-                                                                                    const isOrderMatched = pureManualChange === 0 && d.change !== 0;
 
                                                                                     return (
-                                                                                        <div key={dIdx} className={`flex flex-col text-xs bg-white rounded border border-slate-100 border-l-4 ${physicalChange > 0 ? 'border-l-emerald-500' : 'border-l-blue-500'} ${isOrderMatched ? 'opacity-80 border-dashed' : ''}`}>
+                                                                                        <div key={dIdx} className={`flex flex-col text-xs bg-white rounded border border-slate-100 border-l-4 ${d.change > 0 ? 'border-l-emerald-500' : 'border-l-blue-500'}`}>
                                                                                             <div 
                                                                                                 className="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-50 transition-colors"
                                                                                                 onClick={() => toggleTrendItem(rowKey)}
@@ -2526,14 +2365,7 @@ export default function SihwaInventory() {
                                                                                                                     )}
                                                                                                                 </div>
                                                                                                             ))}
-                                                                                                            {valueChips.length === 0 && physicalChange === 0 && (
-                                                                                                                <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">변동상쇄됨 (0)</span>
-                                                                                                            )}
-                                                                                                            {isOrderMatched && (
-                                                                                                                <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded ml-1 font-bold" title="주문 관리 시스템 기록과 완벽 일치">✔️ 주문연동</span>
-                                                                                                            )}
                                                                                                         </div>
-
                                                                                                     </div>
                                                                                                     <ChevronDown className={`w-4 h-4 text-slate-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                                                                                 </div>
