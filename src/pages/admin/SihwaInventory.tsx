@@ -2461,7 +2461,7 @@ export default function SihwaInventory() {
 
                             {/* TAB 3: ALL TABLE WITH SORTING */}
                             {activeTab === 'ALL_TABLE' && (
-                                <div className="space-y-4 overflow-x-auto pb-4">
+                                <div className="space-y-4 overflow-x-auto overflow-y-auto max-h-[800px] custom-scrollbar pb-4 bg-white">
                                 <table className="w-full text-left text-sm whitespace-nowrap min-w-[1000px]">
                                     <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none sticky top-0 z-10 shadow-sm">
                                         <tr className="text-xs uppercase tracking-wider text-slate-500 font-bold border-b-2 border-slate-200">
