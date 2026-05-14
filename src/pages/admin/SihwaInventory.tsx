@@ -2260,11 +2260,10 @@ export default function SihwaInventory() {
                                                             const filteredDiff = (snap.diff || []).filter((d: InventoryDiffItem) => {
                                                                 const product = inventory.find(p => p.id === d.id);
                                                                 if (!product) return false;
-                                                                // 평가 기준: 시화(실제 시스템상 서울/서울재고/시화) & 대경
-                                                                const isSihwaPrimary = product.location === '시화' || product.location === '서울' || product.location === '서울재고';
-                                                                const isSihwaSecondary = product.location1 === '시화';
-                                                                const isSihwa = isSihwaPrimary || isSihwaSecondary;
+                                                                
+                                                                const isSihwa = product.location === '시화' || product.location1 === '시화' || (product.locationStock && product.locationStock['시화'] !== undefined);
                                                                 const isDaekyung = product.maker === '대경' || product.maker1 === '대경';
+                                                                
                                                                 return isSihwa && isDaekyung;
                                                             });
 
