@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import { useInventory } from '../../hooks/useInventory';
 import { 
@@ -15,7 +15,8 @@ import {
     Download,
     ShoppingCart,
     Filter,
-    X
+    X,
+    RefreshCw
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
@@ -199,7 +200,10 @@ export default function SihwaInventory() {
         addItem: state.addItem
     })));
     const navigate = useNavigate();
-    const { inventory, isLoading: invLoading } = useInventory();
+    const { inventory, isLoading: invLoading, refresh: refreshInventory } = useInventory();
+
+    const [targetRegion] = useState('시화');
+    const [targetMaker] = useState('대경');
 
     const [historyData, setHistoryData] = useState<{
         inventoryHistory: InventoryHistorySnapshot[];
@@ -279,37 +283,38 @@ export default function SihwaInventory() {
     };
 
     // 1. Fetch History Data from the local-api-server (MUST WAIT FOR INVENTORY TO FINISH DIFFING)
+    const fetchHistory = useCallback(async () => {
+        try {
+            setHistoryLoading(true);
+            const token = useStore.getState().auth.token;
+            const headers: Record<string, string> = { 'x-requester-role': 'admin' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/admin/inventory-history', {
+                headers
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const ignoreDates = ['2026-04-14', '2026-04-15', '2026-04-16'];
+                if (data.inventoryHistory) {
+                    const filteredHistory = data.inventoryHistory.filter((h: { date: string }) => !ignoreDates.includes(h.date));
+                    setHistoryData({ ...data, inventoryHistory: filteredHistory });
+                } else if (Array.isArray(data)) {
+                    const filteredHistory = data.filter((h: { date: string }) => !ignoreDates.includes(h.date));
+                    setHistoryData({ inventoryHistory: filteredHistory, daekyungHistory: [] });
+                }
+            }
+        } catch (err) {
+            console.error('Failed to fetch inventory history:', err);
+        } finally {
+            setHistoryLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         if (invLoading) return; // Wait until inventory fetch completes (which triggers backend snapshot ledger)
-
-        const fetchHistory = async () => {
-            try {
-                const token = useStore.getState().auth.token;
-                const headers: Record<string, string> = { 'x-requester-role': 'admin' };
-                if (token) headers['Authorization'] = `Bearer ${token}`;
-
-                const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/admin/inventory-history', {
-                    headers
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    const ignoreDates = ['2026-04-14', '2026-04-15', '2026-04-16'];
-                    if (data.inventoryHistory) {
-                        const filteredHistory = data.inventoryHistory.filter((h: { date: string }) => !ignoreDates.includes(h.date));
-                        setHistoryData({ ...data, inventoryHistory: filteredHistory });
-                    } else if (Array.isArray(data)) {
-                        const filteredHistory = data.filter((h: { date: string }) => !ignoreDates.includes(h.date));
-                        setHistoryData({ inventoryHistory: filteredHistory, daekyungHistory: [] });
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to fetch inventory history:', err);
-            } finally {
-                setHistoryLoading(false);
-            }
-        };
         fetchHistory();
-    }, [invLoading]);
+    }, [invLoading, fetchHistory]);
 
     // 1.5 Fetch Orders to sync with inventory
     const setOrders = useStore(state => state.setOrders);
@@ -361,6 +366,11 @@ export default function SihwaInventory() {
         fetchUsers();
     }, [setOrders, setQuotes, fetchUsers, user]);
 
+    const handleDataRefresh = async () => {
+        if (refreshInventory) await refreshInventory();
+        await fetchHistory();
+    };
+
     // Filter out irrelevant orders
     const activeOrders = useMemo(() => {
         return orders.filter(order => !['CANCELLED', 'WITHDRAWN'].includes(order.status) && !order.isDeleted);
@@ -399,6 +409,42 @@ export default function SihwaInventory() {
         inventory.forEach((p: Product) => map.set(p.id, p));
         return map;
     }, [inventory]);
+
+    const groupedDailyTrend = useMemo(() => {
+        const groups: Record<string, { date: string, items: Record<string, { product: Product, incoming: number, outgoing: number }> }> = {};
+        
+        [...historyData.inventoryHistory].forEach(snap => {
+            const date = snap.date.split('T')[0]; // Ensure it's just YYYY-MM-DD
+            if (!groups[date]) {
+                groups[date] = { date, items: {} };
+            }
+            
+            (snap.diff || []).forEach(d => {
+                const product = inventoryMap.get(d.id);
+                if (!product) return;
+                
+                const locStr = product.location || product.location1 || '';
+                const locStock = product.locationStock || {};
+                const isTargetLocation = locStr.includes(targetRegion) || locStock[targetRegion] !== undefined;
+                const isTargetMaker = product.maker === targetMaker || product.maker1 === targetMaker;
+                
+                if (isTargetLocation && isTargetMaker) {
+                    if (!groups[date].items[d.id]) {
+                        groups[date].items[d.id] = { product: product as Product, incoming: 0, outgoing: 0 };
+                    }
+                    if (d.change > 0) {
+                        groups[date].items[d.id].incoming += d.change;
+                    } else if (d.change < 0) {
+                        groups[date].items[d.id].outgoing += Math.abs(d.change);
+                    }
+                }
+            });
+        });
+
+        return Object.values(groups)
+            .filter(g => Object.keys(g.items).length > 0)
+            .sort((a, b) => b.date.localeCompare(a.date));
+    }, [historyData.inventoryHistory, inventoryMap, targetRegion, targetMaker]);
 
     const monthData = useMemo(() => {
         const monthlyOrders = sihwaOrders.filter(o => new Date(o.createdAt).toISOString().slice(0, 7) === selectedMonth);
@@ -1529,6 +1575,16 @@ export default function SihwaInventory() {
                     </p>
                 </div>
                 <div className="flex gap-2 shrink-0">
+                    {user?.role === 'MASTER' && (
+                        <button
+                            onClick={handleDataRefresh}
+                            disabled={invLoading || historyLoading}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-bold text-sm shadow-md transition-all active:scale-95 border border-blue-600"
+                        >
+                            <RefreshCw className={`w-4 h-4 ${(invLoading || historyLoading) ? 'animate-spin' : ''}`} />
+                            데이터 새로고침
+                        </button>
+                    )}
                     <button 
                         onClick={handleExportSihwaSummary} 
                         className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-black text-white rounded-lg font-bold text-sm shadow-md transition-all active:scale-95 border border-slate-700"
@@ -2256,45 +2312,31 @@ export default function SihwaInventory() {
                                                     <div className="p-8 text-center text-slate-400">최근 변동 이력이 없습니다.</div>
                                                 ) : (
                                                     <div className="p-0">
-                                                        {[...historyData.inventoryHistory].reverse().map((snap: InventoryHistorySnapshot, idx: number) => {
-                                                            const filteredDiff = (snap.diff || []).filter((d: InventoryDiffItem) => {
-                                                                const product = inventory.find(p => p.id === d.id);
-                                                                if (!product) return false;
-                                                                
-                                                                const isSihwa = product.location === '시화' || product.location1 === '시화' || (product.locationStock && product.locationStock['시화'] !== undefined);
-                                                                const isDaekyung = product.maker === '대경' || product.maker1 === '대경';
-                                                                
-                                                                return isSihwa && isDaekyung;
-                                                            });
-
-                                                            if (filteredDiff.length === 0) return null; // 시화 대경 품목의 변동이 없으면 렌더링하지 않음
-
+                                                        {groupedDailyTrend.map((group, idx) => {
                                                             let dailyRevenue = 0;
                                                             let dailyCost = 0;
-
-                                                            filteredDiff.forEach((d: InventoryDiffItem) => {
-                                                                const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
-                                                                if (d.change < 0) { // 출고
-                                                                    dailyRevenue += Math.abs(d.change) * (analysis ? analysis.sellingPrice : 0);
-                                                                } else if (d.change > 0) { // 입고
-                                                                    dailyCost += d.change * (analysis ? analysis.recentPurchasePrice : 0);
-                                                                }
+                                                            
+                                                            const itemsList = Object.values(group.items);
+                                                            itemsList.forEach(({ product, incoming, outgoing }) => {
+                                                                const analysis = analyzedInventory.find(ai => ai.product.id === product.id);
+                                                                if (outgoing > 0) dailyRevenue += outgoing * (analysis ? analysis.sellingPrice : 0);
+                                                                if (incoming > 0) dailyCost += incoming * (analysis ? analysis.recentPurchasePrice : 0);
                                                             });
 
-                                                            const isGroupExpanded = expandedDailyGroups[snap.date] ?? (idx === 0);
+                                                            const isGroupExpanded = expandedDailyGroups[group.date] ?? (idx === 0);
 
                                                             return (
-                                                                <div key={idx} className="border-b border-slate-100 last:border-0 p-4">
+                                                                <div key={group.date} className="border-b border-slate-100 last:border-0 p-4">
                                                                     <div className="flex flex-col gap-2 mb-3">
                                                                         <div className="flex items-center justify-between">
-                                                                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono font-bold hover:bg-slate-300 cursor-pointer transition-colors" onClick={() => toggleDailyGroup(snap.date)}>{snap.date}</span>
-                                                                            <span className="text-slate-500 font-medium text-xs">총 변동 {filteredDiff.length}건</span>
+                                                                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono font-bold hover:bg-slate-300 cursor-pointer transition-colors" onClick={() => toggleDailyGroup(group.date)}>{group.date}</span>
+                                                                            <span className="text-slate-500 font-medium text-xs">총 변동 {itemsList.length}건</span>
                                                                         </div>
 
                                                                         {(dailyRevenue > 0 || dailyCost > 0) && (
                                                                             <div 
                                                                                 className="flex items-center gap-3 mt-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200 shadow-sm cursor-pointer hover:bg-slate-100 transition-colors"
-                                                                                onClick={() => toggleDailyGroup(snap.date)}
+                                                                                onClick={() => toggleDailyGroup(group.date)}
                                                                             >
                                                                                 <div className="flex flex-col flex-1 pl-2 border-l-4 border-blue-400">
                                                                                     <span className="text-[10px] text-slate-500 font-bold tracking-tight">출고액(추정)</span>
@@ -2310,95 +2352,94 @@ export default function SihwaInventory() {
                                                                         )}
                                                                     </div>
                                                                     {isGroupExpanded && (
-                                                                        filteredDiff.length > 0 ? (
-                                                                            <div className="grid grid-cols-1 gap-2 mt-2">
-                                                                                {[...filteredDiff].sort((a, b) => {
-                                                                                    const aiA = a.id ? analyzedInventory.find(ai => ai.product.id === a.id) : null;
-                                                                                    const aiB = b.id ? analyzedInventory.find(ai => ai.product.id === b.id) : null;
-                                                                                    return (aiB ? aiB.deficit : 0) - (aiA ? aiA.deficit : 0);
-                                                                                }).map((d, dIdx) => {
-                                                                                    const rowKey = `${snap.date}-${d.id || d.name}-${dIdx}`;
-                                                                                    const isExpanded = !!expandedTrendItems[rowKey];
-                                                                                    const analysis = d.id ? analyzedInventory.find(ai => ai.product.id === d.id) : null;
-                                                                                    
-                                                                                    const sellingPrice = analysis ? analysis.sellingPrice : 0;
-                                                                                    const purchasePrice = analysis ? analysis.recentPurchasePrice : 0;
+                                                                        <div className="grid grid-cols-1 gap-2 mt-2">
+                                                                            {itemsList.sort((a, b) => {
+                                                                                const aiA = analyzedInventory.find(ai => ai.product.id === a.product.id);
+                                                                                const aiB = analyzedInventory.find(ai => ai.product.id === b.product.id);
+                                                                                return (aiB ? aiB.deficit : 0) - (aiA ? aiA.deficit : 0);
+                                                                            }).map(item => {
+                                                                                const rowKey = `${group.date}-${item.product.id}`;
+                                                                                const isExpanded = !!expandedTrendItems[rowKey];
+                                                                                const analysis = analyzedInventory.find(ai => ai.product.id === item.product.id);
+                                                                                
+                                                                                const sellingPrice = analysis ? analysis.sellingPrice : 0;
+                                                                                const purchasePrice = analysis ? analysis.recentPurchasePrice : 0;
 
-                                                                                    const valueChips = [];
-                                                                                    if (d.change < 0) {
-                                                                                        valueChips.push({
-                                                                                            label: `출고수량 ${Math.abs(d.change)}개`,
-                                                                                            amt: `출고액 ${formatCur(Math.abs(d.change) * sellingPrice)}원`,
-                                                                                            style: 'text-blue-700 bg-blue-50 border border-blue-200'
-                                                                                        });
-                                                                                    }
-                                                                                    if (d.change > 0) {
-                                                                                        valueChips.push({
-                                                                                            label: `입고수량 ${d.change}개`,
-                                                                                            amt: `입고액 ${formatCur(d.change * purchasePrice)}원`,
-                                                                                            style: 'text-emerald-700 bg-emerald-50 border border-emerald-200'
-                                                                                        });
-                                                                                    }
+                                                                                const valueChips = [];
+                                                                                if (item.outgoing > 0) {
+                                                                                    valueChips.push({
+                                                                                        label: `출고수량 ${item.outgoing}개`,
+                                                                                        amt: `출고액 ${formatCur(item.outgoing * sellingPrice)}원`,
+                                                                                        style: 'text-blue-700 bg-blue-50 border border-blue-200'
+                                                                                    });
+                                                                                }
+                                                                                if (item.incoming > 0) {
+                                                                                    valueChips.push({
+                                                                                        label: `입고수량 ${item.incoming}개`,
+                                                                                        amt: `입고액 ${formatCur(item.incoming * purchasePrice)}원`,
+                                                                                        style: 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                                                                                    });
+                                                                                }
 
-                                                                                    const finalId = d.id || d.name || '알수없음';
+                                                                                const finalId = item.product.id || '알수없음';
+                                                                                const isNetIncoming = item.incoming >= item.outgoing;
 
-                                                                                    return (
-                                                                                        <div key={dIdx} className={`flex flex-col text-xs bg-white rounded border border-slate-100 border-l-4 ${d.change > 0 ? 'border-l-emerald-500' : 'border-l-blue-500'}`}>
-                                                                                            <div 
-                                                                                                className="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-50 transition-colors"
-                                                                                                onClick={() => toggleTrendItem(rowKey)}
-                                                                                            >
-                                                                                                <div className="flex flex-col flex-1 min-w-0 pr-2">
-                                                                                                    <span className="font-bold text-slate-700 font-mono truncate" title={finalId}>{finalId}</span>
-                                                                                                    {d.name && d.name !== finalId && <span className="text-[10px] text-slate-400 truncate">{d.name}</span>}
-                                                                                                </div>
-                                                                                                <div className="flex items-center gap-2 shrink-0">
-                                                                                                    <div className="flex flex-col items-end gap-1">
-                                                                                                        <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-[200px]">
-                                                                                                            {analysis && (
-                                                                                                                <div className="text-[10px] w-full text-right text-slate-500 group-hover:text-slate-700 transition-colors mt-0.5">
-                                                                                                                    현재고 <span className="font-bold text-slate-700">{analysis.shQty}</span> / 적정재고 <span className="font-bold text-slate-700">{analysis.safeStock}</span>
-                                                                                                                </div>
-                                                                                                            )}
-                                                                                                            {valueChips.map((chip, i) => (
-                                                                                                                <div key={i} className={`flex flex-col items-end px-1.5 py-0.5 rounded ${chip.style}`}>
-                                                                                                                    <span className="font-bold tracking-tight">{chip.label}</span>
-                                                                                                                    {(sellingPrice > 0 || purchasePrice > 0) && (
-                                                                                                                        <span className="text-[9px] opacity-80">{chip.amt}</span>
-                                                                                                                    )}
-                                                                                                                </div>
-                                                                                                            ))}
-                                                                                                        </div>
+                                                                                return (
+                                                                                    <div key={rowKey} className={`flex flex-col text-xs bg-white rounded border border-slate-100 border-l-4 ${isNetIncoming ? 'border-l-emerald-500' : 'border-l-blue-500'}`}>
+                                                                                        <div 
+                                                                                            className="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-50 transition-colors"
+                                                                                            onClick={() => toggleTrendItem(rowKey)}
+                                                                                        >
+                                                                                            <div className="flex flex-col flex-1 min-w-0 pr-2">
+                                                                                                <span className="font-bold text-slate-700 font-mono truncate" title={finalId}>{finalId}</span>
+                                                                                                {item.product.name && item.product.name !== finalId && <span className="text-[10px] text-slate-400 truncate">{item.product.name}</span>}
+                                                                                            </div>
+                                                                                            <div className="flex items-center gap-2 shrink-0">
+                                                                                                <div className="flex flex-col items-end gap-1">
+                                                                                                    <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-[200px]">
+                                                                                                        {analysis && (
+                                                                                                            <div className="text-[10px] w-full text-right text-slate-500 group-hover:text-slate-700 transition-colors mt-0.5">
+                                                                                                                현재고 <span className="font-bold text-slate-700">{analysis.shQty}</span> / 적정재고 <span className="font-bold text-slate-700">{analysis.safeStock}</span>
+                                                                                                            </div>
+                                                                                                        )}
+                                                                                                        {valueChips.map((chip, i) => (
+                                                                                                            <div key={i} className={`flex flex-col items-end px-1.5 py-0.5 rounded ${chip.style}`}>
+                                                                                                                <span className="font-bold tracking-tight">{chip.label}</span>
+                                                                                                                {(sellingPrice > 0 || purchasePrice > 0) && (
+                                                                                                                    <span className="text-[9px] opacity-80">{chip.amt}</span>
+                                                                                                                )}
+                                                                                                            </div>
+                                                                                                        ))}
                                                                                                     </div>
-                                                                                                    <ChevronDown className={`w-4 h-4 text-slate-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                                                                </div>
+                                                                                                <ChevronDown className={`w-4 h-4 text-slate-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                                                            </div>
+                                                                                        </div>
+
+                                                                                        {isExpanded && analysis && (
+                                                                                            <div className="p-3 bg-slate-50/50 border-t border-slate-100 grid grid-cols-2 gap-4">
+                                                                                                <div className="flex flex-col gap-1">
+                                                                                                    <span className="text-[10px] text-slate-400 font-bold">현재재고(시화)</span>
+                                                                                                    <span className="text-sm font-black text-slate-700">{analysis.shQty} <span className="text-[10px] font-normal text-slate-500">개</span></span>
+                                                                                                </div>
+                                                                                                <div className="flex flex-col gap-1">
+                                                                                                    <span className="text-[10px] text-slate-400 font-bold">적정재고(목표)</span>
+                                                                                                    <span className="text-sm font-bold text-indigo-500">{analysis.safeStock} <span className="text-[10px] font-normal text-slate-500">개</span></span>
+                                                                                                </div>
+                                                                                                <div className="flex flex-col gap-1">
+                                                                                                    <span className="text-[10px] text-slate-400 font-bold">매출단가(추정)</span>
+                                                                                                    <span className="text-sm font-bold text-slate-700">{formatCur(analysis.sellingPrice)} <span className="text-[10px] font-normal text-slate-500">원</span></span>
+                                                                                                </div>
+                                                                                                <div className="flex flex-col gap-1">
+                                                                                                    <span className="text-[10px] text-slate-400 font-bold">매입단가(최근)</span>
+                                                                                                    <span className="text-sm font-bold text-slate-700">{formatCur(analysis.recentPurchasePrice)} <span className="text-[10px] font-normal text-slate-500">원</span></span>
                                                                                                 </div>
                                                                                             </div>
-
-                                                                                            {isExpanded && analysis && (
-                                                                                                <div className="p-3 bg-slate-50/50 border-t border-slate-100 grid grid-cols-2 gap-4">
-                                                                                                    <div className="flex flex-col gap-1">
-                                                                                                        <span className="text-[10px] text-slate-400 font-bold">현재재고(시화)</span>
-                                                                                                        <span className="text-sm font-black text-slate-700">{analysis.shQty} <span className="text-[10px] font-normal text-slate-500">개</span></span>
-                                                                                                    </div>
-                                                                                                    <div className="flex flex-col gap-1">
-                                                                                                        <span className="text-[10px] text-slate-400 font-bold">적정재고(목표)</span>
-                                                                                                        <span className="text-sm font-bold text-indigo-500">{analysis.safeStock} <span className="text-[10px] font-normal text-slate-500">개</span></span>
-                                                                                                    </div>
-                                                                                                    <div className="flex flex-col gap-1">
-                                                                                                        <span className="text-[10px] text-slate-400 font-bold">매출단가(추정)</span>
-                                                                                                        <span className="text-sm font-bold text-slate-700">{formatCur(analysis.sellingPrice)} <span className="text-[10px] font-normal text-slate-500">원</span></span>
-                                                                                                    </div>
-                                                                                                    <div className="flex flex-col gap-1">
-                                                                                                        <span className="text-[10px] text-slate-400 font-bold">매입단가(최근)</span>
-                                                                                                        <span className="text-sm font-bold text-slate-700">{formatCur(analysis.recentPurchasePrice)} <span className="text-[10px] font-normal text-slate-500">원</span></span>
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    );
-                                                                                })}
-                                                                            </div>
-                                                                        ) : <p className="text-xs text-slate-400 mt-2 px-1">변동 이력이 없습니다.</p>
+                                                                                        )}
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
                                                                     )}
                                                                 </div>
                                                             );

@@ -54,7 +54,7 @@ export function useInventory() {
     const setInventory = useStore((state) => state.setInventory);
     const existingInventory = useStore((state) => state.inventory);
 
-    const { data, error, isLoading, isValidating } = useSWR(INVENTORY_URL, fetcher, {
+    const { data, error, isLoading, isValidating, mutate } = useSWR(INVENTORY_URL, fetcher, {
         revalidateIfStale: false, // Don't revalidate if we have data (unless expired)
         revalidateOnFocus: false,
         revalidateOnReconnect: true,
@@ -150,7 +150,8 @@ export function useInventory() {
         lastModified: data?.lastModified || null,
         isLoading,
         isValidating,
-        error: error ? String(error) : null
+        error: error ? String(error) : null,
+        refresh: mutate
     };
 }
 
