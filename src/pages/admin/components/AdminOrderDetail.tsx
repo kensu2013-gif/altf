@@ -62,7 +62,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const cleanDefault = (val: string) => {
         if (!val) return '';
         if (val === '000-00-00000' || val === '-' || val === 'Admin' || val === '010-0000-0000' || val === 'Unknown') return '';
-        return val;
+        // Also apply the cleanText logic here for consistent unicode corruption cleanup
+        let cleaned = val.replace(/\uFFFD{1,3}동대로/g, '낙동대로');
+        cleaned = cleaned.replace(/[\uFFFC\uFFFD]/g, '');
+        return cleaned;
     };
 
     const [editableCustomerInfo, setEditableCustomerInfo] = useState({
@@ -107,7 +110,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         .catch(console.error);
     }, [user]);
 
-    const [poEndCustomer, setPoEndCustomer] = useState(order.poEndCustomer || order.customerName || '');
+    const [poEndCustomer, setPoEndCustomer] = useState(() => {
+        const val = order.poEndCustomer || order.customerName || '';
+        return val.replace(/\uFFFD{1,3}동대로/g, '낙동대로').replace(/[\uFFFC\uFFFD]/g, '');
+    });
 
     const uploadFile = useStore(state => state.uploadFile);
 
@@ -211,13 +217,27 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const [currentManagers, setCurrentManagers] = useState<{ id: string; name: string }[]>(order.managers || (order.manager ? [order.manager] : []));
 
     // PO Specific State
-    const [supplierInfo, setSupplierInfo] = useState(order.supplierInfo || {
-        company_name: '(주)대경벤드',
-        contact_name: '정호근 과장',
-        tel: '055-364-1800',
-        email: 'dksales@daekyungbend.com',
-        address: '경상남도 양산시 어실로 115',
-        note: ''
+    const [supplierInfo, setSupplierInfo] = useState(() => {
+        let info = order.supplierInfo;
+        if (!info) {
+            info = {
+                company_name: '(주)대경벤드',
+                contact_name: '정호근 과장',
+                tel: '055-364-1800',
+                email: 'dksales@daekyungbend.com',
+                address: '경상남도 양산시 어실로 115',
+                note: ''
+            };
+        }
+        return {
+            ...info,
+            company_name: cleanText(info.company_name),
+            contact_name: cleanText(info.contact_name),
+            address: cleanText(info.address),
+            note: cleanText(info.note),
+            tel: info.tel || '',
+            email: info.email || ''
+        };
     });
 
     const [deliveryNoteFiles, setDeliveryNoteFiles] = useState<File[]>([]);
@@ -255,15 +275,33 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const [isSendingWebhook, setIsSendingWebhook] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
+    const cleanText = (val: string | undefined | null) => {
+        if (!val) return '';
+        // Fix specific known corruption: "낙동대로" turning into "동대로"
+        let cleaned = val.replace(/\uFFFD{1,3}동대로/g, '낙동대로');
+        // Remove any remaining generic corruption markers
+        cleaned = cleaned.replace(/[\uFFFC\uFFFD]/g, '');
+        return cleaned;
+    };
+
     const [buyerInfo, setBuyerInfo] = useState(() => {
-        if (order.buyerInfo) return order.buyerInfo;
-        // Default to ALTF info
+        let info = order.buyerInfo;
+        if (!info) {
+            info = {
+                company_name: '알트에프',
+                contact_name: user?.contactName || '조현진 대표',
+                tel: user?.phone || '051-303-3751',
+                email: user?.email || 'altf@altf.kr',
+                address: user?.address || '부산시 사상구 낙동대로1330번길 67'
+            };
+        }
         return {
-            company_name: '알트에프',
-            contact_name: user?.contactName || '조현진 대표',
-            tel: user?.phone || '051-303-3751',
-            email: user?.email || 'altf@altf.kr',
-            address: user?.address || '부산시 사상구 낙동대로1330번길 67'
+            ...info,
+            company_name: cleanText(info.company_name),
+            contact_name: cleanText(info.contact_name),
+            address: cleanText(info.address),
+            tel: info.tel || '',
+            email: info.email || ''
         };
     });
 
@@ -281,7 +319,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     // Shipping Memo State (Editable)
     const [shippingMemo, setShippingMemo] = useState(() => {
         const memo = order.memo || order.payload?.customer?.memo || '';
-        return memo.replace(/[\uFFFC\uFFFD]/g, '');
+        return cleanText(memo);
     });
 
     // --- Delivery Preset Logic ---
