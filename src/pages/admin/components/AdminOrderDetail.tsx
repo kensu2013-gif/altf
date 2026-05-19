@@ -36,6 +36,21 @@ interface CrmCustomerOption {
     contacts?: { contactName: string; phone: string; email: string; }[];
 }
 
+const cleanText = (val: string | undefined | null) => {
+    if (!val) return '';
+    // Fix specific known corruption: "낙동대로" turning into "동대로"
+    let cleaned = val.replace(/\uFFFD{1,3}동대로/g, '낙동대로');
+    // Remove any remaining generic corruption markers
+    cleaned = cleaned.replace(/[\uFFFC\uFFFD]/g, '');
+    return cleaned;
+};
+
+const cleanDefault = (val: string) => {
+    if (!val) return '';
+    if (val === '000-00-00000' || val === '-' || val === 'Admin' || val === '010-0000-0000' || val === 'Unknown') return '';
+    return cleanText(val);
+};
+
 
 export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose, onUpdate, initialMode = 'CUSTOMER' }: AdminOrderDetailProps) {
     const inventory = useStore((state) => state.inventory);
@@ -59,14 +74,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         };
     }, [order.payload, user]);
 
-    const cleanDefault = (val: string) => {
-        if (!val) return '';
-        if (val === '000-00-00000' || val === '-' || val === 'Admin' || val === '010-0000-0000' || val === 'Unknown') return '';
-        // Also apply the cleanText logic here for consistent unicode corruption cleanup
-        let cleaned = val.replace(/\uFFFD{1,3}동대로/g, '낙동대로');
-        cleaned = cleaned.replace(/[\uFFFC\uFFFD]/g, '');
-        return cleaned;
-    };
+
 
     const [editableCustomerInfo, setEditableCustomerInfo] = useState({
         bizNo: cleanDefault(order.customerBizNo || customerInfo.bizNo),
@@ -275,14 +283,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const [isSendingWebhook, setIsSendingWebhook] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    const cleanText = (val: string | undefined | null) => {
-        if (!val) return '';
-        // Fix specific known corruption: "낙동대로" turning into "동대로"
-        let cleaned = val.replace(/\uFFFD{1,3}동대로/g, '낙동대로');
-        // Remove any remaining generic corruption markers
-        cleaned = cleaned.replace(/[\uFFFC\uFFFD]/g, '');
-        return cleaned;
-    };
+
 
     const [buyerInfo, setBuyerInfo] = useState(() => {
         let info = order.buyerInfo;
