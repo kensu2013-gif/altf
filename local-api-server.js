@@ -22,7 +22,12 @@ let db = {
     orders: [],
     loginLogs: [],
     inventoryHistory: [],
-    customers: []
+    customers: [],
+    lastSnapshotDate: null,
+    lastSnapshot: null,
+    currentSnapshot: null,
+    lastDaekyungSnapshot: null,
+    currentDaekyungSnapshot: null
 };
 
 // Load Data
@@ -35,11 +40,16 @@ async function loadData() {
             db.orders = json.orders || [];
             db.loginLogs = json.loginLogs || [];
             db.inventoryHistory = json.inventoryHistory || [];
-            db.inventorySnapshot = json.inventorySnapshot || null; // Add snapshot support
-            db.daekyungSnapshot = json.daekyungSnapshot || null;
+            db.inventorySnapshot = json.inventorySnapshot || null; // Keep legacy for fallback
+            db.daekyungSnapshot = json.daekyungSnapshot || null; // Keep legacy for fallback
+            db.lastSnapshotDate = json.lastSnapshotDate || null;
+            db.lastSnapshot = json.lastSnapshot || json.inventorySnapshot || null;
+            db.currentSnapshot = json.currentSnapshot || json.inventorySnapshot || null;
+            db.lastDaekyungSnapshot = json.lastDaekyungSnapshot || json.daekyungSnapshot || null;
+            db.currentDaekyungSnapshot = json.currentDaekyungSnapshot || json.daekyungSnapshot || null;
             db.daekyungHistory = json.daekyungHistory || [];
             db.customers = json.customers || [];
-            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.loginLogs.length} logs, ${db.inventoryHistory.length} history, Snapshot exists: ${!!db.inventorySnapshot}`);
+            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.loginLogs.length} logs, ${db.inventoryHistory.length} history, Snapshot Date: ${db.lastSnapshotDate}`);
             
             // Seed Customers if empty
             if (db.customers.length === 0) {
@@ -403,109 +413,100 @@ const server = http.createServer(async (req, res) => {
                     const daekyungHistory = db.daekyungHistory || []; 
                     db.daekyungHistory = daekyungHistory; // Ensure linked
                     
-                    // The Perpetual State-Diffing Ledger Pattern
-                    if (!db.inventorySnapshot || !db.daekyungSnapshot) {
-                        if (!db.inventorySnapshot) db.inventorySnapshot = sihwaStockMap;
-                        if (!db.daekyungSnapshot) db.daekyungSnapshot = ysStockMap;
+                    // Initialize if missing
+                    if (!db.lastSnapshotDate) {
+                        db.lastSnapshotDate = today;
+                        db.lastSnapshot = sihwaStockMap;
+                        db.currentSnapshot = sihwaStockMap;
+                        db.lastDaekyungSnapshot = ysStockMap;
+                        db.currentDaekyungSnapshot = ysStockMap;
                         
                         if (history.length === 0) history.push({ date: today, diff: [] });
                         if (daekyungHistory.length === 0) daekyungHistory.push({ date: today, diff: [] });
                         
                         await saveData();
-                        console.log(`[API] Initialized perpetual inventory snapshot ledger for Sihwa & Daekyung.`);
-                    } else {
-                        // SIHWA DIFF
-                        const changesObj = {};
-                        const daekyungChangesObj = {};
-                        
-                        const isValidItem = (name) => {
-                            if (!name) return false;
-                            const nameUpper = name.toUpperCase();
-                            const isCompositeOrStubend = nameUpper.startsWith('COMPOSITE') || nameUpper.startsWith('STUBEND');
-                            const validPrefixes = ['90', '45', 'R', 'T', 'CAP'];
-                            return !isCompositeOrStubend && validPrefixes.some(p => nameUpper.startsWith(p));
-                        };
-                        
-                        // Sihwa
-                        for (const [id, data] of Object.entries(sihwaStockMap)) {
-                            if (!isValidItem(data.name)) continue;
-                            const oldRecord = db.inventorySnapshot[id];
-                            const oldStock = oldRecord ? oldRecord.stock : 0;
-                            if (oldStock !== data.stock) {
-                                changesObj[id] = { name: data.name, change: data.stock - oldStock, from: oldStock, to: data.stock };
-                            }
-                        }
-                        for (const [id, oldRecord] of Object.entries(db.inventorySnapshot)) {
-                            if (!isValidItem(oldRecord.name)) continue;
-                            if (sihwaStockMap[id] === undefined) {
-                                changesObj[id] = { name: oldRecord.name, change: -oldRecord.stock, from: oldRecord.stock, to: 0 };
-                            }
-                        }
-                        
-                        // Daekyung
-                        for (const [id, data] of Object.entries(ysStockMap)) {
-                            if (!isValidItem(data.name)) continue;
-                            const oldRecord = db.daekyungSnapshot[id];
-                            const oldStock = oldRecord ? oldRecord.stock : 0;
-                            if (oldStock !== data.stock) {
-                                daekyungChangesObj[id] = { name: data.name, change: data.stock - oldStock, from: oldStock, to: data.stock };
-                            }
-                        }
-                        for (const [id, oldRecord] of Object.entries(db.daekyungSnapshot)) {
-                            if (!isValidItem(oldRecord.name)) continue;
-                            if (ysStockMap[id] === undefined) {
-                                daekyungChangesObj[id] = { name: oldRecord.name, change: -oldRecord.stock, from: oldRecord.stock, to: 0 };
-                            }
-                        }
-
-                        db.inventorySnapshot = sihwaStockMap;
-                        db.daekyungSnapshot = ysStockMap;
-                        
-                        if (Object.keys(changesObj).length > 0) {
-                            let todayRecord = history.find(h => h.date === today);
-                            if (!todayRecord) {
-                                todayRecord = { date: today, diff: [] };
-                                history.push(todayRecord);
-                                if (history.length > 61) history.shift();
-                            }
-                            
-                            for (const [id, changeData] of Object.entries(changesObj)) {
-                                const existingChange = todayRecord.diff.find(d => d.id === id);
-
-                                if (existingChange) {
-                                    existingChange.to = changeData.to; 
-                                    existingChange.change = existingChange.to - existingChange.from; 
-                                } else {
-                                    todayRecord.diff.push({ id, ...changeData });
-                                }
-                            }
-                            todayRecord.diff = todayRecord.diff.filter(d => d.change !== 0);
-                        }
-                        
-                        if (Object.keys(daekyungChangesObj).length > 0) {
-                            let todayRecord = daekyungHistory.find(h => h.date === today);
-                            if (!todayRecord) {
-                                todayRecord = { date: today, diff: [] };
-                                daekyungHistory.push(todayRecord);
-                                if (daekyungHistory.length > 185) daekyungHistory.shift(); // keep 6 months
-                            }
-                            
-                            for (const [id, changeData] of Object.entries(daekyungChangesObj)) {
-                                const existingChange = todayRecord.diff.find(d => d.id === id);
-
-                                if (existingChange) {
-                                    existingChange.to = changeData.to; 
-                                    existingChange.change = existingChange.to - existingChange.from; 
-                                } else {
-                                    todayRecord.diff.push({ id, ...changeData });
-                                }
-                            }
-                            todayRecord.diff = todayRecord.diff.filter(d => d.change !== 0);
-                        }
-
-                        // Save even if changesObj is empty, because we updated the master snapshot!
-                        await saveData();
+                        console.log(`[API] Initialized daily baseline snapshot ledger system.`);
+                    } else if (db.lastSnapshotDate !== today) {
+                        // Day transition: previous day's final state (currentSnapshot) becomes today's baseline (lastSnapshot)
+                        db.lastSnapshot = db.currentSnapshot || sihwaStockMap;
+                        db.lastDaekyungSnapshot = db.currentDaekyungSnapshot || ysStockMap;
+                        db.lastSnapshotDate = today;
+                        console.log(`[API] Day transitioned to ${today}. Baseline snapshots updated.`);
                     }
+
+                    // Compute diff against start-of-day baseline (lastSnapshot / lastDaekyungSnapshot)
+                    const changesObj = {};
+                    const daekyungChangesObj = {};
+                    
+                    const isValidItem = (name) => {
+                        if (!name) return false;
+                        const nameUpper = name.toUpperCase();
+                        const isCompositeOrStubend = nameUpper.startsWith('COMPOSITE') || nameUpper.startsWith('STUBEND');
+                        const validPrefixes = ['90', '45', 'R', 'T', 'CAP'];
+                        return !isCompositeOrStubend && validPrefixes.some(p => nameUpper.startsWith(p));
+                    };
+                    
+                    // Sihwa
+                    for (const [id, data] of Object.entries(sihwaStockMap)) {
+                        if (!isValidItem(data.name)) continue;
+                        const oldRecord = db.lastSnapshot[id];
+                        const oldStock = oldRecord ? oldRecord.stock : 0;
+                        if (oldStock !== data.stock) {
+                            changesObj[id] = { name: data.name, change: data.stock - oldStock, from: oldStock, to: data.stock };
+                        }
+                    }
+                    for (const [id, oldRecord] of Object.entries(db.lastSnapshot)) {
+                        if (!isValidItem(oldRecord.name)) continue;
+                        if (sihwaStockMap[id] === undefined) {
+                            changesObj[id] = { name: oldRecord.name, change: -oldRecord.stock, from: oldRecord.stock, to: 0 };
+                        }
+                    }
+                    
+                    // Daekyung
+                    for (const [id, data] of Object.entries(ysStockMap)) {
+                        if (!isValidItem(data.name)) continue;
+                        const oldRecord = db.lastDaekyungSnapshot[id];
+                        const oldStock = oldRecord ? oldRecord.stock : 0;
+                        if (oldStock !== data.stock) {
+                            daekyungChangesObj[id] = { name: data.name, change: data.stock - oldStock, from: oldStock, to: data.stock };
+                        }
+                    }
+                    for (const [id, oldRecord] of Object.entries(db.lastDaekyungSnapshot)) {
+                        if (!isValidItem(oldRecord.name)) continue;
+                        if (ysStockMap[id] === undefined) {
+                            daekyungChangesObj[id] = { name: oldRecord.name, change: -oldRecord.stock, from: oldRecord.stock, to: 0 };
+                        }
+                    }
+
+                    // Update current snapshots to reflect the latest values
+                    db.currentSnapshot = sihwaStockMap;
+                    db.currentDaekyungSnapshot = ysStockMap;
+                    // Retain legacy keys for backward compatibility
+                    db.inventorySnapshot = sihwaStockMap;
+                    db.daekyungSnapshot = ysStockMap;
+
+                    // Update history record by overwriting its daily diff with the complete change from start-of-day
+                    let todayRecord = history.find(h => h.date === today);
+                    if (!todayRecord) {
+                        todayRecord = { date: today, diff: [] };
+                        history.push(todayRecord);
+                        if (history.length > 61) history.shift();
+                    }
+                    todayRecord.diff = Object.entries(changesObj)
+                        .map(([id, changeData]) => ({ id, ...changeData }))
+                        .filter(d => d.change !== 0);
+
+                    let todayDaekyungRecord = daekyungHistory.find(h => h.date === today);
+                    if (!todayDaekyungRecord) {
+                        todayDaekyungRecord = { date: today, diff: [] };
+                        daekyungHistory.push(todayDaekyungRecord);
+                        if (daekyungHistory.length > 185) daekyungHistory.shift();
+                    }
+                    todayDaekyungRecord.diff = Object.entries(daekyungChangesObj)
+                        .map(([id, changeData]) => ({ id, ...changeData }))
+                        .filter(d => d.change !== 0);
+
+                    await saveData();
                     // REPLACED SECTION END
 
                 } catch (snapErr) {

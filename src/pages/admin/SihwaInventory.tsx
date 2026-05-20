@@ -170,6 +170,17 @@ const calculateFallbackPurchasePrice = (id: string, basePrice: number): number =
     }
 };
 
+// Helper: Calculate Purchase Price prioritizing actual rates from product if available
+const getPurchasePriceForProduct = (product: Product | undefined, id: string, basePrice: number): number => {
+    if (product) {
+        const rate = product.rate_act2 ?? product.rate_act ?? product.rate_pct ?? 0;
+        if (rate > 0) {
+            return Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+        }
+    }
+    return calculateFallbackPurchasePrice(id, basePrice);
+};
+
 // ── 재고 건전성 진단 기준 (쿠팡·다이소 물류 기준 참고) ──────────
 // Removed unused DEAD_STOCK_DAYS etc.
 const HEALTHY_DEAD_RATIO     = 0.05;  // 허용 악성재고 비중 (5%)
@@ -518,7 +529,14 @@ export default function SihwaInventory() {
             if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) continue;
 
             const displayCustomer = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase();
-            const isSeoulStock = displayCustomer.includes('서울') && displayCustomer.includes('재고');
+            const normalizedCustomer = displayCustomer.replace(/\s+/g, '');
+            const isSeoulStock = normalizedCustomer.includes('재고') || 
+                                 normalizedCustomer.includes('서울') || 
+                                 normalizedCustomer.includes('시화') || 
+                                 normalizedCustomer.includes('에스제이엔브이') || 
+                                 normalizedCustomer.includes('sjnv') || 
+                                 normalizedCustomer.includes('알트에프') || 
+                                 normalizedCustomer.includes('altf');
 
             if (isSeoulStock) {
                 const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
@@ -537,7 +555,8 @@ export default function SihwaInventory() {
                     } else if (typeof itemRec.purchasePrice === 'number' && itemRec.purchasePrice > 0) {
                         cost = itemRec.purchasePrice;
                     } else {
-                        cost = calculateFallbackPurchasePrice(id, rawBasePrice);
+                        const product = inventoryMap.get(id);
+                        cost = getPurchasePriceForProduct(product as Product | undefined, id, rawBasePrice);
                     }
 
                     if (cost > 0) {
@@ -547,7 +566,7 @@ export default function SihwaInventory() {
             }
         }
         return pMap;
-    }, [orders]);
+    }, [orders, inventoryMap]);
 
     // CORE AI MERGED STOCK ANALYZER (Includes pending orders + actual asset prices)
     interface AnalyzedItem {
@@ -724,7 +743,7 @@ export default function SihwaInventory() {
 
             // Calculate Profit Margin
             const sellingPrice = calculateSellingPrice(item.id, basePrice);
-            const purchasePrice = recentInfo ? recentInfo.price : calculateFallbackPurchasePrice(item.id, basePrice);
+            const purchasePrice = recentInfo ? recentInfo.price : getPurchasePriceForProduct(item, item.id, basePrice);
             const profitMarginRate = sellingPrice > 0 ? parseFloat((((sellingPrice - purchasePrice) / sellingPrice) * 100).toFixed(1)) : 0;
 
             // Calculate Daekyung Direct Ratio (estimated from total sales vs sihwa drops)
