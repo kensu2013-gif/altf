@@ -907,6 +907,7 @@ const server = http.createServer(async (req, res) => {
         // Compares S3 raw inventory versions and lists bucket contents
         let s3InventoryChanges = [];
         let s3Files = [];
+        let versionsRes = null;
         try {
             const { ListObjectVersionsCommand, GetObjectCommand, ListObjectsV2Command } = await import('@aws-sdk/client-s3');
             
@@ -922,7 +923,7 @@ const server = http.createServer(async (req, res) => {
                 }));
             }
 
-            const versionsRes = await s3Client.send(new ListObjectVersionsCommand({
+            versionsRes = await s3Client.send(new ListObjectVersionsCommand({
                 Bucket: BUCKET_NAME,
                 Prefix: 'public/inventory/inventory.json'
             }));
@@ -1004,7 +1005,7 @@ const server = http.createServer(async (req, res) => {
                 isTodayHistoryEmpty: !(db.inventoryHistory.find(h => h.date === new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10))?.diff?.length > 0),
                 s3RawInventoryChangesCount: s3InventoryChanges.length,
                 s3RawInventoryChangesSample: s3InventoryChanges.slice(0, 10),
-                s3InventoryVersions: (versionsRes.Versions || []).slice(0, 5).map(v => ({
+                s3InventoryVersions: (versionsRes?.Versions || []).slice(0, 5).map(v => ({
                     versionId: v.VersionId,
                     lastModified: v.LastModified,
                     size: v.Size,
