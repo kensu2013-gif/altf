@@ -888,15 +888,31 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/admin/inventory-history') {
+        const mockChanges = {};
+        const sihwaStockMap = db.currentSnapshot || {};
+        const lastSnapshot = db.lastSnapshot || {};
+        for (const [id, data] of Object.entries(sihwaStockMap)) {
+            const oldRecord = lastSnapshot[id];
+            const oldStock = oldRecord ? oldRecord.stock : 0;
+            if (oldStock !== data.stock) {
+                mockChanges[id] = { name: data.name, change: data.stock - oldStock, from: oldStock, to: data.stock };
+            }
+        }
+        for (const [id, oldRecord] of Object.entries(lastSnapshot)) {
+            if (sihwaStockMap[id] === undefined) {
+                mockChanges[id] = { name: oldRecord.name, change: -oldRecord.stock, from: oldRecord.stock, to: 0 };
+            }
+        }
+
         sendJsonResponse(req, res, 200, {
             inventoryHistory: db.inventoryHistory,
             daekyungHistory: db.daekyungHistory,
             debug: {
                 lastSnapshotDate: db.lastSnapshotDate,
-                lastSnapshotSize: db.lastSnapshot ? Object.keys(db.lastSnapshot).length : 0,
-                currentSnapshotSize: db.currentSnapshot ? Object.keys(db.currentSnapshot).length : 0,
-                lastDaekyungSnapshotSize: db.lastDaekyungSnapshot ? Object.keys(db.lastDaekyungSnapshot).length : 0,
-                currentDaekyungSnapshotSize: db.currentDaekyungSnapshot ? Object.keys(db.currentDaekyungSnapshot).length : 0,
+                lastSnapshotSize: Object.keys(lastSnapshot).length,
+                currentSnapshotSize: Object.keys(sihwaStockMap).length,
+                mockChangesCount: Object.keys(mockChanges).length,
+                mockChangesSample: Object.entries(mockChanges).slice(0, 5),
                 isTodayHistoryEmpty: !(db.inventoryHistory.find(h => h.date === new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10))?.diff?.length > 0)
             }
         });
