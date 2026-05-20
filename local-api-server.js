@@ -1004,6 +1004,12 @@ const server = http.createServer(async (req, res) => {
                 isTodayHistoryEmpty: !(db.inventoryHistory.find(h => h.date === new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10))?.diff?.length > 0),
                 s3RawInventoryChangesCount: s3InventoryChanges.length,
                 s3RawInventoryChangesSample: s3InventoryChanges.slice(0, 10),
+                s3InventoryVersions: (versionsRes.Versions || []).slice(0, 5).map(v => ({
+                    versionId: v.VersionId,
+                    lastModified: v.LastModified,
+                    size: v.Size,
+                    isLatest: v.IsLatest
+                })),
                 s3Files
             }
         });
