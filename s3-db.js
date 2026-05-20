@@ -4,12 +4,12 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const s3Client = new S3Client({
+export const s3Client = new S3Client({
     region: process.env.AWS_REGION || 'ap-northeast-2'
     // credentials will be loaded automatically if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are in .env
 });
 
-const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'altf-web-data-prod';
+export const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'altf-web-data-prod';
 const DB_KEY = process.env.S3_DB_KEY || 'database/db.json';
 
 const streamToString = (stream) =>

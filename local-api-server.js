@@ -6,7 +6,7 @@ import zlib from 'zlib';
 const PORT = process.env.PORT || 3001;
 
 // --- Persistence Setup ---
-import { loadDbFromS3, saveDbToS3, uploadFileToS3, getInventoryFromS3, getPresignedUrlToS3, getPreviousDbVersion } from './s3-db.js';
+import { loadDbFromS3, saveDbToS3, uploadFileToS3, getInventoryFromS3, getPresignedUrlToS3, getPreviousDbVersion, s3Client, BUCKET_NAME } from './s3-db.js';
 
 import multer from 'multer';
 
@@ -904,6 +904,78 @@ const server = http.createServer(async (req, res) => {
             }
         }
 
+        // Compares S3 raw inventory versions
+        let s3InventoryChanges = [];
+        try {
+            const { ListObjectVersionsCommand, GetObjectCommand } = await import('@aws-sdk/client-s3');
+            const versionsRes = await s3Client.send(new ListObjectVersionsCommand({
+                Bucket: BUCKET_NAME,
+                Prefix: 'public/inventory/inventory.json'
+            }));
+            if (versionsRes.Versions && versionsRes.Versions.length > 1) {
+                // Sort by last modified descending
+                versionsRes.Versions.sort((a, b) => new Date(b.LastModified) - new Date(a.LastModified));
+                const latestV = versionsRes.Versions[0];
+                const prevV = versionsRes.Versions[1];
+
+                const getVContent = async (versionId) => {
+                    const res = await s3Client.send(new GetObjectCommand({
+                        Bucket: BUCKET_NAME,
+                        Key: 'public/inventory/inventory.json',
+                        VersionId: versionId
+                    }));
+                    const chunks = [];
+                    for await (const chunk of res.Body) {
+                        chunks.push(chunk);
+                    }
+                    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+                };
+
+                const latestInv = await getVContent(latestV.VersionId);
+                const prevInv = await getVContent(prevV.VersionId);
+
+                const getSihwaMap = (invData) => {
+                    const map = {};
+                    const items = Array.isArray(invData) ? invData : (invData.items || []);
+                    items.forEach(item => {
+                        let shStock = 0;
+                        let isSihwa = false;
+                        const id = item.sku_key || item.id;
+                        if ((item.location || '').includes('서울') || (item.location || '').includes('시화')) {
+                            shStock += Number(item.ready_qty || item.currentStock || 0);
+                            isSihwa = true;
+                        }
+                        if ((item.location1 || '').includes('서울') || (item.location1 || '').includes('시화')) {
+                            shStock += Number(item.sh_qty || 0);
+                            isSihwa = true;
+                        }
+                        if (id && isSihwa) {
+                            map[id] = { name: item.item || item.name, stock: shStock };
+                        }
+                    });
+                    return map;
+                };
+
+                const latestMap = getSihwaMap(latestInv);
+                const prevMap = getSihwaMap(prevInv);
+
+                for (const [id, data] of Object.entries(latestMap)) {
+                    const old = prevMap[id];
+                    const oldStock = old ? old.stock : 0;
+                    if (oldStock !== data.stock) {
+                        s3InventoryChanges.push({ id, name: data.name, from: oldStock, to: data.stock, change: data.stock - oldStock });
+                    }
+                }
+                for (const [id, old] of Object.entries(prevMap)) {
+                    if (latestMap[id] === undefined && old.stock > 0) {
+                        s3InventoryChanges.push({ id, name: old.name, from: old.stock, to: 0, change: -old.stock });
+                    }
+                }
+            }
+        } catch (e) {
+            s3InventoryChanges = [{ error: e.message }];
+        }
+
         sendJsonResponse(req, res, 200, {
             inventoryHistory: db.inventoryHistory,
             daekyungHistory: db.daekyungHistory,
@@ -915,7 +987,9 @@ const server = http.createServer(async (req, res) => {
                 currentSnapshotKeysSample: Object.keys(sihwaStockMap).slice(0, 10),
                 mockChangesCount: Object.keys(mockChanges).length,
                 mockChangesSample: Object.entries(mockChanges).slice(0, 5),
-                isTodayHistoryEmpty: !(db.inventoryHistory.find(h => h.date === new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10))?.diff?.length > 0)
+                isTodayHistoryEmpty: !(db.inventoryHistory.find(h => h.date === new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10))?.diff?.length > 0),
+                s3RawInventoryChangesCount: s3InventoryChanges.length,
+                s3RawInventoryChangesSample: s3InventoryChanges.slice(0, 10)
             }
         });
         return;
