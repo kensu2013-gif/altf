@@ -75,6 +75,44 @@ export async function saveDbToS3(dbObject) {
     }
 }
 
+export async function getPreviousDbVersion(cutoffDateStr) {
+    try {
+        const { ListObjectVersionsCommand, GetObjectCommand } = await import('@aws-sdk/client-s3');
+        const versionsRes = await s3Client.send(new ListObjectVersionsCommand({
+            Bucket: BUCKET_NAME,
+            Prefix: DB_KEY
+        }));
+
+        if (versionsRes.Versions && versionsRes.Versions.length > 1) {
+            const cutoff = new Date(cutoffDateStr);
+            const pastVersions = versionsRes.Versions.filter(v => new Date(v.LastModified) < cutoff);
+            if (pastVersions.length > 0) {
+                pastVersions.sort((a, b) => new Date(b.LastModified) - new Date(a.LastModified));
+                const targetVersion = pastVersions[0];
+                console.log(`[S3] Found past DB version from ${targetVersion.LastModified} with VersionId: ${targetVersion.VersionId}`);
+
+                const response = await s3Client.send(new GetObjectCommand({
+                    Bucket: BUCKET_NAME,
+                    Key: DB_KEY,
+                    VersionId: targetVersion.VersionId
+                }));
+                
+                const chunks = [];
+                for await (const chunk of response.Body) {
+                    chunks.push(chunk);
+                }
+                const bodyContent = Buffer.concat(chunks).toString('utf8');
+                return JSON.parse(bodyContent);
+            }
+        }
+        return null;
+    } catch (error) {
+        console.error('[S3] Failed to load previous DB version:', error);
+        return null;
+    }
+}
+
+
 /**
  * Uploads an arbitrary file (buffer) to S3 at the specified prefix/filename.
  * returns the public S3 URL.

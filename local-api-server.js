@@ -6,7 +6,7 @@ import zlib from 'zlib';
 const PORT = process.env.PORT || 3001;
 
 // --- Persistence Setup ---
-import { loadDbFromS3, saveDbToS3, uploadFileToS3, getInventoryFromS3, getPresignedUrlToS3 } from './s3-db.js';
+import { loadDbFromS3, saveDbToS3, uploadFileToS3, getInventoryFromS3, getPresignedUrlToS3, getPreviousDbVersion } from './s3-db.js';
 
 import multer from 'multer';
 
@@ -61,6 +61,59 @@ async function loadData() {
                     await saveData();
                 } catch (e) {
                     console.log(`[API] Failed to seed customers mapping: ${e.message}`);
+                }
+            }
+
+            // Self-healing recovery for missing daily diffs due to initialization overwrite
+            const kstDate = new Date(Date.now() + 9 * 60 * 60 * 1000);
+            const today = kstDate.toISOString().slice(0, 10);
+            if (db.lastSnapshotDate === today) {
+                const todayHistory = db.inventoryHistory.find(h => h.date === today);
+                if (!todayHistory || !todayHistory.diff || todayHistory.diff.length === 0) {
+                    console.log(`[RECOVERY] Detected empty diff for ${today}. Reconstructing yesterday's stock snapshot from history...`);
+                    try {
+                        const baseRecord = db.inventoryHistory.find(h => h.stock);
+                        if (baseRecord) {
+                            const reconstructedSihwa = {};
+                            for (const [id, item] of Object.entries(baseRecord.stock)) {
+                                reconstructedSihwa[id] = { name: item.name, stock: item.stock };
+                            }
+                            const baseIdx = db.inventoryHistory.indexOf(baseRecord);
+                            for (let i = baseIdx + 1; i < db.inventoryHistory.length; i++) {
+                                const h = db.inventoryHistory[i];
+                                if (h.date === today) continue;
+                                if (h.diff) {
+                                    h.diff.forEach(d => {
+                                        reconstructedSihwa[d.id] = { name: d.name, stock: d.to };
+                                    });
+                                }
+                            }
+                            db.lastSnapshot = reconstructedSihwa;
+                            console.log(`[RECOVERY] Mathematically reconstructed Sihwa baseline snapshot successfully.`);
+                        }
+                    } catch (err) {
+                        console.error(`[RECOVERY] Mathematical reconstruction failed:`, err);
+                    }
+
+                    // Try S3 version recovery to get the exact previous state
+                    try {
+                        console.log('[RECOVERY] Attempting S3 database version recovery...');
+                        const oldDb = await getPreviousDbVersion('2026-05-20T05:35:00Z');
+                        if (oldDb) {
+                            const recoveredSihwa = oldDb.currentSnapshot || oldDb.inventorySnapshot;
+                            const recoveredDaekyung = oldDb.currentDaekyungSnapshot || oldDb.daekyungSnapshot;
+                            if (recoveredSihwa) {
+                                db.lastSnapshot = recoveredSihwa;
+                                console.log('[RECOVERY] Restored Sihwa lastSnapshot from S3 version history.');
+                            }
+                            if (recoveredDaekyung) {
+                                db.lastDaekyungSnapshot = recoveredDaekyung;
+                                console.log('[RECOVERY] Restored Daekyung lastDaekyungSnapshot from S3 version history.');
+                            }
+                        }
+                    } catch (s3Err) {
+                        console.log(`[RECOVERY] S3 version recovery not available: ${s3Err.message}`);
+                    }
                 }
             }
         } else {
@@ -416,10 +469,10 @@ const server = http.createServer(async (req, res) => {
                     // Initialize if missing
                     if (!db.lastSnapshotDate) {
                         db.lastSnapshotDate = today;
-                        db.lastSnapshot = sihwaStockMap;
-                        db.currentSnapshot = sihwaStockMap;
-                        db.lastDaekyungSnapshot = ysStockMap;
-                        db.currentDaekyungSnapshot = ysStockMap;
+                        if (!db.lastSnapshot) db.lastSnapshot = sihwaStockMap;
+                        if (!db.currentSnapshot) db.currentSnapshot = sihwaStockMap;
+                        if (!db.lastDaekyungSnapshot) db.lastDaekyungSnapshot = ysStockMap;
+                        if (!db.currentDaekyungSnapshot) db.currentDaekyungSnapshot = ysStockMap;
                         
                         if (history.length === 0) history.push({ date: today, diff: [] });
                         if (daekyungHistory.length === 0) daekyungHistory.push({ date: today, diff: [] });
