@@ -911,6 +911,8 @@ const server = http.createServer(async (req, res) => {
                 lastSnapshotDate: db.lastSnapshotDate,
                 lastSnapshotSize: Object.keys(lastSnapshot).length,
                 currentSnapshotSize: Object.keys(sihwaStockMap).length,
+                lastSnapshotKeysSample: Object.keys(lastSnapshot).slice(0, 10),
+                currentSnapshotKeysSample: Object.keys(sihwaStockMap).slice(0, 10),
                 mockChangesCount: Object.keys(mockChanges).length,
                 mockChangesSample: Object.entries(mockChanges).slice(0, 5),
                 isTodayHistoryEmpty: !(db.inventoryHistory.find(h => h.date === new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10))?.diff?.length > 0)
