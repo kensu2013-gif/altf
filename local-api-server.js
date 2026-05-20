@@ -887,16 +887,19 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // GET /api/admin/inventory-history
     if (req.method === 'GET' && url.pathname === '/api/admin/inventory-history') {
-        const session = getAuthenticatedSession(req);
-        if (false) {
-            res.writeHead(403);
-            res.end(JSON.stringify({ error: 'Forbidden' }));
-            return;
-        }
-
-        sendJsonResponse(req, res, 200, { inventoryHistory: db.inventoryHistory, daekyungHistory: db.daekyungHistory });
+        sendJsonResponse(req, res, 200, {
+            inventoryHistory: db.inventoryHistory,
+            daekyungHistory: db.daekyungHistory,
+            debug: {
+                lastSnapshotDate: db.lastSnapshotDate,
+                lastSnapshotSize: db.lastSnapshot ? Object.keys(db.lastSnapshot).length : 0,
+                currentSnapshotSize: db.currentSnapshot ? Object.keys(db.currentSnapshot).length : 0,
+                lastDaekyungSnapshotSize: db.lastDaekyungSnapshot ? Object.keys(db.lastDaekyungSnapshot).length : 0,
+                currentDaekyungSnapshotSize: db.currentDaekyungSnapshot ? Object.keys(db.currentDaekyungSnapshot).length : 0,
+                isTodayHistoryEmpty: !(db.inventoryHistory.find(h => h.date === new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10))?.diff?.length > 0)
+            }
+        });
         return;
     }
 
