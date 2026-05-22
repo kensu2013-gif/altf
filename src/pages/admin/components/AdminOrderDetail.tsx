@@ -588,13 +588,6 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         }
     };
 
-    const handleDeleteAllItems = () => {
-        if (confirm('모든 품목을 삭제하시겠습니까? (저장 시 반영됩니다)')) {
-            setItems([]);
-            setPoItems([]);
-        }
-    };
-
     const handleSplitItem = (index: number) => {
         const item = displayedItems[index];
         const splitQtyStr = prompt(`현재 수량은 ${item.quantity}입니다. 분할하여 빼낼(새로운 줄로 만들) 수량을 입력하세요.`);
