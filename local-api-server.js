@@ -65,55 +65,28 @@ async function loadData() {
             }
 
             // Self-healing recovery for missing daily diffs due to initialization overwrite
-            const kstDate = new Date(Date.now() + 9 * 60 * 60 * 1000);
-            const today = kstDate.toISOString().slice(0, 10);
-            if (db.lastSnapshotDate === today) {
-                const todayHistory = db.inventoryHistory.find(h => h.date === today);
-                if (!todayHistory || !todayHistory.diff || todayHistory.diff.length === 0) {
-                    console.log(`[RECOVERY] Detected empty diff for ${today}. Reconstructing yesterday's stock snapshot from history...`);
-                    try {
-                        const baseRecord = db.inventoryHistory.find(h => h.stock);
-                        if (baseRecord) {
-                            const reconstructedSihwa = {};
-                            for (const [id, item] of Object.entries(baseRecord.stock)) {
-                                reconstructedSihwa[id] = { name: item.name, stock: item.stock };
-                            }
-                            const baseIdx = db.inventoryHistory.indexOf(baseRecord);
-                            for (let i = baseIdx + 1; i < db.inventoryHistory.length; i++) {
-                                const h = db.inventoryHistory[i];
-                                if (h.date === today) continue;
-                                if (h.diff) {
-                                    h.diff.forEach(d => {
-                                        reconstructedSihwa[d.id] = { name: d.name, stock: d.to };
-                                    });
-                                }
-                            }
-                            db.lastSnapshot = reconstructedSihwa;
-                            console.log(`[RECOVERY] Mathematically reconstructed Sihwa baseline snapshot successfully.`);
+            if (!db.lastSnapshot || Object.keys(db.lastSnapshot).length === 0 || !db.lastDaekyungSnapshot || Object.keys(db.lastDaekyungSnapshot).length === 0) {
+                console.log(`[RECOVERY] Snapshot empty or missing. Recovering baseline snapshot...`);
+                // Try S3 version recovery to get the exact previous state
+                try {
+                    console.log('[RECOVERY] Attempting S3 database version recovery...');
+                    const oldDb = await getPreviousDbVersion(new Date(Date.now() - 60 * 1000).toISOString());
+                    if (oldDb) {
+                        const recoveredSihwa = oldDb.currentSnapshot || oldDb.inventorySnapshot || oldDb.lastSnapshot;
+                        const recoveredDaekyung = oldDb.currentDaekyungSnapshot || oldDb.daekyungSnapshot || oldDb.lastDaekyungSnapshot;
+                        if (recoveredSihwa && Object.keys(recoveredSihwa).length > 0) {
+                            db.lastSnapshot = recoveredSihwa;
+                            db.currentSnapshot = recoveredSihwa;
+                            console.log('[RECOVERY] Restored Sihwa lastSnapshot from S3 version history.');
                         }
-                    } catch (err) {
-                        console.error(`[RECOVERY] Mathematical reconstruction failed:`, err);
-                    }
-
-                    // Try S3 version recovery to get the exact previous state
-                    try {
-                        console.log('[RECOVERY] Attempting S3 database version recovery...');
-                        const oldDb = await getPreviousDbVersion('2026-05-20T05:35:00Z');
-                        if (oldDb) {
-                            const recoveredSihwa = oldDb.currentSnapshot || oldDb.inventorySnapshot;
-                            const recoveredDaekyung = oldDb.currentDaekyungSnapshot || oldDb.daekyungSnapshot;
-                            if (recoveredSihwa) {
-                                db.lastSnapshot = recoveredSihwa;
-                                console.log('[RECOVERY] Restored Sihwa lastSnapshot from S3 version history.');
-                            }
-                            if (recoveredDaekyung) {
-                                db.lastDaekyungSnapshot = recoveredDaekyung;
-                                console.log('[RECOVERY] Restored Daekyung lastDaekyungSnapshot from S3 version history.');
-                            }
+                        if (recoveredDaekyung && Object.keys(recoveredDaekyung).length > 0) {
+                            db.lastDaekyungSnapshot = recoveredDaekyung;
+                            db.currentDaekyungSnapshot = recoveredDaekyung;
+                            console.log('[RECOVERY] Restored Daekyung lastDaekyungSnapshot from S3 version history.');
                         }
-                    } catch (s3Err) {
-                        console.log(`[RECOVERY] S3 version recovery not available: ${s3Err.message}`);
                     }
+                } catch (s3Err) {
+                    console.log(`[RECOVERY] S3 version recovery not available: ${s3Err.message}`);
                 }
             }
         } else {
@@ -428,31 +401,35 @@ const server = http.createServer(async (req, res) => {
                         let ysStock = 0;
                         let isSihwa = false;
 
-                        if (item.locationStock) {
+                        // Only track maker '대경' for Sihwa/Daekyung and Yangsan/Daekyung history
+                        const maker = item.maker || item.maker1 || '';
+                        if (maker !== '대경') {
+                            return;
+                        }
+
+                        const locationStock = {};
+                        if (item.locationStock && Object.keys(item.locationStock).length > 0) {
                             for (const [key, qty] of Object.entries(item.locationStock)) {
-                                if (key.includes('서울') || key.includes('시화')) {
-                                    shStock += Number(qty);
-                                    isSihwa = true;
-                                }
-                                if (key.includes('양산')) {
-                                    ysStock += Number(qty);
-                                }
+                                const newKey = (key === '서울' || key === '서울재고') ? '시화' : key;
+                                locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
                             }
                         } else {
-                            if ((item.location || '').includes('서울') || (item.location || '').includes('시화')) {
-                                shStock += Number(item.ready_qty || item.currentStock || 0);
-                                isSihwa = true;
+                            if (item.location1 && item.sh_qty !== undefined) {
+                                const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
+                                locationStock[loc1] = (locationStock[loc1] || 0) + Number(item.sh_qty);
                             }
-                            if ((item.location || '').includes('양산')) {
-                                ysStock += Number(item.ready_qty || item.currentStock || 0);
+                            if (item.location && item.ready_qty !== undefined) {
+                                const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
+                                locationStock[primaryLoc] = (locationStock[primaryLoc] || 0) + Number(item.ready_qty);
                             }
-                            if ((item.location1 || '').includes('서울') || (item.location1 || '').includes('시화')) {
-                                shStock += Number(item.sh_qty || 0);
-                                isSihwa = true;
-                            }
-                            if ((item.location1 || '').includes('양산')) {
-                                ysStock += Number(item.sh_qty || 0);
-                            }
+                        }
+
+                        if (locationStock['시화'] !== undefined) {
+                            shStock = locationStock['시화'];
+                            isSihwa = true;
+                        }
+                        if (locationStock['양산'] !== undefined) {
+                            ysStock = locationStock['양산'];
                         }
 
                         const id = item.sku_key || item.id;
@@ -956,14 +933,35 @@ const server = http.createServer(async (req, res) => {
                         let shStock = 0;
                         let isSihwa = false;
                         const id = item.sku_key || item.id;
-                        if ((item.location || '').includes('서울') || (item.location || '').includes('시화')) {
-                            shStock += Number(item.ready_qty || item.currentStock || 0);
+
+                        // Only track maker '대경' for Sihwa/Daekyung history
+                        const maker = item.maker || item.maker1 || '';
+                        if (maker !== '대경') {
+                            return;
+                        }
+
+                        const locationStock = {};
+                        if (item.locationStock && Object.keys(item.locationStock).length > 0) {
+                            for (const [key, qty] of Object.entries(item.locationStock)) {
+                                const cleanKey = (key === '서울' || key === '서울재고') ? '시화' : key;
+                                locationStock[cleanKey] = (locationStock[cleanKey] || 0) + Number(qty);
+                            }
+                        } else {
+                            if (item.location1 && item.sh_qty !== undefined) {
+                                const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
+                                locationStock[loc1] = (locationStock[loc1] || 0) + Number(item.sh_qty);
+                            }
+                            if (item.location && item.ready_qty !== undefined) {
+                                const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
+                                locationStock[primaryLoc] = (locationStock[primaryLoc] || 0) + Number(item.ready_qty);
+                            }
+                        }
+
+                        if (locationStock['시화'] !== undefined) {
+                            shStock = locationStock['시화'];
                             isSihwa = true;
                         }
-                        if ((item.location1 || '').includes('서울') || (item.location1 || '').includes('시화')) {
-                            shStock += Number(item.sh_qty || 0);
-                            isSihwa = true;
-                        }
+
                         if (id && isSihwa) {
                             map[id] = { name: item.item || item.name, stock: shStock };
                         }
