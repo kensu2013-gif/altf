@@ -242,9 +242,12 @@ export default function SihwaInventory() {
 
     // 결품 기회손실 관련 상태 추가
     const [mdSearchQuery, setMdSearchQuery] = useState('');
+    const [mdFilterName, setMdFilterName] = useState('');
+    const [mdFilterThickness, setMdFilterThickness] = useState('');
+    const [mdFilterSize, setMdFilterSize] = useState('');
     const [mdFilterMaterial, setMdFilterMaterial] = useState('');
     const [mdSortConfig, setMdSortConfig] = useState<{
-        key: 'id' | 'name' | 'count' | 'estimatedRevenue' | 'material';
+        key: 'id' | 'name' | 'count' | 'estimatedRevenue' | 'material' | 'thickness' | 'size';
         direction: 'asc' | 'desc';
     }>({ key: 'count', direction: 'desc' });
     const [selectedMissedDemandIds, setSelectedMissedDemandIds] = useState<Set<string>>(new Set());
@@ -1772,8 +1775,20 @@ export default function SihwaInventory() {
             );
         }
 
+        if (mdFilterName) {
+            list = list.filter(m => (m.row?.product?.name || '') === mdFilterName);
+        }
+
+        if (mdFilterThickness) {
+            list = list.filter(m => (m.row?.product?.thickness || '') === mdFilterThickness);
+        }
+
+        if (mdFilterSize) {
+            list = list.filter(m => (m.row?.product?.size || '') === mdFilterSize);
+        }
+
         if (mdFilterMaterial) {
-            list = list.filter(m => m.row?.product?.material === mdFilterMaterial);
+            list = list.filter(m => (m.row?.product?.material || '') === mdFilterMaterial);
         }
 
         list.sort((a, b) => {
@@ -1795,6 +1810,12 @@ export default function SihwaInventory() {
             } else if (mdSortConfig.key === 'material') {
                 valA = a.row?.product?.material || '';
                 valB = b.row?.product?.material || '';
+            } else if (mdSortConfig.key === 'thickness') {
+                valA = a.row?.product?.thickness || '';
+                valB = b.row?.product?.thickness || '';
+            } else if (mdSortConfig.key === 'size') {
+                valA = a.row?.product?.size || '';
+                valB = b.row?.product?.size || '';
             }
 
             if (valA < valB) return mdSortConfig.direction === 'asc' ? -1 : 1;
@@ -1803,7 +1824,17 @@ export default function SihwaInventory() {
         });
 
         return list;
-    }, [healthDiagnosis.missedDemandList, mdSearchQuery, mdFilterMaterial, mdSortConfig, mdPeriod, inventory]);
+    }, [
+        healthDiagnosis.missedDemandList,
+        mdSearchQuery,
+        mdFilterName,
+        mdFilterThickness,
+        mdFilterSize,
+        mdFilterMaterial,
+        mdSortConfig,
+        mdPeriod,
+        inventory
+    ]);
 
     const mdPeriodStats = useMemo(() => {
         const totalOccurrences = filteredMissedDemandList.reduce((sum, m) => sum + m.count, 0);
@@ -1812,13 +1843,28 @@ export default function SihwaInventory() {
         return { totalOccurrences, totalQuantity, totalLoss };
     }, [filteredMissedDemandList]);
 
-    const mdMaterialOptions = useMemo(() => {
-        const mats = new Set<string>();
+    const mdFilterOptions = useMemo(() => {
+        const names = new Set<string>();
+        const thicknesses = new Set<string>();
+        const sizes = new Set<string>();
+        const materials = new Set<string>();
+
         healthDiagnosis.missedDemandList.forEach(m => {
-            const mat = m.row?.product?.material || inventory.find(item => item.id === m.id)?.material;
-            if (mat) mats.add(mat);
+            const prod = m.row?.product || inventory.find(item => item.id === m.id);
+            if (prod) {
+                if (prod.name) names.add(prod.name);
+                if (prod.thickness) thicknesses.add(prod.thickness);
+                if (prod.size) sizes.add(prod.size);
+                if (prod.material) materials.add(prod.material);
+            }
         });
-        return Array.from(mats).sort();
+
+        return {
+            names: Array.from(names).sort(),
+            thicknesses: Array.from(thicknesses).sort(),
+            sizes: Array.from(sizes).sort(),
+            materials: Array.from(materials).sort()
+        };
     }, [healthDiagnosis.missedDemandList, inventory]);
 
     const handleCreateMissedDemandOrder = () => {
@@ -3721,81 +3767,137 @@ export default function SihwaInventory() {
                                             </div>
 
                                             {/* 검색 및 필터 컨트롤 바 */}
-                                            <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                                                <div className="flex flex-wrap items-center gap-2 flex-1">
-                                                    {/* 기간 필터 */}
-                                                    <select
-                                                        value={mdPeriod}
-                                                        onChange={(e) => setMdPeriod(e.target.value as 'ALL' | '7D' | '30D' | '60D')}
-                                                        className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 font-bold text-slate-700"
-                                                    >
-                                                        <option value="ALL">전체 기간</option>
-                                                        <option value="7D">최근 7일</option>
-                                                        <option value="30D">최근 30일</option>
-                                                        <option value="60D">최근 60일</option>
-                                                    </select>
+                                            <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col gap-3">
+                                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        {/* 기간 필터 */}
+                                                        <select
+                                                            value={mdPeriod}
+                                                            onChange={(e) => setMdPeriod(e.target.value as 'ALL' | '7D' | '30D' | '60D')}
+                                                            className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 font-bold text-slate-700"
+                                                        >
+                                                            <option value="ALL">전체 기간</option>
+                                                            <option value="7D">최근 7일</option>
+                                                            <option value="30D">최근 30일</option>
+                                                            <option value="60D">최근 60일</option>
+                                                        </select>
 
-                                                    {/* 검색창 */}
-                                                    <div className="relative min-w-[200px] flex-1 max-w-xs">
-                                                        <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400 text-xs">🔍</span>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="품목 코드 또는 품목명 검색..."
-                                                            value={mdSearchQuery}
-                                                            onChange={(e) => setMdSearchQuery(e.target.value)}
-                                                            className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 placeholder-slate-400 font-medium"
-                                                        />
-                                                        {mdSearchQuery && (
-                                                            <button 
-                                                                onClick={() => setMdSearchQuery('')}
-                                                                className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600 text-[10px]"
+                                                        {/* 검색창 */}
+                                                        <div className="relative min-w-[200px] flex-1 max-w-xs">
+                                                            <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400 text-xs">🔍</span>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="품명 검색..."
+                                                                value={mdSearchQuery}
+                                                                onChange={(e) => setMdSearchQuery(e.target.value)}
+                                                                className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 placeholder-slate-400 font-medium"
+                                                            />
+                                                            {mdSearchQuery && (
+                                                                <button 
+                                                                    onClick={() => setMdSearchQuery('')}
+                                                                    className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600 text-[10px]"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            )}
+                                                        </div>
+
+                                                        {/* 필터 초기화 버튼 */}
+                                                        {(mdSearchQuery || mdFilterName || mdFilterThickness || mdFilterSize || mdFilterMaterial || mdPeriod !== 'ALL') && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setMdSearchQuery('');
+                                                                    setMdFilterName('');
+                                                                    setMdFilterThickness('');
+                                                                    setMdFilterSize('');
+                                                                    setMdFilterMaterial('');
+                                                                    setMdPeriod('ALL');
+                                                                }}
+                                                                className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg text-xs transition-colors"
                                                             >
-                                                                ✕
+                                                                필터 초기화 🔄
                                                             </button>
                                                         )}
                                                     </div>
 
-                                                    {/* 재질 필터 */}
-                                                    <select
-                                                        value={mdFilterMaterial}
-                                                        onChange={(e) => setMdFilterMaterial(e.target.value)}
-                                                        className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 font-medium"
-                                                    >
-                                                        <option value="">재질 전체</option>
-                                                        {mdMaterialOptions.map(mat => (
-                                                            <option key={mat} value={mat}>{mat}</option>
-                                                        ))}
-                                                    </select>
-
-                                                    {/* 필터 초기화 버튼 */}
-                                                    {(mdSearchQuery || mdFilterMaterial || mdPeriod !== 'ALL') && (
+                                                    {/* 레이아웃 토글 */}
+                                                    <div className="flex items-center gap-1 shrink-0">
                                                         <button
-                                                            onClick={() => {
-                                                                setMdSearchQuery('');
-                                                                setMdFilterMaterial('');
-                                                                setMdPeriod('ALL');
-                                                            }}
-                                                            className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg text-xs transition-colors"
+                                                            onClick={() => setMdViewLayout('TABLE')}
+                                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${mdViewLayout === 'TABLE' ? 'bg-violet-600 text-white shadow-xs' : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'}`}
                                                         >
-                                                            필터 초기화 🔄
+                                                            📋 테이블 뷰
                                                         </button>
-                                                    )}
+                                                        <button
+                                                            onClick={() => setMdViewLayout('CARD')}
+                                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${mdViewLayout === 'CARD' ? 'bg-violet-600 text-white shadow-xs' : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'}`}
+                                                        >
+                                                            🎴 카드 뷰
+                                                        </button>
+                                                    </div>
                                                 </div>
 
-                                                {/* 레이아웃 토글 */}
-                                                <div className="flex items-center gap-1 shrink-0">
-                                                    <button
-                                                        onClick={() => setMdViewLayout('TABLE')}
-                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${mdViewLayout === 'TABLE' ? 'bg-violet-600 text-white shadow-xs' : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'}`}
-                                                    >
-                                                        📋 테이블 뷰
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setMdViewLayout('CARD')}
-                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${mdViewLayout === 'CARD' ? 'bg-violet-600 text-white shadow-xs' : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'}`}
-                                                    >
-                                                        🎴 카드 뷰
-                                                    </button>
+                                                {/* 4단 필터 그리드 (동일한 간격) */}
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white p-3 rounded-lg border border-slate-200">
+                                                    {/* 품목명 필터 */}
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-[10px] font-bold text-slate-500">품목명</span>
+                                                        <select
+                                                            value={mdFilterName}
+                                                            onChange={(e) => setMdFilterName(e.target.value)}
+                                                            className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 font-medium"
+                                                        >
+                                                            <option value="">품목명 전체</option>
+                                                            {mdFilterOptions.names.map(name => (
+                                                                <option key={name} value={name}>{name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* 두께 필터 */}
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-[10px] font-bold text-slate-500">두께</span>
+                                                        <select
+                                                            value={mdFilterThickness}
+                                                            onChange={(e) => setMdFilterThickness(e.target.value)}
+                                                            className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 font-medium"
+                                                        >
+                                                            <option value="">두께 전체</option>
+                                                            {mdFilterOptions.thicknesses.map(t => (
+                                                                <option key={t} value={t}>{t}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* 사이즈 필터 */}
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-[10px] font-bold text-slate-500">사이즈</span>
+                                                        <select
+                                                            value={mdFilterSize}
+                                                            onChange={(e) => setMdFilterSize(e.target.value)}
+                                                            className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 font-medium"
+                                                        >
+                                                            <option value="">사이즈 전체</option>
+                                                            {mdFilterOptions.sizes.map(s => (
+                                                                <option key={s} value={s}>{s}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* 재질 필터 */}
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-[10px] font-bold text-slate-500">재질</span>
+                                                        <select
+                                                            value={mdFilterMaterial}
+                                                            onChange={(e) => setMdFilterMaterial(e.target.value)}
+                                                            className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 font-medium"
+                                                        >
+                                                            <option value="">재질 전체</option>
+                                                            {mdFilterOptions.materials.map(mat => (
+                                                                <option key={mat} value={mat}>{mat}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -3826,25 +3928,29 @@ export default function SihwaInventory() {
                                                                 </th>
                                                                 <th className="p-3 w-10 text-center">순위</th>
                                                                 <th 
-                                                                    className="p-3 cursor-pointer hover:bg-slate-200 transition-colors"
-                                                                    onClick={() => setMdSortConfig(prev => ({ key: 'id', direction: prev.key === 'id' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
-                                                                >
-                                                                    품목코드 {mdSortConfig.key === 'id' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
-                                                                </th>
-                                                                <th 
-                                                                    className="p-3 cursor-pointer hover:bg-slate-200 transition-colors"
+                                                                    className="p-3 w-32 min-w-[120px] cursor-pointer hover:bg-slate-200 transition-colors text-left"
                                                                     onClick={() => setMdSortConfig(prev => ({ key: 'name', direction: prev.key === 'name' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
                                                                 >
                                                                     품목명 {mdSortConfig.key === 'name' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
                                                                 </th>
                                                                 <th 
-                                                                    className="p-3 cursor-pointer hover:bg-slate-200 transition-colors"
+                                                                    className="p-3 w-32 min-w-[120px] cursor-pointer hover:bg-slate-200 transition-colors text-left"
+                                                                    onClick={() => setMdSortConfig(prev => ({ key: 'thickness', direction: prev.key === 'thickness' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
+                                                                >
+                                                                    두께 {mdSortConfig.key === 'thickness' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
+                                                                </th>
+                                                                <th 
+                                                                    className="p-3 w-32 min-w-[120px] cursor-pointer hover:bg-slate-200 transition-colors text-left"
+                                                                    onClick={() => setMdSortConfig(prev => ({ key: 'size', direction: prev.key === 'size' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
+                                                                >
+                                                                    사이즈 {mdSortConfig.key === 'size' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
+                                                                </th>
+                                                                <th 
+                                                                    className="p-3 w-32 min-w-[120px] cursor-pointer hover:bg-slate-200 transition-colors text-left"
                                                                     onClick={() => setMdSortConfig(prev => ({ key: 'material', direction: prev.key === 'material' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
                                                                 >
                                                                     재질 {mdSortConfig.key === 'material' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
                                                                 </th>
-                                                                <th className="p-3">사이즈</th>
-                                                                <th className="p-3">두께</th>
                                                                 <th className="p-3 text-right">시화재고</th>
                                                                 <th className="p-3 text-right">대경재고</th>
                                                                 <th className="p-3 text-right">입고예정</th>
@@ -3904,11 +4010,10 @@ export default function SihwaInventory() {
                                                                                 />
                                                                             </td>
                                                                             <td className="p-3 text-center text-slate-500 font-mono text-[10px]">{i + 1}</td>
-                                                                            <td className="p-3 font-mono font-bold text-slate-800 text-[10px]">{m.id}</td>
-                                                                            <td className="p-3 text-slate-700 font-semibold">{m.row?.product?.name || m.id}</td>
-                                                                            <td className="p-3 text-slate-500">{m.row?.product?.material || '알수없음'}</td>
-                                                                            <td className="p-3 text-slate-500 font-mono text-[11px]">{m.row?.product?.size || '-'}</td>
-                                                                            <td className="p-3 text-slate-500 font-mono text-[11px]">{m.row?.product?.thickness || '-'}</td>
+                                                                            <td className="p-3 w-32 min-w-[120px] text-slate-700 font-semibold text-left">{m.row?.product?.name || m.id}</td>
+                                                                            <td className="p-3 w-32 min-w-[120px] text-slate-500 font-mono text-[11px] text-left">{m.row?.product?.thickness || '-'}</td>
+                                                                            <td className="p-3 w-32 min-w-[120px] text-slate-500 font-mono text-[11px] text-left">{m.row?.product?.size || '-'}</td>
+                                                                            <td className="p-3 w-32 min-w-[120px] text-slate-500 text-left">{m.row?.product?.material || '알수없음'}</td>
                                                                             
                                                                             {/* 재고 데이터 */}
                                                                             <td className={`p-3 text-right font-mono font-semibold ${shQty === 0 ? 'text-slate-400' : 'text-slate-800'}`}>
@@ -3971,7 +4076,7 @@ export default function SihwaInventory() {
                                                                         </tr>
                                                                         {isExpanded && (
                                                                             <tr className="bg-slate-50/85">
-                                                                                <td colSpan={16} className="px-6 py-3 border-b border-violet-100">
+                                                                                <td colSpan={15} className="px-6 py-3 border-b border-violet-100">
                                                                                     <div className="bg-white rounded-xl border border-violet-100 p-4 shadow-xs">
                                                                                         <div className="flex items-center justify-between mb-2">
                                                                                             <span className="text-xs font-bold text-violet-800 flex items-center gap-1.5">
@@ -4085,7 +4190,6 @@ export default function SihwaInventory() {
                                                                         </button>
                                                                     </div>
 
-                                                                    <div className="text-[10px] font-mono font-bold text-slate-800 leading-tight break-all mb-1">{m.id}</div>
                                                                     <div className="text-[12px] font-bold text-slate-900 mb-1">{m.row?.product?.name || m.id}</div>
                                                                     
                                                                     <div className="text-[10px] text-slate-500 grid grid-cols-2 gap-x-2 gap-y-1 mb-2.5 pb-2 border-b border-slate-100 font-medium">

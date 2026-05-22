@@ -386,7 +386,9 @@ const server = http.createServer(async (req, res) => {
                 console.log('[API] Cache miss. Fetching inventory from S3...');
                 const inventoryData = await getInventoryFromS3();
 
-                // --- Daily Sihwa Inventory Snapshot Logic ---
+                // --- Daily Sihwa/Daekyung Inventory Snapshot Logic ---
+                // CRITICAL PRESERVATION RULE: Do not change, bypass, or rewrite this daily snapshot logic.
+                // Daekyung rolling average stock evaluation relies strictly on these daily ledger snapshots (db.daekyungHistory).
                 try {
                     const kstDate = new Date(now + 9 * 60 * 60 * 1000); // KST
                     const today = kstDate.toISOString().slice(0, 10);
