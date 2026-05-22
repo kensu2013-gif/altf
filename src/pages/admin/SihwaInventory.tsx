@@ -239,6 +239,7 @@ export default function SihwaInventory() {
         'REGULAR': true
     });
     const [selectedHealthCategory, setSelectedHealthCategory] = useState<'DEAD' | 'EXCESS' | 'SLOW' | 'MISSED' | 'URGENT' | null>(null);
+    const [showAllMissedDemand, setShowAllMissedDemand] = useState(false);
 
 
     const [selectedCriticalIds, setSelectedCriticalIds] = useState<Set<string>>(new Set());
@@ -1647,8 +1648,7 @@ export default function SihwaInventory() {
                 return { id, ...v, row };
             })
             .filter(m => m.count >= 1)
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 10);
+            .sort((a, b) => b.count - a.count);
 
         // ── 즉시 처분 대상 (악성재고 중 대경 반품 가능하거나 장기(180일+) 악성인 품목) ──
         const urgentDisposalItems = deadStockItems
@@ -3510,7 +3510,10 @@ export default function SihwaInventory() {
                                                 </div>
                                             </div>
                                             <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-                                                {healthDiagnosis.missedDemandList.slice(0, 10).map((m, i) => (
+                                                {(showAllMissedDemand
+                                                    ? healthDiagnosis.missedDemandList
+                                                    : healthDiagnosis.missedDemandList.slice(0, 10)
+                                                ).map((m, i) => (
                                                     <div key={m.id} className={`rounded-xl p-3 border ${m.count >= 3 ? 'border-rose-200 bg-rose-50' : 'border-violet-100 bg-violet-50'}`}>
                                                         <div className="flex items-center gap-1.5 mb-2">
                                                             <span className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-black shrink-0 ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>{i + 1}</span>
@@ -3529,6 +3532,19 @@ export default function SihwaInventory() {
                                                     </div>
                                                 ))}
                                             </div>
+                                            {healthDiagnosis.missedDemandList.length > 10 && (
+                                                <div className="px-4 pb-4 flex justify-center">
+                                                    <button
+                                                        onClick={() => setShowAllMissedDemand(!showAllMissedDemand)}
+                                                        className="px-4 py-2 bg-violet-50 hover:bg-violet-100 border border-violet-200 text-violet-700 font-bold rounded-lg text-xs transition-colors"
+                                                    >
+                                                        {showAllMissedDemand 
+                                                            ? `접기 (상위 10개만 보기)` 
+                                                            : `더보기 (전체 ${healthDiagnosis.missedDemandList.length}개 품목 보기)`
+                                                        }
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
