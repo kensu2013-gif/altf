@@ -434,8 +434,8 @@ const server = http.createServer(async (req, res) => {
 
                         const id = item.sku_key || item.id;
                         if (id) {
-                            if (isSihwa) sihwaStockMap[id] = { name: item.item || item.name, stock: shStock };
-                            ysStockMap[id] = { name: item.item || item.name, stock: ysStock };
+                            if (isSihwa) sihwaStockMap[id] = { name: item.item || item.name, stock: shStock, sh_qty: shStock };
+                            ysStockMap[id] = { name: item.item || item.name, stock: ysStock, ys_qty: ysStock };
                         }
                     });
 
@@ -476,35 +476,72 @@ const server = http.createServer(async (req, res) => {
                         return !isCompositeOrStubend && validPrefixes.some(p => nameUpper.startsWith(p));
                     };
                     
-                    // Sihwa
-                    for (const [id, data] of Object.entries(sihwaStockMap)) {
-                        if (!isValidItem(data.name)) continue;
-                        const oldRecord = db.lastSnapshot[id];
-                        const oldStock = oldRecord ? oldRecord.stock : 0;
-                        if (oldStock !== data.stock) {
-                            changesObj[id] = { name: data.name, change: data.stock - oldStock, from: oldStock, to: data.stock };
+                    for (const [id, curr] of Object.entries(sihwaStockMap)) {
+                        if (!isValidItem(curr.name)) continue;
+                        const prev = db.lastSnapshot[id];
+                        const sh_from = prev ? (prev.sh_qty !== undefined ? prev.sh_qty : prev.stock) : 0;
+                        const sh_to = curr.sh_qty ?? 0;
+                        const sh_change = sh_to - sh_from;
+                        if (sh_change !== 0) {
+                            changesObj[id] = { 
+                                name: curr.name, 
+                                change: sh_change, 
+                                from: sh_from, 
+                                to: sh_to,
+                                location: '시화',
+                                maker: '대경'
+                            };
                         }
                     }
-                    for (const [id, oldRecord] of Object.entries(db.lastSnapshot)) {
-                        if (!isValidItem(oldRecord.name)) continue;
+                    for (const [id, prev] of Object.entries(db.lastSnapshot)) {
+                        if (!isValidItem(prev.name)) continue;
                         if (sihwaStockMap[id] === undefined) {
-                            changesObj[id] = { name: oldRecord.name, change: -oldRecord.stock, from: oldRecord.stock, to: 0 };
+                            const sh_from = prev.sh_qty !== undefined ? prev.sh_qty : prev.stock;
+                            if (sh_from !== 0) {
+                                changesObj[id] = { 
+                                    name: prev.name, 
+                                    change: -sh_from, 
+                                    from: sh_from, 
+                                    to: 0,
+                                    location: '시화',
+                                    maker: '대경'
+                                };
+                            }
                         }
                     }
                     
                     // Daekyung
-                    for (const [id, data] of Object.entries(ysStockMap)) {
-                        if (!isValidItem(data.name)) continue;
-                        const oldRecord = db.lastDaekyungSnapshot[id];
-                        const oldStock = oldRecord ? oldRecord.stock : 0;
-                        if (oldStock !== data.stock) {
-                            daekyungChangesObj[id] = { name: data.name, change: data.stock - oldStock, from: oldStock, to: data.stock };
+                    for (const [id, curr] of Object.entries(ysStockMap)) {
+                        if (!isValidItem(curr.name)) continue;
+                        const prev = db.lastDaekyungSnapshot[id];
+                        const ys_from = prev ? (prev.ys_qty !== undefined ? prev.ys_qty : prev.stock) : 0;
+                        const ys_to = curr.ys_qty ?? 0;
+                        const ys_change = ys_to - ys_from;
+                        if (ys_change !== 0) {
+                            daekyungChangesObj[id] = { 
+                                name: curr.name, 
+                                change: ys_change, 
+                                from: ys_from, 
+                                to: ys_to,
+                                location: '양산',
+                                maker: '대경'
+                            };
                         }
                     }
-                    for (const [id, oldRecord] of Object.entries(db.lastDaekyungSnapshot)) {
-                        if (!isValidItem(oldRecord.name)) continue;
+                    for (const [id, prev] of Object.entries(db.lastDaekyungSnapshot)) {
+                        if (!isValidItem(prev.name)) continue;
                         if (ysStockMap[id] === undefined) {
-                            daekyungChangesObj[id] = { name: oldRecord.name, change: -oldRecord.stock, from: oldRecord.stock, to: 0 };
+                            const ys_from = prev.ys_qty !== undefined ? prev.ys_qty : prev.stock;
+                            if (ys_from !== 0) {
+                                daekyungChangesObj[id] = { 
+                                    name: prev.name, 
+                                    change: -ys_from, 
+                                    from: ys_from, 
+                                    to: 0,
+                                    location: '양산',
+                                    maker: '대경'
+                                };
+                            }
                         }
                     }
 
@@ -868,16 +905,21 @@ const server = http.createServer(async (req, res) => {
         const mockChanges = {};
         const sihwaStockMap = db.currentSnapshot || {};
         const lastSnapshot = db.lastSnapshot || {};
-        for (const [id, data] of Object.entries(sihwaStockMap)) {
-            const oldRecord = lastSnapshot[id];
-            const oldStock = oldRecord ? oldRecord.stock : 0;
-            if (oldStock !== data.stock) {
-                mockChanges[id] = { name: data.name, change: data.stock - oldStock, from: oldStock, to: data.stock };
+        for (const [id, curr] of Object.entries(sihwaStockMap)) {
+            const prev = lastSnapshot[id];
+            const sh_from = prev ? (prev.sh_qty !== undefined ? prev.sh_qty : prev.stock) : 0;
+            const sh_to = curr.sh_qty ?? 0;
+            const sh_change = sh_to - sh_from;
+            if (sh_change !== 0) {
+                mockChanges[id] = { name: curr.name, change: sh_change, from: sh_from, to: sh_to };
             }
         }
-        for (const [id, oldRecord] of Object.entries(lastSnapshot)) {
+        for (const [id, prev] of Object.entries(lastSnapshot)) {
             if (sihwaStockMap[id] === undefined) {
-                mockChanges[id] = { name: oldRecord.name, change: -oldRecord.stock, from: oldRecord.stock, to: 0 };
+                const sh_from = prev.sh_qty !== undefined ? prev.sh_qty : prev.stock;
+                if (sh_from !== 0) {
+                    mockChanges[id] = { name: prev.name, change: -sh_from, from: sh_from, to: 0 };
+                }
             }
         }
 
@@ -963,7 +1005,7 @@ const server = http.createServer(async (req, res) => {
                         }
 
                         if (id && isSihwa) {
-                            map[id] = { name: item.item || item.name, stock: shStock };
+                            map[id] = { name: item.item || item.name, stock: shStock, sh_qty: shStock };
                         }
                     });
                     return map;
@@ -972,16 +1014,37 @@ const server = http.createServer(async (req, res) => {
                 const latestMap = getSihwaMap(latestInv);
                 const prevMap = getSihwaMap(prevInv);
 
-                for (const [id, data] of Object.entries(latestMap)) {
-                    const old = prevMap[id];
-                    const oldStock = old ? old.stock : 0;
-                    if (oldStock !== data.stock) {
-                        s3InventoryChanges.push({ id, name: data.name, from: oldStock, to: data.stock, change: data.stock - oldStock });
+                for (const [id, curr] of Object.entries(latestMap)) {
+                    const prev = prevMap[id];
+                    const sh_from = prev ? (prev.sh_qty !== undefined ? prev.sh_qty : prev.stock) : 0;
+                    const sh_to = curr.sh_qty ?? 0;
+                    const sh_change = sh_to - sh_from;
+                    if (sh_change !== 0) {
+                        s3InventoryChanges.push({ 
+                            id, 
+                            name: curr.name, 
+                            from: sh_from, 
+                            to: sh_to, 
+                            change: sh_change,
+                            location: '시화',
+                            maker: '대경'
+                        });
                     }
                 }
-                for (const [id, old] of Object.entries(prevMap)) {
-                    if (latestMap[id] === undefined && old.stock > 0) {
-                        s3InventoryChanges.push({ id, name: old.name, from: old.stock, to: 0, change: -old.stock });
+                for (const [id, prev] of Object.entries(prevMap)) {
+                    if (latestMap[id] === undefined) {
+                        const sh_from = prev.sh_qty !== undefined ? prev.sh_qty : prev.stock;
+                        if (sh_from !== 0) {
+                            s3InventoryChanges.push({ 
+                                id, 
+                                name: prev.name, 
+                                from: sh_from, 
+                                to: 0, 
+                                change: -sh_from,
+                                location: '시화',
+                                maker: '대경'
+                            });
+                        }
                     }
                 }
             }
