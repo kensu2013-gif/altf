@@ -29,6 +29,7 @@ import { MaterialFilter } from '../components/search/MaterialFilter';
 import { PixelRobotLoader } from '../components/ui/PixelRobotLoader';
 import { STANDARD_SYSTEMS, type StandardSystem } from '../lib/productUtils';
 import type { LineItem } from '../types';
+import { parseSku } from '../lib/sku';
 
 // Anti-Gravity: Error Boundary to prevent White Screen
 class InventoryErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -662,13 +663,11 @@ export default function Search() {
 
                     // Fallback Parsing (only if product not found, for display purposes)
                     if (!matchedProduct) {
-                        const parts = decodedId.split('-');
-                        if (parts.length >= 4) {
-                            pName = parts[0];
-                            pThickness = parts[1];
-                            pSize = parts[2];
-                            pMaterial = parts.slice(3).join('-'); // Handle material needing dash? usually last part
-                        }
+                        const parsed = parseSku(decodedId);
+                        pName = parsed.name;
+                        pThickness = parsed.thickness;
+                        pSize = parsed.size.replace(/^[A-Z]+-?/, '').trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
+                        pMaterial = parsed.material;
                     }
 
                 } catch (e) {

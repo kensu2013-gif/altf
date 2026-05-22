@@ -55,7 +55,48 @@ export async function getInventoryFromS3() {
             lastModified: response.LastModified
         };
     } catch (error) {
-        console.error('[S3] Failed to fetch inventory from S3:', error);
+        console.warn('[S3] Failed to fetch inventory from S3. Trying local file fallback...', error.message);
+        try {
+            const fs = await import('fs');
+            const path = await import('path');
+            const { fileURLToPath } = await import('url');
+
+            const __filename = fileURLToPath(import.meta.url);
+            const __dirname = path.dirname(__filename);
+            const localPath = path.join(__dirname, 'public/api/inventory/inventory.json');
+            
+            if (fs.existsSync(localPath)) {
+                console.log(`[S3 Fallback] Reading local file: ${localPath}`);
+                const localData = fs.readFileSync(localPath, 'utf8');
+                return {
+                    items: JSON.parse(localData),
+                    lastModified: fs.statSync(localPath).mtime
+                };
+            } else {
+                console.warn(`[S3 Fallback] Local file does not exist at ${localPath}`);
+            }
+        } catch (localError) {
+            console.error('[S3 Fallback] Failed to read local file fallback:', localError);
+        }
+
+        try {
+            console.log('[S3 Fallback] Fetching inventory from public HTTP URL...');
+            const publicUrl = 'https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/public/inventory/inventory.json';
+            const response = await fetch(publicUrl);
+            if (response.ok) {
+                const bodyContent = await response.json();
+                console.log('[S3 Fallback] Successfully fetched from public HTTP URL.');
+                return {
+                    items: bodyContent,
+                    lastModified: new Date()
+                };
+            } else {
+                console.warn(`[S3 Fallback] HTTP fetch failed with status ${response.status}`);
+            }
+        } catch (fetchError) {
+            console.error('[S3 Fallback] Failed to fetch from public HTTP URL:', fetchError);
+        }
+
         throw error;
     }
 }

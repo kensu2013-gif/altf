@@ -243,13 +243,15 @@ export default function SihwaInventory() {
     // 결품 기회손실 관련 상태 추가
     const [mdSearchQuery, setMdSearchQuery] = useState('');
     const [mdFilterMaterial, setMdFilterMaterial] = useState('');
-    const [mdFilterMaker, setMdFilterMaker] = useState('');
     const [mdSortConfig, setMdSortConfig] = useState<{
-        key: 'id' | 'name' | 'count' | 'estimatedRevenue' | 'maker' | 'material';
+        key: 'id' | 'name' | 'count' | 'estimatedRevenue' | 'material';
         direction: 'asc' | 'desc';
     }>({ key: 'count', direction: 'desc' });
     const [selectedMissedDemandIds, setSelectedMissedDemandIds] = useState<Set<string>>(new Set());
     const [mdViewLayout, setMdViewLayout] = useState<'TABLE' | 'CARD'>('TABLE');
+    const [mdPeriod, setMdPeriod] = useState<'ALL' | '7D' | '30D' | '60D'>('ALL');
+    const [expandedMdRowIds, setExpandedMdRowIds] = useState<Set<string>>(new Set());
+    const [mdRowQtys, setMdRowQtys] = useState<Record<string, number>>({});
 
 
 
@@ -1522,7 +1524,19 @@ export default function SihwaInventory() {
 
         // ── 결품 기회손실: 대경+시화 모두 0일 때 주문→취소 이력 ────
         // ── 결품 기회손실: 취소/철회, 미결 지연(5일↑), 견적 미전환 ────
-        const missedDemandMap: Record<string, { count: number; estimatedRevenue: number }> = {};
+        const missedDemandMap: Record<string, { 
+            count: number; 
+            estimatedRevenue: number; 
+            history: { 
+                date: string; 
+                type: 'ORDER' | 'QUOTE'; 
+                qty: number; 
+                price: number; 
+                customer: string; 
+                refNo: string; 
+                status: string; 
+            }[] 
+        }> = {};
 
         // 1. 주문 건 (취소/철회 및 5일 이상 장기 미결품)
         orders.forEach(o => {
@@ -1549,9 +1563,20 @@ export default function SihwaInventory() {
                 const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
                 // 전체 혹은 일부 수량 부족 판정 (재고 < 주문수량)
                 if (row.shQty + row.ysQty < qty || (isCancelled && row.shQty <= 0 && row.ysQty <= 0)) {
-                    if (!missedDemandMap[id]) missedDemandMap[id] = { count: 0, estimatedRevenue: 0 };
+                    if (!missedDemandMap[id]) {
+                        missedDemandMap[id] = { count: 0, estimatedRevenue: 0, history: [] };
+                    }
                     missedDemandMap[id].count += 1;
                     missedDemandMap[id].estimatedRevenue += qty * row.sellingPrice;
+                    missedDemandMap[id].history.push({
+                        date: o.createdAt,
+                        type: 'ORDER',
+                        qty: qty,
+                        price: row.sellingPrice,
+                        customer: o.customerName || '일반고객',
+                        refNo: o.poNumber || o.id || '',
+                        status: o.status === 'PROCESSING' ? '장기 미결' : o.status === 'CANCELLED' ? '주문 취소' : o.status === 'WITHDRAWN' ? '주문 철회' : o.status
+                    });
                 }
             });
         });
@@ -1573,9 +1598,20 @@ export default function SihwaInventory() {
 
                 const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
                 if (row.shQty + row.ysQty < qty) {
-                    if (!missedDemandMap[id]) missedDemandMap[id] = { count: 0, estimatedRevenue: 0 };
+                    if (!missedDemandMap[id]) {
+                        missedDemandMap[id] = { count: 0, estimatedRevenue: 0, history: [] };
+                    }
                     missedDemandMap[id].count += 1;
                     missedDemandMap[id].estimatedRevenue += qty * row.sellingPrice;
+                    missedDemandMap[id].history.push({
+                        date: q.createdAt,
+                        type: 'QUOTE',
+                        qty: qty,
+                        price: row.sellingPrice,
+                        customer: q.customerName || '일반고객',
+                        refNo: q.id,
+                        status: '견적 미전환'
+                    });
                 }
             });
         });
@@ -1685,68 +1721,59 @@ export default function SihwaInventory() {
         };
     }, [analyzedInventory, historyData, orders, quotes]);
 
-    const getProcurementInsight = (maker?: string, material?: string, count: number = 0) => {
-        const isSpecialty = (mat?: string) => {
-            if (!mat) return false;
-            const upper = mat.toUpperCase();
-            return upper.startsWith('WP') || 
-                   ['316L', '310S', '321', 'DUPLEX', 'SUPER DUPLEX'].some(kw => upper.includes(kw));
-        };
-
-        if (maker === '대경') {
-            if (count >= 3) {
-                return {
-                    recommendation: '대경 대량 매입 (할인 협상)',
-                    badgeClass: 'bg-rose-100 text-rose-700 border border-rose-300 text-[10px] font-bold px-1.5 py-0.5 rounded'
-                };
-            } else {
-                return {
-                    recommendation: '대경 소량 긴급 보충',
-                    badgeClass: 'bg-amber-100 text-amber-700 border border-amber-300 text-[10px] font-bold px-1.5 py-0.5 rounded'
-                };
-            }
-        }
-
-        if (isSpecialty(material)) {
-            return {
-                recommendation: '특수재질 외주 견적 문의',
-                badgeClass: 'bg-violet-100 text-violet-700 border border-violet-300 text-[10px] font-bold px-1.5 py-0.5 rounded'
-            };
-        }
-
-        return {
-            recommendation: '대체재 일반 소싱 검토',
-            badgeClass: 'bg-blue-100 text-blue-700 border border-blue-300 text-[10px] font-bold px-1.5 py-0.5 rounded'
-        };
-    };
-
     const filteredMissedDemandList = useMemo(() => {
         let list = healthDiagnosis.missedDemandList.map(m => {
             const row = m.row || {
                 product: inventory.find(item => item.id === m.id) || { id: m.id, name: m.id, material: '알수없음', maker: '알수없음', size: '', thickness: '' },
                 sellingPrice: 0,
-                recentPurchasePrice: 0
+                recentPurchasePrice: 0,
+                shQty: 0,
+                ysQty: 0,
+                pendingOrderQty: 0,
+                safeStock: 0
             };
+
+            // Filter history by period
+            const nowTime = Date.now();
+            const filteredHistory = (m.history || []).filter(h => {
+                if (mdPeriod === 'ALL') return true;
+                const dateVal = new Date(h.date).getTime();
+                if (isNaN(dateVal)) return true;
+                const diffDays = (nowTime - dateVal) / 86400000;
+                if (mdPeriod === '7D') return diffDays <= 7;
+                if (mdPeriod === '30D') return diffDays <= 30;
+                if (mdPeriod === '60D') return diffDays <= 60;
+                return true;
+            });
+
+            const count = filteredHistory.length;
+            const totalQty = filteredHistory.reduce((sum, h) => sum + h.qty, 0);
+            const estimatedRevenue = filteredHistory.reduce((sum, h) => sum + h.qty * h.price, 0);
+
             return {
                 ...m,
-                row
+                row,
+                history: filteredHistory,
+                count,
+                totalQty,
+                estimatedRevenue
             };
         });
+
+        // Filter items with 0 count in the selected period
+        list = list.filter(m => m.count > 0);
 
         if (mdSearchQuery.trim()) {
             const query = mdSearchQuery.toLowerCase();
             list = list.filter(m => 
                 m.id.toLowerCase().includes(query) || 
-                (m.row?.product?.name || '').toLowerCase().includes(query)
+                (m.row?.product?.name || '').toLowerCase().includes(query) ||
+                (m.row?.product?.material || '').toLowerCase().includes(query)
             );
         }
 
         if (mdFilterMaterial) {
             list = list.filter(m => m.row?.product?.material === mdFilterMaterial);
-        }
-
-        if (mdFilterMaker) {
-            list = list.filter(m => m.row?.product?.maker === mdFilterMaker);
         }
 
         list.sort((a, b) => {
@@ -1765,9 +1792,6 @@ export default function SihwaInventory() {
             } else if (mdSortConfig.key === 'estimatedRevenue') {
                 valA = a.estimatedRevenue;
                 valB = b.estimatedRevenue;
-            } else if (mdSortConfig.key === 'maker') {
-                valA = a.row?.product?.maker || '';
-                valB = b.row?.product?.maker || '';
             } else if (mdSortConfig.key === 'material') {
                 valA = a.row?.product?.material || '';
                 valB = b.row?.product?.material || '';
@@ -1779,7 +1803,14 @@ export default function SihwaInventory() {
         });
 
         return list;
-    }, [healthDiagnosis.missedDemandList, mdSearchQuery, mdFilterMaterial, mdFilterMaker, mdSortConfig, inventory]);
+    }, [healthDiagnosis.missedDemandList, mdSearchQuery, mdFilterMaterial, mdSortConfig, mdPeriod, inventory]);
+
+    const mdPeriodStats = useMemo(() => {
+        const totalOccurrences = filteredMissedDemandList.reduce((sum, m) => sum + m.count, 0);
+        const totalQuantity = filteredMissedDemandList.reduce((sum, m) => sum + m.totalQty, 0);
+        const totalLoss = filteredMissedDemandList.reduce((sum, m) => sum + m.estimatedRevenue, 0);
+        return { totalOccurrences, totalQuantity, totalLoss };
+    }, [filteredMissedDemandList]);
 
     const mdMaterialOptions = useMemo(() => {
         const mats = new Set<string>();
@@ -1790,21 +1821,12 @@ export default function SihwaInventory() {
         return Array.from(mats).sort();
     }, [healthDiagnosis.missedDemandList, inventory]);
 
-    const mdMakerOptions = useMemo(() => {
-        const makers = new Set<string>();
-        healthDiagnosis.missedDemandList.forEach(m => {
-            const maker = m.row?.product?.maker || inventory.find(item => item.id === m.id)?.maker;
-            if (maker) makers.add(maker);
-        });
-        return Array.from(makers).sort();
-    }, [healthDiagnosis.missedDemandList, inventory]);
-
     const handleCreateMissedDemandOrder = () => {
         if (selectedMissedDemandIds.size === 0) return;
 
         filteredMissedDemandList.forEach(m => {
             if (selectedMissedDemandIds.has(m.id)) {
-                const qty = Math.max(5, m.count * 2);
+                const qty = mdRowQtys[m.id] ?? Math.max(5, m.count * 2);
                 const unitPrice = m.row && m.row.recentPurchasePrice > 0 ? m.row.recentPurchasePrice : (m.row?.sellingPrice || 0);
 
                 addItem({
@@ -1824,6 +1846,30 @@ export default function SihwaInventory() {
         });
 
         setSelectedMissedDemandIds(new Set());
+        navigate('/cart');
+    };
+
+    const handleCreateSingleMissedDemandOrder = (id: string, customQty?: number) => {
+        const item = filteredMissedDemandList.find(m => m.id === id);
+        if (!item) return;
+
+        const qty = customQty ?? mdRowQtys[id] ?? Math.max(5, item.count * 2);
+        const unitPrice = item.row && item.row.recentPurchasePrice > 0 ? item.row.recentPurchasePrice : (item.row?.sellingPrice || 0);
+
+        addItem({
+            id: crypto.randomUUID(),
+            productId: id,
+            name: item.row?.product?.name || id,
+            thickness: (item.row?.product as { thickness?: string })?.thickness || '',
+            size: item.row?.product?.size || '',
+            material: item.row?.product?.material || '',
+            quantity: qty,
+            unitPrice: unitPrice,
+            amount: qty * unitPrice,
+            note: `[결품 기회손실 즉시발주]`,
+            isVerified: false
+        });
+
         navigate('/cart');
     };
 
@@ -3648,21 +3694,28 @@ export default function SihwaInventory() {
                                     {(!selectedHealthCategory || selectedHealthCategory === 'MISSED') && healthDiagnosis.missedDemandList.length > 0 && (
                                         <div id="missed-demand-section" className="bg-white rounded-2xl border border-violet-200 shadow-sm overflow-hidden mt-4">
                                             {/* 헤더 */}
-                                            <div className="px-5 py-4 bg-linear-to-r from-violet-50 to-indigo-50 border-b border-violet-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                            <div className="px-5 py-4 bg-linear-to-r from-violet-50 to-indigo-50 border-b border-violet-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                 <div>
                                                     <div className="text-sm font-black text-violet-800 flex items-center gap-1.5">
-                                                        <span>🔍 재고 없어서 놓친 수요 — 결품 기회비용 분석</span>
+                                                        <span>🔍 결품 기회비용 분석 (재고 부족으로 놓친 수요)</span>
                                                         <span className="text-[9px] bg-violet-600 text-white px-2 py-0.5 rounded-full font-bold">데이터 분석 완료</span>
                                                     </div>
                                                     <div className="text-[10px] text-violet-500 mt-0.5">
-                                                        대경+시화 재고 0 상태에서 주문 시도 후 취소·철회된 이력 기반 (추정치)
+                                                        시화 및 대경재고가 없는 상태에서 고객의 견적 문의나 주문 시도 후 취소·철회된 이력 분석
                                                     </div>
                                                 </div>
-                                                <div className="text-left sm:text-right bg-white/60 backdrop-blur-xs px-3 py-1.5 rounded-lg border border-violet-100">
-                                                    <div className="text-[10px] text-violet-600 font-bold">필터링된 기회손실 합계</div>
-                                                    <div className="text-xs font-black text-indigo-700">
-                                                        ₩{formatCur(Math.round(filteredMissedDemandList.reduce((s, m) => s + m.estimatedRevenue, 0) / 10000))}만
-                                                        <span className="text-[10px] font-normal text-slate-500 ml-1">(전체 {filteredMissedDemandList.length}건)</span>
+                                                <div className="flex flex-wrap items-center gap-3">
+                                                    <div className="bg-white px-3 py-1.5 rounded-lg border border-violet-100 text-center sm:text-left shadow-xs">
+                                                        <div className="text-[9px] text-slate-400 font-bold">총 결품 횟수</div>
+                                                        <div className="text-sm font-black text-rose-600">{mdPeriodStats.totalOccurrences}회</div>
+                                                    </div>
+                                                    <div className="bg-white px-3 py-1.5 rounded-lg border border-violet-100 text-center sm:text-left shadow-xs">
+                                                        <div className="text-[9px] text-slate-400 font-bold">총 문의 수량</div>
+                                                        <div className="text-sm font-black text-amber-600">{mdPeriodStats.totalQuantity.toLocaleString()}개</div>
+                                                    </div>
+                                                    <div className="bg-white px-3 py-1.5 rounded-lg border border-violet-100 text-center sm:text-left shadow-xs">
+                                                        <div className="text-[9px] text-violet-500 font-bold">추정 기회손실액</div>
+                                                        <div className="text-sm font-black text-indigo-700">₩{formatCur(mdPeriodStats.totalLoss)}</div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -3670,6 +3723,18 @@ export default function SihwaInventory() {
                                             {/* 검색 및 필터 컨트롤 바 */}
                                             <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
                                                 <div className="flex flex-wrap items-center gap-2 flex-1">
+                                                    {/* 기간 필터 */}
+                                                    <select
+                                                        value={mdPeriod}
+                                                        onChange={(e) => setMdPeriod(e.target.value as 'ALL' | '7D' | '30D' | '60D')}
+                                                        className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 font-bold text-slate-700"
+                                                    >
+                                                        <option value="ALL">전체 기간</option>
+                                                        <option value="7D">최근 7일</option>
+                                                        <option value="30D">최근 30일</option>
+                                                        <option value="60D">최근 60일</option>
+                                                    </select>
+
                                                     {/* 검색창 */}
                                                     <div className="relative min-w-[200px] flex-1 max-w-xs">
                                                         <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400 text-xs">🔍</span>
@@ -3702,25 +3767,13 @@ export default function SihwaInventory() {
                                                         ))}
                                                     </select>
 
-                                                    {/* 제조사 필터 */}
-                                                    <select
-                                                        value={mdFilterMaker}
-                                                        onChange={(e) => setMdFilterMaker(e.target.value)}
-                                                        className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 font-medium"
-                                                    >
-                                                        <option value="">제조사 전체</option>
-                                                        {mdMakerOptions.map(maker => (
-                                                            <option key={maker} value={maker}>{maker}</option>
-                                                        ))}
-                                                    </select>
-
                                                     {/* 필터 초기화 버튼 */}
-                                                    {(mdSearchQuery || mdFilterMaterial || mdFilterMaker) && (
+                                                    {(mdSearchQuery || mdFilterMaterial || mdPeriod !== 'ALL') && (
                                                         <button
                                                             onClick={() => {
                                                                 setMdSearchQuery('');
                                                                 setMdFilterMaterial('');
-                                                                setMdFilterMaker('');
+                                                                setMdPeriod('ALL');
                                                             }}
                                                             className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg text-xs transition-colors"
                                                         >
@@ -3771,12 +3824,12 @@ export default function SihwaInventory() {
                                                                         className="rounded border-slate-300 text-violet-600 focus:ring-violet-500 w-3.5 h-3.5"
                                                                     />
                                                                 </th>
-                                                                <th className="p-3 w-12 text-center">순위</th>
+                                                                <th className="p-3 w-10 text-center">순위</th>
                                                                 <th 
                                                                     className="p-3 cursor-pointer hover:bg-slate-200 transition-colors"
                                                                     onClick={() => setMdSortConfig(prev => ({ key: 'id', direction: prev.key === 'id' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
                                                                 >
-                                                                    품목 코드 {mdSortConfig.key === 'id' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
+                                                                    품목코드 {mdSortConfig.key === 'id' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
                                                                 </th>
                                                                 <th 
                                                                     className="p-3 cursor-pointer hover:bg-slate-200 transition-colors"
@@ -3790,73 +3843,183 @@ export default function SihwaInventory() {
                                                                 >
                                                                     재질 {mdSortConfig.key === 'material' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
                                                                 </th>
-                                                                <th 
-                                                                    className="p-3 cursor-pointer hover:bg-slate-200 transition-colors"
-                                                                    onClick={() => setMdSortConfig(prev => ({ key: 'maker', direction: prev.key === 'maker' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
-                                                                >
-                                                                    제조사 {mdSortConfig.key === 'maker' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
-                                                                </th>
+                                                                <th className="p-3">사이즈</th>
+                                                                <th className="p-3">두께</th>
+                                                                <th className="p-3 text-right">시화재고</th>
+                                                                <th className="p-3 text-right">대경재고</th>
+                                                                <th className="p-3 text-right">입고예정</th>
+                                                                <th className="p-3 text-right">안전재고</th>
                                                                 <th 
                                                                     className="p-3 text-right cursor-pointer hover:bg-slate-200 transition-colors"
                                                                     onClick={() => setMdSortConfig(prev => ({ key: 'count', direction: prev.key === 'count' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
                                                                 >
                                                                     결품 횟수 {mdSortConfig.key === 'count' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
                                                                 </th>
+                                                                <th className="p-3 text-right">총 문의수량</th>
                                                                 <th 
                                                                     className="p-3 text-right cursor-pointer hover:bg-slate-200 transition-colors"
                                                                     onClick={() => setMdSortConfig(prev => ({ key: 'estimatedRevenue', direction: prev.key === 'estimatedRevenue' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
                                                                 >
                                                                     추정 기회손실 {mdSortConfig.key === 'estimatedRevenue' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
                                                                 </th>
-                                                                <th className="p-3 text-center">구매 권장 조치</th>
+                                                                <th className="p-3 text-center">발주 수량</th>
+                                                                <th className="p-3 text-center">작업</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             {filteredMissedDemandList.map((m, i) => {
                                                                 const isSelected = selectedMissedDemandIds.has(m.id);
-                                                                const maker = m.row?.product?.maker;
-                                                                const material = m.row?.product?.material;
-                                                                const insight = getProcurementInsight(maker, material, m.count);
+                                                                const isExpanded = expandedMdRowIds.has(m.id);
+                                                                const defaultQty = Math.max(5, m.count * 2);
+                                                                const qtyValue = mdRowQtys[m.id] ?? defaultQty;
+
+                                                                const shQty = m.row?.shQty ?? 0;
+                                                                const ysQty = m.row?.ysQty ?? 0;
+                                                                const pendingOrderQty = m.row?.pendingOrderQty ?? 0;
+                                                                const safeStock = m.row?.safeStock ?? 0;
 
                                                                 return (
-                                                                    <tr 
-                                                                        key={m.id}
-                                                                        onClick={() => {
-                                                                            const next = new Set(selectedMissedDemandIds);
-                                                                            if (next.has(m.id)) next.delete(m.id);
-                                                                            else next.add(m.id);
-                                                                            setSelectedMissedDemandIds(next);
-                                                                        }}
-                                                                        className={`border-b border-slate-100 hover:bg-violet-50/40 transition-colors text-xs font-medium cursor-pointer ${isSelected ? 'bg-violet-50/70' : ''}`}
-                                                                    >
-                                                                        <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                checked={isSelected}
-                                                                                onChange={(e) => {
-                                                                                    const next = new Set(selectedMissedDemandIds);
-                                                                                    if (e.target.checked) next.add(m.id);
-                                                                                    else next.delete(m.id);
-                                                                                    setSelectedMissedDemandIds(next);
-                                                                                }}
-                                                                                className="rounded border-slate-300 text-violet-600 focus:ring-violet-500 w-3.5 h-3.5"
-                                                                            />
-                                                                        </td>
-                                                                        <td className="p-3 text-center text-slate-500 font-mono text-[10px]">{i + 1}</td>
-                                                                        <td className="p-3 font-mono font-bold text-slate-800 text-[10px]">{m.id}</td>
-                                                                        <td className="p-3 text-slate-700">{m.row?.product?.name || m.id}</td>
-                                                                        <td className="p-3 text-slate-500">{material || '알수없음'}</td>
-                                                                        <td className="p-3 text-slate-500">{maker || '알수없음'}</td>
-                                                                        <td className="p-3 text-right font-mono font-black text-rose-600">{m.count}회</td>
-                                                                        <td className="p-3 text-right font-mono font-bold text-slate-800">
-                                                                            ₩{formatCur(m.estimatedRevenue)}
-                                                                        </td>
-                                                                        <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
-                                                                            <span className={insight.badgeClass}>
-                                                                                {insight.recommendation}
-                                                                            </span>
-                                                                        </td>
-                                                                    </tr>
+                                                                    <>
+                                                                        <tr 
+                                                                            key={m.id}
+                                                                            onClick={() => {
+                                                                                const next = new Set(selectedMissedDemandIds);
+                                                                                if (next.has(m.id)) next.delete(m.id);
+                                                                                else next.add(m.id);
+                                                                                setSelectedMissedDemandIds(next);
+                                                                            }}
+                                                                            className={`border-b border-slate-100 hover:bg-violet-50/40 transition-colors text-xs font-medium cursor-pointer ${isSelected ? 'bg-violet-50/70' : ''}`}
+                                                                        >
+                                                                            <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={isSelected}
+                                                                                    onChange={(e) => {
+                                                                                        const next = new Set(selectedMissedDemandIds);
+                                                                                        if (e.target.checked) next.add(m.id);
+                                                                                        else next.delete(m.id);
+                                                                                        setSelectedMissedDemandIds(next);
+                                                                                    }}
+                                                                                    className="rounded border-slate-300 text-violet-600 focus:ring-violet-500 w-3.5 h-3.5"
+                                                                                />
+                                                                            </td>
+                                                                            <td className="p-3 text-center text-slate-500 font-mono text-[10px]">{i + 1}</td>
+                                                                            <td className="p-3 font-mono font-bold text-slate-800 text-[10px]">{m.id}</td>
+                                                                            <td className="p-3 text-slate-700 font-semibold">{m.row?.product?.name || m.id}</td>
+                                                                            <td className="p-3 text-slate-500">{m.row?.product?.material || '알수없음'}</td>
+                                                                            <td className="p-3 text-slate-500 font-mono text-[11px]">{m.row?.product?.size || '-'}</td>
+                                                                            <td className="p-3 text-slate-500 font-mono text-[11px]">{m.row?.product?.thickness || '-'}</td>
+                                                                            
+                                                                            {/* 재고 데이터 */}
+                                                                            <td className={`p-3 text-right font-mono font-semibold ${shQty === 0 ? 'text-slate-400' : 'text-slate-800'}`}>
+                                                                                {shQty.toLocaleString()}개
+                                                                            </td>
+                                                                            <td className={`p-3 text-right font-mono font-semibold ${ysQty === 0 ? 'text-slate-400' : 'text-slate-800'}`}>
+                                                                                {ysQty.toLocaleString()}개
+                                                                            </td>
+                                                                            <td className={`p-3 text-right font-mono ${pendingOrderQty === 0 ? 'text-slate-400' : 'text-indigo-600 font-bold'}`}>
+                                                                                {pendingOrderQty.toLocaleString()}개
+                                                                            </td>
+                                                                            <td className="p-3 text-right font-mono text-slate-500">
+                                                                                {safeStock.toLocaleString()}개
+                                                                            </td>
+
+                                                                            <td className="p-3 text-right font-mono font-black text-rose-600">{m.count}회</td>
+                                                                            <td className="p-3 text-right font-mono text-slate-700">{m.totalQty.toLocaleString()}개</td>
+                                                                            <td className="p-3 text-right font-mono font-bold text-slate-800">
+                                                                                ₩{formatCur(m.estimatedRevenue)}
+                                                                            </td>
+                                                                            
+                                                                            {/* 인라인 발주 수량 입력 */}
+                                                                            <td className="p-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    min={1}
+                                                                                    value={qtyValue}
+                                                                                    onChange={(e) => {
+                                                                                        const val = parseInt(e.target.value, 10);
+                                                                                        setMdRowQtys(prev => ({
+                                                                                            ...prev,
+                                                                                            [m.id]: isNaN(val) ? 1 : val
+                                                                                        }));
+                                                                                    }}
+                                                                                    className="w-16 px-1.5 py-1 bg-white border border-slate-300 rounded text-center text-xs font-bold font-mono focus:outline-hidden focus:border-violet-500"
+                                                                                />
+                                                                            </td>
+
+                                                                            {/* 인라인 즉시발주 및 상세 토글 */}
+                                                                            <td className="p-2 text-center flex items-center justify-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                                                                <button
+                                                                                    onClick={() => handleCreateSingleMissedDemandOrder(m.id, qtyValue)}
+                                                                                    className="px-2 py-1 bg-violet-600 hover:bg-violet-700 text-white rounded text-[10px] font-bold transition-all shadow-xs"
+                                                                                >
+                                                                                    즉시 발주
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        const next = new Set(expandedMdRowIds);
+                                                                                        if (next.has(m.id)) next.delete(m.id);
+                                                                                        else next.add(m.id);
+                                                                                        setExpandedMdRowIds(next);
+                                                                                    }}
+                                                                                    className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                                                                                    title="상세 근거 내역 보기"
+                                                                                >
+                                                                                    {isExpanded ? <ChevronDown className="w-4 h-4 text-violet-600" /> : <ChevronRight className="w-4 h-4" />}
+                                                                                </button>
+                                                                            </td>
+                                                                        </tr>
+                                                                        {isExpanded && (
+                                                                            <tr className="bg-slate-50/85">
+                                                                                <td colSpan={16} className="px-6 py-3 border-b border-violet-100">
+                                                                                    <div className="bg-white rounded-xl border border-violet-100 p-4 shadow-xs">
+                                                                                        <div className="flex items-center justify-between mb-2">
+                                                                                            <span className="text-xs font-bold text-violet-800 flex items-center gap-1.5">
+                                                                                                <span>📝 {m.row?.product?.name || m.id} 상세 결품/기회손실 유입 근거 내역</span>
+                                                                                            </span>
+                                                                                            <span className="text-[10px] text-slate-400">
+                                                                                                * 추정 기회손실 = 재고 부족 시기에 접수된 총 수량 × 현재 판매단가
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        <table className="w-full text-left border-collapse text-[10px]">
+                                                                                            <thead>
+                                                                                                <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
+                                                                                                    <th className="p-2">날짜</th>
+                                                                                                    <th className="p-2">구분</th>
+                                                                                                    <th className="p-2">거래처</th>
+                                                                                                    <th className="p-2 text-right">문의수량</th>
+                                                                                                    <th className="p-2 text-right">단가</th>
+                                                                                                    <th className="p-2 text-right">예상 손실액</th>
+                                                                                                    <th className="p-2">문서번호</th>
+                                                                                                    <th className="p-2">상태</th>
+                                                                                                </tr>
+                                                                                            </thead>
+                                                                                            <tbody>
+                                                                                                {m.history.map((h, hi) => (
+                                                                                                    <tr key={hi} className="border-b border-slate-100 hover:bg-slate-50/50">
+                                                                                                        <td className="p-2 font-mono text-slate-500">{h.date.substring(0, 10)}</td>
+                                                                                                        <td className="p-2">
+                                                                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${h.type === 'ORDER' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                                                                {h.type === 'ORDER' ? '주문' : '견적'}
+                                                                                                            </span>
+                                                                                                        </td>
+                                                                                                        <td className="p-2 text-slate-700 font-medium">{h.customer}</td>
+                                                                                                        <td className="p-2 text-right font-mono font-bold text-slate-700">{h.qty}개</td>
+                                                                                                        <td className="p-2 text-right font-mono text-slate-500">₩{formatCur(h.price)}</td>
+                                                                                                        <td className="p-2 text-right font-mono font-bold text-slate-800">₩{formatCur(h.qty * h.price)}</td>
+                                                                                                        <td className="p-2 font-mono text-slate-400">{h.refNo}</td>
+                                                                                                        <td className="p-2">
+                                                                                                            <span className="text-rose-600 font-semibold">{h.status}</span>
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                ))}
+                                                                                            </tbody>
+                                                                                        </table>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        )}
+                                                                    </>
                                                                 );
                                                             })}
                                                         </tbody>
@@ -3864,57 +4027,153 @@ export default function SihwaInventory() {
                                                 </div>
                                             ) : (
                                                 /* 카드 뷰 */
-                                                <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-                                                    {filteredMissedDemandList.map((m, i) => {
-                                                        const isSelected = selectedMissedDemandIds.has(m.id);
-                                                        const maker = m.row?.product?.maker;
-                                                        const material = m.row?.product?.material;
-                                                        const insight = getProcurementInsight(maker, material, m.count);
+                                                <div className="p-4">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
+                                                        {filteredMissedDemandList.map((m, i) => {
+                                                            const isSelected = selectedMissedDemandIds.has(m.id);
+                                                            const isExpanded = expandedMdRowIds.has(m.id);
+                                                            const defaultQty = Math.max(5, m.count * 2);
+                                                            const qtyValue = mdRowQtys[m.id] ?? defaultQty;
 
-                                                        return (
-                                                            <div 
-                                                                key={m.id}
-                                                                onClick={() => {
-                                                                    const next = new Set(selectedMissedDemandIds);
-                                                                    if (next.has(m.id)) next.delete(m.id);
-                                                                    else next.add(m.id);
-                                                                    setSelectedMissedDemandIds(next);
-                                                                }}
-                                                                className={`rounded-xl p-3.5 border transition-all cursor-pointer select-none ${isSelected ? 'border-violet-400 bg-violet-50/80 shadow-xs' : m.count >= 3 ? 'border-rose-200 bg-rose-50/60 hover:bg-rose-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
-                                                            >
-                                                                <div className="flex items-center gap-1.5 mb-2.5">
-                                                                    <div onClick={(e) => e.stopPropagation()}>
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={isSelected}
-                                                                            onChange={(e) => {
-                                                                                const next = new Set(selectedMissedDemandIds);
-                                                                                if (e.target.checked) next.add(m.id);
-                                                                                else next.delete(m.id);
-                                                                                setSelectedMissedDemandIds(next);
+                                                            const shQty = m.row?.shQty ?? 0;
+                                                            const ysQty = m.row?.ysQty ?? 0;
+                                                            const pendingOrderQty = m.row?.pendingOrderQty ?? 0;
+                                                            const safeStock = m.row?.safeStock ?? 0;
+
+                                                            return (
+                                                                <div 
+                                                                    key={m.id}
+                                                                    onClick={() => {
+                                                                        const next = new Set(selectedMissedDemandIds);
+                                                                        if (next.has(m.id)) next.delete(m.id);
+                                                                        else next.add(m.id);
+                                                                        setSelectedMissedDemandIds(next);
+                                                                    }}
+                                                                    className={`rounded-xl p-3.5 border transition-all cursor-pointer select-none ${isSelected ? 'border-violet-400 bg-violet-50/80 shadow-xs' : m.count >= 3 ? 'border-rose-200 bg-rose-50/60 hover:bg-rose-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                                                                >
+                                                                    <div className="flex items-center justify-between mb-2.5">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <div onClick={(e) => e.stopPropagation()}>
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={isSelected}
+                                                                                    onChange={(e) => {
+                                                                                        const next = new Set(selectedMissedDemandIds);
+                                                                                        if (e.target.checked) next.add(m.id);
+                                                                                        else next.delete(m.id);
+                                                                                        setSelectedMissedDemandIds(next);
+                                                                                    }}
+                                                                                    className="rounded border-slate-300 text-violet-600 focus:ring-violet-500 w-3.5 h-3.5"
+                                                                                />
+                                                                            </div>
+                                                                            <span className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-black shrink-0 ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{i + 1}</span>
+                                                                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${m.count >= 3 ? 'bg-rose-200 text-rose-700' : 'bg-violet-200 text-violet-700'}`}>
+                                                                                {m.count}회 결품 ({m.totalQty}개)
+                                                                            </span>
+                                                                        </div>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const next = new Set(expandedMdRowIds);
+                                                                                if (next.has(m.id)) next.delete(m.id);
+                                                                                else next.add(m.id);
+                                                                                setExpandedMdRowIds(next);
                                                                             }}
-                                                                            className="rounded border-slate-300 text-violet-600 focus:ring-violet-500 w-3.5 h-3.5"
-                                                                        />
+                                                                            className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                                                                        >
+                                                                            {isExpanded ? <ChevronDown className="w-4 h-4 text-violet-600" /> : <ChevronRight className="w-4 h-4" />}
+                                                                        </button>
                                                                     </div>
-                                                                    <span className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-black shrink-0 ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{i + 1}</span>
-                                                                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${m.count >= 3 ? 'bg-rose-200 text-rose-700' : 'bg-violet-200 text-violet-700'}`}>
-                                                                        {m.count}회 결품
-                                                                    </span>
+
+                                                                    <div className="text-[10px] font-mono font-bold text-slate-800 leading-tight break-all mb-1">{m.id}</div>
+                                                                    <div className="text-[12px] font-bold text-slate-900 mb-1">{m.row?.product?.name || m.id}</div>
+                                                                    
+                                                                    <div className="text-[10px] text-slate-500 grid grid-cols-2 gap-x-2 gap-y-1 mb-2.5 pb-2 border-b border-slate-100 font-medium">
+                                                                        <span>재질: {m.row?.product?.material || '알수없음'}</span>
+                                                                        <span>사이즈: {m.row?.product?.size || '-'}</span>
+                                                                        <span>두께: {m.row?.product?.thickness || '-'}</span>
+                                                                    </div>
+
+                                                                    <div className="text-[10px] text-slate-600 grid grid-cols-2 gap-x-2 gap-y-1 mb-3 bg-slate-50 p-2 rounded-lg font-mono">
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-slate-400 font-sans">시화재고:</span>
+                                                                            <span className="font-bold text-slate-700">{shQty}개</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-slate-400 font-sans">대경재고:</span>
+                                                                            <span className="font-bold text-slate-700">{ysQty}개</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between col-span-2 pt-1 border-t border-slate-200/50">
+                                                                            <span className="text-slate-400 font-sans">입고예정 / 안전:</span>
+                                                                            <span className="font-bold text-indigo-600">{pendingOrderQty}개 / <span className="text-slate-500">{safeStock}개</span></span>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="text-[11px] text-slate-800 font-bold font-mono flex items-center justify-between">
+                                                                        <span className="text-slate-400 font-normal font-sans text-[10px]">추정 기회손실:</span>
+                                                                        <span>₩{formatCur(m.estimatedRevenue)}</span>
+                                                                    </div>
+
+                                                                    {/* 인라인 수량 및 즉시발주 */}
+                                                                    <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                                                        <span className="text-[10px] text-slate-400">발주량:</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            min={1}
+                                                                            value={qtyValue}
+                                                                            onChange={(e) => {
+                                                                                const val = parseInt(e.target.value, 10);
+                                                                                setMdRowQtys(prev => ({
+                                                                                    ...prev,
+                                                                                    [m.id]: isNaN(val) ? 1 : val
+                                                                                }));
+                                                                            }}
+                                                                            className="w-14 px-1 py-0.5 bg-white border border-slate-300 rounded text-center text-xs font-bold font-mono focus:outline-hidden"
+                                                                        />
+                                                                        <button
+                                                                            onClick={() => handleCreateSingleMissedDemandOrder(m.id, qtyValue)}
+                                                                            className="flex-1 py-1 bg-violet-600 hover:bg-violet-700 text-white rounded text-[10px] font-bold text-center transition-all shadow-xs"
+                                                                        >
+                                                                            즉시 발주 ⚡
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
-                                                                <div className="text-[10px] font-mono font-bold text-slate-800 leading-tight break-all mb-1">{m.id}</div>
-                                                                <div className="text-[11px] font-medium text-slate-600 mb-1.5 truncate">{m.row?.product?.name || m.id}</div>
-                                                                <div className="text-[10px] text-slate-500 flex gap-2 mb-2 font-medium">
-                                                                    <span>재질: {material || '알수없음'}</span>
-                                                                    <span>제조사: {maker || '알수없음'}</span>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    {/* 카드 뷰 상세 이력 노출 */}
+                                                    {filteredMissedDemandList.map((m) => {
+                                                        if (!expandedMdRowIds.has(m.id)) return null;
+                                                        return (
+                                                            <div key={`exp-card-${m.id}`} className="mt-2 mb-4 bg-violet-50/50 rounded-xl p-3 border border-violet-100 text-[10px]">
+                                                                <div className="font-bold text-violet-800 mb-2 border-b border-violet-200/50 pb-1.5 flex items-center justify-between">
+                                                                    <span>📋 {m.row?.product?.name || m.id} 결품 이력 근거</span>
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            const next = new Set(expandedMdRowIds);
+                                                                            next.delete(m.id);
+                                                                            setExpandedMdRowIds(next);
+                                                                        }}
+                                                                        className="text-slate-400 hover:text-slate-600 font-bold"
+                                                                    >✕</button>
                                                                 </div>
-                                                                <div className="text-[10px] text-slate-800 font-bold font-mono border-t border-slate-100 pt-2 flex items-center justify-between">
-                                                                    <span className="text-slate-400 font-normal">추정 기회손실:</span>
-                                                                    <span>₩{formatCur(m.estimatedRevenue)}</span>
-                                                                </div>
-                                                                <div className="mt-2.5 flex justify-end">
-                                                                    <span className={insight.badgeClass}>
-                                                                        {insight.recommendation}
-                                                                    </span>
+                                                                <div className="max-h-40 overflow-y-auto space-y-2">
+                                                                    {m.history.map((h, hi) => (
+                                                                        <div key={hi} className="flex justify-between items-start py-1 border-b border-slate-200/40">
+                                                                            <div>
+                                                                                <div className="flex items-center gap-1.5">
+                                                                                    <span className={`px-1 py-0.2 rounded text-[8px] font-bold ${h.type === 'ORDER' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>{h.type === 'ORDER' ? '주문' : '견적'}</span>
+                                                                                    <span className="font-bold text-slate-700">{h.customer}</span>
+                                                                                </div>
+                                                                                <div className="text-slate-400 font-mono text-[9px] mt-0.5">{h.date.substring(0, 10)} | {h.refNo}</div>
+                                                                            </div>
+                                                                            <div className="text-right">
+                                                                                <div className="font-bold font-mono text-slate-800">{h.qty}개 (₩{formatCur(h.qty * h.price)})</div>
+                                                                                <div className="text-[9px] text-rose-500 font-medium">{h.status}</div>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
                                                                 </div>
                                                             </div>
                                                         );
@@ -3934,13 +4193,14 @@ export default function SihwaInventory() {
                                                                 총 권장수량: <span className="font-bold text-white">
                                                                     {Array.from(selectedMissedDemandIds).reduce((acc, id) => {
                                                                         const item = filteredMissedDemandList.find(m => m.id === id);
-                                                                        return acc + Math.max(5, (item?.count || 0) * 2);
+                                                                        const qty = mdRowQtys[id] ?? Math.max(5, (item?.count || 0) * 2);
+                                                                        return acc + qty;
                                                                     }, 0)}개
                                                                 </span> | 
                                                                 예상금액: <span className="font-bold text-violet-400">
                                                                     ₩{formatCur(Array.from(selectedMissedDemandIds).reduce((acc, id) => {
                                                                         const item = filteredMissedDemandList.find(m => m.id === id);
-                                                                        const qty = Math.max(5, (item?.count || 0) * 2);
+                                                                        const qty = mdRowQtys[id] ?? Math.max(5, (item?.count || 0) * 2);
                                                                         const price = (item?.row && item.row.recentPurchasePrice > 0) ? item.row.recentPurchasePrice : (item?.row?.sellingPrice || 0);
                                                                         return acc + qty * price;
                                                                     }, 0))}

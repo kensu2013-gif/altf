@@ -2,6 +2,7 @@ import useSWR from 'swr';
 import { useStore } from '../store/useStore';
 import { useEffect } from 'react';
 import type { Product } from '../types';
+import { parseSku } from '../lib/sku';
 
 const INVENTORY_URL = (import.meta.env.VITE_API_URL || '') + '/api/inventory/inventory.json';
 
@@ -111,11 +112,17 @@ export function useInventory() {
                 // Map main location property as well
                 const mappedLocation = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
 
+                const id = (item.sku_key || item.id || '') as string;
+                const parsed = parseSku(id);
+                const finalSize = parsed.size.replace(/^[A-Z]+-?/, '').trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
+
                 return {
                     ...item, // Keep original props
-                    id: item.sku_key || item.id, // S3 uses sku_key
-                    name: item.item || item.name, // S3 uses item
-                    // thickness, size, material, location, maker usually match keys
+                    id: id,
+                    name: item.item || item.name || '',
+                    thickness: parsed.thickness || item.thickness || '',
+                    size: finalSize || item.size || '',
+                    material: parsed.material || item.material || '',
                     location: mappedLocation,
                     unitPrice: item.final_price !== undefined ? item.final_price : item.unitPrice,
                     currentStock: currentStock,

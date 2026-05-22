@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import type { Product } from '../types';
 import { useInventory } from '../hooks/useInventory';
-import { ALL_MATERIALS } from '../lib/productUtils';
+import { parseSku } from '../lib/sku';
 
 interface ImportedItem {
     item_id: string;
@@ -116,35 +116,15 @@ export function GlobalUploadManager() {
                                     // Ideally we should move logic to `lib/productUtils.ts`.
                                     // I'll assume users want robust logic. I will implement a robust parser here briefly.
 
-                                    // Quick Parse fallback
+                                    // Let's use the standardized parseSku utility to make it robust.
                                     let pName = importedItem.item_id;
-                                    // ... (We would assume full logic here, but for this task step let's just add as Unverified)
-                                    // Actually, to respect user expectations, we should do the parsing.
-                                    // Since I cannot call `Search.tsx` functions, I'll rely on the fact that `itemId` is passed.
-
-                                    // Let's copy the Critical Parser Logic to make it robust.
                                     let pThickness = '-', pSize = '-', pMaterial = '-';
                                     try {
-                                        let remaining = importedItem.item_id.trim();
-                                        const sortedMaterials = [...ALL_MATERIALS].sort((a, b) => b.length - a.length);
-                                        const matchedMat = sortedMaterials.find(m => remaining.endsWith(m));
-                                        if (matchedMat) {
-                                            pMaterial = matchedMat;
-                                            remaining = remaining.substring(0, remaining.lastIndexOf(matchedMat));
-                                            if (remaining.endsWith('-')) remaining = remaining.slice(0, -1);
-                                        }
-                                        const firstHyphen = remaining.indexOf('-');
-                                        if (firstHyphen > 0) {
-                                            pName = remaining.substring(0, firstHyphen);
-                                            remaining = remaining.substring(firstHyphen + 1);
-                                        } else {
-                                            pName = remaining;
-                                        }
-                                        const splitRest = remaining.split('-');
-                                        if (splitRest.length >= 1) {
-                                            pThickness = splitRest[0];
-                                            pSize = splitRest.slice(1).join('-');
-                                        }
+                                        const parsed = parseSku(importedItem.item_id.trim());
+                                        pName = parsed.name || importedItem.item_id;
+                                        pThickness = parsed.thickness || '-';
+                                        pSize = parsed.size ? parsed.size.replace(/^[A-Z]+-?/, '').trim().toUpperCase().replace(/\s*x\s*/gi, ' X ') : '-';
+                                        pMaterial = parsed.material || '-';
                                     } catch {
                                         // Ignore parsing failures; use default values
                                     }
