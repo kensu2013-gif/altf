@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import { useInventory } from '../../hooks/useInventory';
-import { 
-    CalendarDays, 
-    TrendingUp, 
+import {
+    CalendarDays,
+    TrendingUp,
     AlertTriangle,
     PackageSearch,
     History,
@@ -68,34 +68,34 @@ function calcCompositeScore(row: {
 }): number {
     const salesFreqScore =
         row.salesFreq >= 30 ? 100 :
-        row.salesFreq >= 10 ? 70  :
-        row.salesFreq >= 5  ? 40  :
-        row.salesFreq >= 1  ? 15  : 0;
+            row.salesFreq >= 10 ? 70 :
+                row.salesFreq >= 5 ? 40 :
+                    row.salesFreq >= 1 ? 15 : 0;
 
     const monthlyExpected = row.salesVolume / 12;
     const trendRatio = monthlyExpected > 0 ? (row.recent30dSales / monthlyExpected) : 0;
     const recentTrendScore = Math.min(100,
         trendRatio >= 1.0 ? 100 :
-        trendRatio >= 0.5 ? 80  :
-        trendRatio >= 0.2 ? 50  :
-        row.recent60dSales > 0 ? 30 : 0
+            trendRatio >= 0.5 ? 80 :
+                trendRatio >= 0.2 ? 50 :
+                    row.recent60dSales > 0 ? 30 : 0
     );
 
     const quoteDemandScore =
         row.quoteCount >= 3 ? 100 :
-        row.quoteCount >= 1 ? 60  : 0;
+            row.quoteCount >= 1 ? 60 : 0;
 
     const salesVolumeScore =
-        row.salesVolume >= 500  ? 100 :
-        row.salesVolume >= 200  ? 75  :
-        row.salesVolume >= 50   ? 50  :
-        row.salesVolume >= 10   ? 25  : 0;
+        row.salesVolume >= 500 ? 100 :
+            row.salesVolume >= 200 ? 75 :
+                row.salesVolume >= 50 ? 50 :
+                    row.salesVolume >= 10 ? 25 : 0;
 
     const profitScore =
         row.profitMarginRate >= 30 ? 100 :
-        row.profitMarginRate >= 20 ? 75  :
-        row.profitMarginRate >= 10 ? 50  :
-        row.profitMarginRate >= 0  ? 25  : 0;
+            row.profitMarginRate >= 20 ? 75 :
+                row.profitMarginRate >= 10 ? 50 :
+                    row.profitMarginRate >= 0 ? 25 : 0;
 
     let bonusScore = 0;
     if (row.recent30dSales >= Math.max(10, row.salesVolume / 12 * 1.5)) bonusScore += 15; // 최근 30일 단기 급등
@@ -104,11 +104,11 @@ function calcCompositeScore(row: {
     if (row.quoteCount >= 5) bonusScore += 10; // 최근 견적 급증
 
     const finalScore = Math.round(
-        salesFreqScore    * 0.25 +
-        recentTrendScore  * 0.25 +
-        quoteDemandScore  * 0.20 +
-        salesVolumeScore  * 0.15 +
-        profitScore       * 0.15 +
+        salesFreqScore * 0.25 +
+        recentTrendScore * 0.25 +
+        quoteDemandScore * 0.20 +
+        salesVolumeScore * 0.15 +
+        profitScore * 0.15 +
         bonusScore
     );
 
@@ -183,9 +183,9 @@ const getPurchasePriceForProduct = (product: Product | undefined, id: string, ba
 
 // ── 재고 건전성 진단 기준 (쿠팡·다이소 물류 기준 참고) ──────────
 // Removed unused DEAD_STOCK_DAYS etc.
-const HEALTHY_DEAD_RATIO     = 0.05;  // 허용 악성재고 비중 (5%)
-const HEALTHY_EXCESS_RATIO   = 0.10;  // 허용 과잉재고 비중 (10%)
-const HEALTHY_ITS_MAX        = 0.12;  // 허용 ITS (재고/매출) 상한 12%
+const HEALTHY_DEAD_RATIO = 0.05;  // 허용 악성재고 비중 (5%)
+const HEALTHY_EXCESS_RATIO = 0.10;  // 허용 과잉재고 비중 (10%)
+const HEALTHY_ITS_MAX = 0.12;  // 허용 ITS (재고/매출) 상한 12%
 
 interface InventoryDiffItem {
     id: string;
@@ -203,8 +203,8 @@ interface InventoryHistorySnapshot {
 }
 
 export default function SihwaInventory() {
-    const { orders, quotes, users, user, addItem } = useStore(useShallow(state => ({ 
-        orders: state.orders, 
+    const { orders, quotes, users, user, addItem } = useStore(useShallow(state => ({
+        orders: state.orders,
         quotes: state.quotes,
         users: state.users,
         user: state.auth.user,
@@ -242,9 +242,9 @@ export default function SihwaInventory() {
     const [expandedTrendItems, setExpandedTrendItems] = useState<Record<string, boolean>>({});
     const [expandedDailyGroups, setExpandedDailyGroups] = useState<Record<string, boolean>>({});
 
-    const [sortConfig, setSortConfig] = useState<{ 
-        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank' | 'quoteCount' | 'recent60dOrderCount', 
-        direction: 'asc' | 'desc' 
+    const [sortConfig, setSortConfig] = useState<{
+        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank' | 'quoteCount' | 'recent60dOrderCount',
+        direction: 'asc' | 'desc'
     }>({ key: 'deficit', direction: 'desc' });
 
     const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank' | 'quoteCount' | 'recent60dOrderCount') => {
@@ -258,7 +258,7 @@ export default function SihwaInventory() {
     const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
 
     const toggleTagFilter = (tag: string) => {
-        setActiveTagFilters(prev => 
+        setActiveTagFilters(prev =>
             prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
         );
     };
@@ -391,13 +391,13 @@ export default function SihwaInventory() {
         return activeOrders.filter(order => {
             const displayCustomer = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase();
             const normalizedCustomer = displayCustomer.replace(/\s+/g, '');
-            return normalizedCustomer.includes('재고') || 
-                   normalizedCustomer.includes('서울') || 
-                   normalizedCustomer.includes('시화') || 
-                   normalizedCustomer.includes('에스제이엔브이') || 
-                   normalizedCustomer.includes('sjnv') || 
-                   normalizedCustomer.includes('알트에프') || 
-                   normalizedCustomer.includes('altf');
+            return normalizedCustomer.includes('재고') ||
+                normalizedCustomer.includes('서울') ||
+                normalizedCustomer.includes('시화') ||
+                normalizedCustomer.includes('에스제이엔브이') ||
+                normalizedCustomer.includes('sjnv') ||
+                normalizedCustomer.includes('알트에프') ||
+                normalizedCustomer.includes('altf');
         });
     }, [activeOrders]);
 
@@ -423,22 +423,22 @@ export default function SihwaInventory() {
 
     const groupedDailyTrend = useMemo(() => {
         const groups: Record<string, { date: string, items: Record<string, { product: Product, incoming: number, outgoing: number }> }> = {};
-        
+
         [...historyData.inventoryHistory].forEach(snap => {
             const date = snap.date.split('T')[0]; // Ensure it's just YYYY-MM-DD
             if (!groups[date]) {
                 groups[date] = { date, items: {} };
             }
-            
+
             (snap.diff || []).forEach(d => {
                 const product = inventoryMap.get(d.id);
                 if (!product) return;
-                
+
                 const locStr = product.location || product.location1 || '';
                 const locStock = product.locationStock || {};
                 const isTargetLocation = locStr.includes(targetRegion) || locStock[targetRegion] !== undefined;
                 const isTargetMaker = product.maker === targetMaker || product.maker1 === targetMaker;
-                
+
                 if (isTargetLocation && isTargetMaker) {
                     if (!groups[date].items[d.id]) {
                         groups[date].items[d.id] = { product: product as Product, incoming: 0, outgoing: 0 };
@@ -491,11 +491,11 @@ export default function SihwaInventory() {
         // Pending cost and count should reflect ALL outstanding orders, not just the selected month.
         let pendingCost = 0;
         let pendingCount = 0;
-        
+
         sihwaOrders.forEach(o => {
             const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
             const isOrderFullyCompleted = o.status === 'COMPLETED' || (items.length > 0 && items.every(i => i.transactionIssued));
-            
+
             if (!isOrderFullyCompleted) {
                 pendingCount++;
                 items.forEach(item => {
@@ -530,13 +530,13 @@ export default function SihwaInventory() {
 
             const displayCustomer = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase();
             const normalizedCustomer = displayCustomer.replace(/\s+/g, '');
-            const isSeoulStock = normalizedCustomer.includes('재고') || 
-                                 normalizedCustomer.includes('서울') || 
-                                 normalizedCustomer.includes('시화') || 
-                                 normalizedCustomer.includes('에스제이엔브이') || 
-                                 normalizedCustomer.includes('sjnv') || 
-                                 normalizedCustomer.includes('알트에프') || 
-                                 normalizedCustomer.includes('altf');
+            const isSeoulStock = normalizedCustomer.includes('재고') ||
+                normalizedCustomer.includes('서울') ||
+                normalizedCustomer.includes('시화') ||
+                normalizedCustomer.includes('에스제이엔브이') ||
+                normalizedCustomer.includes('sjnv') ||
+                normalizedCustomer.includes('알트에프') ||
+                normalizedCustomer.includes('altf');
 
             if (isSeoulStock) {
                 const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
@@ -749,8 +749,8 @@ export default function SihwaInventory() {
             // Calculate Daekyung Direct Ratio (estimated from total sales vs sihwa drops)
             // If total sales is 100, but Sihwa dropped by 20, 80 were direct dropped (80%).
             const total60dSales = salesData.salesVolume; // Actually, salesVolume is all-time from orders. We'll approximate.
-            const daekyungDirectRatio = (total60dSales > 0 && total60dSales > recentSales.recent60d) 
-                ? parseFloat((((total60dSales - recentSales.recent60d) / total60dSales) * 100).toFixed(1)) 
+            const daekyungDirectRatio = (total60dSales > 0 && total60dSales > recentSales.recent60d)
+                ? parseFloat((((total60dSales - recentSales.recent60d) / total60dSales) * 100).toFixed(1))
                 : 0;
 
             // Populate items (if it has stock or sales data, we analyze it)
@@ -798,7 +798,7 @@ export default function SihwaInventory() {
         sihwaOrders.filter(o => o.status !== 'COMPLETED').forEach(order => {
             const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
             items.forEach(item => {
-                if (item.transactionIssued) return; 
+                if (item.transactionIssued) return;
 
                 const id = item.productId || (item as { item_id?: string }).item_id || 'UNKNOWN';
                 const addQty = Number(item.quantity ?? item.qty ?? 0);
@@ -820,9 +820,9 @@ export default function SihwaInventory() {
                     const purchasePrice = recentInfo ? recentInfo.price : calculateFallbackPurchasePrice(id, rawBasePrice);
                     const profitMarginRate = finalSellingPrice > 0 ? parseFloat((((finalSellingPrice - purchasePrice) / finalSellingPrice) * 100).toFixed(1)) : 0;
 
-                    const total60dSales = salesData.salesVolume; 
-                    const daekyungDirectRatio = (total60dSales > 0 && total60dSales > recentSales.recent60d) 
-                        ? parseFloat((((total60dSales - recentSales.recent60d) / total60dSales) * 100).toFixed(1)) 
+                    const total60dSales = salesData.salesVolume;
+                    const daekyungDirectRatio = (total60dSales > 0 && total60dSales > recentSales.recent60d)
+                        ? parseFloat((((total60dSales - recentSales.recent60d) / total60dSales) * 100).toFixed(1))
                         : 0;
 
                     comparisonMap[id] = {
@@ -870,15 +870,15 @@ export default function SihwaInventory() {
         // Step 3: Run AI Rules for status computation
         const processedList = Object.values(comparisonMap).map(row => {
             // REQUIREMENT 3: INCLUDE PENDING ORDERS as effective stock
-            const effectiveStock = row.shQty + row.pendingOrderQty; 
+            const effectiveStock = row.shQty + row.pendingOrderQty;
 
             // === 신규 건전성 등급 평가 로직 (100점 만점 복합 점수제) ===
             const compositeScore = calcCompositeScore({
-                salesFreq:       row.salesFreq,
-                salesVolume:     row.salesVolume,
-                recent30dSales:  row.recent30dSales,
-                recent60dSales:  row.recent60dSales,
-                quoteCount:      row.quoteCount,
+                salesFreq: row.salesFreq,
+                salesVolume: row.salesVolume,
+                recent30dSales: row.recent30dSales,
+                recent60dSales: row.recent60dSales,
+                quoteCount: row.quoteCount,
                 profitMarginRate: row.profitMarginRate,
             });
 
@@ -892,16 +892,16 @@ export default function SihwaInventory() {
 
             // 통계 기반 기초 계산 (σ)
             const dailyAvgSales = row.salesVolume / WORKING_DAYS;
-            
+
             // 시화의 실제 평균 출고량 추정 (최근 60일 시화 출고량 기준)
             const sihwaDailySales = row.recent60dSales > 0 ? (row.recent60dSales / 40) : (dailyAvgSales * 0.2); // 출고 없으면 연간의 20%만 잡음
-            
+
             const cvEstimate = row.salesFreq >= 100 ? 0.20 : row.salesFreq >= 50 ? 0.30 : row.salesFreq >= 20 ? 0.40 : 0.50;
             // 안전재고(버퍼)는 시화 실판매량 기준으로 계산
             const sigma = sihwaDailySales * cvEstimate;
             const safetyStockSigma = Math.ceil(Z_VALUE * sigma * Math.sqrt(LEAD_TIME));
             const reorderPoint = Math.ceil(sihwaDailySales * LEAD_TIME + safetyStockSigma);
-            
+
             // 1. 기초 안전재고 축소: 안전재고 + 20일치 평균 (약 1개월)
             let safeStock = safetyStockSigma + Math.ceil(sihwaDailySales * 20);
 
@@ -919,7 +919,7 @@ export default function SihwaInventory() {
 
             // 3.5. 대경 직발주 비중이 압도적으로 높고 시화 출고가 없는 경우, 기초 재고 10개 강제 보류 해제
             const isMostlyDropShipped = row.recent60dOrderCount > 0 && row.recent60dSales === 0;
-            
+
             if (isMostlyDropShipped) {
                 safeStock = safeStock > 0 ? Math.round(safeStock / 10) * 10 : 0;
             } else {
@@ -959,7 +959,7 @@ export default function SihwaInventory() {
                 // WP/CARBON은 기본적으로 시화재고에서 제외 (0개)
                 // 단, 월 3회 이상(연 36회) 초고빈도 필수 품목은 최대 20개까지만 예외 허용
                 if (row.salesFreq >= 36 && row.salesVolume >= 500) {
-                    safeStock = Math.min(safeStock, 20); 
+                    safeStock = Math.min(safeStock, 20);
                 } else {
                     safeStock = 0;
                 }
@@ -979,9 +979,9 @@ export default function SihwaInventory() {
 
             // 부피 제약 다단화
             if (!isNaN(sizeNum)) {
-                if (sizeNum >= 400) { if (safeStock > 30)  safeStock = 30; }
-                else if (sizeNum >= 300) { if (safeStock > 50)  safeStock = 50; }
-                else if (sizeNum >= 200) { if (safeStock > 80)  safeStock = 80; }
+                if (sizeNum >= 400) { if (safeStock > 30) safeStock = 30; }
+                else if (sizeNum >= 300) { if (safeStock > 50) safeStock = 50; }
+                else if (sizeNum >= 200) { if (safeStock > 80) safeStock = 80; }
                 else if (sizeNum >= 150) { if (safeStock > 150) safeStock = 150; }
                 else if (sizeNum >= 100) { if (safeStock > 300) safeStock = 300; }
             }
@@ -1000,13 +1000,13 @@ export default function SihwaInventory() {
             if (isExcessStock) {
                 excessCategory =
                     healthGrade === 'A' ? 'EXCESS_A' :
-                    healthGrade === 'B' ? 'EXCESS_B' :
-                    healthGrade === 'C' ? 'EXCESS_C' :
-                    healthGrade === 'D' ? 'EXCESS_D' : null;
+                        healthGrade === 'B' ? 'EXCESS_B' :
+                            healthGrade === 'C' ? 'EXCESS_C' :
+                                healthGrade === 'D' ? 'EXCESS_D' : null;
             }
 
             // 발주 상태 라벨링
-            let statusCategory = 'IDLE'; 
+            let statusCategory = 'IDLE';
             let statusLabel = '대기/데이터없음';
 
             if (healthGrade === 'E') {
@@ -1060,7 +1060,7 @@ export default function SihwaInventory() {
             const sihwaDailySalesCurrent = row.recent60dSales > 0 ? (row.recent60dSales / 40) : (row.salesVolume / 250 * 0.2);
             let twoMonthDemand = Math.ceil(sihwaDailySalesCurrent * 40);
             if (twoMonthDemand < 10 && row.salesVolume > 0) twoMonthDemand = Math.ceil(row.salesVolume / 6);
-            
+
             let rawQty = 0;
             if (statusCategory === 'WARNING' || statusCategory === 'CRITICAL') {
                 rawQty = finalDeficit + twoMonthDemand;
@@ -1069,12 +1069,12 @@ export default function SihwaInventory() {
                 if (twoMonthDemand < 10) baseDemand = twoMonthDemand;
                 rawQty = baseDemand - effectiveStock;
             }
-            
+
             if (rawQty > 0 && !isExcessStock && row.ysQty < rawQty * 2) {
                 const sizeStr = row.product.size || '';
                 const sizeNum = parseInt(sizeStr.replace(/[^0-9]/g, ''), 10);
                 const isLargeSize = !isNaN(sizeNum) && sizeNum >= 300;
-                
+
                 if (isLargeSize) {
                     recommendedQty = rawQty; // 대형은 단위 올림 없음
                 } else if (!isNaN(sizeNum) && sizeNum >= 100) {
@@ -1082,7 +1082,7 @@ export default function SihwaInventory() {
                 } else {
                     recommendedQty = Math.max(10, Math.ceil(rawQty / 10) * 10); // 소형은 10단위 (최소 10)
                 }
-                
+
                 // Max capping
                 if (!isNaN(sizeNum) && sizeNum >= 100) {
                     const dynamicCap = Math.max(100, Math.ceil(row.salesVolume / 4));
@@ -1115,15 +1115,15 @@ export default function SihwaInventory() {
         let filtered = processedList;
         if (searchTerm) {
             const lowerQuery = searchTerm.toLowerCase();
-            filtered = processedList.filter(row => 
-                row.product.id.toLowerCase().includes(lowerQuery) || 
+            filtered = processedList.filter(row =>
+                row.product.id.toLowerCase().includes(lowerQuery) ||
                 (row.product.name && row.product.name.toLowerCase().includes(lowerQuery))
             );
         }
 
         return filtered.sort((a, b) => {
             const dir = sortConfig.direction === 'asc' ? 1 : -1;
-            switch(sortConfig.key) {
+            switch (sortConfig.key) {
                 case 'id': return a.product.id.localeCompare(b.product.id) * dir;
                 case 'salesFreq': return (a.salesFreq - b.salesFreq) * dir;
                 case 'salesVolume': return (a.salesVolume - b.salesVolume) * dir;
@@ -1149,7 +1149,7 @@ export default function SihwaInventory() {
             .filter(r => !(r.product.material || '').toLowerCase().startsWith('wp'));
 
         // 견적 문의가 많으나 재고가 없는 경우 기회손실 (결품)
-        const missedOpportunities = analyzedInventory.filter(r => 
+        const missedOpportunities = analyzedInventory.filter(r =>
             r.shQty === 0 && r.ysQty === 0 && r.quoteCount > 0
         );
 
@@ -1177,10 +1177,10 @@ export default function SihwaInventory() {
     const processOrderSet = (selectedSet: Set<string>, listType: 'CRITICAL' | 'WARNING' | 'REGULAR') => {
         if (selectedSet.size === 0) return;
 
-        const listItems = listType === 'CRITICAL' 
-            ? stats.critical 
-            : listType === 'WARNING' 
-                ? stats.warning 
+        const listItems = listType === 'CRITICAL'
+            ? stats.critical
+            : listType === 'WARNING'
+                ? stats.warning
                 : stats.regular;
 
         const itemsToAdd = listItems.filter(item => selectedSet.has(item.product.id) && !(item as { canTransfer?: boolean }).canTransfer);
@@ -1273,187 +1273,187 @@ export default function SihwaInventory() {
     // ── 재고 건전성 진단 ENGINE ─────────────────────────────────────
     const healthDiagnosis = useMemo(() => {
 
-      // ── 기준 날짜 ──────────────────────────────────────────────
-      const now = Date.now();
+        // ── 기준 날짜 ──────────────────────────────────────────────
+        const now = Date.now();
 
-      // ── 품목별 마지막 판매일 추출 (inventoryHistory 기반) ──────
-      const lastSaleDateMap: Record<string, number> = {};
-      historyData.inventoryHistory.forEach((snap: InventoryHistorySnapshot) => {
-        const snapTime = new Date(snap.date).getTime();
-        if (isNaN(snapTime)) return;
-        snap.diff?.forEach((d: InventoryDiffItem) => {
-          if (d.change < 0) {  // 감소 = 출고 = 판매
-            if (!lastSaleDateMap[d.id] || snapTime > lastSaleDateMap[d.id]) {
-              lastSaleDateMap[d.id] = snapTime;
+        // ── 품목별 마지막 판매일 추출 (inventoryHistory 기반) ──────
+        const lastSaleDateMap: Record<string, number> = {};
+        historyData.inventoryHistory.forEach((snap: InventoryHistorySnapshot) => {
+            const snapTime = new Date(snap.date).getTime();
+            if (isNaN(snapTime)) return;
+            snap.diff?.forEach((d: InventoryDiffItem) => {
+                if (d.change < 0) {  // 감소 = 출고 = 판매
+                    if (!lastSaleDateMap[d.id] || snapTime > lastSaleDateMap[d.id]) {
+                        lastSaleDateMap[d.id] = snapTime;
+                    }
+                }
+            });
+        });
+
+        // ── 결품 기회손실: 대경+시화 모두 0일 때 주문→취소 이력 ────
+        // ── 결품 기회손실: 취소/철회, 미결 지연(5일↑), 견적 미전환 ────
+        const missedDemandMap: Record<string, { count: number; estimatedRevenue: number }> = {};
+
+        // 1. 주문 건 (취소/철회 및 5일 이상 장기 미결품)
+        orders.forEach(o => {
+            if (o.isDeleted) return;
+
+            const isCancelled = ['CANCELLED', 'WITHDRAWN'].includes(o.status);
+            const isDelayedPending = o.status === 'PROCESSING' && Math.floor((now - new Date(o.createdAt).getTime()) / 86400000) >= 5;
+
+            if (!isCancelled && !isDelayedPending) return;
+
+            // 내부 재고 이동 주문 제외
+            const custStr = (o.poEndCustomer || o.customerName || '').toLowerCase().replace(/\s+/g, '');
+            if (custStr.includes('재고') || custStr.includes('시화') || custStr.includes('서울') || custStr.includes('알트에프') || custStr.includes('altf')) return;
+
+            const items = o.po_items?.length ? o.po_items : o.items;
+            items?.forEach(item => {
+                if (isDelayedPending && item.transactionIssued) return; // 미결품이 아닌 것은 제외
+
+                const id = item.productId || (item as { item_id?: string }).item_id || '';
+                if (!id) return;
+                const row = analyzedInventory.find(r => r.product.id === id);
+                if (!row) return;
+
+                const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
+                // 전체 혹은 일부 수량 부족 판정 (재고 < 주문수량)
+                if (row.shQty + row.ysQty < qty || (isCancelled && row.shQty <= 0 && row.ysQty <= 0)) {
+                    if (!missedDemandMap[id]) missedDemandMap[id] = { count: 0, estimatedRevenue: 0 };
+                    missedDemandMap[id].count += 1;
+                    missedDemandMap[id].estimatedRevenue += qty * row.sellingPrice;
+                }
+            });
+        });
+
+        // 2. 견적(Quotes) 건 (답변완료 후 발주 미전환, 재고 부족)
+        quotes?.forEach(q => {
+            if (q.isDeleted) return;
+            if (!['PROCESSED', 'COMPLETED'].includes(q.status)) return;
+
+            // 발주 전환 여부 체크
+            const isConverted = orders.some(o => o.linkedQuoteId === q.id && !['CANCELLED', 'WITHDRAWN'].includes(o.status));
+            if (isConverted) return;
+
+            q.items?.forEach(item => {
+                const id = item.productId || (item as { item_id?: string }).item_id || '';
+                if (!id) return;
+                const row = analyzedInventory.find(r => r.product.id === id);
+                if (!row) return;
+
+                const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
+                if (row.shQty + row.ysQty < qty) {
+                    if (!missedDemandMap[id]) missedDemandMap[id] = { count: 0, estimatedRevenue: 0 };
+                    missedDemandMap[id].count += 1;
+                    missedDemandMap[id].estimatedRevenue += qty * row.sellingPrice;
+                }
+            });
+        });
+
+        // ── 품목별 분류 ────────────────────────────────────────────
+        const deadStockItems: typeof analyzedInventory = [];
+        const excessStockItems: typeof analyzedInventory = [];
+        const slowMoveItems: typeof analyzedInventory = [];
+        const optimalItems: typeof analyzedInventory = [];
+
+        let totalStockValue = 0;
+        let deadStockValue = 0;
+        let excessStockValue = 0;
+        let slowMoveValue = 0;
+        let optimalStockValue = 0;
+
+        analyzedInventory.forEach(row => {
+            // STUBEND 제외
+            if (row.product.id.toLowerCase().includes('stubend')) return;
+            const itemValue = row.shQty * row.recentPurchasePrice;
+            if (itemValue <= 0 && row.shQty <= 0) return;
+            totalStockValue += itemValue;
+
+            // 무판매 일수 계산
+            const lastSaleTime = lastSaleDateMap[row.product.id];
+            const daysSinceLastSale = lastSaleTime
+                ? Math.floor((now - lastSaleTime) / 86400000)
+                : (row.salesVolume === 0 ? 999 : 0);
+
+            // 악성재고 판단
+            const isDeadStock = row.isDeadStock === true;
+
+            // 과잉재고 판단 (악성이 아닌 것 중에서)
+            const targetStock = row.safeStock > 0 ? row.safeStock : row.safeStock;
+            const excessQty = targetStock > 0 ? row.shQty - targetStock : 0;
+            const isExcessStock = row.isExcessStock === true;
+
+            // 부진재고 판단 (N급이 아닌 B/A/S급 중에서 주의 상태)
+            const isSlowMove = !isDeadStock && !isExcessStock && row.healthGrade === 'B' && row.shQty > 0;
+
+            if (isDeadStock) {
+                deadStockItems.push({ ...row, _daysSinceLastSale: daysSinceLastSale } as typeof row & { _daysSinceLastSale: number });
+                deadStockValue += itemValue;
+            } else if (isExcessStock) {
+                excessStockItems.push({ ...row, _excessQty: excessQty, _excessValue: excessQty * row.recentPurchasePrice } as typeof row & { _excessQty: number; _excessValue: number });
+                excessStockValue += itemValue;
+            } else if (isSlowMove) {
+                slowMoveItems.push(row);
+                slowMoveValue += itemValue;
+            } else {
+                optimalItems.push(row);
+                optimalStockValue += itemValue;
             }
-          }
         });
-      });
 
-      // ── 결품 기회손실: 대경+시화 모두 0일 때 주문→취소 이력 ────
-      // ── 결품 기회손실: 취소/철회, 미결 지연(5일↑), 견적 미전환 ────
-      const missedDemandMap: Record<string, { count: number; estimatedRevenue: number }> = {};
-      
-      // 1. 주문 건 (취소/철회 및 5일 이상 장기 미결품)
-      orders.forEach(o => {
-        if (o.isDeleted) return;
+        // ── 건강도 점수 (0~100) ────────────────────────────────────
+        const deadRatio = totalStockValue > 0 ? deadStockValue / totalStockValue : 0;
+        const excessRatio = totalStockValue > 0 ? excessStockValue / totalStockValue : 0;
+        const slowRatio = totalStockValue > 0 ? slowMoveValue / totalStockValue : 0;
 
-        const isCancelled = ['CANCELLED', 'WITHDRAWN'].includes(o.status);
-        const isDelayedPending = o.status === 'PROCESSING' && Math.floor((now - new Date(o.createdAt).getTime()) / 86400000) >= 5;
+        // 항목별 감점
+        const deadPenalty = Math.min(40, Math.round(deadRatio / HEALTHY_DEAD_RATIO * 20));
+        const excessPenalty = Math.min(30, Math.round(excessRatio / HEALTHY_EXCESS_RATIO * 15));
+        const slowPenalty = Math.min(15, Math.round(slowRatio * 30));
+        const healthScore = Math.max(0, 100 - deadPenalty - excessPenalty - slowPenalty);
 
-        if (!isCancelled && !isDelayedPending) return;
+        const healthGrade =
+            healthScore >= 80 ? { label: '우량 🟢', textClass: 'text-green-600', strokeColor: '#16a34a' } :
+                healthScore >= 60 ? { label: '보통 🟡', textClass: 'text-amber-600', strokeColor: '#d97706' } :
+                    healthScore >= 40 ? { label: '주의 🟠', textClass: 'text-orange-600', strokeColor: '#ea580c' } :
+                        { label: '위험 🔴', textClass: 'text-rose-600', strokeColor: '#dc2626' };
 
-        // 내부 재고 이동 주문 제외
-        const custStr = (o.poEndCustomer || o.customerName || '').toLowerCase().replace(/\s+/g, '');
-        if (custStr.includes('재고') || custStr.includes('시화') || custStr.includes('서울') || custStr.includes('알트에프') || custStr.includes('altf')) return;
+        // ── 매출 대비 재고 비율 (ITS) ─────────────────────────────
+        const annualRevenue = analyzedInventory.reduce((s, r) => s + r.salesVolume * r.sellingPrice, 0);
+        const its = annualRevenue > 0 ? (totalStockValue / annualRevenue) : 0;
 
-        const items = o.po_items?.length ? o.po_items : o.items;
-        items?.forEach(item => {
-          if (isDelayedPending && item.transactionIssued) return; // 미결품이 아닌 것은 제외
+        // ── 결품 기회손실 상위 품목 ─────────────────────────────────
+        const missedDemandList = Object.entries(missedDemandMap)
+            .map(([id, v]) => {
+                const row = analyzedInventory.find(r => r.product.id === id);
+                return { id, ...v, row };
+            })
+            .filter(m => m.count >= 1)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10);
 
-          const id = item.productId || (item as { item_id?: string }).item_id || '';
-          if (!id) return;
-          const row = analyzedInventory.find(r => r.product.id === id);
-          if (!row) return;
+        // ── 즉시 처분 대상 (악성재고 중 대경 반품 가능하거나 장기(180일+) 악성인 품목) ──
+        const urgentDisposalItems = deadStockItems
+            .filter(row => {
+                const daysSince = (row as typeof row & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0;
+                return row.ysQty > 0 || daysSince > 180;
+            })
+            .sort((a, b) => ((b as typeof b & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0) - ((a as typeof a & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0));
 
-          const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
-          // 전체 혹은 일부 수량 부족 판정 (재고 < 주문수량)
-          if (row.shQty + row.ysQty < qty || (isCancelled && row.shQty <= 0 && row.ysQty <= 0)) {
-            if (!missedDemandMap[id]) missedDemandMap[id] = { count: 0, estimatedRevenue: 0 };
-            missedDemandMap[id].count += 1;
-            missedDemandMap[id].estimatedRevenue += qty * row.sellingPrice;
-          }
-        });
-      });
-
-      // 2. 견적(Quotes) 건 (답변완료 후 발주 미전환, 재고 부족)
-      quotes?.forEach(q => {
-        if (q.isDeleted) return;
-        if (!['PROCESSED', 'COMPLETED'].includes(q.status)) return;
-        
-        // 발주 전환 여부 체크
-        const isConverted = orders.some(o => o.linkedQuoteId === q.id && !['CANCELLED', 'WITHDRAWN'].includes(o.status));
-        if (isConverted) return;
-
-        q.items?.forEach(item => {
-          const id = item.productId || (item as { item_id?: string }).item_id || '';
-          if (!id) return;
-          const row = analyzedInventory.find(r => r.product.id === id);
-          if (!row) return;
-
-          const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
-          if (row.shQty + row.ysQty < qty) {
-            if (!missedDemandMap[id]) missedDemandMap[id] = { count: 0, estimatedRevenue: 0 };
-            missedDemandMap[id].count += 1;
-            missedDemandMap[id].estimatedRevenue += qty * row.sellingPrice;
-          }
-        });
-      });
-
-      // ── 품목별 분류 ────────────────────────────────────────────
-      const deadStockItems:   typeof analyzedInventory = [];
-      const excessStockItems: typeof analyzedInventory = [];
-      const slowMoveItems:    typeof analyzedInventory = [];
-      const optimalItems:     typeof analyzedInventory = [];
-
-      let totalStockValue    = 0;
-      let deadStockValue     = 0;
-      let excessStockValue   = 0;
-      let slowMoveValue      = 0;
-      let optimalStockValue  = 0;
-
-      analyzedInventory.forEach(row => {
-        // STUBEND 제외
-        if (row.product.id.toLowerCase().includes('stubend')) return;
-        const itemValue = row.shQty * row.recentPurchasePrice;
-        if (itemValue <= 0 && row.shQty <= 0) return;
-        totalStockValue += itemValue;
-
-        // 무판매 일수 계산
-        const lastSaleTime = lastSaleDateMap[row.product.id];
-        const daysSinceLastSale = lastSaleTime
-          ? Math.floor((now - lastSaleTime) / 86400000)
-          : (row.salesVolume === 0 ? 999 : 0);
-
-        // 악성재고 판단
-        const isDeadStock = row.isDeadStock === true;
-
-        // 과잉재고 판단 (악성이 아닌 것 중에서)
-        const targetStock = row.safeStock > 0 ? row.safeStock : row.safeStock;
-        const excessQty = targetStock > 0 ? row.shQty - targetStock : 0;
-        const isExcessStock = row.isExcessStock === true;
-
-        // 부진재고 판단 (N급이 아닌 B/A/S급 중에서 주의 상태)
-        const isSlowMove = !isDeadStock && !isExcessStock && row.healthGrade === 'B' && row.shQty > 0;
-
-        if (isDeadStock) {
-          deadStockItems.push({ ...row, _daysSinceLastSale: daysSinceLastSale } as typeof row & { _daysSinceLastSale: number });
-          deadStockValue += itemValue;
-        } else if (isExcessStock) {
-          excessStockItems.push({ ...row, _excessQty: excessQty, _excessValue: excessQty * row.recentPurchasePrice } as typeof row & { _excessQty: number; _excessValue: number });
-          excessStockValue += itemValue;
-        } else if (isSlowMove) {
-          slowMoveItems.push(row);
-          slowMoveValue += itemValue;
-        } else {
-          optimalItems.push(row);
-          optimalStockValue += itemValue;
-        }
-      });
-
-      // ── 건강도 점수 (0~100) ────────────────────────────────────
-      const deadRatio    = totalStockValue > 0 ? deadStockValue  / totalStockValue : 0;
-      const excessRatio  = totalStockValue > 0 ? excessStockValue/ totalStockValue : 0;
-      const slowRatio    = totalStockValue > 0 ? slowMoveValue   / totalStockValue : 0;
-
-      // 항목별 감점
-      const deadPenalty   = Math.min(40, Math.round(deadRatio  / HEALTHY_DEAD_RATIO  * 20));
-      const excessPenalty = Math.min(30, Math.round(excessRatio/ HEALTHY_EXCESS_RATIO* 15));
-      const slowPenalty   = Math.min(15, Math.round(slowRatio  * 30));
-      const healthScore   = Math.max(0, 100 - deadPenalty - excessPenalty - slowPenalty);
-
-      const healthGrade =
-        healthScore >= 80 ? { label: '우량 🟢', textClass: 'text-green-600', strokeColor: '#16a34a' } :
-        healthScore >= 60 ? { label: '보통 🟡', textClass: 'text-amber-600', strokeColor: '#d97706' } :
-        healthScore >= 40 ? { label: '주의 🟠', textClass: 'text-orange-600', strokeColor: '#ea580c' } :
-        { label: '위험 🔴', textClass: 'text-rose-600', strokeColor: '#dc2626' };
-
-      // ── 매출 대비 재고 비율 (ITS) ─────────────────────────────
-      const annualRevenue = analyzedInventory.reduce((s, r) => s + r.salesVolume * r.sellingPrice, 0);
-      const its = annualRevenue > 0 ? (totalStockValue / annualRevenue) : 0;
-
-      // ── 결품 기회손실 상위 품목 ─────────────────────────────────
-      const missedDemandList = Object.entries(missedDemandMap)
-        .map(([id, v]) => {
-          const row = analyzedInventory.find(r => r.product.id === id);
-          return { id, ...v, row };
-        })
-        .filter(m => m.count >= 1)
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-
-      // ── 즉시 처분 대상 (악성재고 중 대경 반품 가능하거나 장기(180일+) 악성인 품목) ──
-      const urgentDisposalItems = deadStockItems
-        .filter(row => {
-          const daysSince = (row as typeof row & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0;
-          return row.ysQty > 0 || daysSince > 180;
-        })
-        .sort((a, b) => ((b as typeof b & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0) - ((a as typeof a & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0));
-
-      return {
-        totalStockValue,
-        deadStockItems,   deadStockValue,
-        excessStockItems, excessStockValue,
-        slowMoveItems,    slowMoveValue,
-        optimalItems,     optimalStockValue,
-        deadRatio, excessRatio, slowRatio,
-        healthScore, healthGrade,
-        annualRevenue, its,
-        missedDemandList,
-        urgentDisposalItems,
-        lockedCapital: deadStockValue + excessStockValue,
-        totalIssueCount: analyzedInventory.filter(r => r.healthGrade === 'E' || r.excessCategory !== null).length,
-      };
+        return {
+            totalStockValue,
+            deadStockItems, deadStockValue,
+            excessStockItems, excessStockValue,
+            slowMoveItems, slowMoveValue,
+            optimalItems, optimalStockValue,
+            deadRatio, excessRatio, slowRatio,
+            healthScore, healthGrade,
+            annualRevenue, its,
+            missedDemandList,
+            urgentDisposalItems,
+            lockedCapital: deadStockValue + excessStockValue,
+            totalIssueCount: analyzedInventory.filter(r => r.healthGrade === 'E' || r.excessCategory !== null).length,
+        };
     }, [analyzedInventory, historyData, orders, quotes]);
 
 
@@ -1550,8 +1550,8 @@ export default function SihwaInventory() {
                             const hasCompData = analyzedInventory.filter(r => r.compSales > 0).length;
                             const compDataScore = Math.min(20, Math.round((hasCompData / Math.max(analyzedInventory.length, 1)) * 20 * 5));
                             const historyScore = historyData.inventoryHistory.length >= 30 ? 20
-                                             : historyData.inventoryHistory.length >= 7  ? 12
-                                             : historyData.inventoryHistory.length >= 1  ? 6 : 0;
+                                : historyData.inventoryHistory.length >= 7 ? 12
+                                    : historyData.inventoryHistory.length >= 1 ? 6 : 0;
                             const freqScore = analyzedInventory.filter(r => r.salesFreq >= 20).length > 50 ? 20 : 10;
                             const safeStockScore = (() => {
                                 const total = analyzedInventory.filter(r => r.safeStock > 0).length;
@@ -1559,7 +1559,7 @@ export default function SihwaInventory() {
                                 return total > 0 ? Math.round((ok / total) * 20) : 0;
                             })();
                             const assetScore = stats.totalAssetCost >= 250_000_000 && stats.totalAssetCost <= 300_000_000 ? 20
-                                           : stats.totalAssetCost >= 200_000_000 ? 12 : 5;
+                                : stats.totalAssetCost >= 200_000_000 ? 12 : 5;
                             const totalScore = compDataScore + historyScore + freqScore + safeStockScore + assetScore;
 
                             return (
@@ -1575,7 +1575,7 @@ export default function SihwaInventory() {
                             <span className="bg-amber-500 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Learning</span>
                         </h2>
                         <p className="text-slate-300 text-[13px] mt-1 pr-4">
-                            현재 시화재고 출고량의 대부분을 '수도권(경기) 판매'로 간주하여 분석 중입니다.<br/>
+                            현재 시화재고 출고량의 대부분을 '수도권(경기) 판매'로 간주하여 분석 중입니다.<br />
                             <span className="text-teal-300">지역별 맞춤 CRM/주문 태깅 데이터가 누적</span>될수록 신뢰도가 95%+ 까지 향상됩니다.
                         </p>
                     </div>
@@ -1604,8 +1604,8 @@ export default function SihwaInventory() {
                             데이터 새로고침
                         </button>
                     )}
-                    <button 
-                        onClick={handleExportSihwaSummary} 
+                    <button
+                        onClick={handleExportSihwaSummary}
                         className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-black text-white rounded-lg font-bold text-sm shadow-md transition-all active:scale-95 border border-slate-700"
                     >
                         <Download className="w-4 h-4" />
@@ -1616,50 +1616,50 @@ export default function SihwaInventory() {
 
             {/* Smart Tableau Dashboard */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 xl:gap-5">
-                <div 
-                    onClick={() => { setActiveTab('AI_SUMMARY'); setExpandedGroups(prev => ({...prev, CRITICAL: true})); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
+                <div
+                    onClick={() => { setActiveTab('AI_SUMMARY'); setExpandedGroups(prev => ({ ...prev, CRITICAL: true })); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
                     className="bg-linear-to-br from-rose-500 to-red-600 rounded-2xl p-5 shadow-lg shadow-rose-200 text-white flex flex-col relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 active:scale-95"
                 >
                     <div className="absolute top-0 right-0 -mr-6 -mt-6 p-4 opacity-20 transform group-hover:scale-110 transition-transform duration-500">
                         <AlertTriangle className="w-32 h-32" />
                     </div>
-                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><AlertTriangle className="w-5 h-5"/>매입처 동반 결품 (선발주 요망)</h3>
+                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><AlertTriangle className="w-5 h-5" />매입처 동반 결품 (선발주 요망)</h3>
                     <p className="text-4xl font-black mb-1 z-10">{stats.critical.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
                     <p className="text-sm font-medium opacity-80 z-10 break-keep mt-auto">현재고 및 대경 재고가 바닥났으며, 연 판매량(100↑)이 많아 선발주 관리가 필요한 품목입니다.</p>
                 </div>
 
-                <div 
-                    onClick={() => { setActiveTab('AI_SUMMARY'); setExpandedGroups(prev => ({...prev, WARNING: true})); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
+                <div
+                    onClick={() => { setActiveTab('AI_SUMMARY'); setExpandedGroups(prev => ({ ...prev, WARNING: true })); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
                     className="bg-linear-to-br from-amber-500 to-orange-500 rounded-2xl p-5 shadow-lg shadow-amber-200 text-white flex flex-col relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 active:scale-95"
                 >
                     <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-20 transform group-hover:scale-110 transition-transform duration-500">
                         <PackageSearch className="w-32 h-32" />
                     </div>
-                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><PackageSearch className="w-5 h-5"/>일반 발주 필요 (적정재고 미달)</h3>
+                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><PackageSearch className="w-5 h-5" />일반 발주 필요 (적정재고 미달)</h3>
                     <p className="text-4xl font-black mb-1 z-10">{stats.warning.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
                     <p className="text-sm font-medium opacity-80 z-10 mt-auto">대경 재고를 통해 조달하거나 목표수량에 미달되어 일반발주(최소 100개)가 필요한 품목입니다.</p>
                 </div>
 
-                <div 
+                <div
                     onClick={() => { setActiveTab('ALL_TABLE'); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
                     className="bg-linear-to-br from-slate-700 to-slate-900 rounded-2xl p-5 shadow-lg shadow-slate-300 text-white flex flex-col relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 active:scale-95"
                 >
                     <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-10 transform group-hover:-translate-y-2 transition-transform duration-500">
                         <Activity className="w-32 h-32" />
                     </div>
-                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><TrendingUp className="w-5 h-5"/>매입 실적가 기준 기초 자산</h3>
+                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><TrendingUp className="w-5 h-5" />매입 실적가 기준 기초 자산</h3>
                     <p className="text-3xl font-black mb-1 z-10">{formatCur(totalsMap.totalCurrentStockCost)} <span className="text-[16px] font-bold opacity-80 tracking-normal">원</span></p>
                     <p className="text-sm font-medium opacity-80 z-10 mt-auto">현재 보유 중인 시화재고 전체의 실매입 추정 자산가치입니다 (Stubend 제외)</p>
                 </div>
 
-                <div 
+                <div
                     onClick={() => { setActiveTab('HEALTH_DIAGNOSIS'); setSelectedHealthCategory('MISSED'); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
                     className="bg-linear-to-br from-indigo-500 to-purple-600 rounded-2xl p-5 shadow-lg shadow-indigo-200 text-white flex flex-col relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 active:scale-95"
                 >
                     <div className="absolute top-0 right-0 -mr-4 -mt-4 p-4 opacity-20 transform group-hover:scale-110 transition-transform duration-500">
                         <BrainCircuit className="w-32 h-32" />
                     </div>
-                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><TrendingUp className="w-5 h-5"/>견적 유입 & 결품 (기회손실)</h3>
+                    <h3 className="font-bold flex items-center gap-2 opacity-90 mb-1 z-10"><TrendingUp className="w-5 h-5" />견적 유입 & 결품 (기회손실)</h3>
                     <p className="text-4xl font-black mb-1 z-10">{healthDiagnosis.missedDemandList.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
                     <p className="text-sm font-medium opacity-80 z-10 mt-auto">최근 60일 내 견적 문의가 있었으나 시화/대경 재고가 없어 판매 기회를 잃었을 가능성이 높은 품목입니다.</p>
                 </div>
@@ -1671,38 +1671,38 @@ export default function SihwaInventory() {
                     <p className="text-4xl font-black text-slate-800 mb-2 invisible h-0">0</p>
 
                     <div className="space-y-2 mt-auto">
-                        {(['A','B','C','D','E'] as const).map(grade => {
-                        const count = analyzedInventory.filter(r =>
-                            r.healthGrade === grade
-                        ).length;
-                        const total = analyzedInventory.filter(r => r.healthGrade !== 'N').length;
-                        const pct = total > 0 ? (count / total * 100).toFixed(1) : 0;
-                        const labels: Record<string, string> = {
-                            A: 'A급 최우수 (핵심)',
-                            B: 'B급 양호 (안정적)',
-                            C: 'C급 보통 (관망)',
-                            D: 'D급 주의 (과잉/정체)',
-                            E: 'E급 악성 (즉시처분)',
-                        };
-                        const colors: Record<string, string> = {
-                            A: '#10B981', B: '#3B82F6', C: '#F59E0B', D: '#F97316', E: '#EF4444'
-                        };
-                        return (
-                            <div key={grade} className="flex items-center gap-2">
-                            <span className="text-[11px] font-bold w-28 text-slate-600 shrink-0">
-                                {labels[grade]}
-                            </span>
-                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                <div
-                                className="h-full rounded-full transition-all"
-                                {...{ style: { width: `${pct}%`, background: colors[grade] } }}
-                                />
-                            </div>
-                            <span className="text-[11px] font-bold text-slate-500 w-12 text-right shrink-0 whitespace-nowrap">
-                                {count}품목
-                            </span>
-                            </div>
-                        );
+                        {(['A', 'B', 'C', 'D', 'E'] as const).map(grade => {
+                            const count = analyzedInventory.filter(r =>
+                                r.healthGrade === grade
+                            ).length;
+                            const total = analyzedInventory.filter(r => r.healthGrade !== 'N').length;
+                            const pct = total > 0 ? (count / total * 100).toFixed(1) : 0;
+                            const labels: Record<string, string> = {
+                                A: 'A급 최우수 (핵심)',
+                                B: 'B급 양호 (안정적)',
+                                C: 'C급 보통 (관망)',
+                                D: 'D급 주의 (과잉/정체)',
+                                E: 'E급 악성 (즉시처분)',
+                            };
+                            const colors: Record<string, string> = {
+                                A: '#10B981', B: '#3B82F6', C: '#F59E0B', D: '#F97316', E: '#EF4444'
+                            };
+                            return (
+                                <div key={grade} className="flex items-center gap-2">
+                                    <span className="text-[11px] font-bold w-28 text-slate-600 shrink-0">
+                                        {labels[grade]}
+                                    </span>
+                                    <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full transition-all"
+                                            {...{ style: { width: `${pct}%`, background: colors[grade] } }}
+                                        />
+                                    </div>
+                                    <span className="text-[11px] font-bold text-slate-500 w-12 text-right shrink-0 whitespace-nowrap">
+                                        {count}품목
+                                    </span>
+                                </div>
+                            );
                         })}
                     </div>
                 </div>
@@ -1720,7 +1720,7 @@ export default function SihwaInventory() {
                         <p><strong className="text-rose-400">E급 (10점↓)</strong>: 장기 무매출, 악성재고</p>
                         <div className="border-t border-slate-700 pt-2.5 mt-2.5 text-slate-400 text-[10px]">
                             <span className="block mb-1.5 font-bold text-slate-300 text-[11px]">항목별 가중치 (배점)</span>
-                            판매빈도(25) + 판매규모(15) + <br/>최근트렌드(25) + 견적유입(20) + <br/>이익률(15)
+                            판매빈도(25) + 판매규모(15) + <br />최근트렌드(25) + 견적유입(20) + <br />이익률(15)
                         </div>
                     </div>
                 </div>
@@ -1748,39 +1748,38 @@ export default function SihwaInventory() {
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
                     <div className="flex flex-wrap bg-slate-200/50 p-1 rounded-lg gap-1">
-                        <button 
+                        <button
                             className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'AI_SUMMARY' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             onClick={() => setActiveTab('AI_SUMMARY')}
                         >
                             AI 요약보기 (발주 추천)
                         </button>
-                        <button 
+                        <button
                             className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'ALL_TABLE' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             onClick={() => setActiveTab('ALL_TABLE')}
                         >
                             전체 재고 리스트(정렬지원)
                         </button>
-                        <button 
+                        <button
                             className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'TOTAL_DASHBOARD' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             onClick={() => setActiveTab('TOTAL_DASHBOARD')}
                         >
                             월간·일간 변동 트렌드
                         </button>
                         <button
-                          className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-1.5 ${
-                            activeTab === 'HEALTH_DIAGNOSIS'
-                              ? 'bg-linear-to-r from-rose-600 to-violet-600 text-white shadow-sm'
-                              : 'text-slate-500 hover:text-slate-700'
-                          }`}
-                          onClick={() => setActiveTab('HEALTH_DIAGNOSIS')}
+                            className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-1.5 ${activeTab === 'HEALTH_DIAGNOSIS'
+                                    ? 'bg-linear-to-r from-rose-600 to-violet-600 text-white shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                            onClick={() => setActiveTab('HEALTH_DIAGNOSIS')}
                         >
-                          🩺 재고 건전성 진단
-                          {/* 악성재고 경고 배지 */}
-                          {healthDiagnosis.deadStockItems.length > 0 && (
-                            <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
-                              {healthDiagnosis.totalIssueCount}
-                            </span>
-                          )}
+                            🩺 재고 건전성 진단
+                            {/* 악성재고 경고 배지 */}
+                            {healthDiagnosis.deadStockItems.length > 0 && (
+                                <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                                    {healthDiagnosis.totalIssueCount}
+                                </span>
+                            )}
                         </button>
                     </div>
 
@@ -1807,7 +1806,7 @@ export default function SihwaInventory() {
                                     <div className="border border-rose-200 rounded-xl overflow-hidden shadow-sm">
                                         <button onClick={() => toggleGroup('CRITICAL')} className="w-full flex items-center justify-between px-5 py-4 bg-rose-50 hover:bg-rose-100 transition-colors">
                                             <div className="flex items-center gap-3">
-                                                {expandedGroups['CRITICAL'] ? <ChevronDown className="w-5 h-5 text-rose-500"/> : <ChevronRight className="w-5 h-5 text-rose-500"/>}
+                                                {expandedGroups['CRITICAL'] ? <ChevronDown className="w-5 h-5 text-rose-500" /> : <ChevronRight className="w-5 h-5 text-rose-500" />}
                                                 <h3 className="font-bold text-rose-800 text-lg flex flex-wrap items-center gap-2">
                                                     <span>🚨 선발주 요망 리스트</span>
                                                     <span className="text-sm font-medium text-rose-500">(대경매입처 동반 결품 위험)</span>
@@ -1822,148 +1821,147 @@ export default function SihwaInventory() {
                                         {expandedGroups['CRITICAL'] && (
                                             <div className="bg-white border-t border-rose-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
                                                 {stats.critical.length > 0 ? (
-                                                <table className="w-full text-sm text-left whitespace-nowrap">
-                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
-                                                        <tr>
-                                                            <th className="px-5 py-3 w-12 text-center">
-                                                                <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-600" 
-                                                                    checked={stats.critical.length > 0 && selectedCriticalIds.size === stats.critical.length}
-                                                                    onChange={(e) => {
-                                                                        if (e.target.checked) setSelectedCriticalIds(new Set(stats.critical.map(r => r.product.id)));
-                                                                        else setSelectedCriticalIds(new Set());
-                                                                    }}
-                                                                />
-                                                            </th>
-                                                            <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                                            <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                                            <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                                            <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('pendingOrderQty')}>대기수량 (Pending) {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                                            <th className="px-5 py-3 text-right">매입단가</th>
-                                                            <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
-                                                            <th className="px-5 py-3 text-right">경쟁사 연판매</th>
-                                                            <th className="px-5 py-3 text-center">건전성 등급</th>
-
-                                                            <th className="px-5 py-3">🚨 분석 근거 (명확성)</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-slate-100">
-                                                        {stats.critical.map(row => (
-                                                            <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
-                                                                <td className="px-5 py-4 text-center">
+                                                    <table className="w-full text-sm text-left whitespace-nowrap">
+                                                        <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
+                                                            <tr>
+                                                                <th className="px-5 py-3 w-12 text-center">
                                                                     <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-600"
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                        checked={selectedCriticalIds.has(row.product.id)}
+                                                                        checked={stats.critical.length > 0 && selectedCriticalIds.size === stats.critical.length}
                                                                         onChange={(e) => {
-                                                                            const newSet = new Set(selectedCriticalIds);
-                                                                            if (e.target.checked) newSet.add(row.product.id);
-                                                                            else newSet.delete(row.product.id);
-                                                                            setSelectedCriticalIds(newSet);
+                                                                            if (e.target.checked) setSelectedCriticalIds(new Set(stats.critical.map(r => r.product.id)));
+                                                                            else setSelectedCriticalIds(new Set());
                                                                         }}
                                                                     />
-                                                                </td>
-                                                                <td className="px-5 py-4">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
-                                                                    <button 
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setSelectedIntelligenceItem(row);
-                                                                        }}
-                                                                        className="font-mono font-bold text-slate-900 text-sm hover:text-indigo-600 transition-colors flex items-center gap-1 group text-left"
-                                                                    >
-                                                                        {row.product.id}
-                                                                        <Info className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                                    </button>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-5 py-4 text-right font-black font-mono text-rose-600 bg-rose-50/30">0</td>
-                                                                <td className="px-5 py-4 text-right font-black font-mono text-slate-400">0</td>
-                                                                <td className="px-5 py-4 text-center font-bold text-slate-400">
-                                                                    {row.pendingOrderQty > 0 ? <span className="text-indigo-600">+{row.pendingOrderQty} 대기중</span> : '없음'}
-                                                                </td>
-                                                                <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
-                                                                <td className="px-5 py-4 text-right font-black text-rose-600 bg-rose-50/10">{formatCur(row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1))}</td>
-                                                                <td className="px-5 py-4 text-right font-mono text-slate-400 text-xs">
-                                                                    {row.compSales > 0 ? (
-                                                                        <span>{row.compSales.toLocaleString()}</span>
-                                                                    ) : <span className="text-slate-200">—</span>}
-                                                                </td>
-                                                                <td className="px-5 py-4 text-center border-l border-slate-100">
-                                                                    <div className="flex flex-col items-center gap-1">
-                                                                        <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
-                                                                            row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
-                                                                            row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
-                                                                            row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
-                                                                            row.healthGrade === 'D' ? 'bg-rose-100 text-rose-600' :
-                                                                            'bg-slate-100 text-slate-400'
-                                                                        }`}>
-                                                                            {row.healthGrade === 'A' ? 'A급' :
-                                                                            row.healthGrade === 'B' ? 'B급' :
-                                                                            row.healthGrade === 'C' ? 'C급' :
-                                                                            row.healthGrade === 'D' ? 'D급' : '—'}
-                                                                        </span>
-                                                                        <span className="text-xs font-mono text-slate-500">
-                                                                            {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '—'}
-                                                                        </span>
-                                                                    </div>
-                                                                </td>
+                                                                </th>
+                                                                <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key === 'id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                                <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key === 'shQty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                                <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key === 'ysQty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                                <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('pendingOrderQty')}>대기수량 (Pending) {sortConfig.key === 'pendingOrderQty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                                <th className="px-5 py-3 text-right">매입단가</th>
+                                                                <th className="px-5 py-3 text-right">필요예산 (단가×결핍수량)</th>
+                                                                <th className="px-5 py-3 text-right">경쟁사 연판매</th>
+                                                                <th className="px-5 py-3 text-center">건전성 등급</th>
 
-                                                                <td className="px-5 py-4">
-                                                                    <div className="flex flex-col gap-0.5">
-                                                                        <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
-                                                                            <Info className="w-4 h-4 text-rose-500" />
-                                                                            적정재고 대비 <span className="text-rose-600">{row.deficit}</span>개 부족
-                                                                        </div>
-                                                                        <div className="text-xs text-slate-500 pl-5">
-                                                                            연 {row.salesVolume}개 판매 / 목표 {row.safeStock}개
-                                                                        </div>
-                                                                        <div className="text-xs text-slate-400 pl-5">
-                                                                            ROP: {row.reorderPoint}개 도달 시 발주 | 목표적정: {row.safeStock}개
-                                                                            {row.isExcessStock && (
-                                                                                <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.safeStock > 0 ? row.shQty - row.safeStock : row.shQty}개 초과]</span>
-                                                                            )}
-                                                                            {row.isDeadStock && (
-                                                                                <span className="text-slate-400 ml-1">[사장재고 의심 — 소진 후 재평가]</span>
-                                                                            )}
-                                                                            {row.daekyungDirectRatio >= 80 && row.shQty > 0 && (
-                                                                                <span className="text-rose-500 font-bold ml-1 bg-rose-50 px-1 rounded border border-rose-200">⚠️ 시화재고 방치 (직발송 {row.daekyungDirectRatio}%)</span>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
+                                                                <th className="px-5 py-3">🚨 분석 근거 (명확성)</th>
                                                             </tr>
-                                                        ))}
-                                                    </tbody>
-                                                    <tfoot className="bg-rose-50/50 border-t-2 border-rose-200">
-                                                        <tr>
-                                                            <td colSpan={2} className="px-5 py-4">
-                                                                <button onClick={() => handleCreateOrder(selectedCriticalIds, 'CRITICAL')} disabled={selectedCriticalIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedCriticalIds.size > 0 ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
-                                                                    <span>선택 품목 발주서 만들기 ({selectedCriticalIds.size}건)</span>
-                                                                    <ChevronRight className="w-4 h-4" />
-                                                                </button>
-                                                            </td>
-                                                            <td colSpan={6} className="px-5 py-4 text-right font-bold text-slate-700 relative">
-                                                                {(() => {
-                                                                    const selectedItems = stats.critical.filter(item => selectedCriticalIds.has(item.product.id));
-                                                                    const negoEligibleCount = selectedItems.filter(item => (item.recentPurchasePrice * (item.deficit>0?item.deficit:1)) >= 20_000_000).length;
-                                                                    if (negoEligibleCount > 0) {
-                                                                        return (
-                                                                            <div className="absolute top-3 left-0 bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-md shadow-lg flex items-center gap-1.5 animate-bounce z-10 whitespace-nowrap">
-                                                                                🎉 단품 2천만원 이상 {negoEligibleCount}종! (대경 볼륨 네고)
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {stats.critical.map(row => (
+                                                                <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
+                                                                    <td className="px-5 py-4 text-center">
+                                                                        <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-600"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            checked={selectedCriticalIds.has(row.product.id)}
+                                                                            onChange={(e) => {
+                                                                                const newSet = new Set(selectedCriticalIds);
+                                                                                if (e.target.checked) newSet.add(row.product.id);
+                                                                                else newSet.delete(row.product.id);
+                                                                                setSelectedCriticalIds(newSet);
+                                                                            }}
+                                                                        />
+                                                                    </td>
+                                                                    <td className="px-5 py-4">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setSelectedIntelligenceItem(row);
+                                                                                }}
+                                                                                className="font-mono font-bold text-slate-900 text-sm hover:text-indigo-600 transition-colors flex items-center gap-1 group text-left"
+                                                                            >
+                                                                                {row.product.id}
+                                                                                <Info className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-right font-black font-mono text-rose-600 bg-rose-50/30">0</td>
+                                                                    <td className="px-5 py-4 text-right font-black font-mono text-slate-400">0</td>
+                                                                    <td className="px-5 py-4 text-center font-bold text-slate-400">
+                                                                        {row.pendingOrderQty > 0 ? <span className="text-indigo-600">+{row.pendingOrderQty} 대기중</span> : '없음'}
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
+                                                                    <td className="px-5 py-4 text-right font-black text-rose-600 bg-rose-50/10">{formatCur(row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1))}</td>
+                                                                    <td className="px-5 py-4 text-right font-mono text-slate-400 text-xs">
+                                                                        {row.compSales > 0 ? (
+                                                                            <span>{row.compSales.toLocaleString()}</span>
+                                                                        ) : <span className="text-slate-200">—</span>}
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-center border-l border-slate-100">
+                                                                        <div className="flex flex-col items-center gap-1">
+                                                                            <span className={`text-xs font-black px-2 py-0.5 rounded-full ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                                                    row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
+                                                                                        row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
+                                                                                            row.healthGrade === 'D' ? 'bg-rose-100 text-rose-600' :
+                                                                                                'bg-slate-100 text-slate-400'
+                                                                                }`}>
+                                                                                {row.healthGrade === 'A' ? 'A급' :
+                                                                                    row.healthGrade === 'B' ? 'B급' :
+                                                                                        row.healthGrade === 'C' ? 'C급' :
+                                                                                            row.healthGrade === 'D' ? 'D급' : '—'}
+                                                                            </span>
+                                                                            <span className="text-xs font-mono text-slate-500">
+                                                                                {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '—'}
+                                                                            </span>
+                                                                        </div>
+                                                                    </td>
+
+                                                                    <td className="px-5 py-4">
+                                                                        <div className="flex flex-col gap-0.5">
+                                                                            <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                                                                                <Info className="w-4 h-4 text-rose-500" />
+                                                                                적정재고 대비 <span className="text-rose-600">{row.deficit}</span>개 부족
                                                                             </div>
-                                                                        );
-                                                                    }
-                                                                    return null;
-                                                                })()}
-                                                                선택항목 <span className="text-rose-600 underline decoration-2">{selectedCriticalIds.size}</span>건 예상 합계:
-                                                            </td>
-                                                            <td className="px-5 py-4 text-right font-black text-rose-700 text-lg">
-                                                                {formatCur(stats.critical.filter(w => selectedCriticalIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1), 0))} 원
-                                                            </td>
-                                                            <td></td>
-                                                        </tr>
-                                                    </tfoot>
-                                                </table>
+                                                                            <div className="text-xs text-slate-500 pl-5">
+                                                                                연 {row.salesVolume}개 판매 / 목표 {row.safeStock}개
+                                                                            </div>
+                                                                            <div className="text-xs text-slate-400 pl-5">
+                                                                                ROP: {row.reorderPoint}개 도달 시 발주 | 목표적정: {row.safeStock}개
+                                                                                {row.isExcessStock && (
+                                                                                    <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.safeStock > 0 ? row.shQty - row.safeStock : row.shQty}개 초과]</span>
+                                                                                )}
+                                                                                {row.isDeadStock && (
+                                                                                    <span className="text-slate-400 ml-1">[사장재고 의심 — 소진 후 재평가]</span>
+                                                                                )}
+                                                                                {row.daekyungDirectRatio >= 80 && row.shQty > 0 && (
+                                                                                    <span className="text-rose-500 font-bold ml-1 bg-rose-50 px-1 rounded border border-rose-200">⚠️ 시화재고 방치 (직발송 {row.daekyungDirectRatio}%)</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                        <tfoot className="bg-rose-50/50 border-t-2 border-rose-200">
+                                                            <tr>
+                                                                <td colSpan={2} className="px-5 py-4">
+                                                                    <button onClick={() => handleCreateOrder(selectedCriticalIds, 'CRITICAL')} disabled={selectedCriticalIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedCriticalIds.size > 0 ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                                                                        <span>선택 품목 발주서 만들기 ({selectedCriticalIds.size}건)</span>
+                                                                        <ChevronRight className="w-4 h-4" />
+                                                                    </button>
+                                                                </td>
+                                                                <td colSpan={6} className="px-5 py-4 text-right font-bold text-slate-700 relative">
+                                                                    {(() => {
+                                                                        const selectedItems = stats.critical.filter(item => selectedCriticalIds.has(item.product.id));
+                                                                        const negoEligibleCount = selectedItems.filter(item => (item.recentPurchasePrice * (item.deficit > 0 ? item.deficit : 1)) >= 20_000_000).length;
+                                                                        if (negoEligibleCount > 0) {
+                                                                            return (
+                                                                                <div className="absolute top-3 left-0 bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-md shadow-lg flex items-center gap-1.5 animate-bounce z-10 whitespace-nowrap">
+                                                                                    🎉 단품 2천만원 이상 {negoEligibleCount}종! (대경 볼륨 네고)
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                        return null;
+                                                                    })()}
+                                                                    선택항목 <span className="text-rose-600 underline decoration-2">{selectedCriticalIds.size}</span>건 예상 합계:
+                                                                </td>
+                                                                <td className="px-5 py-4 text-right font-black text-rose-700 text-lg">
+                                                                    {formatCur(stats.critical.filter(w => selectedCriticalIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1), 0))} 원
+                                                                </td>
+                                                                <td></td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
                                                 ) : <div className="p-8 text-center text-slate-400">훌륭합니다! 매입처 결품리스크 항목이 없습니다.</div>}
                                             </div>
                                         )}
@@ -1972,7 +1970,7 @@ export default function SihwaInventory() {
                                     <div className="border border-amber-200 rounded-xl overflow-hidden shadow-sm">
                                         <button onClick={() => toggleGroup('WARNING')} className="w-full flex items-center justify-between px-5 py-4 bg-amber-50 hover:bg-amber-100 transition-colors">
                                             <div className="flex items-center gap-3">
-                                                {expandedGroups['WARNING'] ? <ChevronDown className="w-5 h-5 text-amber-600"/> : <ChevronRight className="w-5 h-5 text-amber-600"/>}
+                                                {expandedGroups['WARNING'] ? <ChevronDown className="w-5 h-5 text-amber-600" /> : <ChevronRight className="w-5 h-5 text-amber-600" />}
                                                 <h3 className="font-bold text-amber-800 text-lg flex flex-wrap items-center gap-2">
                                                     <span>⚠️ 일반 발주 필요</span>
                                                     <span className="text-sm font-medium text-amber-600">(입고 대기물량을 고려해도 부족함)</span>
@@ -1987,144 +1985,143 @@ export default function SihwaInventory() {
                                         {expandedGroups['WARNING'] && (
                                             <div className="bg-white border-t border-amber-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
                                                 {stats.warning.length > 0 ? (
-                                                <table className="w-full text-sm text-left whitespace-nowrap">
-                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
-                                                        <tr>
-                                                            <th className="px-4 py-3 w-10 text-center">
-                                                                <input type="checkbox" title="전체 선택" checked={stats.warning.length > 0 && selectedWarningIds.size === stats.warning.length} onChange={toggleAllWarnings} className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer" />
-                                                            </th>
-                                                            <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                                            <th className="px-5 py-3 text-right">시화재고</th>
-                                                            <th className="px-5 py-3 text-right">권장발주량</th>
-                                                            <th className="px-5 py-3 text-right">대기중</th>
-                                                            <th className="px-5 py-3 text-right">대경재고</th>
-                                                            <th className="px-5 py-3 text-right">매입단가</th>
-                                                            <th className="px-5 py-3 text-right">필요예산</th>
-                                                            <th className="px-5 py-3 text-center">건전성 등급</th>
-                                                            <th className="px-5 py-3">💡 분석 근거</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-slate-100">
-                                                        {stats.warning.map(row => (
-                                                            <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
-                                                                <td className="px-4 py-4 text-center">
-                                                                    <input 
-                                                                        type="checkbox"
-                                                                        title="발주 항목 선택"
-                                                                        checked={selectedWarningIds.has(row.product.id)}
-                                                                        onChange={(e) => toggleWarningSelection(row.product.id, e as unknown as React.MouseEvent)}
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                        className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
-                                                                    />
-                                                                </td>
-                                                                <td className="px-5 py-4">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
-                                                                    <button 
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setSelectedIntelligenceItem(row);
-                                                                        }}
-                                                                        className="font-mono font-bold text-slate-900 text-sm hover:text-indigo-600 transition-colors flex items-center gap-1 group text-left"
-                                                                    >
-                                                                        {row.product.id}
-                                                                        <Info className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                                    </button>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-5 py-4 text-right font-black font-mono text-amber-600 bg-amber-50 text-base">
-                                                                    {row.shQty}
-                                                                </td>
-                                                                <td className="px-5 py-4 text-right font-black font-mono text-indigo-600">
-                                                                    {row.recommendedQty}
-                                                                    <div className="text-[10px] font-normal text-slate-400 mt-1">/ 총판매:{row.salesVolume}</div>
-                                                                </td>
-                                                                <td className="px-5 py-4 text-center font-bold text-slate-500">
-                                                                    {row.pendingOrderQty > 0 ? <span className="text-blue-600 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md font-black shadow-sm">+{row.pendingOrderQty}</span> : <span className="text-slate-300">-</span>}
-                                                                </td>
-                                                                <td className="px-5 py-4 text-right">
-                                                                    <span className="px-2 py-1 bg-teal-50 text-teal-700 font-extrabold font-mono rounded-lg border border-teal-200 shadow-sm">{row.ysQty}</span>
-                                                                </td>
-                                                                <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
-                                                                <td className="px-5 py-4 text-right font-black text-amber-700 bg-amber-50/30">{formatCur(row.recentPurchasePrice * (row.recommendedQty > 0 ? row.recommendedQty : 1))}</td>
-                                                                <td className="px-5 py-4 text-right font-mono text-slate-400 text-xs">
-                                                                    {row.compSales > 0 ? (
-                                                                        <span>{row.compSales.toLocaleString()}</span>
-                                                                    ) : <span className="text-slate-200">—</span>}
-                                                                </td>
-                                                                <td className="px-5 py-4 text-center border-l border-slate-100">
-                                                                    <div className="flex flex-col items-center gap-1">
-                                                                        <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
-                                                                            row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
-                                                                            row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
-                                                                            row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
-                                                                            row.healthGrade === 'D' ? 'bg-rose-100 text-rose-600' :
-                                                                            'bg-slate-100 text-slate-400'
-                                                                        }`}>
-                                                                            {row.healthGrade === 'A' ? 'A급' :
-                                                                            row.healthGrade === 'B' ? 'B급' :
-                                                                            row.healthGrade === 'C' ? 'C급' :
-                                                                            row.healthGrade === 'D' ? 'D급' : '—'}
-                                                                        </span>
-                                                                        <span className="text-xs font-mono text-slate-500">
-                                                                            {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '—'}
-                                                                        </span>
-                                                                    </div>
-                                                                </td>
-
-                                                                <td className="px-5 py-4">
-                                                                    <div className="flex flex-col gap-0.5">
-                                                                        <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
-                                                                            <Info className="w-4 h-4 text-amber-500" />
-                                                                            <span className="text-rose-600">권장발주량 {row.recommendedQty}개</span> (결품 {row.deficit}개)
-                                                                        </div>
-                                                                        <div className="text-xs text-slate-500 pl-5">
-                                                                            등급: <strong className={`font-black ${row.healthGrade === 'A' ? 'text-emerald-600' : row.healthGrade === 'B' ? 'text-blue-600' : row.healthGrade === 'C' ? 'text-amber-500' : 'text-rose-500'}`}>{row.healthGrade}급</strong> | 최근 판매: <strong className="text-indigo-600">{row.recent60dSales}개(60일)</strong> / 연 총 {row.salesVolume}개
-                                                                        </div>
-                                                                        <div className="text-[11px] text-slate-400 pl-5 mt-0.5">
-                                                                            목표 재고 {row.safeStock}개 대비 현재 {row.shQty}개 보유 중 (ROP: {row.reorderPoint}개)
-                                                                            {row.isExcessStock && (
-                                                                                <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.safeStock > 0 ? row.shQty - row.safeStock : row.shQty}개 초과]</span>
-                                                                            )}
-                                                                            {row.isDeadStock && (
-                                                                                <span className="text-slate-400 ml-1">[사장재고 의심 — 소진 후 재평가]</span>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
+                                                    <table className="w-full text-sm text-left whitespace-nowrap">
+                                                        <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
+                                                            <tr>
+                                                                <th className="px-4 py-3 w-10 text-center">
+                                                                    <input type="checkbox" title="전체 선택" checked={stats.warning.length > 0 && selectedWarningIds.size === stats.warning.length} onChange={toggleAllWarnings} className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer" />
+                                                                </th>
+                                                                <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key === 'id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                                <th className="px-5 py-3 text-right">시화재고</th>
+                                                                <th className="px-5 py-3 text-right">권장발주량</th>
+                                                                <th className="px-5 py-3 text-right">대기중</th>
+                                                                <th className="px-5 py-3 text-right">대경재고</th>
+                                                                <th className="px-5 py-3 text-right">매입단가</th>
+                                                                <th className="px-5 py-3 text-right">필요예산</th>
+                                                                <th className="px-5 py-3 text-center">건전성 등급</th>
+                                                                <th className="px-5 py-3">💡 분석 근거</th>
                                                             </tr>
-                                                        ))}
-                                                    </tbody>
-                                                    <tfoot className="bg-amber-50/50 border-t-2 border-amber-200">
-                                                        <tr>
-                                                            <td colSpan={3} className="px-5 py-4">
-                                                                <button onClick={() => handleCreateOrder(selectedWarningIds, 'WARNING')} disabled={selectedWarningIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedWarningIds.size > 0 ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
-                                                                    <span>선택 품목 발주서 만들기 ({selectedWarningIds.size}건)</span>
-                                                                    <ChevronRight className="w-4 h-4" />
-                                                                </button>
-                                                            </td>
-                                                            <td colSpan={6} className="px-5 py-4 text-right font-bold text-slate-700 relative">
-                                                                {(() => {
-                                                                    const selectedItems = stats.warning.filter(item => selectedWarningIds.has(item.product.id));
-                                                                    const negoEligibleCount = selectedItems.filter(item => (item.recentPurchasePrice * (item.deficit>0?item.deficit:1)) >= 20_000_000).length;
-                                                                    if (negoEligibleCount > 0) {
-                                                                        return (
-                                                                            <div className="absolute top-3 left-0 bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-md shadow-lg flex items-center gap-1.5 animate-bounce z-10 whitespace-nowrap">
-                                                                                🎉 단품 2천만원 이상 {negoEligibleCount}종! (대경 볼륨 네고)
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {stats.warning.map(row => (
+                                                                <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
+                                                                    <td className="px-4 py-4 text-center">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            title="발주 항목 선택"
+                                                                            checked={selectedWarningIds.has(row.product.id)}
+                                                                            onChange={(e) => toggleWarningSelection(row.product.id, e as unknown as React.MouseEvent)}
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
+                                                                        />
+                                                                    </td>
+                                                                    <td className="px-5 py-4">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setSelectedIntelligenceItem(row);
+                                                                                }}
+                                                                                className="font-mono font-bold text-slate-900 text-sm hover:text-indigo-600 transition-colors flex items-center gap-1 group text-left"
+                                                                            >
+                                                                                {row.product.id}
+                                                                                <Info className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-right font-black font-mono text-amber-600 bg-amber-50 text-base">
+                                                                        {row.shQty}
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-right font-black font-mono text-indigo-600">
+                                                                        {row.recommendedQty}
+                                                                        <div className="text-[10px] font-normal text-slate-400 mt-1">/ 총판매:{row.salesVolume}</div>
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-center font-bold text-slate-500">
+                                                                        {row.pendingOrderQty > 0 ? <span className="text-blue-600 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md font-black shadow-sm">+{row.pendingOrderQty}</span> : <span className="text-slate-300">-</span>}
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-right">
+                                                                        <span className="px-2 py-1 bg-teal-50 text-teal-700 font-extrabold font-mono rounded-lg border border-teal-200 shadow-sm">{row.ysQty}</span>
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
+                                                                    <td className="px-5 py-4 text-right font-black text-amber-700 bg-amber-50/30">{formatCur(row.recentPurchasePrice * (row.recommendedQty > 0 ? row.recommendedQty : 1))}</td>
+                                                                    <td className="px-5 py-4 text-right font-mono text-slate-400 text-xs">
+                                                                        {row.compSales > 0 ? (
+                                                                            <span>{row.compSales.toLocaleString()}</span>
+                                                                        ) : <span className="text-slate-200">—</span>}
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-center border-l border-slate-100">
+                                                                        <div className="flex flex-col items-center gap-1">
+                                                                            <span className={`text-xs font-black px-2 py-0.5 rounded-full ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                                                    row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
+                                                                                        row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
+                                                                                            row.healthGrade === 'D' ? 'bg-rose-100 text-rose-600' :
+                                                                                                'bg-slate-100 text-slate-400'
+                                                                                }`}>
+                                                                                {row.healthGrade === 'A' ? 'A급' :
+                                                                                    row.healthGrade === 'B' ? 'B급' :
+                                                                                        row.healthGrade === 'C' ? 'C급' :
+                                                                                            row.healthGrade === 'D' ? 'D급' : '—'}
+                                                                            </span>
+                                                                            <span className="text-xs font-mono text-slate-500">
+                                                                                {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '—'}
+                                                                            </span>
+                                                                        </div>
+                                                                    </td>
+
+                                                                    <td className="px-5 py-4">
+                                                                        <div className="flex flex-col gap-0.5">
+                                                                            <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                                                                                <Info className="w-4 h-4 text-amber-500" />
+                                                                                <span className="text-rose-600">권장발주량 {row.recommendedQty}개</span> (결품 {row.deficit}개)
                                                                             </div>
-                                                                        );
-                                                                    }
-                                                                    return null;
-                                                                })()}
-                                                                선택항목 <span className="text-amber-600 underline decoration-2">{selectedWarningIds.size}</span>건 예상 합계:
-                                                            </td>
-                                                            <td className="px-5 py-4 text-right font-black text-amber-700 text-lg">
-                                                                {formatCur(stats.warning.filter(w => selectedWarningIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1), 0))} 원
-                                                            </td>
-                                                            <td></td>
-                                                        </tr>
-                                                    </tfoot>
-                                                </table>
+                                                                            <div className="text-xs text-slate-500 pl-5">
+                                                                                등급: <strong className={`font-black ${row.healthGrade === 'A' ? 'text-emerald-600' : row.healthGrade === 'B' ? 'text-blue-600' : row.healthGrade === 'C' ? 'text-amber-500' : 'text-rose-500'}`}>{row.healthGrade}급</strong> | 최근 판매: <strong className="text-indigo-600">{row.recent60dSales}개(60일)</strong> / 연 총 {row.salesVolume}개
+                                                                            </div>
+                                                                            <div className="text-[11px] text-slate-400 pl-5 mt-0.5">
+                                                                                목표 재고 {row.safeStock}개 대비 현재 {row.shQty}개 보유 중 (ROP: {row.reorderPoint}개)
+                                                                                {row.isExcessStock && (
+                                                                                    <span className="text-amber-500 font-bold ml-1">[과잉 {row.shQty - row.safeStock > 0 ? row.shQty - row.safeStock : row.shQty}개 초과]</span>
+                                                                                )}
+                                                                                {row.isDeadStock && (
+                                                                                    <span className="text-slate-400 ml-1">[사장재고 의심 — 소진 후 재평가]</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                        <tfoot className="bg-amber-50/50 border-t-2 border-amber-200">
+                                                            <tr>
+                                                                <td colSpan={3} className="px-5 py-4">
+                                                                    <button onClick={() => handleCreateOrder(selectedWarningIds, 'WARNING')} disabled={selectedWarningIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedWarningIds.size > 0 ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                                                                        <span>선택 품목 발주서 만들기 ({selectedWarningIds.size}건)</span>
+                                                                        <ChevronRight className="w-4 h-4" />
+                                                                    </button>
+                                                                </td>
+                                                                <td colSpan={6} className="px-5 py-4 text-right font-bold text-slate-700 relative">
+                                                                    {(() => {
+                                                                        const selectedItems = stats.warning.filter(item => selectedWarningIds.has(item.product.id));
+                                                                        const negoEligibleCount = selectedItems.filter(item => (item.recentPurchasePrice * (item.deficit > 0 ? item.deficit : 1)) >= 20_000_000).length;
+                                                                        if (negoEligibleCount > 0) {
+                                                                            return (
+                                                                                <div className="absolute top-3 left-0 bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-md shadow-lg flex items-center gap-1.5 animate-bounce z-10 whitespace-nowrap">
+                                                                                    🎉 단품 2천만원 이상 {negoEligibleCount}종! (대경 볼륨 네고)
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                        return null;
+                                                                    })()}
+                                                                    선택항목 <span className="text-amber-600 underline decoration-2">{selectedWarningIds.size}</span>건 예상 합계:
+                                                                </td>
+                                                                <td className="px-5 py-4 text-right font-black text-amber-700 text-lg">
+                                                                    {formatCur(stats.warning.filter(w => selectedWarningIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1), 0))} 원
+                                                                </td>
+                                                                <td></td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
                                                 ) : <div className="p-8 text-center text-slate-400">발주가 필요한 품목이 없습니다. 시화재고 관리가 매우 이상적입니다!</div>}
                                             </div>
                                         )}
@@ -2133,7 +2130,7 @@ export default function SihwaInventory() {
                                     <div className="border border-indigo-200 rounded-xl overflow-hidden shadow-sm mt-6">
                                         <button onClick={() => toggleGroup('REGULAR')} className="w-full flex items-center justify-between px-5 py-4 bg-indigo-50 hover:bg-indigo-100 transition-colors">
                                             <div className="flex items-center gap-3">
-                                                {expandedGroups['REGULAR'] ? <ChevronDown className="w-5 h-5 text-indigo-600"/> : <ChevronRight className="w-5 h-5 text-indigo-600"/>}
+                                                {expandedGroups['REGULAR'] ? <ChevronDown className="w-5 h-5 text-indigo-600" /> : <ChevronRight className="w-5 h-5 text-indigo-600" />}
                                                 <h3 className="font-bold text-indigo-800 text-lg flex flex-wrap items-center gap-2">
                                                     <span>♻️ 정기 발주 예측</span>
                                                     <span className="text-sm font-medium text-indigo-500">(우량 품목 2개월분 선주문 권장)</span>
@@ -2148,121 +2145,120 @@ export default function SihwaInventory() {
                                         {expandedGroups['REGULAR'] && (
                                             <div className="bg-white border-t border-indigo-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
                                                 {stats.regular.length > 0 ? (
-                                                <table className="w-full text-sm text-left whitespace-nowrap">
-                                                    <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
-                                                        <tr>
-                                                            <th className="px-5 py-3 w-12 text-center">
-                                                                <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600" 
-                                                                    checked={stats.regular.length > 0 && selectedRegularIds.size === stats.regular.length}
-                                                                    onChange={(e) => {
-                                                                        if (e.target.checked) setSelectedRegularIds(new Set(stats.regular.map(r => r.product.id)));
-                                                                        else setSelectedRegularIds(new Set());
-                                                                    }}
-                                                                />
-                                                            </th>
-                                                            <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                                            <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('safeStock')}>적정재고(목표) {sortConfig.key==='safeStock' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                                            <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                                            <th className="px-5 py-3 text-center">판매/보충 이력</th>
-                                                            <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition text-center" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                                            <th className="px-5 py-3 text-right">매입단가</th>
-                                                            <th className="px-5 py-3 text-center cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('healthGrade')}>건전성 등급 {sortConfig.key==='healthGrade' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                                            <th className="px-5 py-3 text-right w-40">추천 발주량</th>
-                                                            <th className="px-5 py-3">💡 분석 근거</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-slate-100">
-                                                        {stats.regular.map(row => (
-                                                            <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
-                                                                <td className="px-5 py-4 text-center">
+                                                    <table className="w-full text-sm text-left whitespace-nowrap">
+                                                        <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
+                                                            <tr>
+                                                                <th className="px-5 py-3 w-12 text-center">
                                                                     <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                        checked={selectedRegularIds.has(row.product.id)}
+                                                                        checked={stats.regular.length > 0 && selectedRegularIds.size === stats.regular.length}
                                                                         onChange={(e) => {
-                                                                            const newSet = new Set(selectedRegularIds);
-                                                                            if (e.target.checked) newSet.add(row.product.id);
-                                                                            else newSet.delete(row.product.id);
-                                                                            setSelectedRegularIds(newSet);
+                                                                            if (e.target.checked) setSelectedRegularIds(new Set(stats.regular.map(r => r.product.id)));
+                                                                            else setSelectedRegularIds(new Set());
                                                                         }}
                                                                     />
-                                                                </td>
-                                                                <td className="px-5 py-4">
-                                                                    <div className="flex items-center gap-2">
-                                                                    <button 
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setSelectedIntelligenceItem(row);
-                                                                        }}
-                                                                        className="font-mono font-bold text-slate-900 text-sm hover:text-indigo-600 transition-colors flex items-center gap-1 group text-left"
-                                                                    >
-                                                                        {row.product.id}
-                                                                        <Info className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                                    </button>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-5 py-4 text-right font-mono text-indigo-500 text-sm">{row.safeStock}</td>
-                                                                <td className="px-5 py-4 text-right font-black font-mono text-indigo-600 bg-indigo-50 text-base">{row.shQty}</td>
-                                                                <td className="px-5 py-4 text-center text-xs font-medium text-slate-500">
-                                                                    연 {row.salesFreq}회 판매 / 누적 {row.salesVolume}개
-                                                                </td>
-                                                                <td className="px-5 py-4 text-center font-bold font-mono text-slate-500">
-                                                                    {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty}</span> : <span className="text-rose-400">0</span>}
-                                                                </td>
-                                                                <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
-                                                                <td className="px-5 py-4 text-center">
-                                                                    <div className="flex flex-col items-center gap-1">
-                                                                        <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
-                                                                            row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
-                                                                            row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
-                                                                            row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
-                                                                            row.healthGrade === 'D' ? 'bg-rose-100 text-rose-600' :
-                                                                            'bg-slate-100 text-slate-400'
-                                                                        }`}>
-                                                                            {row.healthGrade === 'A' ? 'A급' :
-                                                                            row.healthGrade === 'B' ? 'B급' :
-                                                                            row.healthGrade === 'C' ? 'C급' :
-                                                                            row.healthGrade === 'D' ? 'D급' : '—'}
-                                                                        </span>
-                                                                        <span className="text-xs font-mono text-slate-500">
-                                                                            {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '—'}
-                                                                        </span>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-5 py-4 text-right font-black text-indigo-600 bg-indigo-50/30">
-                                                                    {row.recommendedQty}
-                                                                </td>
-                                                                <td className="px-5 py-4">
-                                                                    <div className="flex flex-col gap-0.5">
-                                                                        <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
-                                                                            <Activity className="w-4 h-4 text-indigo-500" />
-                                                                            전략 목표치 <span className="text-indigo-600">{row.recommendedQty}</span>개 권장
-                                                                        </div>
-                                                                        <div className="text-xs text-slate-500 pl-5">
-                                                                            월평균 {Math.round(row.salesVolume / 12)}개 소요 (회전율 기반)
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
+                                                                </th>
+                                                                <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key === 'id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                                <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('safeStock')}>적정재고(목표) {sortConfig.key === 'safeStock' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                                <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key === 'shQty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                                <th className="px-5 py-3 text-center">판매/보충 이력</th>
+                                                                <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition text-center" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key === 'ysQty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                                <th className="px-5 py-3 text-right">매입단가</th>
+                                                                <th className="px-5 py-3 text-center cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('healthGrade')}>건전성 등급 {sortConfig.key === 'healthGrade' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                                <th className="px-5 py-3 text-right w-40">추천 발주량</th>
+                                                                <th className="px-5 py-3">💡 분석 근거</th>
                                                             </tr>
-                                                        ))}
-                                                    </tbody>
-                                                    <tfoot className="bg-indigo-50/50 border-t-2 border-indigo-200">
-                                                        <tr>
-                                                            <td colSpan={6} className="px-5 py-4">
-                                                                <button onClick={() => handleCreateOrder(selectedRegularIds, 'REGULAR')} disabled={selectedRegularIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedRegularIds.size > 0 ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
-                                                                    <span>선택 품목 발주서 만들기 ({selectedRegularIds.size}건)</span>
-                                                                    <ChevronRight className="w-4 h-4" />
-                                                                </button>
-                                                            </td>
-                                                            <td colSpan={2} className="px-5 py-4 text-right font-bold text-slate-700">
-                                                                선택항목 <span className="text-indigo-600 underline decoration-2">{selectedRegularIds.size}</span>건 예상 합계:
-                                                            </td>
-                                                            <td className="px-5 py-4 text-right font-black text-indigo-700 text-lg">
-                                                                {formatCur(stats.regular.filter(w => selectedRegularIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.recommendedQty || 0), 0))} 원
-                                                            </td>
-                                                            <td></td>
-                                                        </tr>
-                                                    </tfoot>
-                                                </table>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {stats.regular.map(row => (
+                                                                <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
+                                                                    <td className="px-5 py-4 text-center">
+                                                                        <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            checked={selectedRegularIds.has(row.product.id)}
+                                                                            onChange={(e) => {
+                                                                                const newSet = new Set(selectedRegularIds);
+                                                                                if (e.target.checked) newSet.add(row.product.id);
+                                                                                else newSet.delete(row.product.id);
+                                                                                setSelectedRegularIds(newSet);
+                                                                            }}
+                                                                        />
+                                                                    </td>
+                                                                    <td className="px-5 py-4">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setSelectedIntelligenceItem(row);
+                                                                                }}
+                                                                                className="font-mono font-bold text-slate-900 text-sm hover:text-indigo-600 transition-colors flex items-center gap-1 group text-left"
+                                                                            >
+                                                                                {row.product.id}
+                                                                                <Info className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-right font-mono text-indigo-500 text-sm">{row.safeStock}</td>
+                                                                    <td className="px-5 py-4 text-right font-black font-mono text-indigo-600 bg-indigo-50 text-base">{row.shQty}</td>
+                                                                    <td className="px-5 py-4 text-center text-xs font-medium text-slate-500">
+                                                                        연 {row.salesFreq}회 판매 / 누적 {row.salesVolume}개
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-center font-bold font-mono text-slate-500">
+                                                                        {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty}</span> : <span className="text-rose-400">0</span>}
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
+                                                                    <td className="px-5 py-4 text-center">
+                                                                        <div className="flex flex-col items-center gap-1">
+                                                                            <span className={`text-xs font-black px-2 py-0.5 rounded-full ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                                                    row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
+                                                                                        row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
+                                                                                            row.healthGrade === 'D' ? 'bg-rose-100 text-rose-600' :
+                                                                                                'bg-slate-100 text-slate-400'
+                                                                                }`}>
+                                                                                {row.healthGrade === 'A' ? 'A급' :
+                                                                                    row.healthGrade === 'B' ? 'B급' :
+                                                                                        row.healthGrade === 'C' ? 'C급' :
+                                                                                            row.healthGrade === 'D' ? 'D급' : '—'}
+                                                                            </span>
+                                                                            <span className="text-xs font-mono text-slate-500">
+                                                                                {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '—'}
+                                                                            </span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-right font-black text-indigo-600 bg-indigo-50/30">
+                                                                        {row.recommendedQty}
+                                                                    </td>
+                                                                    <td className="px-5 py-4">
+                                                                        <div className="flex flex-col gap-0.5">
+                                                                            <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                                                                                <Activity className="w-4 h-4 text-indigo-500" />
+                                                                                전략 목표치 <span className="text-indigo-600">{row.recommendedQty}</span>개 권장
+                                                                            </div>
+                                                                            <div className="text-xs text-slate-500 pl-5">
+                                                                                월평균 {Math.round(row.salesVolume / 12)}개 소요 (회전율 기반)
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                        <tfoot className="bg-indigo-50/50 border-t-2 border-indigo-200">
+                                                            <tr>
+                                                                <td colSpan={6} className="px-5 py-4">
+                                                                    <button onClick={() => handleCreateOrder(selectedRegularIds, 'REGULAR')} disabled={selectedRegularIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedRegularIds.size > 0 ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                                                                        <span>선택 품목 발주서 만들기 ({selectedRegularIds.size}건)</span>
+                                                                        <ChevronRight className="w-4 h-4" />
+                                                                    </button>
+                                                                </td>
+                                                                <td colSpan={2} className="px-5 py-4 text-right font-bold text-slate-700">
+                                                                    선택항목 <span className="text-indigo-600 underline decoration-2">{selectedRegularIds.size}</span>건 예상 합계:
+                                                                </td>
+                                                                <td className="px-5 py-4 text-right font-black text-indigo-700 text-lg">
+                                                                    {formatCur(stats.regular.filter(w => selectedRegularIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.recommendedQty || 0), 0))} 원
+                                                                </td>
+                                                                <td></td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
                                                 ) : <div className="p-8 text-center text-slate-400">우량 품목들이 현재 모두 충분한 재고량을 안전하게 확보하고 있습니다!</div>}
                                             </div>
                                         )}
@@ -2334,7 +2330,7 @@ export default function SihwaInventory() {
                                                         {groupedDailyTrend.map((group, idx) => {
                                                             let dailyRevenue = 0;
                                                             let dailyCost = 0;
-                                                            
+
                                                             const itemsList = Object.values(group.items);
                                                             itemsList.forEach(({ product, incoming, outgoing }) => {
                                                                 const analysis = analyzedInventory.find(ai => ai.product.id === product.id);
@@ -2353,7 +2349,7 @@ export default function SihwaInventory() {
                                                                         </div>
 
                                                                         {(dailyRevenue > 0 || dailyCost > 0) && (
-                                                                            <div 
+                                                                            <div
                                                                                 className="flex items-center gap-3 mt-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200 shadow-sm cursor-pointer hover:bg-slate-100 transition-colors"
                                                                                 onClick={() => toggleDailyGroup(group.date)}
                                                                             >
@@ -2380,7 +2376,7 @@ export default function SihwaInventory() {
                                                                                 const rowKey = `${group.date}-${item.product.id}`;
                                                                                 const isExpanded = !!expandedTrendItems[rowKey];
                                                                                 const analysis = analyzedInventory.find(ai => ai.product.id === item.product.id);
-                                                                                
+
                                                                                 const sellingPrice = analysis ? analysis.sellingPrice : 0;
                                                                                 const purchasePrice = analysis ? analysis.recentPurchasePrice : 0;
 
@@ -2405,7 +2401,7 @@ export default function SihwaInventory() {
 
                                                                                 return (
                                                                                     <div key={rowKey} className={`flex flex-col text-xs bg-white rounded border border-slate-100 border-l-4 ${isNetIncoming ? 'border-l-emerald-500' : 'border-l-blue-500'}`}>
-                                                                                        <div 
+                                                                                        <div
                                                                                             className="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-50 transition-colors"
                                                                                             onClick={() => toggleTrendItem(rowKey)}
                                                                                         >
@@ -2522,838 +2518,836 @@ export default function SihwaInventory() {
                             {/* TAB 3: ALL TABLE WITH SORTING */}
                             {activeTab === 'ALL_TABLE' && (
                                 <div className="space-y-4 overflow-x-auto overflow-y-auto max-h-[800px] custom-scrollbar pb-4 bg-white">
-                                <table className="w-full text-left text-sm whitespace-nowrap min-w-[1000px]">
-                                    <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none sticky top-0 z-10 shadow-sm">
-                                        <tr className="text-xs uppercase tracking-wider text-slate-500 font-bold border-b-2 border-slate-200">
-                                            <th className="px-3 py-3 w-10 text-center border-r border-slate-200">
-                                                <span className="text-[10px] text-slate-400">선택</span>
-                                            </th>
-                                            <th className="px-4 py-3 group relative text-left">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="cursor-pointer hover:text-slate-800 transition" onClick={() => handleSort('id')}>
-                                                        품목 ID {sortConfig.key==='id' && (sortConfig.direction==='asc'?'↑':'↓')}
-                                                    </span>
-                                                    <span className="text-[10px] bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded cursor-pointer hover:bg-indigo-100 transition border border-indigo-100" onClick={() => handleSort('statusRank')} title="태그(상태) 우선순위로 정렬합니다">
-                                                        태그정렬 {sortConfig.key==='statusRank' && (sortConfig.direction==='asc'?'↑':'↓')}
-                                                    </span>
-                                                    <div className="relative">
-                                                        <button 
-                                                            onClick={() => setIsTagFilterOpen(!isTagFilterOpen)}
-                                                            className={`p-1 rounded transition ${activeTagFilters.length > 0 ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400 hover:bg-slate-200'}`}
-                                                            title="태그로 필터링"
-                                                        >
-                                                            <Filter size={14} className={activeTagFilters.length > 0 ? 'fill-current' : ''} />
-                                                        </button>
-                                                        {isTagFilterOpen && (
-                                                            <div className="absolute top-full left-0 mt-1 w-36 bg-white border border-slate-200 shadow-xl rounded-lg py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
-                                                                <div className="px-3 pb-2 mb-2 border-b border-slate-100 flex justify-between items-center">
-                                                                    <span className="text-[10px] font-black text-slate-500">필터 선택</span>
-                                                                    {activeTagFilters.length > 0 && (
-                                                                        <span className="text-[9px] text-rose-500 cursor-pointer hover:underline" onClick={() => setActiveTagFilters([])}>초기화</span>
-                                                                    )}
-                                                                </div>
-                                                                {['선발주', '일반', '정기발주', '부족', '과잉', '악성'].map(tag => (
-                                                                    <label key={tag} className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs font-medium text-slate-700">
-                                                                        <input 
-                                                                            type="checkbox" 
-                                                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                                                            checked={activeTagFilters.includes(tag)}
-                                                                            onChange={() => toggleTagFilter(tag)}
-                                                                        />
-                                                                        {tag}
-                                                                    </label>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </th>
-                                            <th className="px-4 py-3 text-center group relative cursor-help">
-                                                등급 <span className="text-[10px] text-slate-400">ⓘ</span>
-                                                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 bg-slate-800 text-white text-[11px] p-3 rounded shadow-lg hidden group-hover:block z-50 text-left font-normal whitespace-normal cursor-auto">
-                                                    <div className="font-bold mb-1 border-b border-slate-600 pb-1">건전성 평가 항목(%) 기준</div>
-                                                    <div className="mb-2 text-slate-300">실제 판매량, 견적 유입량, 주문 데이터를 복합 연계하여 산출한 종합 등급입니다.</div>
-                                                    <ul className="space-y-1">
-                                                        <li><span className="text-emerald-300 font-bold">A급 (최우수)</span>: 회전율 우수, 꾸준한 매출 기여</li>
-                                                        <li><span className="text-blue-300 font-bold">B급 (양호)</span>: 회전율 양호, 안정적 유지권</li>
-                                                        <li><span className="text-amber-300 font-bold">C급 (보통)</span>: 저회전 또는 간헐적 판매 발생</li>
-                                                        <li><span className="text-orange-300 font-bold">D급 (주의)</span>: 과잉재고 또는 최근 무판매 정체</li>
-                                                        <li><span className="text-rose-300 font-bold">E급 (악성)</span>: 장기 무판매 사장재고 (처분 요망)</li>
-                                                        <li><span className="text-slate-300 font-bold">N급 (제외)</span>: 판매/재고 없음 (평가 불가)</li>
-                                                    </ul>
-                                                </div>
-                                            </th>
-                                            <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('turnoverRate')}>회전율 {sortConfig.key==='turnoverRate' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-center">
-                                                최근 실적(60일)
-                                                <div className="flex items-center justify-center gap-2 mt-1 text-[10px] font-bold">
-                                                    <span className={`cursor-pointer transition ${sortConfig.key === 'quoteCount' ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-600'}`} onClick={() => handleSort('quoteCount')}>
-                                                        견적순 {sortConfig.key==='quoteCount' && (sortConfig.direction==='asc'?'↑':'↓')}
-                                                    </span>
-                                                    <span className="text-slate-300">|</span>
-                                                    <span className={`cursor-pointer transition ${sortConfig.key === 'recent60dOrderCount' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'}`} onClick={() => handleSort('recent60dOrderCount')}>
-                                                        발주순 {sortConfig.key==='recent60dOrderCount' && (sortConfig.direction==='asc'?'↑':'↓')}
-                                                    </span>
-                                                </div>
-                                            </th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-amber-700" onClick={() => handleSort('salesVolume')}>판매이력 {sortConfig.key==='salesVolume' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-indigo-700" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key==='shQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-600" onClick={() => handleSort('pendingOrderQty')}>입고대기 {sortConfig.key==='pendingOrderQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200" onClick={() => handleSort('ysQty')}>대경 재고 {sortConfig.key==='ysQty' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition group relative" onClick={() => handleSort('daysOnHand')}>
-                                                잔여일 {sortConfig.key==='daysOnHand' && (sortConfig.direction==='asc'?'↑':'↓')}
-                                                <div className="absolute right-0 bottom-full mb-2 w-56 bg-slate-800 text-white text-[11px] p-3 rounded shadow-lg hidden group-hover:block z-50 text-left font-normal whitespace-normal cursor-auto">
-                                                    <div className="font-bold mb-1 border-b border-slate-600 pb-1">잔여일 산출 로직</div>
-                                                    <div className="text-slate-300 mb-1">현재 시화재고를 <span className="font-bold">일평균 판매량</span>으로 나눈 값으로, <span className="text-amber-300 font-bold">재발주 시점 산출 및 결품 예방</span>을 위해 사용됩니다.</div>
-                                                    <div className="text-slate-400 text-[10px] mt-1">※ 무한대(∞)는 판매량 대비 재고가 너무 많아 소진 시점을 추정하기 어려운 상태를 의미합니다.</div>
-                                                </div>
-                                            </th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-500 font-black" onClick={() => handleSort('deficit')}>보충 {sortConfig.key==='deficit' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                            <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-teal-700" onClick={() => handleSort('recentPurchasePrice')}>이익률(단가) {sortConfig.key==='recentPurchasePrice' && (sortConfig.direction==='asc'?'↑':'↓')}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {(() => {
-                                            const criticalSet = new Set(stats.critical.map(i => i.product.id));
-                                            const warningSet = new Set(stats.warning.map(i => i.product.id));
-                                            const regularSet = new Set(stats.regular.map(i => i.product.id));
-
-                                            const getStatusRank = (row: typeof analyzedInventory[0]) => {
-                                                if (criticalSet.has(row.product.id)) return 1;
-                                                if (warningSet.has(row.product.id)) return 2;
-                                                if (regularSet.has(row.product.id)) return 3;
-                                                if (row.deficit > 0) return 4;
-                                                if (row.isExcessStock) return 5;
-                                                if (row.isDeadStock) return 6;
-                                                return 99;
-                                            };
-
-                                            let displayList = [...analyzedInventory];
-
-                                            if (activeTagFilters.length > 0) {
-                                                displayList = displayList.filter(row => {
-                                                    const tags: string[] = [];
-                                                    if (criticalSet.has(row.product.id)) tags.push('선발주');
-                                                    if (warningSet.has(row.product.id)) tags.push('일반');
-                                                    if (regularSet.has(row.product.id)) tags.push('정기발주');
-                                                    if (row.deficit > 0) tags.push('부족');
-                                                    if (row.isExcessStock) tags.push('과잉');
-                                                    if (row.isDeadStock) tags.push('악성');
-
-                                                    // Show row if it has AT LEAST ONE of the active filters
-                                                    return activeTagFilters.some(filterTag => tags.includes(filterTag));
-                                                });
-                                            }
-
-                                            // Apply statusRank sorting if selected
-                                            if (sortConfig.key === 'statusRank') {
-                                                const dir = sortConfig.direction === 'asc' ? 1 : -1;
-                                                displayList.sort((a, b) => {
-                                                    const rankA = getStatusRank(a);
-                                                    const rankB = getStatusRank(b);
-                                                    if (rankA !== rankB) return (rankA - rankB) * dir;
-                                                    return a.product.id.localeCompare(b.product.id);
-                                                });
-                                            }
-
-                                            if (displayList.length === 0) {
-                                                return <tr><td colSpan={11} className="py-10 text-center text-slate-400 font-medium">해당 조건에 맞는 품목이 없습니다.</td></tr>;
-                                            }
-
-                                            return displayList.slice(0, 500).map(row => {
-                                                const rowTags = [];
-                                                if (criticalSet.has(row.product.id)) rowTags.push({ label: '선발주', className: 'bg-rose-100 text-rose-700 border border-rose-200' });
-                                                if (warningSet.has(row.product.id)) rowTags.push({ label: '일반', className: 'bg-amber-100 text-amber-700 border border-amber-200' });
-                                                if (regularSet.has(row.product.id)) rowTags.push({ label: '정기발주', className: 'bg-indigo-100 text-indigo-700 border border-indigo-200' });
-                                                if (row.deficit > 0) rowTags.push({ label: '부족', className: 'bg-red-50 text-red-600 border border-red-100' });
-                                                if (row.isExcessStock) rowTags.push({ label: '과잉', className: 'bg-orange-100 text-orange-600 border border-orange-100' });
-                                                if (row.isDeadStock) rowTags.push({ label: '악성', className: 'bg-slate-100 text-slate-500 border border-slate-200' });
-
-                                                return (
-                                                <tr key={row.product.id} className={`hover:bg-slate-50 group cursor-pointer ${selectedAllTableIds.has(row.product.id) ? 'bg-indigo-50/50' : ''}`} onClick={() => setSelectedIntelligenceItem(row)}>
-                                                <td className="px-3 py-2 text-center border-r border-slate-100">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        aria-label={`${row.product.id} 품목 선택`}
-                                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                                                        checked={selectedAllTableIds.has(row.product.id)}
-                                                        onChange={(e) => {
-                                                            setSelectedAllTableIds(prev => {
-                                                                const next = new Set(prev);
-                                                                if (e.target.checked) next.add(row.product.id);
-                                                                else next.delete(row.product.id);
-                                                                return next;
-                                                            });
-                                                        }}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2 font-mono font-bold text-slate-700">
-                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <button 
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setSelectedIntelligenceItem(row);
-                                                            }}
-                                                            className="font-mono font-bold text-slate-900 text-sm hover:text-indigo-600 transition-colors flex items-center gap-1 group text-left"
-                                                        >
-                                                            {row.product.id === 'UNKNOWN' && row.product.name ? `UNKNOWN (${row.product.name})` : row.product.id}
-                                                            <Info className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                        </button>
-                                                        {rowTags.map((tag, idx) => (
-                                                            <span 
-                                                                key={idx} 
-                                                                className={`text-[9px] px-1 py-0.5 rounded font-black tracking-tight cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-indigo-300 transition ${tag.className} ${activeTagFilters.includes(tag.label) ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    toggleTagFilter(tag.label);
-                                                                }}
-                                                                title="클릭하여 필터 토글"
-                                                            >
-                                                                {tag.label}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-2 text-center">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-black ${
-                                                        row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
-                                                        row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' :
-                                                        row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' :
-                                                        row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' :
-                                                        row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' :
-                                                        'bg-slate-100 text-slate-500'
-                                                    }`} title="종합 건전성 등급">{row.healthGrade}급</span>
-                                                </td>
-                                                <td className="px-4 py-2 text-center">
-                                                {row.healthGrade !== 'N' ? (
-                                                    <div className="flex flex-col items-center">
-                                                    <span className={`text-[10px] font-black px-1.5 rounded ${
-                                                        row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
-                                                        row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
-                                                        row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
-                                                        'bg-rose-100 text-rose-500'
-                                                    }`}>{row.healthGrade}급</span>
-                                                    <span className="text-[10px] font-mono text-slate-400 mt-0.5">
-                                                        {row.turnoverRate > 0 ? `${row.turnoverRate}x` : ''}
-                                                    </span>
-                                                    </div>
-                                                ) : <span className="text-slate-200">—</span>}
-                                                </td>
-                                                <td className="px-4 py-2 text-center text-slate-600">
-                                                    <div className="flex flex-col items-center gap-1">
-                                                        <span className="font-black text-slate-800 text-[12px]">
-                                                            {row.recent60dSales.toLocaleString()}<span className="text-[10px] text-slate-500 font-bold ml-0.5 mr-1">개 /</span>{row.recent60dOrderCount.toLocaleString()}<span className="text-[10px] text-slate-500 font-bold ml-0.5">회출고</span>
+                                    <table className="w-full text-left text-sm whitespace-nowrap min-w-[1000px]">
+                                        <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none sticky top-0 z-10 shadow-sm">
+                                            <tr className="text-xs uppercase tracking-wider text-slate-500 font-bold border-b-2 border-slate-200">
+                                                <th className="px-3 py-3 w-10 text-center border-r border-slate-200">
+                                                    <span className="text-[10px] text-slate-400">선택</span>
+                                                </th>
+                                                <th className="px-4 py-3 group relative text-left">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="cursor-pointer hover:text-slate-800 transition" onClick={() => handleSort('id')}>
+                                                            품목 ID {sortConfig.key === 'id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                                         </span>
-                                                        <div className="flex items-center gap-1 text-[10px] bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 shadow-sm">
-                                                            <span className="text-slate-500 font-bold">견적</span><span className="font-black text-indigo-600">{row.quoteCount.toLocaleString()}</span><span className="text-slate-400">건</span>
-                                                            <span className="w-px h-2.5 bg-slate-300 mx-0.5"></span>
-                                                            <span className="text-slate-500 font-bold">발주</span><span className="font-black text-emerald-600">{row.recent60dOrderCount.toLocaleString()}</span><span className="text-slate-400">건</span>
+                                                        <span className="text-[10px] bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded cursor-pointer hover:bg-indigo-100 transition border border-indigo-100" onClick={() => handleSort('statusRank')} title="태그(상태) 우선순위로 정렬합니다">
+                                                            태그정렬 {sortConfig.key === 'statusRank' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        </span>
+                                                        <div className="relative">
+                                                            <button
+                                                                onClick={() => setIsTagFilterOpen(!isTagFilterOpen)}
+                                                                className={`p-1 rounded transition ${activeTagFilters.length > 0 ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400 hover:bg-slate-200'}`}
+                                                                title="태그로 필터링"
+                                                            >
+                                                                <Filter size={14} className={activeTagFilters.length > 0 ? 'fill-current' : ''} />
+                                                            </button>
+                                                            {isTagFilterOpen && (
+                                                                <div className="absolute top-full left-0 mt-1 w-36 bg-white border border-slate-200 shadow-xl rounded-lg py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
+                                                                    <div className="px-3 pb-2 mb-2 border-b border-slate-100 flex justify-between items-center">
+                                                                        <span className="text-[10px] font-black text-slate-500">필터 선택</span>
+                                                                        {activeTagFilters.length > 0 && (
+                                                                            <span className="text-[9px] text-rose-500 cursor-pointer hover:underline" onClick={() => setActiveTagFilters([])}>초기화</span>
+                                                                        )}
+                                                                    </div>
+                                                                    {['선발주', '일반', '정기발주', '부족', '과잉', '악성'].map(tag => (
+                                                                        <label key={tag} className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs font-medium text-slate-700">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                                                checked={activeTagFilters.includes(tag)}
+                                                                                onChange={() => toggleTagFilter(tag)}
+                                                                            />
+                                                                            {tag}
+                                                                        </label>
+                                                                    ))}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
-                                                </td>
-                                                <td className="px-4 py-2 text-right text-slate-600">
-                                                    {row.salesVolume > 0 ? (
-                                                        <span><span className="font-bold text-slate-800">{row.salesVolume.toLocaleString()}</span> <span className="text-[10px] text-slate-500">({row.salesFreq.toLocaleString()}회)</span></span>
-                                                    ) : '-'}
-                                                </td>
-                                                <td className="px-4 py-2 text-right font-black font-mono text-indigo-600 bg-indigo-50/20">
-                                                    <div className="flex flex-col items-end gap-0.5">
-                                                        <span>{row.shQty.toLocaleString()}</span>
-                                                        <span className="text-[10px] font-normal tracking-tight text-slate-500">적정: {row.safeStock.toLocaleString()}개</span>
+                                                </th>
+                                                <th className="px-4 py-3 text-center group relative cursor-help">
+                                                    등급 <span className="text-[10px] text-slate-400">ⓘ</span>
+                                                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 bg-slate-800 text-white text-[11px] p-3 rounded shadow-lg hidden group-hover:block z-50 text-left font-normal whitespace-normal cursor-auto">
+                                                        <div className="font-bold mb-1 border-b border-slate-600 pb-1">건전성 평가 항목(%) 기준</div>
+                                                        <div className="mb-2 text-slate-300">실제 판매량, 견적 유입량, 주문 데이터를 복합 연계하여 산출한 종합 등급입니다.</div>
+                                                        <ul className="space-y-1">
+                                                            <li><span className="text-emerald-300 font-bold">A급 (최우수)</span>: 회전율 우수, 꾸준한 매출 기여</li>
+                                                            <li><span className="text-blue-300 font-bold">B급 (양호)</span>: 회전율 양호, 안정적 유지권</li>
+                                                            <li><span className="text-amber-300 font-bold">C급 (보통)</span>: 저회전 또는 간헐적 판매 발생</li>
+                                                            <li><span className="text-orange-300 font-bold">D급 (주의)</span>: 과잉재고 또는 최근 무판매 정체</li>
+                                                            <li><span className="text-rose-300 font-bold">E급 (악성)</span>: 장기 무판매 사장재고 (처분 요망)</li>
+                                                            <li><span className="text-slate-300 font-bold">N급 (제외)</span>: 판매/재고 없음 (평가 불가)</li>
+                                                        </ul>
                                                     </div>
-                                                </td>
-                                                <td className="px-4 py-2 text-right font-bold font-mono text-rose-500">
-                                                    {row.pendingOrderQty > 0 ? `+${row.pendingOrderQty.toLocaleString()}` : <span className="text-slate-300">0</span>}
-                                                </td>
-                                                <td className="px-4 py-2 text-center font-bold font-mono text-slate-500">
-                                                    {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty.toLocaleString()}</span> : <span className="text-rose-400">0</span>}
-                                                </td>
-                                                <td className="px-4 py-2 text-right font-mono text-xs">
-                                                <span className={
-                                                    row.daysOnHand <= 10  ? 'text-rose-600 font-bold' :
-                                                    row.daysOnHand <= 30  ? 'text-amber-500 font-bold' :
-                                                    row.daysOnHand > 365  ? 'text-slate-300' :
-                                                    'text-slate-600'
-                                                }>
-                                                    {row.shQty === 0 ? '0일' :
-                                                    row.daysOnHand === 9999 ? '∞' :
-                                                    `${Math.round(row.daysOnHand)}일`}
-                                                </span>
-                                                </td>
-                                                <td className="px-4 py-2 text-right font-black text-rose-600 bg-rose-50/30">
-                                                    {row.deficit > 0 ? `-${row.deficit.toLocaleString()}개` : <span className="text-slate-300 font-normal">충분</span>}
-                                                </td>
-                                                <td className="px-4 py-2 text-right">
-                                                    <div className="flex flex-col items-end">
-                                                        <span className={`font-black text-xs ${row.profitMarginRate <= 0 ? 'text-rose-500' : row.profitMarginRate >= 30 ? 'text-emerald-600' : 'text-slate-700'}`}>{row.profitMarginRate}%</span>
-                                                        <span className="text-[9px] text-slate-400 font-mono">단가 {formatCur(row.recentPurchasePrice)}</span>
+                                                </th>
+                                                <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('turnoverRate')}>회전율 {sortConfig.key === 'turnoverRate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                <th className="px-4 py-3 text-center">
+                                                    최근 실적(60일)
+                                                    <div className="flex items-center justify-center gap-2 mt-1 text-[10px] font-bold">
+                                                        <span className={`cursor-pointer transition ${sortConfig.key === 'quoteCount' ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-600'}`} onClick={() => handleSort('quoteCount')}>
+                                                            견적순 {sortConfig.key === 'quoteCount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        </span>
+                                                        <span className="text-slate-300">|</span>
+                                                        <span className={`cursor-pointer transition ${sortConfig.key === 'recent60dOrderCount' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'}`} onClick={() => handleSort('recent60dOrderCount')}>
+                                                            발주순 {sortConfig.key === 'recent60dOrderCount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        </span>
                                                     </div>
-                                                </td>
+                                                </th>
+                                                <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-amber-700" onClick={() => handleSort('salesVolume')}>판매이력 {sortConfig.key === 'salesVolume' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-indigo-700" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key === 'shQty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-600" onClick={() => handleSort('pendingOrderQty')}>입고대기 {sortConfig.key === 'pendingOrderQty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200" onClick={() => handleSort('ysQty')}>대경 재고 {sortConfig.key === 'ysQty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition group relative" onClick={() => handleSort('daysOnHand')}>
+                                                    잔여일 {sortConfig.key === 'daysOnHand' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                    <div className="absolute right-0 bottom-full mb-2 w-56 bg-slate-800 text-white text-[11px] p-3 rounded shadow-lg hidden group-hover:block z-50 text-left font-normal whitespace-normal cursor-auto">
+                                                        <div className="font-bold mb-1 border-b border-slate-600 pb-1">잔여일 산출 로직</div>
+                                                        <div className="text-slate-300 mb-1">현재 시화재고를 <span className="font-bold">일평균 판매량</span>으로 나눈 값으로, <span className="text-amber-300 font-bold">재발주 시점 산출 및 결품 예방</span>을 위해 사용됩니다.</div>
+                                                        <div className="text-slate-400 text-[10px] mt-1">※ 무한대(∞)는 판매량 대비 재고가 너무 많아 소진 시점을 추정하기 어려운 상태를 의미합니다.</div>
+                                                    </div>
+                                                </th>
+                                                <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-rose-500 font-black" onClick={() => handleSort('deficit')}>보충 {sortConfig.key === 'deficit' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                                <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200 transition text-teal-700" onClick={() => handleSort('recentPurchasePrice')}>이익률(단가) {sortConfig.key === 'recentPurchasePrice' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                             </tr>
-                                            );
-                                        });
-                                        })()}
-                                    </tbody>
-                                </table>
-                                {selectedAllTableIds.size > 0 && (
-                                    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 rounded-full shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] border border-slate-700 px-6 py-3 flex items-center gap-6 z-[100] animate-in slide-in-from-bottom-10 fade-in duration-300">
-                                        <div className="font-bold text-white">
-                                            <span className="text-indigo-400 font-black text-xl">{selectedAllTableIds.size}</span>
-                                            <span className="text-slate-300 ml-2">개 품목 선택됨</span>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {(() => {
+                                                const criticalSet = new Set(stats.critical.map(i => i.product.id));
+                                                const warningSet = new Set(stats.warning.map(i => i.product.id));
+                                                const regularSet = new Set(stats.regular.map(i => i.product.id));
+
+                                                const getStatusRank = (row: typeof analyzedInventory[0]) => {
+                                                    if (criticalSet.has(row.product.id)) return 1;
+                                                    if (warningSet.has(row.product.id)) return 2;
+                                                    if (regularSet.has(row.product.id)) return 3;
+                                                    if (row.deficit > 0) return 4;
+                                                    if (row.isExcessStock) return 5;
+                                                    if (row.isDeadStock) return 6;
+                                                    return 99;
+                                                };
+
+                                                let displayList = [...analyzedInventory];
+
+                                                if (activeTagFilters.length > 0) {
+                                                    displayList = displayList.filter(row => {
+                                                        const tags: string[] = [];
+                                                        if (criticalSet.has(row.product.id)) tags.push('선발주');
+                                                        if (warningSet.has(row.product.id)) tags.push('일반');
+                                                        if (regularSet.has(row.product.id)) tags.push('정기발주');
+                                                        if (row.deficit > 0) tags.push('부족');
+                                                        if (row.isExcessStock) tags.push('과잉');
+                                                        if (row.isDeadStock) tags.push('악성');
+
+                                                        // Show row if it has AT LEAST ONE of the active filters
+                                                        return activeTagFilters.some(filterTag => tags.includes(filterTag));
+                                                    });
+                                                }
+
+                                                // Apply statusRank sorting if selected
+                                                if (sortConfig.key === 'statusRank') {
+                                                    const dir = sortConfig.direction === 'asc' ? 1 : -1;
+                                                    displayList.sort((a, b) => {
+                                                        const rankA = getStatusRank(a);
+                                                        const rankB = getStatusRank(b);
+                                                        if (rankA !== rankB) return (rankA - rankB) * dir;
+                                                        return a.product.id.localeCompare(b.product.id);
+                                                    });
+                                                }
+
+                                                if (displayList.length === 0) {
+                                                    return <tr><td colSpan={11} className="py-10 text-center text-slate-400 font-medium">해당 조건에 맞는 품목이 없습니다.</td></tr>;
+                                                }
+
+                                                return displayList.slice(0, 500).map(row => {
+                                                    const rowTags = [];
+                                                    if (criticalSet.has(row.product.id)) rowTags.push({ label: '선발주', className: 'bg-rose-100 text-rose-700 border border-rose-200' });
+                                                    if (warningSet.has(row.product.id)) rowTags.push({ label: '일반', className: 'bg-amber-100 text-amber-700 border border-amber-200' });
+                                                    if (regularSet.has(row.product.id)) rowTags.push({ label: '정기발주', className: 'bg-indigo-100 text-indigo-700 border border-indigo-200' });
+                                                    if (row.deficit > 0) rowTags.push({ label: '부족', className: 'bg-red-50 text-red-600 border border-red-100' });
+                                                    if (row.isExcessStock) rowTags.push({ label: '과잉', className: 'bg-orange-100 text-orange-600 border border-orange-100' });
+                                                    if (row.isDeadStock) rowTags.push({ label: '악성', className: 'bg-slate-100 text-slate-500 border border-slate-200' });
+
+                                                    return (
+                                                        <tr key={row.product.id} className={`hover:bg-slate-50 group cursor-pointer ${selectedAllTableIds.has(row.product.id) ? 'bg-indigo-50/50' : ''}`} onClick={() => setSelectedIntelligenceItem(row)}>
+                                                            <td className="px-3 py-2 text-center border-r border-slate-100">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    aria-label={`${row.product.id} 품목 선택`}
+                                                                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                                    checked={selectedAllTableIds.has(row.product.id)}
+                                                                    onChange={(e) => {
+                                                                        setSelectedAllTableIds(prev => {
+                                                                            const next = new Set(prev);
+                                                                            if (e.target.checked) next.add(row.product.id);
+                                                                            else next.delete(row.product.id);
+                                                                            return next;
+                                                                        });
+                                                                    }}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                />
+                                                            </td>
+                                                            <td className="px-4 py-2 font-mono font-bold text-slate-700">
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setSelectedIntelligenceItem(row);
+                                                                        }}
+                                                                        className="font-mono font-bold text-slate-900 text-sm hover:text-indigo-600 transition-colors flex items-center gap-1 group text-left"
+                                                                    >
+                                                                        {row.product.id === 'UNKNOWN' && row.product.name ? `UNKNOWN (${row.product.name})` : row.product.id}
+                                                                        <Info className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                    </button>
+                                                                    {rowTags.map((tag, idx) => (
+                                                                        <span
+                                                                            key={idx}
+                                                                            className={`text-[9px] px-1 py-0.5 rounded font-black tracking-tight cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-indigo-300 transition ${tag.className} ${activeTagFilters.includes(tag.label) ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                toggleTagFilter(tag.label);
+                                                                            }}
+                                                                            title="클릭하여 필터 토글"
+                                                                        >
+                                                                            {tag.label}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-center">
+                                                                <span className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-black ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                                        row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' :
+                                                                            row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' :
+                                                                                row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' :
+                                                                                    row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' :
+                                                                                        'bg-slate-100 text-slate-500'
+                                                                    }`} title="종합 건전성 등급">{row.healthGrade}급</span>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-center">
+                                                                {row.healthGrade !== 'N' ? (
+                                                                    <div className="flex flex-col items-center">
+                                                                        <span className={`text-[10px] font-black px-1.5 rounded ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                                                row.healthGrade === 'B' ? 'bg-amber-100 text-amber-700' :
+                                                                                    row.healthGrade === 'C' ? 'bg-blue-100 text-blue-600' :
+                                                                                        'bg-rose-100 text-rose-500'
+                                                                            }`}>{row.healthGrade}급</span>
+                                                                        <span className="text-[10px] font-mono text-slate-400 mt-0.5">
+                                                                            {row.turnoverRate > 0 ? `${row.turnoverRate}x` : ''}
+                                                                        </span>
+                                                                    </div>
+                                                                ) : <span className="text-slate-200">—</span>}
+                                                            </td>
+                                                            <td className="px-4 py-2 text-center text-slate-600">
+                                                                <div className="flex flex-col items-center gap-1">
+                                                                    <span className="font-black text-slate-800 text-[12px]">
+                                                                        {row.recent60dSales.toLocaleString()}<span className="text-[10px] text-slate-500 font-bold ml-0.5 mr-1">개 /</span>{row.recent60dOrderCount.toLocaleString()}<span className="text-[10px] text-slate-500 font-bold ml-0.5">회출고</span>
+                                                                    </span>
+                                                                    <div className="flex items-center gap-1 text-[10px] bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 shadow-sm">
+                                                                        <span className="text-slate-500 font-bold">견적</span><span className="font-black text-indigo-600">{row.quoteCount.toLocaleString()}</span><span className="text-slate-400">건</span>
+                                                                        <span className="w-px h-2.5 bg-slate-300 mx-0.5"></span>
+                                                                        <span className="text-slate-500 font-bold">발주</span><span className="font-black text-emerald-600">{row.recent60dOrderCount.toLocaleString()}</span><span className="text-slate-400">건</span>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-right text-slate-600">
+                                                                {row.salesVolume > 0 ? (
+                                                                    <span><span className="font-bold text-slate-800">{row.salesVolume.toLocaleString()}</span> <span className="text-[10px] text-slate-500">({row.salesFreq.toLocaleString()}회)</span></span>
+                                                                ) : '-'}
+                                                            </td>
+                                                            <td className="px-4 py-2 text-right font-black font-mono text-indigo-600 bg-indigo-50/20">
+                                                                <div className="flex flex-col items-end gap-0.5">
+                                                                    <span>{row.shQty.toLocaleString()}</span>
+                                                                    <span className="text-[10px] font-normal tracking-tight text-slate-500">적정: {row.safeStock.toLocaleString()}개</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-right font-bold font-mono text-rose-500">
+                                                                {row.pendingOrderQty > 0 ? `+${row.pendingOrderQty.toLocaleString()}` : <span className="text-slate-300">0</span>}
+                                                            </td>
+                                                            <td className="px-4 py-2 text-center font-bold font-mono text-slate-500">
+                                                                {row.ysQty > 0 ? <span className="text-teal-600">{row.ysQty.toLocaleString()}</span> : <span className="text-rose-400">0</span>}
+                                                            </td>
+                                                            <td className="px-4 py-2 text-right font-mono text-xs">
+                                                                <span className={
+                                                                    row.daysOnHand <= 10 ? 'text-rose-600 font-bold' :
+                                                                        row.daysOnHand <= 30 ? 'text-amber-500 font-bold' :
+                                                                            row.daysOnHand > 365 ? 'text-slate-300' :
+                                                                                'text-slate-600'
+                                                                }>
+                                                                    {row.shQty === 0 ? '0일' :
+                                                                        row.daysOnHand === 9999 ? '∞' :
+                                                                            `${Math.round(row.daysOnHand)}일`}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-right font-black text-rose-600 bg-rose-50/30">
+                                                                {row.deficit > 0 ? `-${row.deficit.toLocaleString()}개` : <span className="text-slate-300 font-normal">충분</span>}
+                                                            </td>
+                                                            <td className="px-4 py-2 text-right">
+                                                                <div className="flex flex-col items-end">
+                                                                    <span className={`font-black text-xs ${row.profitMarginRate <= 0 ? 'text-rose-500' : row.profitMarginRate >= 30 ? 'text-emerald-600' : 'text-slate-700'}`}>{row.profitMarginRate}%</span>
+                                                                    <span className="text-[9px] text-slate-400 font-mono">단가 {formatCur(row.recentPurchasePrice)}</span>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                });
+                                            })()}
+                                        </tbody>
+                                    </table>
+                                    {selectedAllTableIds.size > 0 && (
+                                        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 rounded-full shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] border border-slate-700 px-6 py-3 flex items-center gap-6 z-[100] animate-in slide-in-from-bottom-10 fade-in duration-300">
+                                            <div className="font-bold text-white">
+                                                <span className="text-indigo-400 font-black text-xl">{selectedAllTableIds.size}</span>
+                                                <span className="text-slate-300 ml-2">개 품목 선택됨</span>
+                                            </div>
+                                            <div className="w-px h-6 bg-slate-600"></div>
+                                            <button
+                                                onClick={handleCreateManualOrder}
+                                                className="bg-indigo-500 hover:bg-indigo-400 text-white font-bold px-6 py-2.5 rounded-full transition-colors shadow-lg flex items-center gap-2 border border-indigo-400"
+                                            >
+                                                <PackageSearch className="w-4 h-4" />
+                                                선택 품목 장바구니에 담기
+                                            </button>
+                                            <button
+                                                onClick={() => setSelectedAllTableIds(new Set())}
+                                                className="text-slate-400 hover:text-white transition-colors"
+                                                title="선택 해제"
+                                            >
+                                                <X className="w-5 h-5" />
+                                            </button>
                                         </div>
-                                        <div className="w-px h-6 bg-slate-600"></div>
-                                        <button 
-                                            onClick={handleCreateManualOrder}
-                                            className="bg-indigo-500 hover:bg-indigo-400 text-white font-bold px-6 py-2.5 rounded-full transition-colors shadow-lg flex items-center gap-2 border border-indigo-400"
-                                        >
-                                            <PackageSearch className="w-4 h-4" />
-                                            선택 품목 장바구니에 담기
-                                        </button>
-                                        <button 
-                                            onClick={() => setSelectedAllTableIds(new Set())}
-                                            className="text-slate-400 hover:text-white transition-colors"
-                                            title="선택 해제"
-                                        >
-                                            <X className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                )}
+                                    )}
                                 </div>
                             )}
 
-{/* ════════════════════════════════════════════════
+                            {/* ════════════════════════════════════════════════
     🩺 악성·과잉 재고 진단 탭
 ════════════════════════════════════════════════ */}
-{activeTab === 'HEALTH_DIAGNOSIS' && (
-  <div className="space-y-5 p-4 md:p-0 pb-8 animate-in fade-in duration-300">
+                            {activeTab === 'HEALTH_DIAGNOSIS' && (
+                                <div className="space-y-5 p-4 md:p-0 pb-8 animate-in fade-in duration-300">
 
-    {/* ── 섹션 1: 건강도 점수 + 구성 개요 ── */}
-    <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr] gap-4">
+                                    {/* ── 섹션 1: 건강도 점수 + 구성 개요 ── */}
+                                    <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr] gap-4">
 
-      {/* 건강도 게이지 */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-        <div className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">
-          🩺 재고 건강도 종합 점수
-        </div>
-        <div className="flex items-center gap-4">
-          {/* SVG 게이지 */}
-          <div className="relative w-28 h-28 shrink-0">
-            <svg viewBox="0 0 112 112" width="112" height="112">
-              <circle cx="56" cy="56" r="44" fill="none" stroke="#f1f5f9" strokeWidth="11"/>
-              <circle cx="56" cy="56" r="44" fill="none"
-                stroke={healthDiagnosis.healthGrade.strokeColor} strokeWidth="11"
-                strokeDasharray="276.5"
-                strokeDashoffset={276.5 * (1 - healthDiagnosis.healthScore / 100)}
-                strokeLinecap="round"
-                transform="rotate(-90 56 56)"
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className={`text-2xl font-black ${healthDiagnosis.healthGrade.textClass}`}>
-                {healthDiagnosis.healthScore}
-              </span>
-              <span className="text-[9px] text-slate-400 font-bold">/ 100점</span>
-            </div>
-          </div>
-          <div className="flex-1">
-            <div className={`text-sm font-black mb-1 ${healthDiagnosis.healthGrade.textClass}`}>
-              {healthDiagnosis.healthGrade.label}
-            </div>
-            <div className="text-[11px] text-slate-500 space-y-0.5">
-              <div>악성재고 <span className="font-bold text-rose-600">{(healthDiagnosis.deadRatio * 100).toFixed(1)}%</span></div>
-              <div>과잉재고 <span className="font-bold text-orange-500">{(healthDiagnosis.excessRatio * 100).toFixed(1)}%</span></div>
-              <div>ITS 비율 <span className="font-bold text-amber-600">{(healthDiagnosis.its * 100).toFixed(1)}%</span></div>
-            </div>
-            <div className="text-[9px] text-slate-400 mt-2">쿠팡·다이소 기준: 악성 5% 이하, 과잉 10% 이하</div>
-          </div>
-        </div>
-      </div>
+                                        {/* 건강도 게이지 */}
+                                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                                            <div className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">
+                                                🩺 재고 건강도 종합 점수
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                {/* SVG 게이지 */}
+                                                <div className="relative w-28 h-28 shrink-0">
+                                                    <svg viewBox="0 0 112 112" width="112" height="112">
+                                                        <circle cx="56" cy="56" r="44" fill="none" stroke="#f1f5f9" strokeWidth="11" />
+                                                        <circle cx="56" cy="56" r="44" fill="none"
+                                                            stroke={healthDiagnosis.healthGrade.strokeColor} strokeWidth="11"
+                                                            strokeDasharray="276.5"
+                                                            strokeDashoffset={276.5 * (1 - healthDiagnosis.healthScore / 100)}
+                                                            strokeLinecap="round"
+                                                            transform="rotate(-90 56 56)"
+                                                        />
+                                                    </svg>
+                                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                        <span className={`text-2xl font-black ${healthDiagnosis.healthGrade.textClass}`}>
+                                                            {healthDiagnosis.healthScore}
+                                                        </span>
+                                                        <span className="text-[9px] text-slate-400 font-bold">/ 100점</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className={`text-sm font-black mb-1 ${healthDiagnosis.healthGrade.textClass}`}>
+                                                        {healthDiagnosis.healthGrade.label}
+                                                    </div>
+                                                    <div className="text-[11px] text-slate-500 space-y-0.5">
+                                                        <div>악성재고 <span className="font-bold text-rose-600">{(healthDiagnosis.deadRatio * 100).toFixed(1)}%</span></div>
+                                                        <div>과잉재고 <span className="font-bold text-orange-500">{(healthDiagnosis.excessRatio * 100).toFixed(1)}%</span></div>
+                                                        <div>ITS 비율 <span className="font-bold text-amber-600">{(healthDiagnosis.its * 100).toFixed(1)}%</span></div>
+                                                    </div>
+                                                    <div className="text-[9px] text-slate-400 mt-2">쿠팡·다이소 기준: 악성 5% 이하, 과잉 10% 이하</div>
+                                                </div>
+                                            </div>
+                                        </div>
 
-      {/* 재고 구성 스택 바 + ITS */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-        <div className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">
-          전체 재고 자산 구성 ({formatCur(Math.round(healthDiagnosis.totalStockValue / 10000))}만원)
-        </div>
-        {/* 스택 바 */}
-        <div className="h-7 rounded-lg overflow-hidden flex mb-3">
-          {[
-            { value: healthDiagnosis.optimalStockValue,  bgClass: 'bg-green-600', label: '적정·안전' },
-            { value: healthDiagnosis.excessStockValue,   bgClass: 'bg-orange-600', label: '과잉' },
-            { value: healthDiagnosis.deadStockValue,     bgClass: 'bg-rose-600', label: '악성' },
-            { value: healthDiagnosis.slowMoveValue,      bgClass: 'bg-purple-600', label: '부진' },
-          ].map(seg => {
-            const pct = healthDiagnosis.totalStockValue > 0
-              ? (seg.value / healthDiagnosis.totalStockValue * 100) : 0;
-            return pct > 0 ? (
-              <div key={seg.label} {...{ style: { flex: pct } }}
-                className={`flex items-center justify-center text-white text-[9px] font-black overflow-hidden ${seg.bgClass}`}
-                title={`${seg.label}: ${pct.toFixed(1)}%`}
-              >
-                {pct >= 5 ? `${pct.toFixed(0)}%` : ''}
-              </div>
-            ) : null;
-          })}
-        </div>
-        {/* 범례 */}
-        <div className="flex flex-wrap gap-3 mb-4">
-          {[
-            { bgClass:'bg-green-600', label:'적정·안전', value: healthDiagnosis.optimalStockValue },
-            { bgClass:'bg-orange-600', label:'과잉재고 ⚠', value: healthDiagnosis.excessStockValue },
-            { bgClass:'bg-rose-600', label:'악성재고 🚨', value: healthDiagnosis.deadStockValue },
-            { bgClass:'bg-purple-600', label:'부진재고', value: healthDiagnosis.slowMoveValue },
-          ].map(l => (
-            <div key={l.label} className="flex items-center gap-1.5 text-xs">
-              <div className={`w-2.5 h-2.5 rounded-sm shrink-0 ${l.bgClass}`}></div>
-              <span className="font-bold text-slate-600">{l.label}</span>
-              <span className="text-slate-400 font-mono">₩{formatCur(Math.round(l.value / 10000))}만</span>
-            </div>
-          ))}
-        </div>
-        {/* KPI 3개 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {[
-            { label: '묶인 자금 (악성+과잉)', value: `₩${formatCur(Math.round(healthDiagnosis.lockedCapital / 10000))}만`, color: 'text-rose-600', note:'해소 시 발주 여력 확보' },
-            { label: '매출 대비 재고 비율', value: `${(healthDiagnosis.its * 100).toFixed(1)}%`, color: healthDiagnosis.its > HEALTHY_ITS_MAX ? 'text-amber-600' : 'text-green-600', note:'쿠팡 기준 8~12%' },
-            { label: '처분 대상 품목', value: `${healthDiagnosis.urgentDisposalItems.length}개`, color: 'text-purple-600', note:'대경 반품 or 단가인하' },
-          ].map(k => (
-            <div key={k.label} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-              <div className="text-[9px] font-bold text-slate-400 mb-1">{k.label}</div>
-              <div className={`text-lg font-black ${k.color}`}>{k.value}</div>
-              <div className="text-[9px] text-slate-400 mt-0.5">{k.note}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+                                        {/* 재고 구성 스택 바 + ITS */}
+                                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                                            <div className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">
+                                                전체 재고 자산 구성 ({formatCur(Math.round(healthDiagnosis.totalStockValue / 10000))}만원)
+                                            </div>
+                                            {/* 스택 바 */}
+                                            <div className="h-7 rounded-lg overflow-hidden flex mb-3">
+                                                {[
+                                                    { value: healthDiagnosis.optimalStockValue, bgClass: 'bg-green-600', label: '적정·안전' },
+                                                    { value: healthDiagnosis.excessStockValue, bgClass: 'bg-orange-600', label: '과잉' },
+                                                    { value: healthDiagnosis.deadStockValue, bgClass: 'bg-rose-600', label: '악성' },
+                                                    { value: healthDiagnosis.slowMoveValue, bgClass: 'bg-purple-600', label: '부진' },
+                                                ].map(seg => {
+                                                    const pct = healthDiagnosis.totalStockValue > 0
+                                                        ? (seg.value / healthDiagnosis.totalStockValue * 100) : 0;
+                                                    return pct > 0 ? (
+                                                        <div key={seg.label} {...{ style: { flex: pct } }}
+                                                            className={`flex items-center justify-center text-white text-[9px] font-black overflow-hidden ${seg.bgClass}`}
+                                                            title={`${seg.label}: ${pct.toFixed(1)}%`}
+                                                        >
+                                                            {pct >= 5 ? `${pct.toFixed(0)}%` : ''}
+                                                        </div>
+                                                    ) : null;
+                                                })}
+                                            </div>
+                                            {/* 범례 */}
+                                            <div className="flex flex-wrap gap-3 mb-4">
+                                                {[
+                                                    { bgClass: 'bg-green-600', label: '적정·안전', value: healthDiagnosis.optimalStockValue },
+                                                    { bgClass: 'bg-orange-600', label: '과잉재고 ⚠', value: healthDiagnosis.excessStockValue },
+                                                    { bgClass: 'bg-rose-600', label: '악성재고 🚨', value: healthDiagnosis.deadStockValue },
+                                                    { bgClass: 'bg-purple-600', label: '부진재고', value: healthDiagnosis.slowMoveValue },
+                                                ].map(l => (
+                                                    <div key={l.label} className="flex items-center gap-1.5 text-xs">
+                                                        <div className={`w-2.5 h-2.5 rounded-sm shrink-0 ${l.bgClass}`}></div>
+                                                        <span className="font-bold text-slate-600">{l.label}</span>
+                                                        <span className="text-slate-400 font-mono">₩{formatCur(Math.round(l.value / 10000))}만</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {/* KPI 3개 */}
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                {[
+                                                    { label: '묶인 자금 (악성+과잉)', value: `₩${formatCur(Math.round(healthDiagnosis.lockedCapital / 10000))}만`, color: 'text-rose-600', note: '해소 시 발주 여력 확보' },
+                                                    { label: '매출 대비 재고 비율', value: `${(healthDiagnosis.its * 100).toFixed(1)}%`, color: healthDiagnosis.its > HEALTHY_ITS_MAX ? 'text-amber-600' : 'text-green-600', note: '쿠팡 기준 8~12%' },
+                                                    { label: '처분 대상 품목', value: `${healthDiagnosis.urgentDisposalItems.length}개`, color: 'text-purple-600', note: '대경 반품 or 단가인하' },
+                                                ].map(k => (
+                                                    <div key={k.label} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                                        <div className="text-[9px] font-bold text-slate-400 mb-1">{k.label}</div>
+                                                        <div className={`text-lg font-black ${k.color}`}>{k.value}</div>
+                                                        <div className="text-[9px] text-slate-400 mt-0.5">{k.note}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
 
-    {/* ── 섹션 2: KPI 5개 ── */}
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-      {[
-        { id: 'DEAD', emoji:'☠️', label:'악성재고 품목', value:`${healthDiagnosis.deadStockItems.length}개`, sub:'90일+ 무판매 or 0.5x미만', color:'rose', border:'border-rose-400', amount: healthDiagnosis.deadStockValue },
-        { id: 'EXCESS', emoji:'📦', label:'과잉재고 품목', value:`${healthDiagnosis.excessStockItems.length}개`, sub:'목표재고 200%+ 초과', color:'orange', border:'border-orange-400', amount: healthDiagnosis.excessStockValue },
-        { id: 'SLOW', emoji:'🐌', label:'부진재고 품목', value:`${healthDiagnosis.slowMoveItems.length}개`, sub:'D등급·잔여 90~180일', color:'purple', border:'border-purple-400', amount: healthDiagnosis.slowMoveValue },
-        { id: 'MISSED', emoji:'🔍', label:'결품 기회손실', value:`${healthDiagnosis.missedDemandList.filter(m=>m.count>=2).length}건↑`, sub:'2회↑ 취소·철회 감지', color:'blue', border:'border-blue-400' },
-        { id: 'MISSED', emoji:'🔍', label:'결품 기회손실', value:`${healthDiagnosis.missedDemandList.length}건`, sub:'견적/미결/취소 종합', color:'blue', border:'border-blue-400' },
-        { id: 'URGENT', emoji:'💡', label:'즉시 처분 권장', value:`${healthDiagnosis.urgentDisposalItems.length}개`, sub:'대경반품 or 단가인하', color:'teal', border:'border-teal-400' },
-      ].map(k => (
-        <button 
-          key={k.label} 
-          onClick={() => setSelectedHealthCategory(selectedHealthCategory === k.id ? null : k.id as 'DEAD' | 'EXCESS' | 'SLOW' | 'MISSED' | 'URGENT')}
-          className={`bg-white rounded-xl border-l-4 border border-slate-200 ${k.border} p-4 shadow-sm text-left transition-all hover:bg-slate-50 hover:shadow-md active:scale-95 ${selectedHealthCategory === k.id ? `ring-2 ring-offset-2 ring-${k.color}-400` : ''}`}
-        >
-          <div className="text-xl mb-1">{k.emoji}</div>
-          <div className="text-[9px] font-bold text-slate-400 mb-1">{k.label}</div>
-          <div className={`text-xl font-black text-${k.color}-600 flex items-end gap-1.5`}>
-            {k.value}
-            {k.amount !== undefined && <span className="text-[10px] text-slate-400 font-bold mb-1">/ ₩{formatCur(k.amount)}</span>}
-          </div>
-          <div className="text-[9px] text-slate-400 mt-1">{k.sub}</div>
-        </button>
-      ))}
-    </div>
+                                    {/* ── 섹션 2: KPI 5개 ── */}
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                        {[
+                                            { id: 'DEAD', emoji: '☠️', label: '악성재고 품목', value: `${healthDiagnosis.deadStockItems.length}개`, sub: '90일+ 무판매 or 0.5x미만', color: 'rose', border: 'border-rose-400', amount: healthDiagnosis.deadStockValue },
+                                            { id: 'EXCESS', emoji: '📦', label: '과잉재고 품목', value: `${healthDiagnosis.excessStockItems.length}개`, sub: '목표재고 200%+ 초과', color: 'orange', border: 'border-orange-400', amount: healthDiagnosis.excessStockValue },
+                                            { id: 'SLOW', emoji: '🐌', label: '부진재고 품목', value: `${healthDiagnosis.slowMoveItems.length}개`, sub: 'D등급·잔여 90~180일', color: 'purple', border: 'border-purple-400', amount: healthDiagnosis.slowMoveValue },
+                                            { id: 'MISSED', emoji: '🔍', label: '결품 기회손실', value: `${healthDiagnosis.missedDemandList.filter(m => m.count >= 2).length}건↑`, sub: '2회↑ 취소·철회 감지', color: 'blue', border: 'border-blue-400' },
+                                            { id: 'MISSED', emoji: '🔍', label: '결품 기회손실', value: `${healthDiagnosis.missedDemandList.length}건`, sub: '견적/미결/취소 종합', color: 'blue', border: 'border-blue-400' },
+                                            { id: 'URGENT', emoji: '💡', label: '즉시 처분 권장', value: `${healthDiagnosis.urgentDisposalItems.length}개`, sub: '대경반품 or 단가인하', color: 'teal', border: 'border-teal-400' },
+                                        ].map(k => (
+                                            <button
+                                                key={k.label}
+                                                onClick={() => setSelectedHealthCategory(selectedHealthCategory === k.id ? null : k.id as 'DEAD' | 'EXCESS' | 'SLOW' | 'MISSED' | 'URGENT')}
+                                                className={`bg-white rounded-xl border-l-4 border border-slate-200 ${k.border} p-4 shadow-sm text-left transition-all hover:bg-slate-50 hover:shadow-md active:scale-95 ${selectedHealthCategory === k.id ? `ring-2 ring-offset-2 ring-${k.color}-400` : ''}`}
+                                            >
+                                                <div className="text-xl mb-1">{k.emoji}</div>
+                                                <div className="text-[9px] font-bold text-slate-400 mb-1">{k.label}</div>
+                                                <div className={`text-xl font-black text-${k.color}-600 flex items-end gap-1.5`}>
+                                                    {k.value}
+                                                    {k.amount !== undefined && <span className="text-[10px] text-slate-400 font-bold mb-1">/ ₩{formatCur(k.amount)}</span>}
+                                                </div>
+                                                <div className="text-[9px] text-slate-400 mt-1">{k.sub}</div>
+                                            </button>
+                                        ))}
+                                    </div>
 
-    {/* ── 섹션 3: 악성·과잉재고 상세 테이블 ── */}
-    <div className={`grid grid-cols-1 ${selectedHealthCategory ? 'xl:grid-cols-1' : 'xl:grid-cols-2'} gap-4`}>
+                                    {/* ── 섹션 3: 악성·과잉재고 상세 테이블 ── */}
+                                    <div className={`grid grid-cols-1 ${selectedHealthCategory ? 'xl:grid-cols-1' : 'xl:grid-cols-2'} gap-4`}>
 
-      {/* 악성재고 */}
-      {(!selectedHealthCategory || selectedHealthCategory === 'DEAD') && (
-      <div className="bg-white rounded-2xl border border-rose-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 bg-rose-50 border-b border-rose-200 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-black text-rose-800">☠️ 악성재고 상세 — 즉시 조치 필요</div>
-            <div className="text-[10px] text-rose-500 mt-0.5">무판매 90일↑ AND 회전율 0.5x 미만 품목</div>
-          </div>
-          <span className="bg-rose-200 text-rose-800 font-black px-3 py-1 rounded-full text-xs">
-            {healthDiagnosis.deadStockItems.length}건
-          </span>
-        </div>
-        <div className="overflow-auto max-h-80">
-          <table className="w-full text-xs text-left whitespace-nowrap">
-            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 sticky top-0 z-10 shadow-sm">
-              <tr>
-                <th className="px-4 py-2">품목코드</th>
-                <th className="px-4 py-2 text-right">무판매</th>
-                <th className="px-4 py-2 text-right">회전율</th>
-                <th className="px-4 py-2 text-right">보유량</th>
-                <th className="px-4 py-2 text-right">자산가치</th>
-                <th className="px-4 py-2 text-right">대경</th>
-                <th className="px-4 py-2">권장 조치</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {healthDiagnosis.deadStockItems.map(row => {
-                const daysSince = (row as typeof row & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0;
-                const itemValue = row.shQty * row.recentPurchasePrice;
-                const action = row.ysQty > 0
-                  ? '대경 반품 협의'
-                  : daysSince > 180
-                  ? '단가인하 긴급처분'
-                  : '영업 판매 독촉';
-                const actionColor = row.ysQty > 0
-                  ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                  : daysSince > 180
-                  ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
-                  : 'bg-amber-100 text-amber-700 hover:bg-amber-200';
+                                        {/* 악성재고 */}
+                                        {(!selectedHealthCategory || selectedHealthCategory === 'DEAD') && (
+                                            <div className="bg-white rounded-2xl border border-rose-200 shadow-sm overflow-hidden">
+                                                <div className="px-5 py-3 bg-rose-50 border-b border-rose-200 flex items-center justify-between">
+                                                    <div>
+                                                        <div className="text-sm font-black text-rose-800">☠️ 악성재고 상세 — 즉시 조치 필요</div>
+                                                        <div className="text-[10px] text-rose-500 mt-0.5">무판매 90일↑ AND 회전율 0.5x 미만 품목</div>
+                                                    </div>
+                                                    <span className="bg-rose-200 text-rose-800 font-black px-3 py-1 rounded-full text-xs">
+                                                        {healthDiagnosis.deadStockItems.length}건
+                                                    </span>
+                                                </div>
+                                                <div className="overflow-auto max-h-80">
+                                                    <table className="w-full text-xs text-left whitespace-nowrap">
+                                                        <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 sticky top-0 z-10 shadow-sm">
+                                                            <tr>
+                                                                <th className="px-4 py-2">품목코드</th>
+                                                                <th className="px-4 py-2 text-right">무판매</th>
+                                                                <th className="px-4 py-2 text-right">회전율</th>
+                                                                <th className="px-4 py-2 text-right">보유량</th>
+                                                                <th className="px-4 py-2 text-right">자산가치</th>
+                                                                <th className="px-4 py-2 text-right">대경</th>
+                                                                <th className="px-4 py-2">권장 조치</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {healthDiagnosis.deadStockItems.map(row => {
+                                                                const daysSince = (row as typeof row & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0;
+                                                                const itemValue = row.shQty * row.recentPurchasePrice;
+                                                                const action = row.ysQty > 0
+                                                                    ? '대경 반품 협의'
+                                                                    : daysSince > 180
+                                                                        ? '단가인하 긴급처분'
+                                                                        : '영업 판매 독촉';
+                                                                const actionColor = row.ysQty > 0
+                                                                    ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                                                    : daysSince > 180
+                                                                        ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                                                                        : 'bg-amber-100 text-amber-700 hover:bg-amber-200';
 
-                return (
-                  <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
-                    <td className="px-4 py-2">
-                        <div className="flex items-center gap-2">
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
-                            <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
-                        </div>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${daysSince > 180 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-right font-mono font-bold text-rose-600">
-                      {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '0x'}
-                    </td>
-                    <td className="px-4 py-2 text-right font-bold">{row.shQty.toLocaleString()}개</td>
-                    <td className="px-4 py-2 text-right font-black text-rose-600">{formatCur(itemValue)}원</td>
-                    <td className="px-4 py-2 text-right text-slate-400">{row.ysQty.toLocaleString()}개</td>
-                    <td className="px-4 py-2">
-                      <button 
-                        onClick={() => {
-                            if (window.confirm(`[${row.product.id}] 품목에 대해 '${action}' 조치를 실행하시겠습니까?`)) {
-                                alert(`'${action}' 조치 요청이 시스템에 등록되었습니다.`);
-                            }
-                        }}
-                        className={`px-2 py-1 rounded text-[10px] font-bold ${actionColor} transition-colors active:scale-95 shadow-sm border border-black/5 flex items-center gap-1`}
-                      >
-                        {action} ⚡
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {healthDiagnosis.deadStockItems.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">악성재고가 없습니다 🎉</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      )}
+                                                                return (
+                                                                    <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
+                                                                        <td className="px-4 py-2">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
+                                                                                <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="px-4 py-2 text-right">
+                                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${daysSince > 180 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                                                {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="px-4 py-2 text-right font-mono font-bold text-rose-600">
+                                                                            {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '0x'}
+                                                                        </td>
+                                                                        <td className="px-4 py-2 text-right font-bold">{row.shQty.toLocaleString()}개</td>
+                                                                        <td className="px-4 py-2 text-right font-black text-rose-600">{formatCur(itemValue)}원</td>
+                                                                        <td className="px-4 py-2 text-right text-slate-400">{row.ysQty.toLocaleString()}개</td>
+                                                                        <td className="px-4 py-2">
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    if (window.confirm(`[${row.product.id}] 품목에 대해 '${action}' 조치를 실행하시겠습니까?`)) {
+                                                                                        alert(`'${action}' 조치 요청이 시스템에 등록되었습니다.`);
+                                                                                    }
+                                                                                }}
+                                                                                className={`px-2 py-1 rounded text-[10px] font-bold ${actionColor} transition-colors active:scale-95 shadow-sm border border-black/5 flex items-center gap-1`}
+                                                                            >
+                                                                                {action} ⚡
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                            {healthDiagnosis.deadStockItems.length === 0 && (
+                                                                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">악성재고가 없습니다 🎉</td></tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
 
-      {/* 과잉재고 */}
-      {(!selectedHealthCategory || selectedHealthCategory === 'EXCESS') && (
-      <div className="bg-white rounded-2xl border border-orange-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 bg-orange-50 border-b border-orange-200 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-black text-orange-800">📦 과잉재고 상세 — 발주 일시 중단 권고</div>
-            <div className="text-[10px] text-orange-500 mt-0.5">현재고 &gt; 목표재고 × 2배 OR 잔여일 180일↑</div>
-          </div>
-          <span className="bg-orange-200 text-orange-800 font-black px-3 py-1 rounded-full text-xs">
-            {healthDiagnosis.excessStockItems.length}건
-          </span>
-        </div>
-        <div className="overflow-auto max-h-80">
-          <table className="w-full text-xs text-left whitespace-nowrap">
-            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 sticky top-0 z-10 shadow-sm">
-              <tr>
-                <th className="px-4 py-2">품목코드 (등급)</th>
-                <th className="px-4 py-2">분석근거 (과잉 사유)</th>
-                <th className="px-4 py-2 text-right">현재고</th>
-                <th className="px-4 py-2 text-right">목표재고</th>
-                <th className="px-4 py-2 text-right">초과량</th>
-                <th className="px-4 py-2 text-right">초과자산</th>
-                <th className="px-4 py-2 text-right">잔여일</th>
-                <th className="px-4 py-2">권장 조치</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {(healthDiagnosis.excessStockItems as (typeof healthDiagnosis.excessStockItems[0] & { _excessQty?: number; _excessValue?: number })[])
-                .sort((a, b) => (b._excessValue || 0) - (a._excessValue || 0))
-                .map(row => {
-                  const excessQty   = (row._excessQty   || 0);
-                  const excessValue = (row._excessValue  || 0);
-                  const action = excessQty > row.safeStock
-                    ? '장기 발주 중단'
-                    : '이번 달 발주 보류';
-                  const actionColor = excessQty > row.safeStock
-                    ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
-                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200';
+                                        {/* 과잉재고 */}
+                                        {(!selectedHealthCategory || selectedHealthCategory === 'EXCESS') && (
+                                            <div className="bg-white rounded-2xl border border-orange-200 shadow-sm overflow-hidden">
+                                                <div className="px-5 py-3 bg-orange-50 border-b border-orange-200 flex items-center justify-between">
+                                                    <div>
+                                                        <div className="text-sm font-black text-orange-800">📦 과잉재고 상세 — 발주 일시 중단 권고</div>
+                                                        <div className="text-[10px] text-orange-500 mt-0.5">현재고 &gt; 목표재고 × 2배 OR 잔여일 180일↑</div>
+                                                    </div>
+                                                    <span className="bg-orange-200 text-orange-800 font-black px-3 py-1 rounded-full text-xs">
+                                                        {healthDiagnosis.excessStockItems.length}건
+                                                    </span>
+                                                </div>
+                                                <div className="overflow-auto max-h-80">
+                                                    <table className="w-full text-xs text-left whitespace-nowrap">
+                                                        <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 sticky top-0 z-10 shadow-sm">
+                                                            <tr>
+                                                                <th className="px-4 py-2">품목코드 (등급)</th>
+                                                                <th className="px-4 py-2">분석근거 (과잉 사유)</th>
+                                                                <th className="px-4 py-2 text-right">현재고</th>
+                                                                <th className="px-4 py-2 text-right">목표재고</th>
+                                                                <th className="px-4 py-2 text-right">초과량</th>
+                                                                <th className="px-4 py-2 text-right">초과자산</th>
+                                                                <th className="px-4 py-2 text-right">잔여일</th>
+                                                                <th className="px-4 py-2">권장 조치</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {(healthDiagnosis.excessStockItems as (typeof healthDiagnosis.excessStockItems[0] & { _excessQty?: number; _excessValue?: number })[])
+                                                                .sort((a, b) => (b._excessValue || 0) - (a._excessValue || 0))
+                                                                .map(row => {
+                                                                    const excessQty = (row._excessQty || 0);
+                                                                    const excessValue = (row._excessValue || 0);
+                                                                    const action = excessQty > row.safeStock
+                                                                        ? '장기 발주 중단'
+                                                                        : '이번 달 발주 보류';
+                                                                    const actionColor = excessQty > row.safeStock
+                                                                        ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                                                                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200';
 
-                  return (
-                    <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
-                      <td className="px-4 py-2">
-                          <div className="flex items-center gap-2">
-                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
-                              <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
-                          </div>
-                      </td>
-                      <td className="px-4 py-2">
-                          <div className="flex flex-col gap-0.5">
-                              <div className="text-[11px] font-bold text-orange-700 flex items-center gap-1">
-                                  <Info className="w-3 h-3" />
-                                  {row.daysOnHand > 180 ? '장기 체화 (잔여 180일 초과)' : `목표재고(${row.safeStock}개) 대비 과잉`}
-                              </div>
-                              <div className="text-[10px] text-slate-500">
-                                  최근 판매: <strong className="text-indigo-600">{row.recent60dSales}개(60일)</strong> / 연 총 {row.salesVolume}개
-                              </div>
-                          </div>
-                      </td>
-                      <td className="px-4 py-2 text-right font-black text-orange-600">{row.shQty.toLocaleString()}개</td>
-                      <td className="px-4 py-2 text-right text-slate-400">{row.safeStock.toLocaleString()}개</td>
-                      <td className="px-4 py-2 text-right">
-                        <span className="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-[9px] font-bold">+{excessQty.toLocaleString()}개</span>
-                      </td>
-                      <td className="px-4 py-2 text-right font-bold text-orange-600">{formatCur(excessValue)}원</td>
-                      <td className="px-4 py-2 text-right font-mono font-bold text-amber-600">
-                        {row.daysOnHand === 9999 ? '∞' : `${Math.round(row.daysOnHand)}일`}
-                      </td>
-                      <td className="px-4 py-2">
-                        <button 
-                          onClick={() => {
-                              if (window.confirm(`[${row.product.id}] 품목에 대해 '${action}' 시스템 설정을 적용하시겠습니까?`)) {
-                                  alert('발주 제한 설정이 안전하게 적용되었습니다.');
-                              }
-                          }}
-                          className={`px-2 py-1 rounded text-[10px] font-bold ${actionColor} transition-colors active:scale-95 shadow-sm border border-black/5 flex items-center gap-1`}
-                        >
-                          {action} 🔒
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              {healthDiagnosis.excessStockItems.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">과잉재고가 없습니다 🎉</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      )}
+                                                                    return (
+                                                                        <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
+                                                                            <td className="px-4 py-2">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
+                                                                                    <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="px-4 py-2">
+                                                                                <div className="flex flex-col gap-0.5">
+                                                                                    <div className="text-[11px] font-bold text-orange-700 flex items-center gap-1">
+                                                                                        <Info className="w-3 h-3" />
+                                                                                        {row.daysOnHand > 180 ? '장기 체화 (잔여 180일 초과)' : `목표재고(${row.safeStock}개) 대비 과잉`}
+                                                                                    </div>
+                                                                                    <div className="text-[10px] text-slate-500">
+                                                                                        최근 판매: <strong className="text-indigo-600">{row.recent60dSales}개(60일)</strong> / 연 총 {row.salesVolume}개
+                                                                                    </div>
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="px-4 py-2 text-right font-black text-orange-600">{row.shQty.toLocaleString()}개</td>
+                                                                            <td className="px-4 py-2 text-right text-slate-400">{row.safeStock.toLocaleString()}개</td>
+                                                                            <td className="px-4 py-2 text-right">
+                                                                                <span className="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-[9px] font-bold">+{excessQty.toLocaleString()}개</span>
+                                                                            </td>
+                                                                            <td className="px-4 py-2 text-right font-bold text-orange-600">{formatCur(excessValue)}원</td>
+                                                                            <td className="px-4 py-2 text-right font-mono font-bold text-amber-600">
+                                                                                {row.daysOnHand === 9999 ? '∞' : `${Math.round(row.daysOnHand)}일`}
+                                                                            </td>
+                                                                            <td className="px-4 py-2">
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        if (window.confirm(`[${row.product.id}] 품목에 대해 '${action}' 시스템 설정을 적용하시겠습니까?`)) {
+                                                                                            alert('발주 제한 설정이 안전하게 적용되었습니다.');
+                                                                                        }
+                                                                                    }}
+                                                                                    className={`px-2 py-1 rounded text-[10px] font-bold ${actionColor} transition-colors active:scale-95 shadow-sm border border-black/5 flex items-center gap-1`}
+                                                                                >
+                                                                                    {action} 🔒
+                                                                                </button>
+                                                                            </td>
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                            {healthDiagnosis.excessStockItems.length === 0 && (
+                                                                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">과잉재고가 없습니다 🎉</td></tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
 
-      {/* 부진재고 */}
-      {selectedHealthCategory === 'SLOW' && (
-      <div className="bg-white rounded-2xl border border-purple-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 bg-purple-50 border-b border-purple-200 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-black text-purple-800">🐌 정체재고 상세 (장기 미판매)</div>
-            <div className="text-[10px] text-purple-500 mt-0.5">D등급이면서 잔여일 90일~180일 품목 (악성재고 전환 주의)</div>
-          </div>
-          <span className="bg-purple-200 text-purple-800 font-black px-3 py-1 rounded-full text-xs">
-            {healthDiagnosis.slowMoveItems.length}건
-          </span>
-        </div>
-        <div className="overflow-auto max-h-80">
-          <table className="w-full text-xs text-left whitespace-nowrap">
-            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 sticky top-0 z-10 shadow-sm">
-              <tr>
-                <th className="px-4 py-2">품목코드</th>
-                <th className="px-4 py-2 text-right">무판매</th>
-                <th className="px-4 py-2 text-right">회전율</th>
-                <th className="px-4 py-2 text-right">보유량</th>
-                <th className="px-4 py-2 text-right">자산가치</th>
-                <th className="px-4 py-2 text-right">잔여일</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {healthDiagnosis.slowMoveItems.map(row => {
-                const daysSince = (row as typeof row & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0;
-                const itemValue = row.shQty * row.recentPurchasePrice;
+                                        {/* 부진재고 */}
+                                        {selectedHealthCategory === 'SLOW' && (
+                                            <div className="bg-white rounded-2xl border border-purple-200 shadow-sm overflow-hidden">
+                                                <div className="px-5 py-3 bg-purple-50 border-b border-purple-200 flex items-center justify-between">
+                                                    <div>
+                                                        <div className="text-sm font-black text-purple-800">🐌 정체재고 상세 (장기 미판매)</div>
+                                                        <div className="text-[10px] text-purple-500 mt-0.5">D등급이면서 잔여일 90일~180일 품목 (악성재고 전환 주의)</div>
+                                                    </div>
+                                                    <span className="bg-purple-200 text-purple-800 font-black px-3 py-1 rounded-full text-xs">
+                                                        {healthDiagnosis.slowMoveItems.length}건
+                                                    </span>
+                                                </div>
+                                                <div className="overflow-auto max-h-80">
+                                                    <table className="w-full text-xs text-left whitespace-nowrap">
+                                                        <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 sticky top-0 z-10 shadow-sm">
+                                                            <tr>
+                                                                <th className="px-4 py-2">품목코드</th>
+                                                                <th className="px-4 py-2 text-right">무판매</th>
+                                                                <th className="px-4 py-2 text-right">회전율</th>
+                                                                <th className="px-4 py-2 text-right">보유량</th>
+                                                                <th className="px-4 py-2 text-right">자산가치</th>
+                                                                <th className="px-4 py-2 text-right">잔여일</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {healthDiagnosis.slowMoveItems.map(row => {
+                                                                const daysSince = (row as typeof row & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0;
+                                                                const itemValue = row.shQty * row.recentPurchasePrice;
 
-                return (
-                  <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
-                    <td className="px-4 py-2">
-                        <div className="flex items-center gap-2">
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
-                            <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
-                        </div>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700`}>
-                        {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-right font-mono font-bold text-purple-600">
-                      {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '0x'}
-                    </td>
-                    <td className="px-4 py-2 text-right font-bold">{row.shQty.toLocaleString()}개</td>
-                    <td className="px-4 py-2 text-right font-black text-purple-600">{formatCur(itemValue)}원</td>
-                    <td className="px-4 py-2 text-right font-mono font-bold text-amber-600">
-                        {row.daysOnHand === 9999 ? '∞' : `${Math.round(row.daysOnHand)}일`}
-                    </td>
-                  </tr>
-                );
-              })}
-              {healthDiagnosis.slowMoveItems.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">부진재고가 없습니다 🎉</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      )}
+                                                                return (
+                                                                    <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
+                                                                        <td className="px-4 py-2">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
+                                                                                <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="px-4 py-2 text-right">
+                                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700`}>
+                                                                                {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="px-4 py-2 text-right font-mono font-bold text-purple-600">
+                                                                            {row.turnoverRate > 0 ? `${row.turnoverRate}x` : '0x'}
+                                                                        </td>
+                                                                        <td className="px-4 py-2 text-right font-bold">{row.shQty.toLocaleString()}개</td>
+                                                                        <td className="px-4 py-2 text-right font-black text-purple-600">{formatCur(itemValue)}원</td>
+                                                                        <td className="px-4 py-2 text-right font-mono font-bold text-amber-600">
+                                                                            {row.daysOnHand === 9999 ? '∞' : `${Math.round(row.daysOnHand)}일`}
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                            {healthDiagnosis.slowMoveItems.length === 0 && (
+                                                                <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">부진재고가 없습니다 🎉</td></tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
 
-      {/* 즉시처분권장 */}
-      {selectedHealthCategory === 'URGENT' && (
-      <div className="bg-white rounded-2xl border border-teal-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 bg-teal-50 border-b border-teal-200 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-black text-teal-800">💡 즉시 처분 권장 상세</div>
-            <div className="text-[10px] text-teal-600 mt-0.5">악성재고 중 대경 반품 또는 단가 인하가 가능한 품목</div>
-          </div>
-          <span className="bg-teal-200 text-teal-800 font-black px-3 py-1 rounded-full text-xs">
-            {healthDiagnosis.urgentDisposalItems.length}건
-          </span>
-        </div>
-        <div className="overflow-auto max-h-80">
-          <table className="w-full text-xs text-left whitespace-nowrap">
-            <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 sticky top-0 z-10 shadow-sm">
-              <tr>
-                <th className="px-4 py-2">품목코드</th>
-                <th className="px-4 py-2 text-right">무판매</th>
-                <th className="px-4 py-2 text-right">보유량</th>
-                <th className="px-4 py-2 text-right">자산가치</th>
-                <th className="px-4 py-2 text-right">대경</th>
-                <th className="px-4 py-2">권장 조치</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {healthDiagnosis.urgentDisposalItems.map(row => {
-                const daysSince = (row as typeof row & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0;
-                const itemValue = row.shQty * row.recentPurchasePrice;
-                const action = row.ysQty > 0
-                  ? '대경 반품 협의'
-                  : daysSince > 180
-                  ? '단가인하 긴급처분'
-                  : '영업 판매 독촉';
-                const actionColor = row.ysQty > 0
-                  ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                  : daysSince > 180
-                  ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
-                  : 'bg-amber-100 text-amber-700 hover:bg-amber-200';
+                                        {/* 즉시처분권장 */}
+                                        {selectedHealthCategory === 'URGENT' && (
+                                            <div className="bg-white rounded-2xl border border-teal-200 shadow-sm overflow-hidden">
+                                                <div className="px-5 py-3 bg-teal-50 border-b border-teal-200 flex items-center justify-between">
+                                                    <div>
+                                                        <div className="text-sm font-black text-teal-800">💡 즉시 처분 권장 상세</div>
+                                                        <div className="text-[10px] text-teal-600 mt-0.5">악성재고 중 대경 반품 또는 단가 인하가 가능한 품목</div>
+                                                    </div>
+                                                    <span className="bg-teal-200 text-teal-800 font-black px-3 py-1 rounded-full text-xs">
+                                                        {healthDiagnosis.urgentDisposalItems.length}건
+                                                    </span>
+                                                </div>
+                                                <div className="overflow-auto max-h-80">
+                                                    <table className="w-full text-xs text-left whitespace-nowrap">
+                                                        <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 sticky top-0 z-10 shadow-sm">
+                                                            <tr>
+                                                                <th className="px-4 py-2">품목코드</th>
+                                                                <th className="px-4 py-2 text-right">무판매</th>
+                                                                <th className="px-4 py-2 text-right">보유량</th>
+                                                                <th className="px-4 py-2 text-right">자산가치</th>
+                                                                <th className="px-4 py-2 text-right">대경</th>
+                                                                <th className="px-4 py-2">권장 조치</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {healthDiagnosis.urgentDisposalItems.map(row => {
+                                                                const daysSince = (row as typeof row & { _daysSinceLastSale?: number })._daysSinceLastSale ?? 0;
+                                                                const itemValue = row.shQty * row.recentPurchasePrice;
+                                                                const action = row.ysQty > 0
+                                                                    ? '대경 반품 협의'
+                                                                    : daysSince > 180
+                                                                        ? '단가인하 긴급처분'
+                                                                        : '영업 판매 독촉';
+                                                                const actionColor = row.ysQty > 0
+                                                                    ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                                                    : daysSince > 180
+                                                                        ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                                                                        : 'bg-amber-100 text-amber-700 hover:bg-amber-200';
 
-                return (
-                  <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
-                    <td className="px-4 py-2">
-                        <div className="flex items-center gap-2">
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
-                            <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
-                        </div>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${daysSince > 180 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-right font-bold">{row.shQty.toLocaleString()}개</td>
-                    <td className="px-4 py-2 text-right font-black text-rose-600">{formatCur(itemValue)}원</td>
-                    <td className="px-4 py-2 text-right text-slate-400">{row.ysQty.toLocaleString()}개</td>
-                    <td className="px-4 py-2">
-                      <button 
-                        onClick={() => {
-                            if (window.confirm(`[${row.product.id}] 품목에 대해 '${action}' 조치를 즉시 실행하시겠습니까?`)) {
-                                alert(`'${action}' 조치 프로세스가 시작되었습니다.`);
-                            }
-                        }}
-                        className={`px-2 py-1 rounded text-[10px] font-bold ${actionColor} transition-colors active:scale-95 shadow-sm border border-black/5 flex items-center gap-1`}
-                      >
-                        {action} ⚡
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {healthDiagnosis.urgentDisposalItems.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">처분 대상이 없습니다 🎉</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      )}
-    </div>
+                                                                return (
+                                                                    <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
+                                                                        <td className="px-4 py-2">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
+                                                                                <span className="font-mono font-bold text-slate-800 text-[10px]">{row.product.id}</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="px-4 py-2 text-right">
+                                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${daysSince > 180 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                                                {daysSince > 900 ? '판매이력없음' : `${daysSince}일`}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="px-4 py-2 text-right font-bold">{row.shQty.toLocaleString()}개</td>
+                                                                        <td className="px-4 py-2 text-right font-black text-rose-600">{formatCur(itemValue)}원</td>
+                                                                        <td className="px-4 py-2 text-right text-slate-400">{row.ysQty.toLocaleString()}개</td>
+                                                                        <td className="px-4 py-2">
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    if (window.confirm(`[${row.product.id}] 품목에 대해 '${action}' 조치를 즉시 실행하시겠습니까?`)) {
+                                                                                        alert(`'${action}' 조치 프로세스가 시작되었습니다.`);
+                                                                                    }
+                                                                                }}
+                                                                                className={`px-2 py-1 rounded text-[10px] font-bold ${actionColor} transition-colors active:scale-95 shadow-sm border border-black/5 flex items-center gap-1`}
+                                                                            >
+                                                                                {action} ⚡
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                            {healthDiagnosis.urgentDisposalItems.length === 0 && (
+                                                                <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">처분 대상이 없습니다 🎉</td></tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
 
-    {/* ── 섹션 4: 결품 기회손실 ── */}
-    {(!selectedHealthCategory || selectedHealthCategory === 'MISSED') && healthDiagnosis.missedDemandList.length > 0 && (
-      <div id="missed-demand-section" className="bg-white rounded-2xl border border-violet-200 shadow-sm overflow-hidden mt-4">
-        <div className="px-5 py-3 bg-violet-50 border-b border-violet-200 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-black text-violet-800">
-              🔍 재고 없어서 놓친 수요 — 결품 기회비용 분석
-              <span className="ml-2 text-[9px] bg-violet-600 text-white px-2 py-0.5 rounded-full">데이터 누적 시 정밀화</span>
-            </div>
-            <div className="text-[10px] text-violet-500 mt-0.5">
-              대경+시화 재고 0 상태에서 주문 시도 후 취소·철회된 이력 기반 (추정치)
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-xs font-black text-violet-700">
-              추정 기회손실 ₩{formatCur(Math.round(healthDiagnosis.missedDemandList.reduce((s,m) => s + m.estimatedRevenue, 0) / 10000))}만
-            </div>
-          </div>
-        </div>
-        <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-          {healthDiagnosis.missedDemandList.slice(0, 10).map((m, i) => (
-            <div key={m.id} className={`rounded-xl p-3 border ${m.count >= 3 ? 'border-rose-200 bg-rose-50' : 'border-violet-100 bg-violet-50'}`}>
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-black shrink-0 ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>{i+1}</span>
-                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${m.count >= 3 ? 'bg-rose-200 text-rose-700' : 'bg-violet-200 text-violet-700'}`}>
-                  {m.count}회 결품
-                </span>
-                {m.row && <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ml-auto ${m.row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : m.row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : m.row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : m.row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : m.row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{m.row.healthGrade}급</span>}
-              </div>
-              <div className="text-[10px] font-bold text-slate-800 font-mono leading-tight break-all mb-1">{m.id}</div>
-              <div className="text-[9px] text-slate-500">추정손실 ₩{formatCur(Math.round(m.estimatedRevenue / 10000))}만</div>
-              <div className="mt-2">
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${m.count >= 3 ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                  {m.count >= 3 ? '즉시 소량 매입' : '수요 모니터링'}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )}
+                                    {/* ── 섹션 4: 결품 기회손실 ── */}
+                                    {(!selectedHealthCategory || selectedHealthCategory === 'MISSED') && healthDiagnosis.missedDemandList.length > 0 && (
+                                        <div id="missed-demand-section" className="bg-white rounded-2xl border border-violet-200 shadow-sm overflow-hidden mt-4">
+                                            <div className="px-5 py-3 bg-violet-50 border-b border-violet-200 flex items-center justify-between">
+                                                <div>
+                                                    <div className="text-sm font-black text-violet-800">
+                                                        🔍 재고 없어서 놓친 수요 — 결품 기회비용 분석
+                                                        <span className="ml-2 text-[9px] bg-violet-600 text-white px-2 py-0.5 rounded-full">데이터 누적 시 정밀화</span>
+                                                    </div>
+                                                    <div className="text-[10px] text-violet-500 mt-0.5">
+                                                        대경+시화 재고 0 상태에서 주문 시도 후 취소·철회된 이력 기반 (추정치)
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-xs font-black text-violet-700">
+                                                        추정 기회손실 ₩{formatCur(Math.round(healthDiagnosis.missedDemandList.reduce((s, m) => s + m.estimatedRevenue, 0) / 10000))}만
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                                                {healthDiagnosis.missedDemandList.slice(0, 10).map((m, i) => (
+                                                    <div key={m.id} className={`rounded-xl p-3 border ${m.count >= 3 ? 'border-rose-200 bg-rose-50' : 'border-violet-100 bg-violet-50'}`}>
+                                                        <div className="flex items-center gap-1.5 mb-2">
+                                                            <span className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-black shrink-0 ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>{i + 1}</span>
+                                                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${m.count >= 3 ? 'bg-rose-200 text-rose-700' : 'bg-violet-200 text-violet-700'}`}>
+                                                                {m.count}회 결품
+                                                            </span>
+                                                            {m.row && <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-sm ml-auto ${m.row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : m.row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : m.row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : m.row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : m.row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{m.row.healthGrade}급</span>}
+                                                        </div>
+                                                        <div className="text-[10px] font-bold text-slate-800 font-mono leading-tight break-all mb-1">{m.id}</div>
+                                                        <div className="text-[9px] text-slate-500">추정손실 ₩{formatCur(Math.round(m.estimatedRevenue / 10000))}만</div>
+                                                        <div className="mt-2">
+                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${m.count >= 3 ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                                                {m.count >= 3 ? '즉시 소량 매입' : '수요 모니터링'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
 
-    {/* ── 섹션 5: 데이터 개선 로드맵 ── */}
-    <div className="bg-linear-to-br from-slate-800 to-indigo-900 rounded-2xl p-5 text-white">
-      <div className="text-sm font-black text-white mb-1 flex items-center gap-2">
-        📡 데이터 누적 로드맵 — 쌓일수록 진단이 정확해집니다
-        <span className="text-[9px] bg-amber-500 text-amber-900 font-bold px-2 py-0.5 rounded-full">현재 신뢰도 58%</span>
-      </div>
-      <div className="text-[11px] text-slate-300 mb-4">아래 데이터가 누적되면 악성·과잉재고 판단 정확도가 90%↑로 향상됩니다</div>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
-        {[
-          { phase:'즉시 가능', textClass:'text-rose-600', bgClass:'bg-rose-600', items:['주문 취소 시 결품 원인 필드 추가','대경 반품 가능 여부 플래그','최초 견적 발생일(Opportunity Date)'] },
-          { phase:'1개월 후', textClass:'text-orange-600', bgClass:'bg-orange-600', items:['일별 스냅샷 30일 누적→σ 정밀화','품목별 무판매일 정확 계산 가능','과잉·악성 오차 50% 감소'] },
-          { phase:'3개월 후', textClass:'text-amber-600', bgClass:'bg-amber-600', items:['권역별 수요 패턴 분리','하치장 품목 기준 데이터화','악성재고 사전 예측 모델'] },
-          { phase:'6개월 후', textClass:'text-green-600', bgClass:'bg-green-600', items:['계절성 보정 지수 산출','납품 현장 유형별 수요 패턴','ITS 목표 8% 이하 달성 가이드'] },
-          { phase:'12개월 후', textClass:'text-blue-600', bgClass:'bg-blue-600', items:['AI 자동 처분 타이밍 추천','신뢰도 99% 발주 시스템','ROI 기반 재고 운용 최적화'] },
-        ].map(p => (
-          <div key={p.phase} className="bg-white/10 rounded-xl p-3 border border-white/15">
-            <div className="text-[10px] font-black mb-2 flex items-center gap-1.5">
-              <div className={`w-2 h-2 rounded-full shrink-0 ${p.bgClass}`}></div>
-              <span className={p.textClass}>{p.phase}</span>
-            </div>
-            {p.items.map((item, i) => (
-              <div key={i} className="text-[9px] text-slate-300 mb-1 flex items-start gap-1">
-                <span className="shrink-0 mt-0.5">→</span>{item}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 pt-4 border-t border-white/15">
-        <div className="text-[10px] font-bold text-slate-300 mb-2">▶ 즉시 추가 권장 데이터 필드</div>
-        <div className="flex flex-wrap gap-2">
-          {['주문 취소 사유 (결품/단가/납기)','납품 현장 분류 (플랜트/건설/조선)','대경 반품 가능 여부 플래그','최초 견적 일자','거래처 업종 코드 (SIC)','계절 수요 태그'].map(tag => (
-            <span key={tag} className="text-[9px] font-bold bg-white/15 px-2 py-1 rounded-full border border-white/20 text-slate-200">{tag}</span>
-          ))}
-        </div>
-      </div>
-    </div>
+                                    {/* ── 섹션 5: 데이터 개선 로드맵 ── */}
+                                    <div className="bg-linear-to-br from-slate-800 to-indigo-900 rounded-2xl p-5 text-white">
+                                        <div className="text-sm font-black text-white mb-1 flex items-center gap-2">
+                                            📡 데이터 누적 로드맵 — 쌓일수록 진단이 정확해집니다
+                                            <span className="text-[9px] bg-amber-500 text-amber-900 font-bold px-2 py-0.5 rounded-full">현재 신뢰도 58%</span>
+                                        </div>
+                                        <div className="text-[11px] text-slate-300 mb-4">아래 데이터가 누적되면 악성·과잉재고 판단 정확도가 90%↑로 향상됩니다</div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+                                            {[
+                                                { phase: '즉시 가능', textClass: 'text-rose-600', bgClass: 'bg-rose-600', items: ['주문 취소 시 결품 원인 필드 추가', '대경 반품 가능 여부 플래그', '최초 견적 발생일(Opportunity Date)'] },
+                                                { phase: '1개월 후', textClass: 'text-orange-600', bgClass: 'bg-orange-600', items: ['일별 스냅샷 30일 누적→σ 정밀화', '품목별 무판매일 정확 계산 가능', '과잉·악성 오차 50% 감소'] },
+                                                { phase: '3개월 후', textClass: 'text-amber-600', bgClass: 'bg-amber-600', items: ['권역별 수요 패턴 분리', '하치장 품목 기준 데이터화', '악성재고 사전 예측 모델'] },
+                                                { phase: '6개월 후', textClass: 'text-green-600', bgClass: 'bg-green-600', items: ['계절성 보정 지수 산출', '납품 현장 유형별 수요 패턴', 'ITS 목표 8% 이하 달성 가이드'] },
+                                                { phase: '12개월 후', textClass: 'text-blue-600', bgClass: 'bg-blue-600', items: ['AI 자동 처분 타이밍 추천', '신뢰도 99% 발주 시스템', 'ROI 기반 재고 운용 최적화'] },
+                                            ].map(p => (
+                                                <div key={p.phase} className="bg-white/10 rounded-xl p-3 border border-white/15">
+                                                    <div className="text-[10px] font-black mb-2 flex items-center gap-1.5">
+                                                        <div className={`w-2 h-2 rounded-full shrink-0 ${p.bgClass}`}></div>
+                                                        <span className={p.textClass}>{p.phase}</span>
+                                                    </div>
+                                                    {p.items.map((item, i) => (
+                                                        <div key={i} className="text-[9px] text-slate-300 mb-1 flex items-start gap-1">
+                                                            <span className="shrink-0 mt-0.5">→</span>{item}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="mt-4 pt-4 border-t border-white/15">
+                                            <div className="text-[10px] font-bold text-slate-300 mb-2">▶ 즉시 추가 권장 데이터 필드</div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {['주문 취소 사유 (결품/단가/납기)', '납품 현장 분류 (플랜트/건설/조선)', '대경 반품 가능 여부 플래그', '최초 견적 일자', '거래처 업종 코드 (SIC)', '계절 수요 태그'].map(tag => (
+                                                    <span key={tag} className="text-[9px] font-bold bg-white/15 px-2 py-1 rounded-full border border-white/20 text-slate-200">{tag}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
 
-  </div>
-)}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -3363,7 +3357,7 @@ export default function SihwaInventory() {
             {(() => {
                 const totalSelectedCount = selectedCriticalIds.size + selectedWarningIds.size + selectedRegularIds.size;
                 if (totalSelectedCount > 0) {
-                    const expectedTotal = 
+                    const expectedTotal =
                         stats.critical.filter(w => selectedCriticalIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1), 0) +
                         stats.warning.filter(w => selectedWarningIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1), 0) +
                         stats.regular.filter(w => selectedRegularIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.recommendedQty || 0), 0);
@@ -3385,11 +3379,11 @@ export default function SihwaInventory() {
                                     )}
                                 </div>
                             </div>
-                            <button 
-                                onClick={handleCreateGlobalOrder} 
+                            <button
+                                onClick={handleCreateGlobalOrder}
                                 className="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-6 py-2.5 rounded-lg sm:rounded-full flex items-center gap-2 transition-all w-full sm:w-auto justify-center shadow-lg hover:shadow-emerald-500/50"
                             >
-                                <ShoppingCart className="w-5 h-5"/>
+                                <ShoppingCart className="w-5 h-5" />
                                 선택 항목 모두 발주서 만들기
                             </button>
                         </div>
@@ -3398,7 +3392,7 @@ export default function SihwaInventory() {
                 return null;
             })()}
             {selectedIntelligenceItem && (
-                <ItemIntelligenceCard 
+                <ItemIntelligenceCard
                     productId={selectedIntelligenceItem.product.id}
                     productName={selectedIntelligenceItem.product.name}
                     inventoryData={selectedIntelligenceItem}
