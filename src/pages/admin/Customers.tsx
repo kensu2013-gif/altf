@@ -955,6 +955,7 @@ export default function Customers() {
     }, [orders, customersList, strategyPeriod]);
 
     const companyIntelCards = useMemo((): CompanyIntelCard[] => {
+      const now = new Date();
       // ── Step 1: 업체별 전체 집계 ─────────────────────────────
       const cardMap: Record<string, {
         companyName: string;
@@ -1148,7 +1149,6 @@ export default function Customers() {
       });
 
       // ── Step 2: 카드 객체 변환 ──────────────────────────────────
-      const now = new Date();
 
       // 최근 12개월 라벨 생성
       const last12Months: string[] = [];
