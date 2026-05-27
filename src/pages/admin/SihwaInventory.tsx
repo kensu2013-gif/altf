@@ -16,7 +16,8 @@ import {
     ShoppingCart,
     Filter,
     X,
-    RefreshCw
+    RefreshCw,
+    Pin
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
@@ -46,9 +47,19 @@ const WORKING_DAYS = 250;      // 연간 영업일수
 const LEAD_TIME = 5;           // 리드타임 (대경 → 시화, 영업일 기준)
 const Z_VALUE = 1.645;         // 목표 서비스율 95% (데이터 충분하면 2.33 = 99%로 상향)
 
-
-
-
+interface DaekyungStockAnalysisItem {
+    id: string;
+    name: string;
+    material: string;
+    size?: string;
+    thickness?: string;
+    currentStock: number;
+    avg3m: number;
+    avg6m: number;
+    share3m: number;
+    share6m: number;
+    trend: number;
+}
 
 // ══════════════════════════════════════════════════════════════
 // ★ 새 등급 시스템: 5개 지표 복합 점수 (100점 만점)
@@ -223,6 +234,11 @@ export default function SihwaInventory() {
     const [historyLoading, setHistoryLoading] = useState(true);
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [sihwaFilterItem, setSihwaFilterItem] = useState('');
+    const [sihwaFilterMaterial, setSihwaFilterMaterial] = useState('');
+    const [sihwaFilterSize, setSihwaFilterSize] = useState('');
+    const [pinnedItemIds, setPinnedItemIds] = useState<Set<string>>(new Set());
+
     const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE' | 'HEALTH_DIAGNOSIS' | 'DAEKYUNG_STOCK'>('AI_SUMMARY');
     const [dkSortConfig, setDkSortConfig] = useState<{
         key: 'id' | 'name' | 'material' | 'size' | 'currentStock' | 'avg3m' | 'avg6m' | 'share3m' | 'share6m' | 'trend';
@@ -464,6 +480,12 @@ export default function SihwaInventory() {
                 const product = inventoryMap.get(d.id);
                 if (!product) return;
 
+                const isMatch = (!searchTerm || product.id.toLowerCase().includes(searchTerm.toLowerCase()) || (product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())))
+                    && (!sihwaFilterItem || product.name === sihwaFilterItem)
+                    && (!sihwaFilterMaterial || product.material === sihwaFilterMaterial)
+                    && (!sihwaFilterSize || product.size === sihwaFilterSize);
+                if (!isMatch) return;
+
                 const locStr = product.location || product.location1 || '';
                 const locStock = product.locationStock || {};
                 const isTargetLocation = locStr.includes(targetRegion) || locStock[targetRegion] !== undefined;
@@ -485,7 +507,7 @@ export default function SihwaInventory() {
         return Object.values(groups)
             .filter(g => Object.keys(g.items).length > 0)
             .sort((a, b) => b.date.localeCompare(a.date));
-    }, [historyData.inventoryHistory, inventoryMap, targetRegion, targetMaker]);
+    }, [historyData.inventoryHistory, inventoryMap, targetRegion, targetMaker, searchTerm, sihwaFilterItem, sihwaFilterMaterial, sihwaFilterSize]);
 
     const monthData = useMemo(() => {
         const monthlyOrders = sihwaOrders.filter(o => new Date(o.createdAt).toISOString().slice(0, 7) === selectedMonth);
@@ -497,9 +519,21 @@ export default function SihwaInventory() {
             const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
 
             items.forEach(item => {
+                const id = item.productId || (item as { item_id?: string }).item_id || '';
+                const product = inventoryMap.get(id);
+
+                if (product) {
+                    const isMatch = (!searchTerm || product.id.toLowerCase().includes(searchTerm.toLowerCase()) || (product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())))
+                        && (!sihwaFilterItem || product.name === sihwaFilterItem)
+                        && (!sihwaFilterMaterial || product.material === sihwaFilterMaterial)
+                        && (!sihwaFilterSize || product.size === sihwaFilterSize);
+                    if (!isMatch) return;
+                } else {
+                    const isMatch = !searchTerm || id.toLowerCase().includes(searchTerm.toLowerCase()) || (item.name && item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+                    if (!isMatch || sihwaFilterItem || sihwaFilterMaterial || sihwaFilterSize) return;
+                }
+
                 if (o.status === 'COMPLETED' || item.transactionIssued) {
-                    const id = item.productId || (item as { item_id?: string }).item_id || '';
-                    const product = inventoryMap.get(id);
                     const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
                     let cost = 0;
                     if (item.supplierRate !== undefined) {
@@ -529,9 +563,21 @@ export default function SihwaInventory() {
             if (!isOrderFullyCompleted) {
                 pendingCount++;
                 items.forEach(item => {
+                    const id = item.productId || (item as { item_id?: string }).item_id || '';
+                    const product = inventoryMap.get(id);
+
+                    if (product) {
+                        const isMatch = (!searchTerm || product.id.toLowerCase().includes(searchTerm.toLowerCase()) || (product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())))
+                            && (!sihwaFilterItem || product.name === sihwaFilterItem)
+                            && (!sihwaFilterMaterial || product.material === sihwaFilterMaterial)
+                            && (!sihwaFilterSize || product.size === sihwaFilterSize);
+                        if (!isMatch) return;
+                    } else {
+                        const isMatch = !searchTerm || id.toLowerCase().includes(searchTerm.toLowerCase()) || (item.name && item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+                        if (!isMatch || sihwaFilterItem || sihwaFilterMaterial || sihwaFilterSize) return;
+                    }
+
                     if (o.status !== 'COMPLETED' && !item.transactionIssued) {
-                        const id = item.productId || (item as { item_id?: string }).item_id || '';
-                        const product = inventoryMap.get(id);
                         const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
                         let cost = 0;
                         if (item.supplierRate !== undefined) {
@@ -548,7 +594,7 @@ export default function SihwaInventory() {
         });
 
         return { completedCost, pendingCost, completedCount, pendingCount, orders: monthlyOrders };
-    }, [sihwaOrders, selectedMonth, inventoryMap]);
+    }, [sihwaOrders, selectedMonth, inventoryMap, searchTerm, sihwaFilterItem, sihwaFilterMaterial, sihwaFilterSize]);
 
     // Extract recent actual Purchase price from Seoul orders
     const recentSeoulPurchaseInfoMap = useMemo(() => {
@@ -1150,8 +1196,23 @@ export default function SihwaInventory() {
                 (row.product.name && row.product.name.toLowerCase().includes(lowerQuery))
             );
         }
+        if (sihwaFilterItem) {
+            filtered = filtered.filter(row => row.product.name === sihwaFilterItem);
+        }
+        if (sihwaFilterMaterial) {
+            filtered = filtered.filter(row => row.product.material === sihwaFilterMaterial);
+        }
+        if (sihwaFilterSize) {
+            filtered = filtered.filter(row => row.product.size === sihwaFilterSize);
+        }
 
         return filtered.sort((a, b) => {
+            const pinA = pinnedItemIds.has(a.product.id) ? 1 : 0;
+            const pinB = pinnedItemIds.has(b.product.id) ? 1 : 0;
+            if (pinA !== pinB) {
+                return pinB - pinA; // 핀 고정된 항목이 무조건 위로
+            }
+
             const dir = sortConfig.direction === 'asc' ? 1 : -1;
             switch (sortConfig.key) {
                 case 'id': return a.product.id.localeCompare(b.product.id) * dir;
@@ -1170,7 +1231,15 @@ export default function SihwaInventory() {
                 default: return 0; // Fallback
             }
         });
-    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, searchTerm, sortConfig, historyData, liveSalesHistory, quotes, orders, users]);
+    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, searchTerm, sihwaFilterItem, sihwaFilterMaterial, sihwaFilterSize, pinnedItemIds, sortConfig, historyData, liveSalesHistory, quotes, orders, users]);
+
+    // ── 시화재고 필터링 옵션 추출 ──
+    const sihwaFilterOptions = useMemo(() => {
+        const names = Array.from(new Set(inventory.map(p => p.name).filter(Boolean))).sort();
+        const materials = Array.from(new Set(inventory.map(p => p.material).filter(Boolean))).sort();
+        const sizes = Array.from(new Set(inventory.map(p => p.size).filter(Boolean))).sort();
+        return { names, materials, sizes };
+    }, [inventory]);
 
     // ── 대경재고(양산) 필터링 옵션 추출 ──
     const daekyungFilterOptions = useMemo(() => {
@@ -1237,7 +1306,7 @@ export default function SihwaInventory() {
                 dailyStocks[i] = currentStock;
 
                 const diffs = historyMapByDate[date] || [];
-                const itemDiff = diffs.find((d: any) => d.id === item.id);
+                const itemDiff = diffs.find((d: { id: string; change: number }) => d.id === item.id);
                 if (itemDiff) {
                     currentStock = Math.max(0, currentStock - itemDiff.change);
                 }
@@ -1297,7 +1366,7 @@ export default function SihwaInventory() {
             filtered = filtered.filter(r => r.size === dkFilterSize);
         }
 
-        let finalResults: any[] = [];
+        let finalResults: DaekyungStockAnalysisItem[] = [];
         if (dkViewMode === 'ITEM') {
             finalResults = filtered;
         } else {
@@ -2264,6 +2333,69 @@ export default function SihwaInventory() {
                     </div>
                 </div>
 
+                {activeTab !== 'DAEKYUNG_STOCK' && activeTab !== 'HEALTH_DIAGNOSIS' && (
+                    <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row gap-3 items-end">
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-slate-500">품목 필터</label>
+                                <select
+                                    value={sihwaFilterItem}
+                                    onChange={e => setSihwaFilterItem(e.target.value)}
+                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                >
+                                    <option value="">전체 품목</option>
+                                    {sihwaFilterOptions.names.map(name => (
+                                        <option key={name} value={name}>{name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-slate-500">재질 필터</label>
+                                <select
+                                    value={sihwaFilterMaterial}
+                                    onChange={e => setSihwaFilterMaterial(e.target.value)}
+                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                >
+                                    <option value="">전체 재질</option>
+                                    {sihwaFilterOptions.materials.map(mat => (
+                                        <option key={mat} value={mat}>{mat}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-slate-500">사이즈 필터</label>
+                                <select
+                                    value={sihwaFilterSize}
+                                    onChange={e => setSihwaFilterSize(e.target.value)}
+                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                >
+                                    <option value="">전체 사이즈</option>
+                                    {sihwaFilterOptions.sizes.map(size => (
+                                        <option key={size} value={size}>{size}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="shrink-0 w-full sm:w-auto">
+                            <button
+                                onClick={() => {
+                                    setSearchTerm('');
+                                    setSihwaFilterItem('');
+                                    setSihwaFilterMaterial('');
+                                    setSihwaFilterSize('');
+                                }}
+                                disabled={!searchTerm && !sihwaFilterItem && !sihwaFilterMaterial && !sihwaFilterSize}
+                                className="w-full sm:w-auto bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+                            >
+                                🔄 필터 초기화
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 <div className="overflow-x-auto p-0 md:p-4 bg-white md:bg-transparent">
                     {invLoading ? (
                         <div className="py-20 flex justify-center text-slate-400 font-medium">데이터를 분석 중입니다...</div>
@@ -2303,6 +2435,7 @@ export default function SihwaInventory() {
                                                                         }}
                                                                     />
                                                                 </th>
+                                                                <th className="px-3 py-3 w-10 text-center">핀</th>
                                                                 <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key === 'id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                                                 <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key === 'shQty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                                                 <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('ysQty')}>대경재고 {sortConfig.key === 'ysQty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
@@ -2317,19 +2450,35 @@ export default function SihwaInventory() {
                                                         </thead>
                                                         <tbody className="divide-y divide-slate-100">
                                                             {stats.critical.map(row => (
-                                                                <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
-                                                                    <td className="px-5 py-4 text-center">
-                                                                        <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-600"
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                            checked={selectedCriticalIds.has(row.product.id)}
-                                                                            onChange={(e) => {
-                                                                                const newSet = new Set(selectedCriticalIds);
-                                                                                if (e.target.checked) newSet.add(row.product.id);
-                                                                                else newSet.delete(row.product.id);
-                                                                                setSelectedCriticalIds(newSet);
-                                                                            }}
-                                                                        />
-                                                                    </td>
+<tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
+                                                                     <td className="px-5 py-4 text-center">
+                                                                         <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-600"
+                                                                             onClick={(e) => e.stopPropagation()}
+                                                                             checked={selectedCriticalIds.has(row.product.id)}
+                                                                             onChange={(e) => {
+                                                                                 const newSet = new Set(selectedCriticalIds);
+                                                                                 if (e.target.checked) newSet.add(row.product.id);
+                                                                                 else newSet.delete(row.product.id);
+                                                                                 setSelectedCriticalIds(newSet);
+                                                                             }}
+                                                                         />
+                                                                     </td>
+                                                                     <td className="px-3 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                         <button
+                                                                             onClick={() => {
+                                                                                 setPinnedItemIds(prev => {
+                                                                                     const next = new Set(prev);
+                                                                                     if (next.has(row.product.id)) next.delete(row.product.id);
+                                                                                     else next.add(row.product.id);
+                                                                                     return next;
+                                                                                 });
+                                                                             }}
+                                                                             className={`p-1.5 rounded-lg hover:bg-slate-100 transition ${pinnedItemIds.has(row.product.id) ? 'text-amber-500' : 'text-slate-300 hover:text-slate-400'}`}
+                                                                             title={pinnedItemIds.has(row.product.id) ? '핀 고정 해제' : '최상단 핀 고정'}
+                                                                         >
+                                                                             <Pin className={`w-4 h-4 ${pinnedItemIds.has(row.product.id) ? 'fill-current' : ''}`} />
+                                                                         </button>
+                                                                     </td>
                                                                     <td className="px-5 py-4">
                                                                         <div className="flex items-center gap-2">
                                                                             <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
@@ -2402,9 +2551,9 @@ export default function SihwaInventory() {
                                                                 </tr>
                                                             ))}
                                                         </tbody>
-                                                        <tfoot className="bg-rose-50/50 border-t-2 border-rose-200">
-                                                            <tr>
-                                                                <td colSpan={2} className="px-5 py-4">
+<tfoot className="bg-rose-50/50 border-t-2 border-rose-200">
+                                                             <tr>
+                                                                 <td colSpan={3} className="px-5 py-4">
                                                                     <button onClick={() => handleCreateOrder(selectedCriticalIds, 'CRITICAL')} disabled={selectedCriticalIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedCriticalIds.size > 0 ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
                                                                         <span>선택 품목 발주서 만들기 ({selectedCriticalIds.size}건)</span>
                                                                         <ChevronRight className="w-4 h-4" />
@@ -2458,9 +2607,10 @@ export default function SihwaInventory() {
                                                     <table className="w-full text-sm text-left whitespace-nowrap">
                                                         <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
                                                             <tr>
-                                                                <th className="px-4 py-3 w-10 text-center">
-                                                                    <input type="checkbox" title="전체 선택" checked={stats.warning.length > 0 && selectedWarningIds.size === stats.warning.length} onChange={toggleAllWarnings} className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer" />
-                                                                </th>
+<th className="px-4 py-3 w-10 text-center">
+                                                                     <input type="checkbox" title="전체 선택" checked={stats.warning.length > 0 && selectedWarningIds.size === stats.warning.length} onChange={toggleAllWarnings} className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer" />
+                                                                 </th>
+                                                                <th className="px-3 py-3 w-10 text-center">핀</th>
                                                                 <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key === 'id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                                                 <th className="px-5 py-3 text-right">시화재고</th>
                                                                 <th className="px-5 py-3 text-right">권장발주량</th>
@@ -2474,17 +2624,33 @@ export default function SihwaInventory() {
                                                         </thead>
                                                         <tbody className="divide-y divide-slate-100">
                                                             {stats.warning.map(row => (
-                                                                <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
-                                                                    <td className="px-4 py-4 text-center">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            title="발주 항목 선택"
-                                                                            checked={selectedWarningIds.has(row.product.id)}
-                                                                            onChange={(e) => toggleWarningSelection(row.product.id, e as unknown as React.MouseEvent)}
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                            className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
-                                                                        />
-                                                                    </td>
+<tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
+                                                                     <td className="px-4 py-4 text-center">
+                                                                         <input
+                                                                             type="checkbox"
+                                                                             title="발주 항목 선택"
+                                                                             checked={selectedWarningIds.has(row.product.id)}
+                                                                             onChange={(e) => toggleWarningSelection(row.product.id, e as unknown as React.MouseEvent)}
+                                                                             onClick={(e) => e.stopPropagation()}
+                                                                             className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
+                                                                         />
+                                                                     </td>
+                                                                     <td className="px-3 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                         <button
+                                                                             onClick={() => {
+                                                                                 setPinnedItemIds(prev => {
+                                                                                     const next = new Set(prev);
+                                                                                     if (next.has(row.product.id)) next.delete(row.product.id);
+                                                                                     else next.add(row.product.id);
+                                                                                     return next;
+                                                                                 });
+                                                                             }}
+                                                                             className={`p-1.5 rounded-lg hover:bg-slate-100 transition ${pinnedItemIds.has(row.product.id) ? 'text-amber-500' : 'text-slate-300 hover:text-slate-400'}`}
+                                                                             title={pinnedItemIds.has(row.product.id) ? '핀 고정 해제' : '최상단 핀 고정'}
+                                                                         >
+                                                                             <Pin className={`w-4 h-4 ${pinnedItemIds.has(row.product.id) ? 'fill-current' : ''}`} />
+                                                                         </button>
+                                                                     </td>
                                                                     <td className="px-5 py-4">
                                                                         <div className="flex items-center gap-2">
                                                                             <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-sm ${row.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-700' : row.healthGrade === 'B' ? 'bg-blue-100 text-blue-700' : row.healthGrade === 'C' ? 'bg-amber-100 text-amber-700' : row.healthGrade === 'D' ? 'bg-orange-100 text-orange-700' : row.healthGrade === 'E' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{row.healthGrade}급</span>
@@ -2562,9 +2728,9 @@ export default function SihwaInventory() {
                                                                 </tr>
                                                             ))}
                                                         </tbody>
-                                                        <tfoot className="bg-amber-50/50 border-t-2 border-amber-200">
-                                                            <tr>
-                                                                <td colSpan={3} className="px-5 py-4">
+<tfoot className="bg-amber-50/50 border-t-2 border-amber-200">
+                                                             <tr>
+                                                                 <td colSpan={4} className="px-5 py-4">
                                                                     <button onClick={() => handleCreateOrder(selectedWarningIds, 'WARNING')} disabled={selectedWarningIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedWarningIds.size > 0 ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
                                                                         <span>선택 품목 발주서 만들기 ({selectedWarningIds.size}건)</span>
                                                                         <ChevronRight className="w-4 h-4" />
@@ -2618,15 +2784,16 @@ export default function SihwaInventory() {
                                                     <table className="w-full text-sm text-left whitespace-nowrap">
                                                         <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
                                                             <tr>
-                                                                <th className="px-5 py-3 w-12 text-center">
-                                                                    <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
-                                                                        checked={stats.regular.length > 0 && selectedRegularIds.size === stats.regular.length}
-                                                                        onChange={(e) => {
-                                                                            if (e.target.checked) setSelectedRegularIds(new Set(stats.regular.map(r => r.product.id)));
-                                                                            else setSelectedRegularIds(new Set());
-                                                                        }}
-                                                                    />
-                                                                </th>
+<th className="px-5 py-3 w-12 text-center">
+                                                                     <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                                                                         checked={stats.regular.length > 0 && selectedRegularIds.size === stats.regular.length}
+                                                                         onChange={(e) => {
+                                                                             if (e.target.checked) setSelectedRegularIds(new Set(stats.regular.map(r => r.product.id)));
+                                                                             else setSelectedRegularIds(new Set());
+                                                                         }}
+                                                                     />
+                                                                 </th>
+                                                                <th className="px-3 py-3 w-10 text-center">핀</th>
                                                                 <th className="px-5 py-3 cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('id')}>품목 코드 {sortConfig.key === 'id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                                                 <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('safeStock')}>적정재고(목표) {sortConfig.key === 'safeStock' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                                                 <th className="px-5 py-3 text-right cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('shQty')}>시화재고 {sortConfig.key === 'shQty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
@@ -2640,19 +2807,35 @@ export default function SihwaInventory() {
                                                         </thead>
                                                         <tbody className="divide-y divide-slate-100">
                                                             {stats.regular.map(row => (
-                                                                <tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
-                                                                    <td className="px-5 py-4 text-center">
-                                                                        <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                            checked={selectedRegularIds.has(row.product.id)}
-                                                                            onChange={(e) => {
-                                                                                const newSet = new Set(selectedRegularIds);
-                                                                                if (e.target.checked) newSet.add(row.product.id);
-                                                                                else newSet.delete(row.product.id);
-                                                                                setSelectedRegularIds(newSet);
-                                                                            }}
-                                                                        />
-                                                                    </td>
+<tr key={row.product.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedIntelligenceItem(row)}>
+                                                                     <td className="px-5 py-4 text-center">
+                                                                         <input type="checkbox" title="품목 선택" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                                                                             onClick={(e) => e.stopPropagation()}
+                                                                             checked={selectedRegularIds.has(row.product.id)}
+                                                                             onChange={(e) => {
+                                                                                 const newSet = new Set(selectedRegularIds);
+                                                                                 if (e.target.checked) newSet.add(row.product.id);
+                                                                                 else newSet.delete(row.product.id);
+                                                                                 setSelectedRegularIds(newSet);
+                                                                             }}
+                                                                         />
+                                                                     </td>
+                                                                     <td className="px-3 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                         <button
+                                                                             onClick={() => {
+                                                                                 setPinnedItemIds(prev => {
+                                                                                     const next = new Set(prev);
+                                                                                     if (next.has(row.product.id)) next.delete(row.product.id);
+                                                                                     else next.add(row.product.id);
+                                                                                     return next;
+                                                                                 });
+                                                                             }}
+                                                                             className={`p-1.5 rounded-lg hover:bg-slate-100 transition ${pinnedItemIds.has(row.product.id) ? 'text-amber-500' : 'text-slate-300 hover:text-slate-400'}`}
+                                                                             title={pinnedItemIds.has(row.product.id) ? '핀 고정 해제' : '최상단 핀 고정'}
+                                                                         >
+                                                                             <Pin className={`w-4 h-4 ${pinnedItemIds.has(row.product.id) ? 'fill-current' : ''}`} />
+                                                                         </button>
+                                                                     </td>
                                                                     <td className="px-5 py-4">
                                                                         <div className="flex items-center gap-2">
                                                                             <button
@@ -2711,9 +2894,9 @@ export default function SihwaInventory() {
                                                                 </tr>
                                                             ))}
                                                         </tbody>
-                                                        <tfoot className="bg-indigo-50/50 border-t-2 border-indigo-200">
-                                                            <tr>
-                                                                <td colSpan={6} className="px-5 py-4">
+<tfoot className="bg-indigo-50/50 border-t-2 border-indigo-200">
+                                                             <tr>
+                                                                 <td colSpan={7} className="px-5 py-4">
                                                                     <button onClick={() => handleCreateOrder(selectedRegularIds, 'REGULAR')} disabled={selectedRegularIds.size === 0} className={`px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${selectedRegularIds.size > 0 ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
                                                                         <span>선택 품목 발주서 만들기 ({selectedRegularIds.size}건)</span>
                                                                         <ChevronRight className="w-4 h-4" />
@@ -2991,9 +3174,10 @@ export default function SihwaInventory() {
                                     <table className="w-full text-left text-sm whitespace-nowrap min-w-[1000px]">
                                         <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none sticky top-0 z-10 shadow-sm">
                                             <tr className="text-xs uppercase tracking-wider text-slate-500 font-bold border-b-2 border-slate-200">
-                                                <th className="px-3 py-3 w-10 text-center border-r border-slate-200">
-                                                    <span className="text-[10px] text-slate-400">선택</span>
-                                                </th>
+<th className="px-3 py-3 w-10 text-center border-r border-slate-200">
+                                                     <span className="text-[10px] text-slate-400">선택</span>
+                                                 </th>
+                                                <th className="px-3 py-3 w-10 text-center border-r border-slate-200"><span className="text-[10px] text-slate-400">핀</span></th>
                                                 <th className="px-4 py-3 group relative text-left">
                                                     <div className="flex items-center gap-2">
                                                         <span className="cursor-pointer hover:text-slate-800 transition" onClick={() => handleSort('id')}>
@@ -3122,9 +3306,9 @@ export default function SihwaInventory() {
                                                     });
                                                 }
 
-                                                if (displayList.length === 0) {
-                                                    return <tr><td colSpan={11} className="py-10 text-center text-slate-400 font-medium">해당 조건에 맞는 품목이 없습니다.</td></tr>;
-                                                }
+if (displayList.length === 0) {
+                                                     return <tr><td colSpan={12} className="py-10 text-center text-slate-400 font-medium">해당 조건에 맞는 품목이 없습니다.</td></tr>;
+                                                 }
 
                                                 return displayList.slice(0, 500).map(row => {
                                                     const rowTags = [];
@@ -3136,23 +3320,39 @@ export default function SihwaInventory() {
                                                     if (row.isDeadStock) rowTags.push({ label: '악성', className: 'bg-slate-100 text-slate-500 border border-slate-200' });
 
                                                     return (
-                                                        <tr key={row.product.id} className={`hover:bg-slate-50 group cursor-pointer ${selectedAllTableIds.has(row.product.id) ? 'bg-indigo-50/50' : ''}`} onClick={() => setSelectedIntelligenceItem(row)}>
-                                                            <td className="px-3 py-2 text-center border-r border-slate-100">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    aria-label={`${row.product.id} 품목 선택`}
-                                                                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                                                                    checked={selectedAllTableIds.has(row.product.id)}
-                                                                    onChange={(e) => {
-                                                                        setSelectedAllTableIds(prev => {
+<tr key={row.product.id} className={`hover:bg-slate-50 group cursor-pointer ${selectedAllTableIds.has(row.product.id) ? 'bg-indigo-50/50' : ''}`} onClick={() => setSelectedIntelligenceItem(row)}>
+                                                             <td className="px-3 py-2 text-center border-r border-slate-100">
+                                                                 <input
+                                                                     type="checkbox"
+                                                                     aria-label={`${row.product.id} 품목 선택`}
+                                                                     className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                                     checked={selectedAllTableIds.has(row.product.id)}
+                                                                     onChange={(e) => {
+                                                                         setSelectedAllTableIds(prev => {
+                                                                             const next = new Set(prev);
+                                                                             if (e.target.checked) next.add(row.product.id);
+                                                                             else next.delete(row.product.id);
+                                                                             return next;
+                                                                         });
+                                                                     }}
+                                                                     onClick={(e) => e.stopPropagation()}
+                                                                 />
+                                                             </td>
+                                                            <td className="px-3 py-2 text-center border-r border-slate-100" onClick={(e) => e.stopPropagation()}>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setPinnedItemIds(prev => {
                                                                             const next = new Set(prev);
-                                                                            if (e.target.checked) next.add(row.product.id);
-                                                                            else next.delete(row.product.id);
+                                                                            if (next.has(row.product.id)) next.delete(row.product.id);
+                                                                            else next.add(row.product.id);
                                                                             return next;
                                                                         });
                                                                     }}
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                />
+                                                                    className={`p-1 rounded-lg hover:bg-slate-100 transition ${pinnedItemIds.has(row.product.id) ? 'text-amber-500' : 'text-slate-300 hover:text-slate-400'}`}
+                                                                    title={pinnedItemIds.has(row.product.id) ? '핀 고정 해제' : '최상단 핀 고정'}
+                                                                >
+                                                                    <Pin className={`w-3.5 h-3.5 ${pinnedItemIds.has(row.product.id) ? 'fill-current' : ''}`} />
+                                                                </button>
                                                             </td>
                                                             <td className="px-4 py-2 font-mono font-bold text-slate-700">
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
