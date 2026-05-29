@@ -2337,8 +2337,9 @@ export default function SihwaInventory() {
                     <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row gap-3 items-end">
                         <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
                             <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-slate-500">품목 필터</label>
+                                <label htmlFor="sihwa-item-filter" className="text-[10px] font-bold text-slate-500">품목 필터</label>
                                 <select
+                                    id="sihwa-item-filter"
                                     value={sihwaFilterItem}
                                     onChange={e => setSihwaFilterItem(e.target.value)}
                                     className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -2351,8 +2352,9 @@ export default function SihwaInventory() {
                             </div>
 
                             <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-slate-500">재질 필터</label>
+                                <label htmlFor="sihwa-material-filter" className="text-[10px] font-bold text-slate-500">재질 필터</label>
                                 <select
+                                    id="sihwa-material-filter"
                                     value={sihwaFilterMaterial}
                                     onChange={e => setSihwaFilterMaterial(e.target.value)}
                                     className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -2365,8 +2367,9 @@ export default function SihwaInventory() {
                             </div>
 
                             <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-slate-500">사이즈 필터</label>
+                                <label htmlFor="sihwa-size-filter" className="text-[10px] font-bold text-slate-500">사이즈 필터</label>
                                 <select
+                                    id="sihwa-size-filter"
                                     value={sihwaFilterSize}
                                     onChange={e => setSihwaFilterSize(e.target.value)}
                                     className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -3206,6 +3209,7 @@ export default function SihwaInventory() {
                                                                         <label key={tag} className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs font-medium text-slate-700">
                                                                             <input
                                                                                 type="checkbox"
+                                                                                aria-label={`${tag} 필터`}
                                                                                 className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                                                                 checked={activeTagFilters.includes(tag)}
                                                                                 onChange={() => toggleTagFilter(tag)}
@@ -3972,6 +3976,8 @@ if (displayList.length === 0) {
                                                     <div className="flex flex-wrap items-center gap-2">
                                                         {/* 기간 필터 */}
                                                         <select
+                                                            title="기간 필터"
+                                                            aria-label="기간 필터"
                                                             value={mdPeriod}
                                                             onChange={(e) => setMdPeriod(e.target.value as 'ALL' | '7D' | '30D' | '60D')}
                                                             className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 font-bold text-slate-700"
@@ -4041,8 +4047,9 @@ if (displayList.length === 0) {
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white p-3 rounded-lg border border-slate-200">
                                                     {/* 품목명 필터 */}
                                                     <div className="flex flex-col gap-1">
-                                                        <span className="text-[10px] font-bold text-slate-500">품목명</span>
+                                                        <label htmlFor="md-filter-name" className="text-[10px] font-bold text-slate-500">품목명</label>
                                                         <select
+                                                            id="md-filter-name"
                                                             value={mdFilterName}
                                                             onChange={(e) => setMdFilterName(e.target.value)}
                                                             className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 font-medium"
@@ -4056,8 +4063,9 @@ if (displayList.length === 0) {
 
                                                     {/* 두께 필터 */}
                                                     <div className="flex flex-col gap-1">
-                                                        <span className="text-[10px] font-bold text-slate-500">두께</span>
+                                                        <label htmlFor="md-filter-thickness" className="text-[10px] font-bold text-slate-500">두께</label>
                                                         <select
+                                                            id="md-filter-thickness"
                                                             value={mdFilterThickness}
                                                             onChange={(e) => setMdFilterThickness(e.target.value)}
                                                             className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 font-medium"
@@ -4071,8 +4079,9 @@ if (displayList.length === 0) {
 
                                                     {/* 사이즈 필터 */}
                                                     <div className="flex flex-col gap-1">
-                                                        <span className="text-[10px] font-bold text-slate-500">사이즈</span>
+                                                        <label htmlFor="md-filter-size" className="text-[10px] font-bold text-slate-500">사이즈</label>
                                                         <select
+                                                            id="md-filter-size"
                                                             value={mdFilterSize}
                                                             onChange={(e) => setMdFilterSize(e.target.value)}
                                                             className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 font-medium"
@@ -4086,8 +4095,9 @@ if (displayList.length === 0) {
 
                                                     {/* 재질 필터 */}
                                                     <div className="flex flex-col gap-1">
-                                                        <span className="text-[10px] font-bold text-slate-500">재질</span>
+                                                        <label htmlFor="md-filter-material" className="text-[10px] font-bold text-slate-500">재질</label>
                                                         <select
+                                                            id="md-filter-material"
                                                             value={mdFilterMaterial}
                                                             onChange={(e) => setMdFilterMaterial(e.target.value)}
                                                             className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:border-violet-500 font-medium"
@@ -4115,6 +4125,7 @@ if (displayList.length === 0) {
                                                                 <th className="p-3 w-10 text-center">
                                                                     <input
                                                                         type="checkbox"
+                                                                        aria-label="전체 결품 내역 선택"
                                                                         checked={filteredMissedDemandList.length > 0 && filteredMissedDemandList.every(m => selectedMissedDemandIds.has(m.id))}
                                                                         onChange={(e) => {
                                                                             if (e.target.checked) {
@@ -4199,6 +4210,7 @@ if (displayList.length === 0) {
                                                                             <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
                                                                                 <input
                                                                                     type="checkbox"
+                                                                                    aria-label="결품 항목 선택"
                                                                                     checked={isSelected}
                                                                                     onChange={(e) => {
                                                                                         const next = new Set(selectedMissedDemandIds);
@@ -4239,6 +4251,7 @@ if (displayList.length === 0) {
                                                                             <td className="p-2 text-center" onClick={(e) => e.stopPropagation()}>
                                                                                 <input
                                                                                     type="number"
+                                                                                    aria-label="발주 수량"
                                                                                     min={1}
                                                                                     value={qtyValue}
                                                                                     onChange={(e) => {
@@ -4361,6 +4374,7 @@ if (displayList.length === 0) {
                                                                             <div onClick={(e) => e.stopPropagation()}>
                                                                                 <input
                                                                                     type="checkbox"
+                                                                                    aria-label="결품 항목 선택"
                                                                                     checked={isSelected}
                                                                                     onChange={(e) => {
                                                                                         const next = new Set(selectedMissedDemandIds);
@@ -4420,8 +4434,9 @@ if (displayList.length === 0) {
 
                                                                     {/* 인라인 수량 및 즉시발주 */}
                                                                     <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                                                        <span className="text-[10px] text-slate-400">발주량:</span>
+                                                                        <label htmlFor={`md-card-order-qty-${m.id}`} className="text-[10px] text-slate-400">발주량:</label>
                                                                         <input
+                                                                            id={`md-card-order-qty-${m.id}`}
                                                                             type="number"
                                                                             min={1}
                                                                             value={qtyValue}
@@ -4682,8 +4697,9 @@ if (displayList.length === 0) {
                                         {/* 드롭다운 필터 */}
                                         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                                             <div className="flex flex-col gap-1">
-                                                <label className="text-[10px] font-bold text-slate-500">품목 필터</label>
+                                                <label htmlFor="dk-item-filter" className="text-[10px] font-bold text-slate-500">품목 필터</label>
                                                 <select
+                                                    id="dk-item-filter"
                                                     value={dkFilterItem}
                                                     onChange={e => setDkFilterItem(e.target.value)}
                                                     className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -4696,8 +4712,9 @@ if (displayList.length === 0) {
                                             </div>
 
                                             <div className="flex flex-col gap-1">
-                                                <label className="text-[10px] font-bold text-slate-500">재질 필터</label>
+                                                <label htmlFor="dk-material-filter" className="text-[10px] font-bold text-slate-500">재질 필터</label>
                                                 <select
+                                                    id="dk-material-filter"
                                                     value={dkFilterMaterial}
                                                     onChange={e => setDkFilterMaterial(e.target.value)}
                                                     className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -4710,8 +4727,9 @@ if (displayList.length === 0) {
                                             </div>
 
                                             <div className="flex flex-col gap-1">
-                                                <label className="text-[10px] font-bold text-slate-500">사이즈 필터</label>
+                                                <label htmlFor="dk-size-filter" className="text-[10px] font-bold text-slate-500">사이즈 필터</label>
                                                 <select
+                                                    id="dk-size-filter"
                                                     value={dkFilterSize}
                                                     onChange={e => setDkFilterSize(e.target.value)}
                                                     className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -4855,7 +4873,7 @@ if (displayList.length === 0) {
                                                                     <div className="flex items-center justify-end gap-1.5">
                                                                         <span className="font-bold text-slate-600">{row.share3m.toFixed(2)}%</span>
                                                                         <div className="w-12 bg-slate-100 h-1.5 rounded-full overflow-hidden hidden sm:block">
-                                                                            <div className="bg-indigo-500 h-full rounded-full" style={{ width: `${Math.min(100, row.share3m * 5)}%` }}></div>
+                                                                            <div className={`bg-indigo-500 h-full rounded-full w-pct-${Math.min(100, Math.round((row.share3m * 5) / 5) * 5)}`}></div>
                                                                         </div>
                                                                     </div>
                                                                 </td>
@@ -4863,7 +4881,7 @@ if (displayList.length === 0) {
                                                                     <div className="flex items-center justify-end gap-1.5">
                                                                         <span className="font-bold text-slate-600">{row.share6m.toFixed(2)}%</span>
                                                                         <div className="w-12 bg-slate-100 h-1.5 rounded-full overflow-hidden hidden sm:block">
-                                                                            <div className="bg-violet-500 h-full rounded-full" style={{ width: `${Math.min(100, row.share6m * 5)}%` }}></div>
+                                                                            <div className={`bg-violet-500 h-full rounded-full w-pct-${Math.min(100, Math.round((row.share6m * 5) / 5) * 5)}`}></div>
                                                                         </div>
                                                                     </div>
                                                                 </td>
