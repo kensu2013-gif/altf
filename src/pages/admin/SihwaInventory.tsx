@@ -655,6 +655,12 @@ export default function SihwaInventory() {
         shQty: number;
         ysQty: number;
         pendingOrderQty: number;
+        pendingOrderDetails?: {
+            poNumber: string;
+            qty: number;
+            deliveryDate?: string;
+            createdAt: string;
+        }[];
         recentPurchasePrice: number;
         recentPurchaseDate: string | null;
         sellingPrice: number;
@@ -888,6 +894,13 @@ export default function SihwaInventory() {
                 const product = inventoryMap.get(id);
                 if (product) rawBasePrice = item.base_price ?? product.base_price ?? product.unitPrice ?? 0;
 
+                const detail = {
+                    poNumber: order.poNumber || order.id || '번호없음',
+                    qty: addQty,
+                    deliveryDate: order.adminResponse?.deliveryDate,
+                    createdAt: order.createdAt
+                };
+
                 if (!comparisonMap[id]) {
                     const finalSellingPrice = calculateSellingPrice(id, rawBasePrice);
                     const recentInfo = recentSeoulPurchaseInfoMap[id];
@@ -911,6 +924,7 @@ export default function SihwaInventory() {
                         shQty: 0,
                         ysQty: 0,
                         pendingOrderQty: addQty,
+                        pendingOrderDetails: [detail],
                         recentPurchasePrice: purchasePrice,
                         recentPurchaseDate: recentInfo ? recentInfo.date : null,
                         sellingPrice: finalSellingPrice,
@@ -944,6 +958,10 @@ export default function SihwaInventory() {
                     };
                 } else {
                     comparisonMap[id].pendingOrderQty += addQty;
+                    if (!comparisonMap[id].pendingOrderDetails) {
+                        comparisonMap[id].pendingOrderDetails = [];
+                    }
+                    comparisonMap[id].pendingOrderDetails!.push(detail);
                 }
             });
         });
@@ -2073,6 +2091,55 @@ export default function SihwaInventory() {
         document.body.removeChild(link);
     };
 
+    const handleExportAiSummary = () => {
+        const headers = ['구분', '품목 코드', '품명', '재질', '사이즈', '두께', '현재고(시화)', '대경재고', '대기중(수량)', '발주서번호(들)', '납품예정일(들)', '매입단가', '권장/추천발주량', '필요예산', '분석근거'];
+        const csvRows = [headers.join(',')];
+
+        const appendRows = (items: typeof stats.critical, category: string) => {
+            items.forEach(row => {
+                const poNumbers = row.pendingOrderDetails?.map(d => d.poNumber).join('; ') || '';
+                const deliveryDates = row.pendingOrderDetails?.map(d => d.deliveryDate ? new Date(d.deliveryDate).toLocaleDateString() : '').filter(Boolean).join('; ') || '';
+                const deficitOrRecommended = category === '🚨 선발주 요망' ? row.deficit : (category === '⚠️ 일반 발주 필요' ? row.recommendedQty : row.recommendedQty);
+                const budget = row.recentPurchasePrice * (deficitOrRecommended > 0 ? deficitOrRecommended : 1);
+                
+                const r = [
+                    `"${category}"`,
+                    `"${row.product.id}"`,
+                    `"${row.product.name || ''}"`,
+                    `"${row.product.material || ''}"`,
+                    `"${row.product.size || ''}"`,
+                    `"${row.product.thickness || ''}"`,
+                    row.shQty,
+                    row.ysQty,
+                    row.pendingOrderQty,
+                    `"${poNumbers}"`,
+                    `"${deliveryDates}"`,
+                    row.recentPurchasePrice,
+                    deficitOrRecommended,
+                    budget,
+                    `"적정 대비 ${row.deficit}개 부족 / 연판매 ${row.salesVolume}개"`
+                ];
+                csvRows.push(r.join(','));
+            });
+        };
+
+        appendRows(stats.critical, '🚨 선발주 요망');
+        appendRows(stats.warning, '⚠️ 일반 발주 필요');
+        appendRows(stats.regular, '♻️ 정기 발주 예측');
+
+        const csvString = csvRows.join('\n');
+        const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        const dateStr = new Date().toISOString().split('T')[0];
+        link.setAttribute('href', url);
+        link.setAttribute('download', `AI_재고요약_분석_${dateStr}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     if (user?.role === 'MANAGER' && !user?.permissions?.viewSihwa) {
         return (
             <div className="flex flex-col items-center justify-center p-20 text-center pb-40">
@@ -2371,7 +2438,7 @@ export default function SihwaInventory() {
                             />
                         </div>
 
-                        <div className="shrink-0 w-full sm:w-auto">
+                        <div className="shrink-0 w-full sm:w-auto flex flex-col sm:flex-row gap-2">
                             <button
                                 onClick={() => {
                                     setSearchTerm('');
@@ -2385,6 +2452,15 @@ export default function SihwaInventory() {
                             >
                                 🔄 필터 초기화
                             </button>
+                            {activeTab === 'AI_SUMMARY' && (
+                                <button
+                                    onClick={handleExportAiSummary}
+                                    className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                >
+                                    <Download className="w-4.5 h-4.5" />
+                                    AI 재고 요약 다운로드 (Excel)
+                                </button>
+                            )}
                         </div>
                     </div>
                 )}
@@ -2490,7 +2566,23 @@ export default function SihwaInventory() {
                                                                     <td className="px-5 py-4 text-right font-black font-mono text-rose-600 bg-rose-50/30">0</td>
                                                                     <td className="px-5 py-4 text-right font-black font-mono text-slate-400">0</td>
                                                                     <td className="px-5 py-4 text-center font-bold text-slate-400">
-                                                                        {row.pendingOrderQty > 0 ? <span className="text-indigo-600">+{row.pendingOrderQty} 대기중</span> : '없음'}
+                                                                        {row.pendingOrderQty > 0 ? (
+                                                                            <div className="flex flex-col items-center">
+                                                                                <span className="text-indigo-600 font-black">+{row.pendingOrderQty} 대기중</span>
+                                                                                {row.pendingOrderDetails && row.pendingOrderDetails.length > 0 && (
+                                                                                    <div className="text-[10px] text-slate-500 mt-1 space-y-0.5 max-w-[150px] overflow-hidden text-ellipsis">
+                                                                                        {row.pendingOrderDetails.map((d, idx) => (
+                                                                                            <div key={idx} className="whitespace-nowrap" title={`${d.poNumber}${d.deliveryDate ? ` (납기: ${d.deliveryDate})` : ''}`}>
+                                                                                                <span className="font-mono bg-slate-100 px-1 rounded text-slate-600 border border-slate-200">{d.poNumber.slice(-8)}</span>
+                                                                                                {d.deliveryDate && (
+                                                                                                    <span className="text-indigo-500 ml-1">({new Date(d.deliveryDate).toLocaleDateString('ko-KR', {month: 'numeric', day: 'numeric'})})</span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        ) : '없음'}
                                                                     </td>
                                                                     <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
                                                                     <td className="px-5 py-4 text-right font-black text-rose-600 bg-rose-50/10">{formatCur(row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1))}</td>
@@ -2667,7 +2759,23 @@ export default function SihwaInventory() {
                                                                         <div className="text-[10px] font-normal text-slate-400 mt-1">/ 총판매:{row.salesVolume}</div>
                                                                     </td>
                                                                     <td className="px-5 py-4 text-center font-bold text-slate-500">
-                                                                        {row.pendingOrderQty > 0 ? <span className="text-blue-600 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md font-black shadow-sm">+{row.pendingOrderQty}</span> : <span className="text-slate-300">-</span>}
+                                                                        {row.pendingOrderQty > 0 ? (
+                                                                            <div className="flex flex-col items-center">
+                                                                                <span className="text-blue-600 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md font-black shadow-sm">+{row.pendingOrderQty}</span>
+                                                                                {row.pendingOrderDetails && row.pendingOrderDetails.length > 0 && (
+                                                                                    <div className="text-[10px] text-slate-500 mt-1 space-y-0.5 max-w-[150px] overflow-hidden text-ellipsis">
+                                                                                        {row.pendingOrderDetails.map((d, idx) => (
+                                                                                            <div key={idx} className="whitespace-nowrap" title={`${d.poNumber}${d.deliveryDate ? ` (납기: ${d.deliveryDate})` : ''}`}>
+                                                                                                <span className="font-mono bg-slate-100 px-1 rounded text-slate-600 border border-slate-200">{d.poNumber.slice(-8)}</span>
+                                                                                                {d.deliveryDate && (
+                                                                                                    <span className="text-indigo-500 ml-1">({new Date(d.deliveryDate).toLocaleDateString('ko-KR', {month: 'numeric', day: 'numeric'})})</span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        ) : <span className="text-slate-300">-</span>}
                                                                     </td>
                                                                     <td className="px-5 py-4 text-right">
                                                                         <span className="px-2 py-1 bg-teal-50 text-teal-700 font-extrabold font-mono rounded-lg border border-teal-200 shadow-sm">{row.ysQty}</span>
