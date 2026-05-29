@@ -25,6 +25,7 @@ import type { Product, LineItem } from '../../types';
 import salesHistoryRaw from '../../data/sales_history.json';
 import { COMPETITOR_DATA, getStrategicGrade, type StrategicGrade } from '../../../competitorData';
 import { ItemIntelligenceCard } from './components/ItemIntelligenceCard';
+import { SearchableMultiSelect } from '../../components/ui/SearchableMultiSelect';
 
 const salesHistory = salesHistoryRaw as Record<string, { salesVolume: number, salesFreq: number }>;
 
@@ -234,9 +235,10 @@ export default function SihwaInventory() {
     const [historyLoading, setHistoryLoading] = useState(true);
 
     const [searchTerm, setSearchTerm] = useState('');
-    const [sihwaFilterItem, setSihwaFilterItem] = useState('');
-    const [sihwaFilterMaterial, setSihwaFilterMaterial] = useState('');
-    const [sihwaFilterSize, setSihwaFilterSize] = useState('');
+    const [sihwaFilterItem, setSihwaFilterItem] = useState<string[]>([]);
+    const [sihwaFilterMaterial, setSihwaFilterMaterial] = useState<string[]>([]);
+    const [sihwaFilterSize, setSihwaFilterSize] = useState<string[]>([]);
+    const [sihwaFilterThickness, setSihwaFilterThickness] = useState<string[]>([]);
     const [pinnedItemIds, setPinnedItemIds] = useState<Set<string>>(new Set());
 
     const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE' | 'HEALTH_DIAGNOSIS' | 'DAEKYUNG_STOCK'>('AI_SUMMARY');
@@ -481,9 +483,10 @@ export default function SihwaInventory() {
                 if (!product) return;
 
                 const isMatch = (!searchTerm || product.id.toLowerCase().includes(searchTerm.toLowerCase()) || (product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())))
-                    && (!sihwaFilterItem || product.name === sihwaFilterItem)
-                    && (!sihwaFilterMaterial || product.material === sihwaFilterMaterial)
-                    && (!sihwaFilterSize || product.size === sihwaFilterSize);
+                    && (sihwaFilterItem.length === 0 || sihwaFilterItem.includes(product.name || ''))
+                    && (sihwaFilterMaterial.length === 0 || sihwaFilterMaterial.includes(product.material || ''))
+                    && (sihwaFilterSize.length === 0 || sihwaFilterSize.includes(product.size || ''))
+                    && (sihwaFilterThickness.length === 0 || sihwaFilterThickness.includes(product.thickness || ''));
                 if (!isMatch) return;
 
                 const locStr = product.location || product.location1 || '';
@@ -507,7 +510,7 @@ export default function SihwaInventory() {
         return Object.values(groups)
             .filter(g => Object.keys(g.items).length > 0)
             .sort((a, b) => b.date.localeCompare(a.date));
-    }, [historyData.inventoryHistory, inventoryMap, targetRegion, targetMaker, searchTerm, sihwaFilterItem, sihwaFilterMaterial, sihwaFilterSize]);
+    }, [historyData.inventoryHistory, inventoryMap, targetRegion, targetMaker, searchTerm, sihwaFilterItem, sihwaFilterMaterial, sihwaFilterSize, sihwaFilterThickness]);
 
     const monthData = useMemo(() => {
         const monthlyOrders = sihwaOrders.filter(o => new Date(o.createdAt).toISOString().slice(0, 7) === selectedMonth);
@@ -524,13 +527,14 @@ export default function SihwaInventory() {
 
                 if (product) {
                     const isMatch = (!searchTerm || product.id.toLowerCase().includes(searchTerm.toLowerCase()) || (product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())))
-                        && (!sihwaFilterItem || product.name === sihwaFilterItem)
-                        && (!sihwaFilterMaterial || product.material === sihwaFilterMaterial)
-                        && (!sihwaFilterSize || product.size === sihwaFilterSize);
+                        && (sihwaFilterItem.length === 0 || sihwaFilterItem.includes(product.name || ''))
+                        && (sihwaFilterMaterial.length === 0 || sihwaFilterMaterial.includes(product.material || ''))
+                        && (sihwaFilterSize.length === 0 || sihwaFilterSize.includes(product.size || ''))
+                        && (sihwaFilterThickness.length === 0 || sihwaFilterThickness.includes(product.thickness || ''));
                     if (!isMatch) return;
                 } else {
                     const isMatch = !searchTerm || id.toLowerCase().includes(searchTerm.toLowerCase()) || (item.name && item.name.toLowerCase().includes(searchTerm.toLowerCase()));
-                    if (!isMatch || sihwaFilterItem || sihwaFilterMaterial || sihwaFilterSize) return;
+                    if (!isMatch || sihwaFilterItem.length > 0 || sihwaFilterMaterial.length > 0 || sihwaFilterSize.length > 0 || sihwaFilterThickness.length > 0) return;
                 }
 
                 if (o.status === 'COMPLETED' || item.transactionIssued) {
@@ -568,13 +572,14 @@ export default function SihwaInventory() {
 
                     if (product) {
                         const isMatch = (!searchTerm || product.id.toLowerCase().includes(searchTerm.toLowerCase()) || (product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())))
-                            && (!sihwaFilterItem || product.name === sihwaFilterItem)
-                            && (!sihwaFilterMaterial || product.material === sihwaFilterMaterial)
-                            && (!sihwaFilterSize || product.size === sihwaFilterSize);
+                            && (sihwaFilterItem.length === 0 || sihwaFilterItem.includes(product.name || ''))
+                            && (sihwaFilterMaterial.length === 0 || sihwaFilterMaterial.includes(product.material || ''))
+                            && (sihwaFilterSize.length === 0 || sihwaFilterSize.includes(product.size || ''))
+                            && (sihwaFilterThickness.length === 0 || sihwaFilterThickness.includes(product.thickness || ''));
                         if (!isMatch) return;
                     } else {
                         const isMatch = !searchTerm || id.toLowerCase().includes(searchTerm.toLowerCase()) || (item.name && item.name.toLowerCase().includes(searchTerm.toLowerCase()));
-                        if (!isMatch || sihwaFilterItem || sihwaFilterMaterial || sihwaFilterSize) return;
+                        if (!isMatch || sihwaFilterItem.length > 0 || sihwaFilterMaterial.length > 0 || sihwaFilterSize.length > 0 || sihwaFilterThickness.length > 0) return;
                     }
 
                     if (o.status !== 'COMPLETED' && !item.transactionIssued) {
@@ -594,7 +599,7 @@ export default function SihwaInventory() {
         });
 
         return { completedCost, pendingCost, completedCount, pendingCount, orders: monthlyOrders };
-    }, [sihwaOrders, selectedMonth, inventoryMap, searchTerm, sihwaFilterItem, sihwaFilterMaterial, sihwaFilterSize]);
+    }, [sihwaOrders, selectedMonth, inventoryMap, searchTerm, sihwaFilterItem, sihwaFilterMaterial, sihwaFilterSize, sihwaFilterThickness]);
 
     // Extract recent actual Purchase price from Seoul orders
     const recentSeoulPurchaseInfoMap = useMemo(() => {
@@ -1196,14 +1201,17 @@ export default function SihwaInventory() {
                 (row.product.name && row.product.name.toLowerCase().includes(lowerQuery))
             );
         }
-        if (sihwaFilterItem) {
-            filtered = filtered.filter(row => row.product.name === sihwaFilterItem);
+        if (sihwaFilterItem.length > 0) {
+            filtered = filtered.filter(row => sihwaFilterItem.includes(row.product.name || ''));
         }
-        if (sihwaFilterMaterial) {
-            filtered = filtered.filter(row => row.product.material === sihwaFilterMaterial);
+        if (sihwaFilterMaterial.length > 0) {
+            filtered = filtered.filter(row => sihwaFilterMaterial.includes(row.product.material || ''));
         }
-        if (sihwaFilterSize) {
-            filtered = filtered.filter(row => row.product.size === sihwaFilterSize);
+        if (sihwaFilterSize.length > 0) {
+            filtered = filtered.filter(row => sihwaFilterSize.includes(row.product.size || ''));
+        }
+        if (sihwaFilterThickness.length > 0) {
+            filtered = filtered.filter(row => sihwaFilterThickness.includes(row.product.thickness || ''));
         }
 
         return filtered.sort((a, b) => {
@@ -1231,14 +1239,15 @@ export default function SihwaInventory() {
                 default: return 0; // Fallback
             }
         });
-    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, searchTerm, sihwaFilterItem, sihwaFilterMaterial, sihwaFilterSize, pinnedItemIds, sortConfig, historyData, liveSalesHistory, quotes, orders, users]);
+    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, searchTerm, sihwaFilterItem, sihwaFilterMaterial, sihwaFilterSize, sihwaFilterThickness, pinnedItemIds, sortConfig, historyData, liveSalesHistory, quotes, orders, users]);
 
     // ── 시화재고 필터링 옵션 추출 ──
     const sihwaFilterOptions = useMemo(() => {
         const names = Array.from(new Set(inventory.map(p => p.name).filter(Boolean))).sort();
         const materials = Array.from(new Set(inventory.map(p => p.material).filter(Boolean))).sort();
         const sizes = Array.from(new Set(inventory.map(p => p.size).filter(Boolean))).sort();
-        return { names, materials, sizes };
+        const thicknesses = Array.from(new Set(inventory.map(p => p.thickness).filter(Boolean))).sort();
+        return { names, materials, sizes, thicknesses };
     }, [inventory]);
 
     // ── 대경재고(양산) 필터링 옵션 추출 ──
@@ -2334,63 +2343,44 @@ export default function SihwaInventory() {
                 </div>
 
                 {activeTab !== 'DAEKYUNG_STOCK' && activeTab !== 'HEALTH_DIAGNOSIS' && (
-                    <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row gap-3 items-end">
-                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
-                            <div className="flex flex-col gap-1">
-                                <label htmlFor="sihwa-item-filter" className="text-[10px] font-bold text-slate-500">품목 필터</label>
-                                <select
-                                    id="sihwa-item-filter"
-                                    value={sihwaFilterItem}
-                                    onChange={e => setSihwaFilterItem(e.target.value)}
-                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                >
-                                    <option value="">전체 품목</option>
-                                    {sihwaFilterOptions.names.map(name => (
-                                        <option key={name} value={name}>{name}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="flex flex-col gap-1">
-                                <label htmlFor="sihwa-material-filter" className="text-[10px] font-bold text-slate-500">재질 필터</label>
-                                <select
-                                    id="sihwa-material-filter"
-                                    value={sihwaFilterMaterial}
-                                    onChange={e => setSihwaFilterMaterial(e.target.value)}
-                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                >
-                                    <option value="">전체 재질</option>
-                                    {sihwaFilterOptions.materials.map(mat => (
-                                        <option key={mat} value={mat}>{mat}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="flex flex-col gap-1">
-                                <label htmlFor="sihwa-size-filter" className="text-[10px] font-bold text-slate-500">사이즈 필터</label>
-                                <select
-                                    id="sihwa-size-filter"
-                                    value={sihwaFilterSize}
-                                    onChange={e => setSihwaFilterSize(e.target.value)}
-                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                >
-                                    <option value="">전체 사이즈</option>
-                                    {sihwaFilterOptions.sizes.map(size => (
-                                        <option key={size} value={size}>{size}</option>
-                                    ))}
-                                </select>
-                            </div>
+                    <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row gap-3 items-center justify-between">
+                        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                            <SearchableMultiSelect
+                                title="품목"
+                                options={sihwaFilterOptions.names}
+                                selectedValues={sihwaFilterItem}
+                                onChange={setSihwaFilterItem}
+                            />
+                            <SearchableMultiSelect
+                                title="재질"
+                                options={sihwaFilterOptions.materials}
+                                selectedValues={sihwaFilterMaterial}
+                                onChange={setSihwaFilterMaterial}
+                            />
+                            <SearchableMultiSelect
+                                title="두께"
+                                options={sihwaFilterOptions.thicknesses}
+                                selectedValues={sihwaFilterThickness}
+                                onChange={setSihwaFilterThickness}
+                            />
+                            <SearchableMultiSelect
+                                title="사이즈"
+                                options={sihwaFilterOptions.sizes}
+                                selectedValues={sihwaFilterSize}
+                                onChange={setSihwaFilterSize}
+                            />
                         </div>
 
                         <div className="shrink-0 w-full sm:w-auto">
                             <button
                                 onClick={() => {
                                     setSearchTerm('');
-                                    setSihwaFilterItem('');
-                                    setSihwaFilterMaterial('');
-                                    setSihwaFilterSize('');
+                                    setSihwaFilterItem([]);
+                                    setSihwaFilterMaterial([]);
+                                    setSihwaFilterSize([]);
+                                    setSihwaFilterThickness([]);
                                 }}
-                                disabled={!searchTerm && !sihwaFilterItem && !sihwaFilterMaterial && !sihwaFilterSize}
+                                disabled={!searchTerm && sihwaFilterItem.length === 0 && sihwaFilterMaterial.length === 0 && sihwaFilterSize.length === 0 && sihwaFilterThickness.length === 0}
                                 className="w-full sm:w-auto bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
                             >
                                 🔄 필터 초기화
