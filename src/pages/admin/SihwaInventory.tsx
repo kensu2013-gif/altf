@@ -727,7 +727,13 @@ export default function SihwaInventory() {
         return base;
     }, [orders]);
 
-    const analyzedInventory = useMemo(() => {
+    const userMap = useMemo(() => {
+        const map = new Map<string, typeof users[0]>();
+        users.forEach(u => map.set(u.id, u));
+        return map;
+    }, [users]);
+
+    const baseAnalyzedInventory = useMemo(() => {
         const comparisonMap: Record<string, AnalyzedItem> = {};
 
         const nowTime = Date.now();
@@ -766,7 +772,7 @@ export default function SihwaInventory() {
             const quoteDate = new Date(quote.createdAt).getTime();
             if (isNaN(quoteDate) || quoteDate < sixtyDaysAgo) return; // Only count recent 60 days
 
-            const quoteUser = users.find(u => u.id === quote.userId);
+            const quoteUser = userMap.get(quote.userId);
             const customerStr = (quote.customerName || quote.customerInfo?.companyName || quote.customerInfo?.contactName || quoteUser?.companyName || '').toLowerCase().replace(/\s+/g, '');
             if (customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf')) return;
 
@@ -1210,11 +1216,22 @@ export default function SihwaInventory() {
             };
         });
 
-        // Step 4: Apply Filters and Multiple Sort logic
-        let filtered = processedList;
+        return processedList;
+    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, historyData, liveSalesHistory, quotes, orders, userMap]);
+
+    const baseAnalyzedInventoryMap = useMemo(() => {
+        const map = new Map<string, typeof baseAnalyzedInventory[0]>();
+        baseAnalyzedInventory.forEach(item => {
+            map.set(item.product.id, item);
+        });
+        return map;
+    }, [baseAnalyzedInventory]);
+
+    const analyzedInventory = useMemo(() => {
+        let filtered = baseAnalyzedInventory;
         if (searchTerm) {
             const lowerQuery = searchTerm.toLowerCase();
-            filtered = processedList.filter(row =>
+            filtered = baseAnalyzedInventory.filter(row =>
                 row.product.id.toLowerCase().includes(lowerQuery) ||
                 (row.product.name && row.product.name.toLowerCase().includes(lowerQuery))
             );
@@ -1257,7 +1274,7 @@ export default function SihwaInventory() {
                 default: return 0; // Fallback
             }
         });
-    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, searchTerm, sihwaFilterItem, sihwaFilterMaterial, sihwaFilterSize, sihwaFilterThickness, pinnedItemIds, sortConfig, historyData, liveSalesHistory, quotes, orders, users]);
+    }, [baseAnalyzedInventory, searchTerm, sihwaFilterItem, sihwaFilterMaterial, sihwaFilterSize, sihwaFilterThickness, pinnedItemIds, sortConfig]);
 
     // ── 시화재고 필터링 옵션 추출 ──
     const sihwaFilterOptions = useMemo(() => {
@@ -1289,7 +1306,7 @@ export default function SihwaInventory() {
     }, [inventory]);
 
     // ── 대경재고(양산) 평균 보유수량 분석 (3개월, 6개월) ──
-    const daekyungStockAverages = useMemo(() => {
+    const daekyungBaseStockAverages = useMemo(() => {
         const dates: string[] = [];
         const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
         for (let i = 0; i < 180; i++) {
@@ -1308,10 +1325,14 @@ export default function SihwaInventory() {
             return isMakerDaekyung && hasYsLoc;
         });
 
-        const historyMapByDate: Record<string, Array<{ id: string; change: number }>> = {};
+        const historyMapByDate: Record<string, Record<string, number>> = {};
         (historyData.daekyungHistory || []).forEach(h => {
             const dateStr = h.date.split('T')[0];
-            historyMapByDate[dateStr] = h.diff || [];
+            const dateMap: Record<string, number> = {};
+            (h.diff || []).forEach((d: { id: string; change: number }) => {
+                dateMap[d.id] = d.change;
+            });
+            historyMapByDate[dateStr] = dateMap;
         });
 
         const rawResults = targetProducts.map((item: Product) => {
@@ -1332,10 +1353,10 @@ export default function SihwaInventory() {
                 const date = dates[i];
                 dailyStocks[i] = currentStock;
 
-                const diffs = historyMapByDate[date] || [];
-                const itemDiff = diffs.find((d: { id: string; change: number }) => d.id === item.id);
-                if (itemDiff) {
-                    currentStock = Math.max(0, currentStock - itemDiff.change);
+                const diffs = historyMapByDate[date] || {};
+                const change = diffs[item.id];
+                if (change !== undefined) {
+                    currentStock = Math.max(0, currentStock - change);
                 }
             }
 
@@ -1362,7 +1383,7 @@ export default function SihwaInventory() {
         const total3m = rawResults.reduce((s, r) => s + r.avg3m, 0);
         const total6m = rawResults.reduce((s, r) => s + r.avg6m, 0);
 
-        const analyzed = rawResults.map(r => {
+        return rawResults.map(r => {
             const share3m = total3m > 0 ? parseFloat(((r.avg3m / total3m) * 100).toFixed(2)) : 0;
             const share6m = total6m > 0 ? parseFloat(((r.avg6m / total6m) * 100).toFixed(2)) : 0;
             const trend = r.avg6m > 0 ? parseFloat((((r.avg3m - r.avg6m) / r.avg6m) * 100).toFixed(1)) : (r.avg3m > 0 ? 100 : 0);
@@ -1374,8 +1395,10 @@ export default function SihwaInventory() {
                 trend,
             };
         });
+    }, [inventory, historyData.daekyungHistory]);
 
-        let filtered = analyzed;
+    const daekyungStockAverages = useMemo(() => {
+        let filtered = daekyungBaseStockAverages;
         if (dkSearchQuery) {
             const query = dkSearchQuery.toLowerCase();
             filtered = filtered.filter(r =>
@@ -1458,7 +1481,7 @@ export default function SihwaInventory() {
                 default: return 0;
             }
         });
-    }, [inventory, historyData.daekyungHistory, dkSearchQuery, dkFilterItem, dkFilterMaterial, dkFilterSize, dkViewMode, dkSortConfig]);
+    }, [daekyungBaseStockAverages, dkSearchQuery, dkFilterItem, dkFilterMaterial, dkFilterSize, dkViewMode, dkSortConfig]);
 
     const daekyungStats = useMemo(() => {
         const totalCurrentStock = daekyungStockAverages.reduce((sum, item) => sum + item.currentStock, 0);
@@ -1656,7 +1679,7 @@ export default function SihwaInventory() {
 
                 const id = item.productId || (item as { item_id?: string }).item_id || '';
                 if (!id) return;
-                const row = analyzedInventory.find(r => r.product.id === id);
+                const row = baseAnalyzedInventoryMap.get(id);
                 if (!row) return;
 
                 const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
@@ -1692,7 +1715,7 @@ export default function SihwaInventory() {
             q.items?.forEach(item => {
                 const id = item.productId || (item as { item_id?: string }).item_id || '';
                 if (!id) return;
-                const row = analyzedInventory.find(r => r.product.id === id);
+                const row = baseAnalyzedInventoryMap.get(id);
                 if (!row) return;
 
                 const qty = Number(item.quantity ?? (item as { qty?: number }).qty ?? 0);
@@ -1790,7 +1813,7 @@ export default function SihwaInventory() {
         // ── 결품 기회손실 상위 품목 ─────────────────────────────────
         const missedDemandList = Object.entries(missedDemandMap)
             .map(([id, v]) => {
-                const row = analyzedInventory.find(r => r.product.id === id);
+                const row = baseAnalyzedInventoryMap.get(id);
                 return { id, ...v, row };
             })
             .filter(m => m.count >= 1)
@@ -1818,7 +1841,7 @@ export default function SihwaInventory() {
             lockedCapital: deadStockValue + excessStockValue,
             totalIssueCount: analyzedInventory.filter(r => r.healthGrade === 'E' || r.excessCategory !== null).length,
         };
-    }, [analyzedInventory, historyData, orders, quotes]);
+    }, [analyzedInventory, baseAnalyzedInventoryMap, historyData, orders, quotes]);
 
     const filteredMissedDemandList = useMemo(() => {
         let list = healthDiagnosis.missedDemandList.map(m => {
@@ -3563,7 +3586,7 @@ if (displayList.length === 0) {
                                         </tbody>
                                     </table>
                                     {selectedAllTableIds.size > 0 && (
-                                        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 rounded-full shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] border border-slate-700 px-6 py-3 flex items-center gap-6 z-[100] animate-in slide-in-from-bottom-10 fade-in duration-300">
+                                        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 rounded-full shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] border border-slate-700 px-6 py-3 flex items-center gap-6 z-100 animate-in slide-in-from-bottom-10 fade-in duration-300">
                                             <div className="font-bold text-white">
                                                 <span className="text-indigo-400 font-black text-xl">{selectedAllTableIds.size}</span>
                                                 <span className="text-slate-300 ml-2">개 품목 선택됨</span>

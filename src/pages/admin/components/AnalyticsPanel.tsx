@@ -25,7 +25,13 @@ export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
 
             const sales = order.totalAmount || 0;
             const displayCustomer = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase();
-            const isZeroSalesInventory = sales === 0 && displayCustomer.includes('재고');
+            
+            // 서울재고, 알트에프 재고, 시화재고, altf 판별
+            const isSeoulOrAltfInventory = 
+                displayCustomer.includes('서울재고') || 
+                displayCustomer.includes('시화재고') || 
+                displayCustomer.includes('알트에프') || 
+                displayCustomer.includes('altf');
 
             // Calculate cost from items
             let orderCost = 0;
@@ -47,7 +53,8 @@ export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
                 orderCost += (cost * item.quantity);
             });
 
-            if (isZeroSalesInventory) {
+            // 서울재고, 알트에프 재고 등 내부 재고 주문인 경우 전체 금액에 반영하지 않고 재고 입고액으로만 분류
+            if (isSeoulOrAltfInventory) {
                 if (displayCustomer.includes('서울') || displayCustomer.includes('시화')) {
                     sihwaInventoryCost += orderCost;
                 } else {
