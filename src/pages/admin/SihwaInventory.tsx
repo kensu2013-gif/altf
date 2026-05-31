@@ -1399,6 +1399,24 @@ export default function SihwaInventory() {
 
     const daekyungStockAverages = useMemo(() => {
         let filtered = daekyungBaseStockAverages;
+
+        // 필터/검색 활성화 여부 확인
+        const isFilterActive = !!(
+            dkSearchQuery.trim() ||
+            dkFilterItem ||
+            dkFilterMaterial ||
+            dkFilterSize
+        );
+
+        // 기본 상태에서는 시화 재고의 건강도 등급이 A, B인 것만 필터링하여 보여줌
+        if (!isFilterActive) {
+            filtered = filtered.filter(r => {
+                const sihwaRow = baseAnalyzedInventoryMap.get(r.id);
+                if (!sihwaRow) return false;
+                return sihwaRow.healthGrade === 'A' || sihwaRow.healthGrade === 'B';
+            });
+        }
+
         if (dkSearchQuery) {
             const query = dkSearchQuery.toLowerCase();
             filtered = filtered.filter(r =>
@@ -1481,7 +1499,7 @@ export default function SihwaInventory() {
                 default: return 0;
             }
         });
-    }, [daekyungBaseStockAverages, dkSearchQuery, dkFilterItem, dkFilterMaterial, dkFilterSize, dkViewMode, dkSortConfig]);
+    }, [daekyungBaseStockAverages, baseAnalyzedInventoryMap, dkSearchQuery, dkFilterItem, dkFilterMaterial, dkFilterSize, dkViewMode, dkSortConfig]);
 
     const daekyungStats = useMemo(() => {
         const totalCurrentStock = daekyungStockAverages.reduce((sum, item) => sum + item.currentStock, 0);
