@@ -289,6 +289,9 @@ export default function AdminQuotes() {
                                         totalStock = product.currentStock || 0;
                                     }
                                     
+                                    const waitQty = product.marking_wait_qty || item.marking_wait_qty || 0;
+                                    totalStock += Number(waitQty);
+                                    
                                     const reqQty = Number(item.quantity ?? item.qty ?? 0);
                                     if (reqQty > totalStock) return true;
                                 }
