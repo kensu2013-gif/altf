@@ -5,6 +5,7 @@ import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { formatCurrency } from '../../lib/utils';
 import { Button } from '../../components/ui/Button';
+import { useInventory } from '../../hooks/useInventory';
 
 import type { Quotation } from '../../types';
 import type { DocumentPayload } from '../../types/document';
@@ -22,6 +23,7 @@ export default function AdminQuotes() {
         setQuotes: state.setQuotes,
         fetchUsers: state.fetchUsers
     })));
+    const { inventory } = useInventory();
     const [selectedQuote, setSelectedQuote] = useState<typeof quotes[0] | null>(null);
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -272,6 +274,27 @@ export default function AdminQuotes() {
                             const displayCompany = quote.customerInfo?.companyName || quoteUser?.companyName || quote.customerName || '알 수 없음';
                             const displayContact = quote.customerInfo?.contactName || quoteUser?.contactName || '';
 
+                            const checkQuoteStockInsufficiency = (q: typeof quote) => {
+                                if (q.status === 'COMPLETED' || q.isDeleted) return false;
+                                for (const item of q.items) {
+                                    const id = item.productId || (item as { item_id?: string }).item_id;
+                                    if (!id) continue;
+                                    const product = inventory.find(p => p.id === id);
+                                    if (!product) continue;
+                                    
+                                    let totalStock = 0;
+                                    if (product.locationStock) {
+                                        totalStock = Object.values(product.locationStock).reduce((sum, qty) => sum + Number(qty), 0);
+                                    } else {
+                                        totalStock = product.currentStock || 0;
+                                    }
+                                    
+                                    const reqQty = Number(item.quantity ?? item.qty ?? 0);
+                                    if (reqQty > totalStock) return true;
+                                }
+                                return false;
+                            };
+
                             return (
                                 <div key={quote.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:shadow-md transition-all">
                                     <div className="flex items-start gap-4">
@@ -286,6 +309,11 @@ export default function AdminQuotes() {
                                                 </span>
                                                 <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{quote.id}</span>
                                                 {isModified && <span className="text-[10px] font-normal text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded ml-1 border border-teal-100">수정됨</span>}
+                                                {checkQuoteStockInsufficiency(quote) && (
+                                                    <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full ml-1 animate-pulse flex items-center gap-1 shadow-sm">
+                                                        ⚠️ 재고 부족
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className={`text-sm font-bold ${isModified ? 'text-teal-700' : 'text-indigo-700'} mb-1 flex items-center gap-1.5`}>
                                                 <span className={`w-1.5 h-1.5 rounded-full ${isModified ? 'bg-teal-400' : 'bg-indigo-400'} inline-block`}></span>

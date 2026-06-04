@@ -173,22 +173,36 @@ export const QuoteItemRow = React.memo(({
                         )}
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center text-xs bg-slate-50 rounded border border-slate-100 p-1.5 w-auto min-w-[85px] mx-auto space-y-0.5">
-                        <div className="flex justify-between w-full gap-2 whitespace-nowrap">
-                            <span className="text-slate-500">양산:</span>
-                            <span className="font-bold text-slate-800">{((product?.locationStock?.['양산'] as number) ?? (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (product.shQty ?? 0)) : 0)).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between w-full gap-2 whitespace-nowrap">
-                            <span className="text-slate-500">시화:</span>
-                            <span className="font-bold text-blue-600">{((product?.locationStock?.['시화'] as number) ?? product?.shQty ?? 0).toLocaleString()}</span>
-                        </div>
-                        {(item.marking_wait_qty || 0) > 0 && (
-                            <div className="flex justify-between w-full gap-2 whitespace-nowrap">
-                                <span className="text-slate-500">대기:</span>
-                                <span className="font-bold text-purple-600">{item.marking_wait_qty?.toLocaleString()}</span>
+                    (() => {
+                        const ysStock = (product?.locationStock?.['양산'] as number) ?? (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (product.shQty ?? 0)) : 0);
+                        const shStock = (product?.locationStock?.['시화'] as number) ?? product?.shQty ?? 0;
+                        const totalStock = ysStock + shStock;
+                        const isStockDeficit = item.quantity > totalStock;
+
+                        return (
+                            <div className={`flex flex-col items-center text-xs rounded border p-1.5 w-auto min-w-[85px] mx-auto space-y-0.5 transition-colors duration-300 ${isStockDeficit ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-slate-50 border-slate-100'}`}>
+                                <div className="flex justify-between w-full gap-2 whitespace-nowrap">
+                                    <span className="text-slate-500">양산:</span>
+                                    <span className="font-bold text-slate-800">{ysStock.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between w-full gap-2 whitespace-nowrap">
+                                    <span className="text-slate-500">시화:</span>
+                                    <span className="font-bold text-blue-600">{shStock.toLocaleString()}</span>
+                                </div>
+                                {(item.marking_wait_qty || 0) > 0 && (
+                                    <div className="flex justify-between w-full gap-2 whitespace-nowrap">
+                                        <span className="text-slate-500">대기:</span>
+                                        <span className="font-bold text-purple-600">{item.marking_wait_qty?.toLocaleString()}</span>
+                                    </div>
+                                )}
+                                {isStockDeficit && (
+                                    <div className="text-[10px] font-extrabold text-red-600 mt-1 whitespace-nowrap animate-pulse border-t border-red-150 pt-1 w-full text-center">
+                                        ⚠️ 재고부족 ({totalStock}개)
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
+                        );
+                    })()
                 )}
             </td>
             <td className="px-4 py-3 text-center align-middle">

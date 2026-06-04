@@ -380,6 +380,13 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/inventory/inventory.json') {
         try {
             const now = Date.now();
+            const forceRefresh = url.searchParams.get('refresh') === 'true' || url.searchParams.get('bypass') === 'true';
+            if (forceRefresh) {
+                console.log('[API] Forced refresh requested. Invalidating memory cache...');
+                inventoryCache.gzippedData = null;
+                inventoryCache.rawData = null;
+                inventoryCache.timestamp = 0;
+            }
 
             // Check memory cache first
             if (!inventoryCache.gzippedData || (now - inventoryCache.timestamp) > CACHE_TTL) {
@@ -1345,6 +1352,11 @@ const server = http.createServer(async (req, res) => {
                 await saveData(); // <--- SAVE
                 console.log(`[API] Saved quotation ${newId} for user ${data.userId}`);
 
+                // Invalidate cache to force snapshot recalculation on next fetch
+                inventoryCache.gzippedData = null;
+                inventoryCache.rawData = null;
+                inventoryCache.timestamp = 0;
+
                 res.writeHead(201, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(newQuote));
 
@@ -1399,6 +1411,12 @@ const server = http.createServer(async (req, res) => {
                     db.quotations[index] = { ...db.quotations[index], ...updates };
                     await saveData();
                     console.log(`[API] Updated quotation ${id}`);
+
+                    // Invalidate cache to force snapshot recalculation on next fetch
+                    inventoryCache.gzippedData = null;
+                    inventoryCache.rawData = null;
+                    inventoryCache.timestamp = 0;
+
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(db.quotations[index]));
                 } else {
@@ -1444,6 +1462,11 @@ const server = http.createServer(async (req, res) => {
                 db.orders.unshift(newOrder);
                 await saveData(); // <--- SAVE
                 console.log(`[API] Created order ${newId}`);
+
+                // Invalidate cache to force snapshot recalculation on next fetch
+                inventoryCache.gzippedData = null;
+                inventoryCache.rawData = null;
+                inventoryCache.timestamp = 0;
 
                 res.writeHead(201, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, orderId: newOrder.id }));
@@ -1499,6 +1522,12 @@ const server = http.createServer(async (req, res) => {
                     db.orders[index] = { ...db.orders[index], ...updates };
                     await saveData(); // <--- SAVE
                     console.log(`[API] Updated order ${id}`);
+
+                    // Invalidate cache to force snapshot recalculation on next fetch
+                    inventoryCache.gzippedData = null;
+                    inventoryCache.rawData = null;
+                    inventoryCache.timestamp = 0;
+
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(db.orders[index]));
 
@@ -1546,6 +1575,12 @@ const server = http.createServer(async (req, res) => {
             try {
                 await saveData();
                 console.log(`[API] Retracted order ${id} to quote ${newQuote.id}`);
+
+                // Invalidate cache to force snapshot recalculation on next fetch
+                inventoryCache.gzippedData = null;
+                inventoryCache.rawData = null;
+                inventoryCache.timestamp = 0;
+
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, quote: newQuote }));
             } catch (e) {

@@ -35,8 +35,21 @@ export async function loadDbFromS3() {
             console.log(`[S3] ${DB_KEY} not found in S3. Returning null for initial seed.`);
             return null;
         }
-        console.error('[S3] Failed to load from S3:', error);
-        throw error;
+        console.warn('[S3] Failed to load from S3. Falling back to local data/db.json...', error.message);
+        try {
+            const fs = await import('fs');
+            const LOCAL_DB = './data/db.json';
+            if (fs.existsSync(LOCAL_DB)) {
+                const localContent = fs.readFileSync(LOCAL_DB, 'utf8');
+                console.log(`[Local DB] Successfully loaded data from local fallback: ${LOCAL_DB}`);
+                return JSON.parse(localContent);
+            }
+            console.warn('[Local DB] Local fallback DB file does not exist. Returning null to allow seeding.');
+            return null;
+        } catch (localError) {
+            console.error('[Local DB] Failed to load from local fallback DB:', localError);
+            throw error;
+        }
     }
 }
 
@@ -110,9 +123,25 @@ export async function saveDbToS3(dbObject) {
             ContentType: 'application/json'
         });
         await s3Client.send(command);
+        console.log('[S3] Data saved successfully to S3');
     } catch (error) {
-        console.error('[S3] Failed to save to S3:', error);
-        throw error;
+        console.error('[S3] Failed to save to S3. Falling back to saving locally...', error.message);
+        try {
+            const fs = await import('fs');
+            const path = await import('path');
+            const dir = './data';
+            const LOCAL_DB = path.join(dir, 'db.json');
+            
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            
+            fs.writeFileSync(LOCAL_DB, JSON.stringify(dbObject, null, 2), 'utf8');
+            console.log(`[Local DB] Successfully saved database to local fallback: ${LOCAL_DB}`);
+        } catch (localError) {
+            console.error('[Local DB] Critical: Failed to save to local fallback DB:', localError);
+            throw error; // Re-throw S3 error if local fallback saving also fails
+        }
     }
 }
 

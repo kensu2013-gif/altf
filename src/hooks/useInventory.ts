@@ -56,12 +56,78 @@ export function useInventory() {
     const existingInventory = useStore((state) => state.inventory);
 
     const { data, error, isLoading, isValidating, mutate } = useSWR(INVENTORY_URL, fetcher, {
-        revalidateIfStale: false, // Don't revalidate if we have data (unless expired)
-        revalidateOnFocus: false,
+        revalidateIfStale: true, // Allow background revalidation on mount
+        revalidateOnFocus: true,  // Revalidate when admin switches windows
         revalidateOnReconnect: true,
-        dedupingInterval: 300000, // 5 minutes (Increased from 1 min)
-        keepPreviousData: true, // Keep showing old data while fetching new
+        dedupingInterval: 60000,  // Reduce deduping window to 1 minute
+        keepPreviousData: true,   // Keep showing old data while fetching new
     });
+
+    const refresh = async () => {
+        try {
+            console.log('[useInventory] Forced refresh initiated. Fetching bypass URL...');
+            const forceUrl = INVENTORY_URL + (INVENTORY_URL.includes('?') ? '&' : '?') + 'refresh=true';
+            const updated = await fetcher(forceUrl);
+            
+            // Format and update state directly
+            const arr = Array.isArray(updated) ? updated : (Array.isArray(updated?.items) ? updated.items : []);
+            const processed = arr.map((item: RawInventoryItem) => {
+                const locationStock: Record<string, number> = {};
+                if (item.locationStock && Object.keys(item.locationStock).length > 0) {
+                    for (const [key, qty] of Object.entries(item.locationStock)) {
+                        const newKey = (key === '서울' || key === '서울재고') ? '시화' : key;
+                        locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
+                    }
+                } else {
+                    if (item.location1 && item.sh_qty) {
+                        const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
+                        locationStock[loc1] = Number(item.sh_qty);
+                    }
+                    if (item.location && item.ready_qty) {
+                        const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
+                        locationStock[primaryLoc] = Number(item.ready_qty);
+                    }
+                }
+                const currentStock = item.ready_qty !== undefined ? Number(item.ready_qty) : (Number(item.currentStock) || 0);
+                let stockStatus = item.stockStatus;
+                if (!stockStatus) {
+                    stockStatus = currentStock > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK';
+                }
+                const mappedLocation = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
+                const id = (item.sku_key || item.id || '') as string;
+                const parsed = parseSku(id);
+                const finalSize = parsed.size.replace(/^[A-Z]+-?/, '').trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
+
+                return {
+                    ...item,
+                    id,
+                    name: item.item || item.name || '',
+                    thickness: parsed.thickness || item.thickness || '',
+                    size: finalSize || item.size || '',
+                    material: parsed.material || item.material || '',
+                    location: mappedLocation,
+                    unitPrice: item.final_price !== undefined ? item.final_price : item.unitPrice,
+                    currentStock,
+                    stockStatus,
+                    odEqKey: item.od_eq_key || item.odEqKey,
+                    locationStock,
+                    maker1: item.maker1,
+                    marking_wait_qty: Number(item.marking_wait_qty) || 0
+                } as Product;
+            });
+
+            if (processed.length > 0) {
+                setInventory(processed);
+            }
+            
+            // Also mutate SWR cache
+            await mutate(updated, { revalidate: false });
+            console.log('[useInventory] Forced refresh completed successfully.');
+        } catch (err) {
+            console.warn('[useInventory] Forced refresh failed. Falling back to standard revalidation.', err);
+            await mutate();
+        }
+    };
 
     // Process and sync data to store
     useEffect(() => {
@@ -158,7 +224,7 @@ export function useInventory() {
         isLoading,
         isValidating,
         error: error ? String(error) : null,
-        refresh: mutate
+        refresh
     };
 }
 
