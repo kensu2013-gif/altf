@@ -102,12 +102,21 @@ function parseSku(sku) {
 // --- Main Execution ---
 
 async function updateInventory() {
-    console.log(`Fetching inventory from ${INVENTORY_URL}...`);
+    let rawData;
+    const localRawPath = path.join(__dirname, '../s3_raw.json');
+    
     try {
-        const response = await fetch(INVENTORY_URL);
-        if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
-
-        const rawData = await response.json();
+        if (fs.existsSync(localRawPath)) {
+            console.log(`[Local Development] Found local raw source: ${localRawPath}`);
+            console.log(`Reading local raw data...`);
+            const localRawContent = fs.readFileSync(localRawPath, 'utf8');
+            rawData = JSON.parse(localRawContent);
+        } else {
+            console.log(`Fetching inventory from ${INVENTORY_URL}...`);
+            const response = await fetch(INVENTORY_URL);
+            if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+            rawData = await response.json();
+        }
 
         let arr = [];
         if (Array.isArray(rawData)) {
@@ -115,7 +124,7 @@ async function updateInventory() {
         } else if (rawData && Array.isArray(rawData.items)) {
             arr = rawData.items;
         } else {
-            console.warn('Unknown data structure, attempting to use as is if array, else empty');
+            console.log('Unknown data structure, attempting to use as is if array, else empty');
             if (Array.isArray(rawData)) arr = rawData;
         }
 

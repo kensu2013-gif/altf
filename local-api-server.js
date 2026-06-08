@@ -158,6 +158,27 @@ let inventoryCache = {
 };
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// Watch local inventory file for changes in development to automatically invalidate memory cache
+if (process.env.NODE_ENV !== 'production') {
+    try {
+        const fs = await import('fs');
+        const localPath = './public/api/inventory/inventory.json';
+        if (fs.existsSync(localPath)) {
+            fs.watch(localPath, (eventType) => {
+                if (eventType === 'change') {
+                    console.log(`[API] Local inventory.json changed on disk. Invalidating memory cache...`);
+                    inventoryCache.gzippedData = null;
+                    inventoryCache.rawData = null;
+                    inventoryCache.timestamp = 0;
+                }
+            });
+            console.log(`[API] Watching local file for changes: ${localPath}`);
+        }
+    } catch (watchErr) {
+        console.warn(`[API] Failed to setup file watcher for inventory.json:`, watchErr.message);
+    }
+}
+
 const sendJsonResponse = (req, res, statusCode, data) => {
     try {
         const raw = JSON.stringify(data);
@@ -599,19 +620,22 @@ const server = http.createServer(async (req, res) => {
             }
 
             const acceptEncoding = req.headers['accept-encoding'] || '';
+            const cacheControl = process.env.NODE_ENV === 'production'
+                ? 'public, max-age=300'
+                : 'no-store, no-cache, must-revalidate';
 
             // Serve Gzip if supported by browser
             if (acceptEncoding.includes('gzip')) {
                 res.writeHead(200, {
                     'Content-Type': 'application/json',
                     'Content-Encoding': 'gzip',
-                    'Cache-Control': 'public, max-age=300'
+                    'Cache-Control': cacheControl
                 });
                 res.end(inventoryCache.gzippedData);
             } else {
                 res.writeHead(200, {
                     'Content-Type': 'application/json',
-                    'Cache-Control': 'public, max-age=300'
+                    'Cache-Control': cacheControl
                 });
                 res.end(inventoryCache.rawData);
             }
