@@ -17,7 +17,10 @@ export interface Product {
     locationStock?: Record<string, number>;
     location1?: string;
     shQty?: number;
+    sh_qty?: number;
+    ready_qty?: number;
     marking_wait_qty?: number;
+    uniqueKey?: string;
     // Supplier / Pricing Fields
     base_price?: number;
     rate_pct?: number;

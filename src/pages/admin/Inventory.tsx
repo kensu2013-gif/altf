@@ -3,6 +3,7 @@ import { RefreshCw, Database } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { ItemIntelligenceCard } from './components/ItemIntelligenceCard';
 import { useState } from 'react';
+import type { Product } from '../../types';
 
 export default function AdminInventory() {
     // Use the hook which handles SWR fetching and data mapping automatically
@@ -14,6 +15,8 @@ export default function AdminInventory() {
     const [thickness, setThickness] = useState('');
     const [size, setSize] = useState('');
     const [material, setMaterial] = useState('');
+    const [location, setLocation] = useState('');
+    const [maker, setMaker] = useState('');
 
     const isBusy = isLoading || isValidating;
 
@@ -21,11 +24,49 @@ export default function AdminInventory() {
         window.location.reload(); // Simple brute force refresh for admin to be sure
     };
 
+    // Flatten inventory to separate Yangsan and Sihwa stocks
+    const flatInventory: Product[] = [];
+    inventory.forEach((item) => {
+        // 1. Yangsan Stock Row (or default location)
+        const primaryLoc = item.location || '';
+        const primaryMaker = item.maker || '';
+        const primaryStock = item.ready_qty !== undefined ? Number(item.ready_qty) : (Number(item.currentStock) || 0);
+
+        flatInventory.push({
+            ...item,
+            uniqueKey: `${item.id}-primary`,
+            location: primaryLoc,
+            maker: primaryMaker,
+            currentStock: primaryStock,
+            stockStatus: primaryStock > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK',
+        });
+
+        // 2. Sihwa Stock Row (secondary location)
+        const hasSecondary = (item.location1 && item.location1.trim() !== '') || 
+                              (item.sh_qty !== undefined && Number(item.sh_qty) > 0) ||
+                              (item.shQty !== undefined && Number(item.shQty) > 0);
+
+        if (hasSecondary) {
+            const secLoc = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : (item.location1 || '시화');
+            const secMaker = item.maker1 || item.maker || '';
+            const secStock = item.sh_qty !== undefined ? Number(item.sh_qty) : (item.shQty !== undefined ? Number(item.shQty) : 0);
+
+            flatInventory.push({
+                ...item,
+                uniqueKey: `${item.id}-secondary`,
+                location: secLoc,
+                maker: secMaker,
+                currentStock: secStock,
+                stockStatus: secStock > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK',
+            });
+        }
+    });
+
     // Count non-empty filter inputs
-    const filledCount = [itemName, thickness, size, material].filter(val => val.trim() !== '').length;
+    const filledCount = [itemName, thickness, size, material, location, maker].filter(val => val.trim() !== '').length;
 
     // Filter items with exact match (===)
-    const filteredInventory = inventory.filter(item => {
+    const filteredInventory = flatInventory.filter(item => {
         if (itemName.trim() !== '' && item.name.trim().toUpperCase() !== itemName.trim().toUpperCase()) {
             return false;
         }
@@ -38,10 +79,16 @@ export default function AdminInventory() {
         if (material.trim() !== '' && item.material.trim().toUpperCase() !== material.trim().toUpperCase()) {
             return false;
         }
+        if (location.trim() !== '' && (item.location || '').trim().toUpperCase() !== location.trim().toUpperCase()) {
+            return false;
+        }
+        if (maker.trim() !== '' && (item.maker || '').trim().toUpperCase() !== maker.trim().toUpperCase()) {
+            return false;
+        }
         return true;
     });
 
-    const displayInventory = filledCount >= 2 ? filteredInventory : inventory.slice(0, 100);
+    const displayInventory = filledCount >= 2 ? filteredInventory : flatInventory.slice(0, 100);
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -82,6 +129,8 @@ export default function AdminInventory() {
                                 setThickness('');
                                 setSize('');
                                 setMaterial('');
+                                setLocation('');
+                                setMaker('');
                             }}
                             className="text-xs text-red-500 hover:text-red-700 font-bold transition-colors"
                         >
@@ -90,7 +139,7 @@ export default function AdminInventory() {
                     )}
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                     <div className="space-y-1.5">
                         <label className="text-[11px] font-bold text-slate-500 block">품목명 (ITEM)</label>
                         <input
@@ -128,6 +177,26 @@ export default function AdminInventory() {
                             value={material}
                             onChange={(e) => setMaterial(e.target.value)}
                             placeholder="예: STS304-W"
+                            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-slate-500 block">위치 (LOCATION)</label>
+                        <input
+                            type="text"
+                            value={location}
+                            onChange={(e) => setLocation(e.target.value)}
+                            placeholder="예: 시화"
+                            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-slate-500 block">제조사 (MAKER)</label>
+                        <input
+                            type="text"
+                            value={maker}
+                            onChange={(e) => setMaker(e.target.value)}
+                            placeholder="예: 대경"
                             className="w-full text-xs border border-slate-200 rounded-lg p-2.5 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
                         />
                     </div>
@@ -174,7 +243,7 @@ export default function AdminInventory() {
                                 displayInventory.map((item) => {
                                     const price = item.unitPrice;
                                     return (
-                                        <tr key={item.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setSelectedItem({ id: item.id, name: item.name })}>
+                                        <tr key={item.uniqueKey || item.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setSelectedItem({ id: item.id, name: item.name })}>
                                             <td className="px-4 py-3 font-mono text-slate-400">{item.id.slice(0, 8)}...</td>
                                             <td className="px-4 py-3 font-bold text-slate-800">
                                                 {item.name}
@@ -219,7 +288,7 @@ export default function AdminInventory() {
                     <span>
                         {filledCount >= 2 
                             ? `검색 결과: 총 ${displayInventory.length}개 품목 표시`
-                            : `전체 ${inventory.length}개 품목 중 100개 표시`
+                            : `전체 ${flatInventory.length}개 품목 중 100개 표시`
                         }
                     </span>
                     <span>
