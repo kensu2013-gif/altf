@@ -224,6 +224,11 @@ async function updateInventory() {
         }
 
         const jsonContent = JSON.stringify(processed, null, 2);
+        // Ensure parent directory exists recursively (e.g. for Render container deployment)
+        const parentDir = path.dirname(OUTPUT_PATH);
+        if (!fs.existsSync(parentDir)) {
+            fs.mkdirSync(parentDir, { recursive: true });
+        }
         fs.writeFileSync(OUTPUT_PATH, jsonContent, 'utf-8');
 
         console.log(`✅ Successfully updated ${OUTPUT_PATH}`);
