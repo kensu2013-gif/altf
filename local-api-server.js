@@ -2,6 +2,7 @@ import http from 'http';
 import aromanize from 'aromanize';
 import crypto from 'crypto';
 import zlib from 'zlib';
+import { execSync } from 'child_process';
 
 const PORT = process.env.PORT || 3001;
 
@@ -129,6 +130,14 @@ async function saveData() {
 }
 
 // Initialize
+try {
+    console.log('[API Startup] Generating inventory from local raw source s3_raw.json...');
+    execSync('node scripts/update-inventory.js', { stdio: 'inherit' });
+    console.log('[API Startup] Inventory generation completed successfully.');
+} catch (e) {
+    console.error('[API Startup] Failed to generate inventory on startup:', e.message);
+}
+
 await loadData();
 
 // References for easier access (optional since we operate on db object directly now)
