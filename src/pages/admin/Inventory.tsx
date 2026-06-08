@@ -30,7 +30,13 @@ export default function AdminInventory() {
         // 1. Yangsan Stock Row (or default location)
         const primaryLoc = item.location || '';
         const primaryMaker = item.maker || '';
-        const primaryStock = item.ready_qty !== undefined ? Number(item.ready_qty) : (Number(item.currentStock) || 0);
+        
+        let primaryStock = 0;
+        if (item.locationStock && primaryLoc && item.locationStock[primaryLoc] !== undefined) {
+            primaryStock = Number(item.locationStock[primaryLoc]);
+        } else {
+            primaryStock = item.ready_qty !== undefined ? Number(item.ready_qty) : (Number(item.currentStock) || 0);
+        }
 
         flatInventory.push({
             ...item,
@@ -49,7 +55,13 @@ export default function AdminInventory() {
         if (hasSecondary) {
             const secLoc = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : (item.location1 || '시화');
             const secMaker = item.maker1 || item.maker || '';
-            const secStock = item.sh_qty !== undefined ? Number(item.sh_qty) : (item.shQty !== undefined ? Number(item.shQty) : 0);
+            
+            let secStock = 0;
+            if (item.locationStock && secLoc && item.locationStock[secLoc] !== undefined) {
+                secStock = Number(item.locationStock[secLoc]);
+            } else {
+                secStock = item.sh_qty !== undefined ? Number(item.sh_qty) : (item.shQty !== undefined ? Number(item.shQty) : 0);
+            }
 
             flatInventory.push({
                 ...item,
