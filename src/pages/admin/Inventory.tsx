@@ -9,17 +9,11 @@ export default function AdminInventory() {
     const { inventory, lastModified, isLoading, isValidating } = useInventory();
     const [selectedItem, setSelectedItem] = useState<{ id: string, name: string } | null>(null);
 
-    // For refresh, we can just reload the page or rely on SWR's focus revalidation, 
-    // but the button suggests manual action. Since useInventory uses SWR, 
-    // we can't easily force-refresh without exposing mutate. 
-    // For now, we'll keep the button but make it just trigger a UI loading state or similar, 
-    // or arguably we don't need manual refresh if SWR works. 
-    // However, to keep it simple and working: using the hook ensures data is loaded on mount.
-
-    // We'll simplisticly assume re-mount or window focus handles updates, 
-    // or just say "Data is live". 
-    // Let's keep the refresh button visual but maybe it doesn't need to do much if SWR is active.
-    // actually useInventory hook doesn't export mutate.
+    // Search filters state
+    const [itemName, setItemName] = useState('');
+    const [thickness, setThickness] = useState('');
+    const [size, setSize] = useState('');
+    const [material, setMaterial] = useState('');
 
     const isBusy = isLoading || isValidating;
 
@@ -27,7 +21,27 @@ export default function AdminInventory() {
         window.location.reload(); // Simple brute force refresh for admin to be sure
     };
 
-    // Effect removed as useInventory hook handles fetching on mount
+    // Count non-empty filter inputs
+    const filledCount = [itemName, thickness, size, material].filter(val => val.trim() !== '').length;
+
+    // Filter items with exact match (===)
+    const filteredInventory = inventory.filter(item => {
+        if (itemName.trim() !== '' && item.name.trim().toUpperCase() !== itemName.trim().toUpperCase()) {
+            return false;
+        }
+        if (thickness.trim() !== '' && item.thickness.trim().toUpperCase() !== thickness.trim().toUpperCase()) {
+            return false;
+        }
+        if (size.trim() !== '' && item.size.trim().toUpperCase() !== size.trim().toUpperCase()) {
+            return false;
+        }
+        if (material.trim() !== '' && item.material.trim().toUpperCase() !== material.trim().toUpperCase()) {
+            return false;
+        }
+        return true;
+    });
+
+    const displayInventory = filledCount >= 2 ? filteredInventory : inventory.slice(0, 100);
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -52,10 +66,90 @@ export default function AdminInventory() {
                 </Button>
             </div>
 
+            {/* Search Filters Card */}
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                        <span>🔍 상세 검색 필터</span>
+                        <span className="text-xs font-normal text-slate-400">
+                            (입력한 항목과 정확히 일치하는 재고 데이터를 검색합니다)
+                        </span>
+                    </h3>
+                    {filledCount > 0 && (
+                        <button
+                            onClick={() => {
+                                setItemName('');
+                                setThickness('');
+                                setSize('');
+                                setMaterial('');
+                            }}
+                            className="text-xs text-red-500 hover:text-red-700 font-bold transition-colors"
+                        >
+                            필터 초기화
+                        </button>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-slate-500 block">품목명 (ITEM)</label>
+                        <input
+                            type="text"
+                            value={itemName}
+                            onChange={(e) => setItemName(e.target.value)}
+                            placeholder="예: 90E(L)"
+                            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-slate-500 block">두께 (THICKNESS)</label>
+                        <input
+                            type="text"
+                            value={thickness}
+                            onChange={(e) => setThickness(e.target.value)}
+                            placeholder="예: S10S"
+                            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-slate-500 block">규격 (SIZE)</label>
+                        <input
+                            type="text"
+                            value={size}
+                            onChange={(e) => setSize(e.target.value)}
+                            placeholder="예: 80A"
+                            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-slate-500 block">재질 (MATERIAL)</label>
+                        <input
+                            type="text"
+                            value={material}
+                            onChange={(e) => setMaterial(e.target.value)}
+                            placeholder="예: STS304-W"
+                            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                        />
+                    </div>
+                </div>
+
+                {/* Status Message Banner */}
+                {filledCount < 2 ? (
+                    <div className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center justify-between">
+                        <span>⚠️ 필터를 작동시키려면 **최소 2개 이상의 검색 조건**을 입력해 주세요. (현재 입력됨: {filledCount}개)</span>
+                        <span className="opacity-70 font-mono text-[10px]">미충족 시 전체 목록 중 100개만 표시됩니다</span>
+                    </div>
+                ) : (
+                    <div className="text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-4 py-3 flex items-center justify-between animate-in fade-in duration-300">
+                        <span>✅ 상세 검색 필터가 적용되었습니다. 검색 매칭 항목: **{filteredInventory.length}개**</span>
+                    </div>
+                )}
+            </div>
+
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase whitespace-nowrap">
+                    <table className="w-full text-left text-xs border-collapse">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase whitespace-nowrap sticky top-0">
                             <tr>
                                 <th className="px-4 py-3 font-bold">ID</th>
                                 <th className="px-4 py-3 font-bold">품목명 (Name)</th>
@@ -70,15 +164,14 @@ export default function AdminInventory() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {inventory.length === 0 ? (
+                            {displayInventory.length === 0 ? (
                                 <tr>
                                     <td colSpan={10} className="px-6 py-12 text-center text-slate-400">
-                                        {isBusy ? '데이터를 불러오는 중입니다...' : '재고 데이터가 없습니다.'}
+                                        {isBusy ? '데이터를 불러오는 중입니다...' : '조건에 매칭되는 재고 데이터가 없습니다.'}
                                     </td>
                                 </tr>
                             ) : (
-                                // Limit display to 100 items to prevent crashing browser with 13,000+ items
-                                inventory.slice(0, 100).map((item) => {
+                                displayInventory.map((item) => {
                                     const price = item.unitPrice;
                                     return (
                                         <tr key={item.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setSelectedItem({ id: item.id, name: item.name })}>
@@ -123,7 +216,12 @@ export default function AdminInventory() {
                     </table>
                 </div>
                 <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 text-xs text-slate-500 flex justify-between">
-                    <span>총 {inventory.length}개 품목 중 100개 표시</span>
+                    <span>
+                        {filledCount >= 2 
+                            ? `검색 결과: 총 ${displayInventory.length}개 품목 표시`
+                            : `전체 ${inventory.length}개 품목 중 100개 표시`
+                        }
+                    </span>
                     <span>
                         데이터 출처(S3) 기준 일시: {lastModified ? new Date(lastModified).toLocaleString('ko-KR') : '확인 중...'} 
                         {' '}(웹 새로고침: {new Date().toLocaleTimeString()})
