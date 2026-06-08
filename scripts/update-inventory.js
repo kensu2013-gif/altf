@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { uploadInventoryToS3 } from '../s3-db.js';
 
 // Configure dotenv to read .env from root
 const __filename = fileURLToPath(import.meta.url);
@@ -227,6 +228,19 @@ async function updateInventory() {
 
         console.log(`✅ Successfully updated ${OUTPUT_PATH}`);
         console.log(`Total records: ${processed.length}`);
+
+        // If S3 credentials are set, also upload the processed inventory to S3
+        if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+            console.log('[S3] AWS credentials detected. Uploading updated inventory to S3...');
+            try {
+                await uploadInventoryToS3(processed);
+                console.log('✅ Successfully uploaded updated inventory to S3.');
+            } catch (s3Err) {
+                console.error('❌ Failed to upload inventory to S3:', s3Err.message);
+            }
+        } else {
+            console.log('[S3] No AWS credentials detected in environment. Skipping S3 upload.');
+        }
 
     } catch (error) {
         console.error('❌ Failed to update inventory:', error);

@@ -244,3 +244,22 @@ export async function getPresignedUrlToS3(key) {
         throw error;
     }
 }
+
+export async function uploadInventoryToS3(jsonData) {
+    try {
+        const INVENTORY_KEY = 'public/inventory/inventory.json';
+        const command = new PutObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: INVENTORY_KEY,
+            Body: JSON.stringify(jsonData, null, 2),
+            ContentType: 'application/json'
+        });
+
+        await s3Client.send(command);
+        console.log(`[S3] Successfully uploaded ${INVENTORY_KEY} to S3.`);
+        return true;
+    } catch (error) {
+        console.error('[S3] Failed to upload inventory to S3:', error.message);
+        throw error;
+    }
+}

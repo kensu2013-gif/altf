@@ -2,7 +2,7 @@
     name: altf-api
     env: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm install && npm run update-inventory
     startCommand: npm start
     envVars:
       - key: AWS_REGION
