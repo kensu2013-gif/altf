@@ -893,6 +893,10 @@ export default function SihwaInventory() {
             items.forEach(item => {
                 if (item.transactionIssued) return;
 
+                const nameLower = (item.name || (item as any).item_name || '').toLowerCase().trim();
+                const isDcOrFreight = nameLower === 'd/c' || nameLower === 'dc' || nameLower.includes('운임') || nameLower.includes('배송') || nameLower.includes('freight') || nameLower.includes('shipping') || nameLower.includes('discount') || nameLower.includes('할인');
+                if (isDcOrFreight) return;
+
                 const id = item.productId || (item as { item_id?: string }).item_id || 'UNKNOWN';
                 const addQty = Number(item.quantity ?? item.qty ?? 0);
 

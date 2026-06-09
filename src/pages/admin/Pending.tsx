@@ -173,6 +173,10 @@ export default function PendingOrders() {
             const isStock = isStockOrder(targetCustomer || '', order.customerName || '');
 
             order.po_items.forEach(poItem => {
+                const nameLower = (poItem.name || '').toLowerCase().trim();
+                const isDcOrFreight = nameLower === 'd/c' || nameLower === 'dc' || nameLower.includes('운임') || nameLower.includes('배송') || nameLower.includes('freight') || nameLower.includes('shipping') || nameLower.includes('discount') || nameLower.includes('할인');
+                if (isDcOrFreight) return;
+
                 const isPending = isStock 
                     ? (includeCompleted || !poItem.transactionIssued)
                     : (poItem.poSent && (includeCompleted || !poItem.transactionIssued));
@@ -275,6 +279,10 @@ export default function PendingOrders() {
             const isStock = isStockOrder(targetCustomer, order.customerName || '');
 
             order.po_items.forEach(poItem => {
+                const nameLower = (poItem.name || '').toLowerCase().trim();
+                const isDcOrFreight = nameLower === 'd/c' || nameLower === 'dc' || nameLower.includes('운임') || nameLower.includes('배송') || nameLower.includes('freight') || nameLower.includes('shipping') || nameLower.includes('discount') || nameLower.includes('할인');
+                if (isDcOrFreight) return;
+
                 const isPending = isStock 
                     ? (includeCompleted || !poItem.transactionIssued)
                     : (poItem.poSent && (includeCompleted || !poItem.transactionIssued));
@@ -306,6 +314,10 @@ export default function PendingOrders() {
             if (!isStockOrder(targetCustomer, order.customerName || '')) return;
 
             order.po_items.forEach(poItem => {
+                const nameLower = (poItem.name || '').toLowerCase().trim();
+                const isDcOrFreight = nameLower === 'd/c' || nameLower === 'dc' || nameLower.includes('운임') || nameLower.includes('배송') || nameLower.includes('freight') || nameLower.includes('shipping') || nameLower.includes('discount') || nameLower.includes('할인');
+                if (isDcOrFreight) return;
+
                 if (includeCompleted || !poItem.transactionIssued) {
                     list.push({
                         orderId: order.id,
@@ -394,6 +406,65 @@ export default function PendingOrders() {
             return matchCust && matchPo && matchDate && matchTag && matchDup && matchManager;
         }).sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
     }, [allStockItems, deferredSearchCustomer, deferredSearchPo, dateFilter, tagFilter, showOnlyDuplicates, searchManager, stockDuplicateMap, orders]);
+
+    // Grouped stock items by specification for ledger-like view
+    const stockLedgerItems = useMemo(() => {
+        const map = new Map<string, {
+            specKey: string;
+            itemName: string;
+            thickness: string;
+            size: string;
+            material: string;
+            tags: string[];
+            totalQuantity: number;
+            items: PendingItem[];
+        }>();
+
+        filteredStockItems.forEach(item => {
+            const specKey = `${item.itemName}::${item.thickness}::${item.size}::${item.material}`.trim();
+            if (!map.has(specKey)) {
+                map.set(specKey, {
+                    specKey,
+                    itemName: item.itemName,
+                    thickness: item.thickness,
+                    size: item.size,
+                    material: item.material,
+                    tags: [],
+                    totalQuantity: 0,
+                    items: []
+                });
+            }
+            const group = map.get(specKey)!;
+            group.totalQuantity += item.quantity;
+            group.items.push(item);
+            
+            if (item.tags) {
+                item.tags.forEach(t => {
+                    if (!group.tags.includes(t)) {
+                        group.tags.push(t);
+                    }
+                });
+            }
+        });
+
+        return Array.from(map.values()).sort((a, b) => {
+            const nameComp = a.itemName.localeCompare(b.itemName);
+            if (nameComp !== 0) return nameComp;
+            
+            const thickComp = a.thickness.localeCompare(b.thickness);
+            if (thickComp !== 0) return thickComp;
+
+            const parseSize = (s: string) => {
+                const num = parseFloat(s);
+                return isNaN(num) ? 99999 : num;
+            };
+            const sizeA = parseSize(a.size);
+            const sizeB = parseSize(b.size);
+            if (sizeA !== sizeB) return sizeA - sizeB;
+
+            return a.material.localeCompare(b.material);
+        });
+    }, [filteredStockItems]);
 
     // Handlers
     const handleUpdateManagersForCustomer = async (targetCustomerName: string, managers: { id: string; name: string }[]) => {
@@ -937,19 +1008,16 @@ export default function PendingOrders() {
                             <table className="w-full min-w-[1000px] text-left">
                                 <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 whitespace-nowrap sticky top-0 z-10">
                                     <tr>
-                                        <th scope="col" className="px-5 py-3 font-bold w-[25%] min-w-[200px]">아이템명 / 규격 (Item Spec)</th>
-                                        <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-[100px]">발주번호 (PO Number)</th>
-                                        <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-[100px] text-center">발주일자</th>
-                                        <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-[100px] text-center">납기예정일</th>
-                                        <th scope="col" className="px-5 py-3 font-bold text-center w-[8%] min-w-[80px]">수량</th>
-                                        <th scope="col" className="px-5 py-3 font-bold w-[16%] min-w-[150px]">중복 발주 확인</th>
-                                        <th scope="col" className="px-5 py-3 font-bold w-[20%] text-center min-w-[180px]">코멘트 (의견/일정 공유)</th>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[22%] min-w-[180px]">아이템명 / 규격 (Item Spec)</th>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-[100px] text-center">총 미결수량</th>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[54%] min-w-[450px]">개별 발주 내역 (PO Breakdown)</th>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-[110px] text-center">중복 발주 상태</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {filteredStockItems.length === 0 ? (
+                                    {stockLedgerItems.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} className="px-6 py-16 text-center text-slate-400">
+                                            <td colSpan={4} className="px-6 py-16 text-center text-slate-400">
                                                 <div className="flex flex-col items-center gap-3">
                                                     <div className="bg-slate-50 p-4 rounded-full border border-slate-100 shadow-inner">
                                                         <PackageX className="w-8 h-8 text-slate-300" />
@@ -961,209 +1029,199 @@ export default function PendingOrders() {
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredStockItems.map((item) => {
-                                            const specKey = `${item.itemName}::${item.thickness}::${item.size}::${item.material}`.trim();
-                                            const dupData = stockDuplicateMap.get(specKey);
-                                            const isDuplicate = dupData && dupData.count > 1;
-                                            const statusObj = getDeliveryStatus(item.deliveryDate);
-                                            const uniqueId = `${item.orderId}-${item.itemId}`;
-                                            const isCommenting = activeCommentItemId === uniqueId;
-                                            const isDelayedAndNoComment = statusObj.type === 'DELAYED' && (!item.comments || item.comments.length === 0);
-
+                                        stockLedgerItems.map((group) => {
                                             return (
-                                                <tr key={uniqueId} className={`hover:bg-slate-50 transition-colors group align-top ${isDelayedAndNoComment ? 'bg-red-50/60 shadow-inner' : ''}`}>
+                                                <tr key={group.specKey} className="hover:bg-slate-50/50 transition-colors align-top">
                                                     {/* Item Spec */}
                                                     <td className="px-5 py-4">
-                                                        <div className="flex flex-col gap-1 pr-4">
-                                                            <div className="font-bold text-slate-800 text-sm flex items-center gap-1.5 flex-wrap">
-                                                                {item.isCompleted && (
-                                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border bg-slate-200 text-slate-500 border-slate-300">
-                                                                        발행 완료
-                                                                    </span>
-                                                                )}
-                                                                {item.tags && item.tags.length > 0 && item.tags.map(tag => (
-                                                                    <span key={tag} className={`text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border ${tag === '관리' ? 'bg-red-50 text-red-700 border-red-200' : tag === '재고품' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : tag === '사급' ? 'bg-amber-50 text-amber-700 border-amber-200' : tag === '생산중' ? 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' : tag === '출고대기' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                                        <div className="flex flex-col gap-1">
+                                                            <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5 flex-wrap">
+                                                                <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs font-black border border-indigo-100">{group.itemName}</span>
+                                                                {group.tags && group.tags.length > 0 && group.tags.map(tag => (
+                                                                    <span key={tag} className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${tag === '관리' ? 'bg-red-50 text-red-700 border-red-200' : tag === '재고품' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : tag === '사급' ? 'bg-amber-50 text-amber-700 border-amber-200' : tag === '생산중' ? 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' : tag === '출고대기' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                                                                         {tag}
                                                                     </span>
                                                                 ))}
-                                                                <span className="text-slate-900 bg-teal-50 px-1.5 py-0.5 rounded mr-1 leading-tight">{item.itemName}</span>
                                                             </div>
-                                                            {(item.thickness || item.size || item.material) && (
-                                                                <div className="text-xs text-slate-500 font-semibold pl-1">
-                                                                    {[item.thickness, item.size, item.material].filter(Boolean).join(' - ')}
-                                                                </div>
-                                                            )}
-                                                            <div className="text-[10px] text-slate-400 pl-1">
-                                                                원주문: {item.targetCustomerName}
-                                                            </div>
-
-                                                            {/* Tag Editor (Master/Manager) */}
-                                                            {user?.role && ['MASTER', 'MANAGER', 'admin'].includes(user.role) && (
-                                                                <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                    {availableTags.map(tag => {
-                                                                        const hasTag = item.tags?.includes(tag);
-                                                                        return (
-                                                                            <button
-                                                                                key={tag}
-                                                                                onClick={() => handleToggleTag(item.orderId, item.itemId, tag)}
-                                                                                className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${hasTag ? 'bg-indigo-50 text-indigo-700 border-indigo-200 font-bold' : 'bg-white text-slate-400 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'}`}
-                                                                            >
-                                                                                {hasTag ? `- ${tag}` : `+ ${tag}`}
-                                                                            </button>
-                                                                        );
-                                                                    })}
+                                                            {(group.thickness || group.size || group.material) && (
+                                                                <div className="text-xs text-slate-600 font-bold mt-1.5 pl-0.5">
+                                                                    {[group.thickness, group.size, group.material].filter(Boolean).join(' - ')}
                                                                 </div>
                                                             )}
                                                         </div>
                                                     </td>
 
-                                                    {/* PO Number */}
-                                                    <td className="px-5 py-4">
-                                                        <button
-                                                            onClick={() => handleOpenOrder(item.orderId, 'SUPPLIER')}
-                                                            className="font-mono font-bold text-indigo-700 text-xs bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-800 px-2 py-1 rounded border border-indigo-100 shadow-sm inline-flex items-center gap-1 transition-colors"
-                                                            title="상세 모달 열기"
-                                                        >
-                                                            NO.{item.poNumber.includes('-') ? item.poNumber.split('-')[1] : item.poNumber}
-                                                        </button>
-                                                    </td>
-
-                                                    {/* PO Date */}
-                                                    <td className="px-5 py-4 text-center text-slate-600 font-medium">
-                                                        {item.poDate}
-                                                    </td>
-
-                                                    {/* Delivery Date */}
+                                                    {/* Total Quantity */}
                                                     <td className="px-5 py-4 text-center">
-                                                        <div className="flex flex-col items-center gap-1">
-                                                            <span className={`text-xs inline-flex items-center gap-1 font-medium ${statusObj.type !== 'NORMAL' ? 'text-slate-800 font-bold' : 'text-slate-500'}`}>
-                                                                {new Date(item.deliveryDate).toLocaleDateString()}
-                                                            </span>
-                                                            {statusObj.type !== 'NORMAL' && (
-                                                                <span className={`px-1.5 py-0.5 ${statusObj.bg} ${statusObj.color} rounded text-[10px] font-bold shadow-sm inline-flex`}>
-                                                                    {statusObj.text}
-                                                                </span>
-                                                            )}
+                                                        <div className="text-lg font-black text-slate-800 font-mono mt-1">
+                                                            {group.totalQuantity.toLocaleString()}
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-400 mt-1">
+                                                            총 {group.items.length}건 대기
                                                         </div>
                                                     </td>
 
-                                                    {/* Quantity */}
-                                                    <td className="px-5 py-4 text-center font-bold text-slate-900 font-mono text-base">
-                                                        <div className="flex items-center justify-center gap-1.5">
-                                                            {item.quantity.toLocaleString()}
-                                                            {user?.role === 'MASTER' && (
-                                                                <button
-                                                                    onClick={() => handleDeleteItem(item.orderId, item.itemId)}
-                                                                    className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                                                    title="품목 완전 삭제 (MASTER)"
-                                                                >
-                                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </td>
-
-                                                    {/* Duplicate Check Warning */}
+                                                    {/* PO Breakdown */}
                                                     <td className="px-5 py-4">
-                                                        {isDuplicate && dupData ? (
-                                                            <div className="flex flex-col gap-1 bg-red-50/50 p-2 rounded border border-red-100/50">
-                                                                <span className="inline-flex items-center gap-1 text-[11px] font-black text-red-700 bg-red-100 border border-red-200 px-1.5 py-0.5 rounded shadow-sm w-fit">
-                                                                    <AlertTriangle className="w-3 h-3 text-red-500" />
-                                                                    중복 발주 의심 ({dupData.count}건)
-                                                                </span>
-                                                                <div className="text-[10px] text-slate-500 pl-1 mt-1 space-y-1 max-h-[80px] overflow-y-auto custom-scrollbar">
-                                                                    {dupData.items.filter(i => i.orderId !== item.orderId || i.itemId !== item.itemId).map((other, idx) => (
-                                                                        <div key={idx} className="flex items-center justify-between gap-1 border-b border-slate-100/30 pb-0.5">
+                                                        <div className="space-y-3">
+                                                            {group.items.map((subItem) => {
+                                                                const statusObj = getDeliveryStatus(subItem.deliveryDate);
+                                                                const uniqueId = `${subItem.orderId}-${subItem.itemId}`;
+                                                                const isCommenting = activeCommentItemId === uniqueId;
+                                                                const isDelayedAndNoComment = statusObj.type === 'DELAYED' && (!subItem.comments || subItem.comments.length === 0);
+
+                                                                return (
+                                                                    <div key={uniqueId} className={`bg-slate-50 border border-slate-200/70 hover:border-slate-300 hover:shadow-sm transition-all rounded-lg p-3 relative group/po ${isDelayedAndNoComment ? 'bg-red-50/20 border-red-200/40' : ''}`}>
+                                                                        <div className="flex items-center gap-3 flex-wrap">
+                                                                            {/* PO Number Button */}
                                                                             <button
-                                                                                onClick={() => handleOpenOrder(other.orderId, 'SUPPLIER')}
-                                                                                className="font-mono text-indigo-600 hover:text-indigo-800 font-bold hover:underline"
-                                                                                title="해당 발주서 열기"
+                                                                                onClick={() => handleOpenOrder(subItem.orderId, 'SUPPLIER')}
+                                                                                className="font-mono font-bold text-indigo-700 text-xs bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-800 px-2 py-1 rounded border border-indigo-100 shadow-sm inline-flex items-center gap-1 transition-colors"
+                                                                                title="발주서 상세 모달 열기"
                                                                             >
-                                                                                NO.{other.poNumber}
+                                                                                NO.{subItem.poNumber.includes('-') ? subItem.poNumber.split('-')[1] : subItem.poNumber}
                                                                             </button>
-                                                                            <span className="text-slate-400">({other.poDate})</span>
-                                                                            <span className="font-bold text-slate-600">{other.quantity}개</span>
+
+                                                                            {/* PO Date & Delivery Date */}
+                                                                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                                                                                <span>발주: {subItem.poDate}</span>
+                                                                                <span className="text-slate-300">|</span>
+                                                                                <span className={`inline-flex items-center gap-1 font-semibold ${statusObj.type !== 'NORMAL' ? 'text-slate-800' : 'text-slate-500'}`}>
+                                                                                    납기: {new Date(subItem.deliveryDate).toLocaleDateString()}
+                                                                                    {statusObj.type !== 'NORMAL' && (
+                                                                                        <span className={`ml-1 px-1.5 py-0.5 ${statusObj.bg} ${statusObj.color} rounded text-[9px] font-bold shadow-sm inline-flex`}>
+                                                                                            {statusObj.text}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </span>
+                                                                            </div>
+
+                                                                            {/* Quantity */}
+                                                                            <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800 text-sm ml-auto">
+                                                                                <span>{subItem.quantity.toLocaleString()}개</span>
+                                                                                {user?.role === 'MASTER' && (
+                                                                                    <button
+                                                                                        onClick={() => handleDeleteItem(subItem.orderId, subItem.itemId)}
+                                                                                        className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1 rounded transition-colors opacity-0 group-hover/po:opacity-100"
+                                                                                        title="품목 완전 삭제 (MASTER)"
+                                                                                    >
+                                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
+
+                                                                        <div className="text-[10px] text-slate-400 mt-1 pl-1">
+                                                                            원주문: {subItem.targetCustomerName}
+                                                                        </div>
+
+                                                                        {/* Tag Editor (Master/Manager) */}
+                                                                        {user?.role && ['MASTER', 'MANAGER', 'admin'].includes(user.role) && (
+                                                                            <div className="flex items-center gap-1 mt-2 pl-0.5 opacity-0 group-hover/po:opacity-100 transition-opacity">
+                                                                                {availableTags.map(tag => {
+                                                                                    const hasTag = subItem.tags?.includes(tag);
+                                                                                    return (
+                                                                                        <button
+                                                                                            key={tag}
+                                                                                            onClick={() => handleToggleTag(subItem.orderId, subItem.itemId, tag)}
+                                                                                            className={`text-[8px] px-1 py-0.5 rounded border transition-colors ${hasTag ? 'bg-indigo-50 text-indigo-700 border-indigo-200 font-bold' : 'bg-white text-slate-400 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'}`}
+                                                                                        >
+                                                                                            {hasTag ? `- ${tag}` : `+ ${tag}`}
+                                                                                        </button>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Comments Section inside the PO Box */}
+                                                                        <div className="mt-2.5 pt-2.5 border-t border-slate-200/50">
+                                                                            {subItem.comments && subItem.comments.length > 0 && (
+                                                                                <div className="space-y-1.5 max-h-[100px] overflow-y-auto pr-1 mb-2 custom-scrollbar">
+                                                                                    {subItem.comments.map((comment, idx) => (
+                                                                                        <div key={idx} className="bg-white rounded-lg p-2 border border-slate-100 text-[11px] shadow-sm">
+                                                                                            <div className="flex justify-between items-center mb-1">
+                                                                                                <span className="font-bold text-slate-700">{comment.author}</span>
+                                                                                                <div className="flex items-center gap-1.5">
+                                                                                                    <span className="text-[8px] text-slate-400">{new Date(comment.timestamp).toLocaleDateString()} {new Date(comment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                                                    {user?.role === 'MASTER' && (
+                                                                                                        <button
+                                                                                                            onClick={() => handleDeleteComment(subItem.orderId, subItem.itemId, idx)}
+                                                                                                            className="text-slate-300 hover:text-red-500 transition-colors p-0.5 rounded"
+                                                                                                            title="코멘트 삭제"
+                                                                                                        >
+                                                                                                            <Trash2 className="w-2.5 h-2.5" />
+                                                                                                        </button>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <p className="text-slate-600 leading-snug break-words whitespace-pre-wrap">{comment.content}</p>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+
+                                                                            {!isCommenting ? (
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        setActiveCommentItemId(uniqueId);
+                                                                                        setNewComment('');
+                                                                                    }}
+                                                                                    className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-teal-600 transition-colors"
+                                                                                >
+                                                                                    <MessageSquare className="w-3 h-3" />
+                                                                                    {subItem.comments && subItem.comments.length > 0 ? '코멘트 추가' : '첫 코멘트 남기기'}
+                                                                                </button>
+                                                                            ) : (
+                                                                                <div className="flex flex-col gap-1.5 bg-white p-2 rounded border border-teal-200 shadow-sm mt-1">
+                                                                                    <textarea
+                                                                                        autoFocus
+                                                                                        value={newComment}
+                                                                                        onChange={(e) => setNewComment(e.target.value)}
+                                                                                        placeholder="담당자 의견, 배차 정보 등..."
+                                                                                        className="w-full text-[11px] p-2 border border-slate-200 rounded outline-none focus:border-teal-400 resize-none h-[45px]"
+                                                                                    />
+                                                                                    <div className="flex justify-end gap-1">
+                                                                                        <button
+                                                                                            onClick={() => {
+                                                                                                setActiveCommentItemId(null);
+                                                                                                setNewComment('');
+                                                                                            }}
+                                                                                            className="p-0.5 text-slate-400 hover:bg-slate-100 rounded"
+                                                                                            title="취소"
+                                                                                        >
+                                                                                            <X className="w-3.5 h-3.5" />
+                                                                                        </button>
+                                                                                        <button
+                                                                                            onClick={() => handleAddComment(subItem.orderId, subItem.itemId)}
+                                                                                            disabled={!newComment.trim()}
+                                                                                            className="px-2.5 py-0.5 bg-teal-600 disabled:bg-slate-300 text-white rounded text-[10px] font-bold hover:bg-teal-700 transition-colors flex items-center gap-1"
+                                                                                        >
+                                                                                            <Send className="w-2.5 h-2.5" />
+                                                                                            등록
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Duplicate Status */}
+                                                    <td className="px-5 py-4 text-center">
+                                                        {group.items.length > 1 ? (
+                                                            <span className="inline-flex items-center gap-1 text-[11px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full shadow-sm mt-1">
+                                                                <AlertTriangle className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
+                                                                중복 발주 ({group.items.length}건)
+                                                            </span>
                                                         ) : (
-                                                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded shadow-sm">
-                                                                <Check className="w-3 h-3 text-emerald-500" />
+                                                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full shadow-sm mt-1">
+                                                                <Check className="w-3.5 h-3.5 text-emerald-500" />
                                                                 단독 발주
                                                             </span>
                                                         )}
-                                                    </td>
-
-                                                    {/* Comments System */}
-                                                    <td className="px-5 py-4">
-                                                        <div className="flex flex-col gap-2">
-                                                            {item.comments && item.comments.length > 0 && (
-                                                                <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
-                                                                    {item.comments.map((comment, idx) => (
-                                                                        <div key={idx} className="bg-slate-50 rounded-lg p-2 border border-slate-100 text-xs shadow-sm">
-                                                                            <div className="flex justify-between items-center mb-1">
-                                                                                <span className="font-bold text-slate-700">{comment.author}</span>
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span className="text-[9px] text-slate-400">{new Date(comment.timestamp).toLocaleDateString()} {new Date(comment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                                                    {user?.role === 'MASTER' && (
-                                                                                        <button
-                                                                                            onClick={() => handleDeleteComment(item.orderId, item.itemId, idx)}
-                                                                                            className="text-slate-300 hover:text-red-500 transition-colors p-0.5 rounded"
-                                                                                            title="코멘트 삭제 (MASTER 권한)"
-                                                                                        >
-                                                                                            <Trash2 className="w-3 h-3" />
-                                                                                        </button>
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                            <p className="text-slate-600 leading-snug break-words whitespace-pre-wrap">{comment.content}</p>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-
-                                                            {!isCommenting ? (
-                                                                <button
-                                                                    onClick={() => setActiveCommentItemId(uniqueId)}
-                                                                    className="flex items-center justify-center gap-1.5 w-full py-1.5 mt-1 border border-dashed border-slate-300 rounded text-xs font-medium text-slate-500 hover:text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
-                                                                >
-                                                                    <MessageSquare className="w-3.5 h-3.5" />
-                                                                    {item.comments && item.comments.length > 0 ? '코멘트 추가' : '첫 코멘트 남기기'}
-                                                                </button>
-                                                            ) : (
-                                                                <div className="flex flex-col gap-2 mt-1 bg-white p-2 rounded border border-teal-200 shadow-md">
-                                                                    <textarea
-                                                                        autoFocus
-                                                                        value={newComment}
-                                                                        onChange={(e) => setNewComment(e.target.value)}
-                                                                        placeholder="담당자 의견, 배차 정보 등..."
-                                                                        className="w-full text-xs p-2 border border-slate-200 rounded outline-none focus:border-teal-400 resize-none h-[60px]"
-                                                                    />
-                                                                    <div className="flex justify-end gap-1">
-                                                                        <button
-                                                                            onClick={() => {
-                                                                                setActiveCommentItemId(null);
-                                                                                setNewComment('');
-                                                                            }}
-                                                                            className="p-1 text-slate-400 hover:bg-slate-100 rounded"
-                                                                            title="Cancel"
-                                                                            aria-label="Cancel commenting"
-                                                                        >
-                                                                            <X className="w-4 h-4" />
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => handleAddComment(item.orderId, item.itemId)}
-                                                                            disabled={!newComment.trim()}
-                                                                            className="flex items-center gap-1 px-3 py-1 bg-teal-600 disabled:bg-slate-300 text-white rounded text-xs font-bold hover:bg-teal-700 transition-colors"
-                                                                        >
-                                                                            <Send className="w-3 h-3" />
-                                                                            등록
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
