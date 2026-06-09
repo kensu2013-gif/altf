@@ -170,15 +170,20 @@ export default function PendingOrders() {
             const deliveryDateStr = order.adminResponse?.deliveryDate || poDateRaw;
 
             const targetCustomer = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName;
+            const isStock = isStockOrder(targetCustomer || '', order.customerName || '');
 
             order.po_items.forEach(poItem => {
-                if (poItem.poSent && (includeCompleted || !poItem.transactionIssued)) {
+                const isPending = isStock 
+                    ? (includeCompleted || !poItem.transactionIssued)
+                    : (poItem.poSent && (includeCompleted || !poItem.transactionIssued));
+
+                if (isPending) {
                     itemsList.push({
                         orderId: order.id,
                         poNumber: order.poNumber || 'N/A',
                         poDate: poDateFormatted,
                         customerName: order.customerName,
-                        targetCustomerName: targetCustomer,
+                        targetCustomerName: targetCustomer || '',
                         itemId: poItem.id,
                         itemName: poItem.name,
                         thickness: poItem.thickness || '',
@@ -203,7 +208,9 @@ export default function PendingOrders() {
             const matchPo = item.poNumber.toLowerCase().includes(deferredSearchPo.toLowerCase());
 
             let matchDate = true;
-            if (dateFilter === 'URGENT') {
+            if (dateFilter === 'ALL') {
+                matchDate = true;
+            } else if (dateFilter === 'URGENT') {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
                 const dDate = new Date(item.deliveryDate);
@@ -268,7 +275,11 @@ export default function PendingOrders() {
             const isStock = isStockOrder(targetCustomer, order.customerName || '');
 
             order.po_items.forEach(poItem => {
-                if (poItem.poSent && (includeCompleted || !poItem.transactionIssued)) {
+                const isPending = isStock 
+                    ? (includeCompleted || !poItem.transactionIssued)
+                    : (poItem.poSent && (includeCompleted || !poItem.transactionIssued));
+
+                if (isPending) {
                     allCount++;
                     if (isStock) {
                         stockCount++;
@@ -295,7 +306,7 @@ export default function PendingOrders() {
             if (!isStockOrder(targetCustomer, order.customerName || '')) return;
 
             order.po_items.forEach(poItem => {
-                if (poItem.poSent && (includeCompleted || !poItem.transactionIssued)) {
+                if (includeCompleted || !poItem.transactionIssued) {
                     list.push({
                         orderId: order.id,
                         poNumber: order.poNumber || 'N/A',
