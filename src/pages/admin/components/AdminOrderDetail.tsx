@@ -50,7 +50,25 @@ const cleanDefault = (val: string) => {
     if (val === '000-00-00000' || val === '-' || val === 'Admin' || val === '010-0000-0000' || val === 'Unknown') return '';
     return cleanText(val);
 };
+const isStockOrder = (targetCustomerName: string, customerName: string) => {
+    const displayCustomer = (targetCustomerName || customerName || '').toLowerCase();
+    const normalizedCustomer = displayCustomer.replace(/\s+/g, '');
+    return normalizedCustomer.includes('서울재고') ||
+        normalizedCustomer.includes('시화재고') ||
+        normalizedCustomer.includes('알트에프재고') ||
+        normalizedCustomer.includes('알트에프') ||
+        normalizedCustomer.includes('altf');
+};
 
+const isStockName = (name: string) => {
+    const displayCustomer = (name || '').toLowerCase();
+    const normalizedCustomer = displayCustomer.replace(/\s+/g, '');
+    return normalizedCustomer.includes('서울재고') ||
+        normalizedCustomer.includes('시화재고') ||
+        normalizedCustomer.includes('알트에프재고') ||
+        normalizedCustomer.includes('알트에프') ||
+        normalizedCustomer.includes('altf');
+};
 
 export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose, onUpdate, initialMode = 'CUSTOMER' }: AdminOrderDetailProps) {
     const inventory = useStore((state) => state.inventory);
@@ -123,6 +141,104 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         return val.replace(/\uFFFD{1,3}동대로/g, '낙동대로').replace(/[\uFFFC\uFFFD]/g, '');
     });
 
+    const [items, setItems] = useState<LineItem[]>(order.items || []);
+    const [poItems, setPoItems] = useState<LineItem[]>(() => {
+        // [FIX] If PO Items specific list exists, use it.
+        // If not, clone the Customer Items as the starting point for the PO.
+        if (order.po_items && order.po_items.length > 0) {
+            return order.po_items;
+        }
+        return order.items ? [...order.items] : [];
+    });
+
+    const [isStockOrderChecked, setIsStockOrderChecked] = useState(() => {
+        if (order.isStockOrder !== undefined) return order.isStockOrder;
+        const initialCustomer = order.poEndCustomer || order.customerName || '';
+        return isStockOrder(initialCustomer, order.customerName || '');
+    });
+
+    const checkDuplicates = useCallback((currentPoItems: LineItem[]) => {
+        const allOrders = useStore.getState().orders || [];
+        const duplicates: {
+            currentItem: LineItem;
+            matchedItems: {
+                poNumber: string;
+                poDate: string;
+                quantity: number;
+                spec: string;
+            }[];
+        }[] = [];
+
+        const activeCurrentItems = currentPoItems.filter(item => item.isSelected !== false);
+
+        activeCurrentItems.forEach(curItem => {
+            const nameLower = (curItem.name || '').toLowerCase().trim();
+            const isDcOrFreight = nameLower === 'd/c' || nameLower === 'dc' || nameLower.includes('운임') || nameLower.includes('배송') || nameLower.includes('freight') || nameLower.includes('shipping') || nameLower.includes('discount') || nameLower.includes('할인');
+            if (isDcOrFreight) return;
+
+            const specKey = `${curItem.name}::${curItem.thickness}::${curItem.size}::${curItem.material}`.trim().toLowerCase();
+
+            const matches: {
+                poNumber: string;
+                poDate: string;
+                quantity: number;
+                spec: string;
+            }[] = [];
+
+            allOrders.forEach(otherOrder => {
+                if (otherOrder.id === order.id || otherOrder.isDeleted || otherOrder.status === 'CANCELLED') return;
+                if (!otherOrder.po_items || otherOrder.po_items.length === 0) return;
+
+                const otherTargetCustomer = otherOrder.poEndCustomer || otherOrder.payload?.customer?.company_name || otherOrder.payload?.customer?.contact_name || otherOrder.customerName || '';
+                const otherIsStock = otherOrder.isStockOrder !== undefined ? otherOrder.isStockOrder : isStockOrder(otherTargetCustomer, otherOrder.customerName || '');
+
+                if (!otherIsStock) return;
+
+                otherOrder.po_items.forEach(otherItem => {
+                    if (otherItem.transactionIssued) return;
+                    const otherNameLower = (otherItem.name || '').toLowerCase().trim();
+                    const otherIsDcOrFreight = otherNameLower === 'd/c' || otherNameLower === 'dc' || otherNameLower.includes('운임') || otherNameLower.includes('배송') || otherNameLower.includes('freight') || otherNameLower.includes('shipping') || otherNameLower.includes('discount') || otherNameLower.includes('할인');
+                    if (otherIsDcOrFreight) return;
+
+                    const otherSpecKey = `${otherItem.name}::${otherItem.thickness}::${otherItem.size}::${otherItem.material}`.trim().toLowerCase();
+                    if (specKey === otherSpecKey) {
+                        matches.push({
+                            poNumber: otherOrder.poNumber || 'N/A',
+                            poDate: new Date(otherOrder.createdAt).toLocaleDateString(),
+                            quantity: otherItem.quantity,
+                            spec: `${otherItem.thickness || ''} ${otherItem.size || ''} ${otherItem.material || ''}`.trim()
+                        });
+                    }
+                });
+            });
+
+            if (matches.length > 0) {
+                duplicates.push({
+                    currentItem: curItem,
+                    matchedItems: matches
+                });
+            }
+        });
+
+        return duplicates;
+    }, [order.id]);
+
+    const handleStockOrderToggle = useCallback((checked: boolean) => {
+        setIsStockOrderChecked(checked);
+        if (checked) {
+            const dups = checkDuplicates(poItems);
+            if (dups.length > 0) {
+                const dupMessages = dups.map(d => {
+                    const spec = `${d.currentItem.thickness || ''} ${d.currentItem.size || ''} ${d.currentItem.material || ''}`.trim();
+                    const matchedDetails = d.matchedItems.map(m => `  - PO: ${m.poNumber} (${m.poDate}) 수량: ${m.quantity}개`).join('\n');
+                    return `• ${d.currentItem.name} ${spec} (현재수량: ${d.currentItem.quantity}개)\n${matchedDetails}`;
+                }).join('\n\n');
+
+                alert(`⚠️ [중복 발주 의심 알림]\n\n현재 발주하려는 품목 중 이미 미결 재고 발주분에 등록된 중복 아이템이 존재합니다:\n\n${dupMessages}\n\n중복 발주 여부를 확인해 주시기 바랍니다.`);
+            }
+        }
+    }, [poItems, checkDuplicates]);
+
     const uploadFile = useStore(state => state.uploadFile);
 
     // ... (state initialization) ...
@@ -139,16 +255,6 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         setMobileModalOpen(true);
         return () => setMobileModalOpen(false);
     }, [setMobileModalOpen]);
-
-    const [items, setItems] = useState<LineItem[]>(order.items || []);
-    const [poItems, setPoItems] = useState<LineItem[]>(() => {
-        // [FIX] If PO Items specific list exists, use it.
-        // If not, clone the Customer Items as the starting point for the PO.
-        if (order.po_items && order.po_items.length > 0) {
-            return order.po_items;
-        }
-        return order.items ? [...order.items] : [];
-    });
 
     // [MOD] Ensure poItems stays synced with base properties from items (sales price, quantity, etc.)
     useEffect(() => {
@@ -477,6 +583,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         const matchInfo = poNumber.match(/\d+$/);
         const seq = matchInfo ? matchInfo[0] : poNumber;
         setEmailAttachmentName(`${seq} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${newCustomer.replace('(주)', '').trim() || '에스제이엔브이'}).pdf`);
+        setIsStockOrderChecked(isStockName(newCustomer));
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -506,6 +613,24 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             setEmailAttachmentName(`${seq} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${c.companyName.replace('(주)', '').trim() || '에스제이엔브이'}).pdf`);
         }
         setShowCrmSuggestions(false);
+
+        // Auto-check and alert duplicates on selection
+        const isStock = isStockName(c.companyName);
+        setIsStockOrderChecked(isStock);
+        if (isStock) {
+            const dups = checkDuplicates(poItems);
+            if (dups.length > 0) {
+                const dupMessages = dups.map(d => {
+                    const spec = `${d.currentItem.thickness || ''} ${d.currentItem.size || ''} ${d.currentItem.material || ''}`.trim();
+                    const matchedDetails = d.matchedItems.map(m => `  - PO: ${m.poNumber} (${m.poDate}) 수량: ${m.quantity}개`).join('\n');
+                    return `• ${d.currentItem.name} ${spec} (현재수량: ${d.currentItem.quantity}개)\n${matchedDetails}`;
+                }).join('\n\n');
+
+                setTimeout(() => {
+                    alert(`⚠️ [중복 발주 의심 알림]\n\n선택하신 고객사(${c.companyName})가 재고 발주분으로 설정되었으며, 이미 미결 재고 발주분에 등록된 중복 아이템이 존재합니다:\n\n${dupMessages}\n\n중복 발주 여부를 확인해 주시기 바랍니다.`);
+                }, 100);
+            }
+        }
     };
 
     // Calculation based on Selected Items
@@ -1048,6 +1173,22 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             alert("업체명, 사업자번호, 담당자명, 연락처, 주소를 모두 입력해야 저장이 가능합니다. (신규 거래처인 경우 상세 내역에 정보를 입력해 주세요.)");
             return;
         }
+
+        if (isStockOrderChecked) {
+            const dups = checkDuplicates(poItems);
+            if (dups.length > 0) {
+                const dupMessages = dups.map(d => {
+                    const spec = `${d.currentItem.thickness || ''} ${d.currentItem.size || ''} ${d.currentItem.material || ''}`.trim();
+                    const matchedDetails = d.matchedItems.map(m => `  - PO: ${m.poNumber} (${m.poDate}) 수량: ${m.quantity}개`).join('\n');
+                    return `• ${d.currentItem.name} ${spec} (현재수량: ${d.currentItem.quantity}개)\n${matchedDetails}`;
+                }).join('\n\n');
+
+                if (!confirm(`⚠️ [중복 발주 경고]\n\n아래 품목들이 이미 미결 재고 발주분에 등록되어 있습니다:\n\n${dupMessages}\n\n그래도 임시 저장하시겠습니까?`)) {
+                    return;
+                }
+            }
+        }
+
         setIsSaving(true);
         try {
             persistCustomPrices();
@@ -1098,6 +1239,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
         const updateData: Partial<Order> = {
             totalAmount: overallTotalWithCharges,
+            isStockOrder: isStockOrderChecked,
             adminResponse: {
                 ...response,
                 confirmedPrice: overallTotalWithCharges,
@@ -1145,11 +1287,27 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         }
     };
 
-    const handleSave = async (extraUpdate: Partial<Order> = {}) => {
+    const handleSave = async (extraUpdate: Partial<Order> = {}, skipDupCheck = false) => {
         if (!poEndCustomer || !editableCustomerInfo.bizNo || !editableCustomerInfo.contactName || !editableCustomerInfo.tel || !editableCustomerInfo.address) {
             alert("업체명, 사업자번호, 담당자명, 연락처, 주소를 모두 입력해야 저장이 가능합니다. (신규 거래처인 경우 상세 내역에 정보를 입력해 주세요.)");
             return;
         }
+
+        if (!skipDupCheck && isStockOrderChecked && extraUpdate.status !== 'CANCELLED') {
+            const dups = checkDuplicates(poItems);
+            if (dups.length > 0) {
+                const dupMessages = dups.map(d => {
+                    const spec = `${d.currentItem.thickness || ''} ${d.currentItem.size || ''} ${d.currentItem.material || ''}`.trim();
+                    const matchedDetails = d.matchedItems.map(m => `  - PO: ${m.poNumber} (${m.poDate}) 수량: ${m.quantity}개`).join('\n');
+                    return `• ${d.currentItem.name} ${spec} (현재수량: ${d.currentItem.quantity}개)\n${matchedDetails}`;
+                }).join('\n\n');
+
+                if (!confirm(`⚠️ [중복 발주 경고]\n\n아래 품목들이 이미 미결 재고 발주분에 등록되어 있습니다:\n\n${dupMessages}\n\n그래도 저장하시겠습니까?`)) {
+                    return;
+                }
+            }
+        }
+
         setIsSaving(true);
         try {
             persistCustomPrices();
@@ -1220,6 +1378,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
         const updateData: Partial<Order> = {
             totalAmount: overallTotalWithCharges,
+            isStockOrder: isStockOrderChecked,
             adminResponse: {
                 ...response,
                 confirmedPrice: overallTotalWithCharges,
@@ -1277,6 +1436,22 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         if (user?.role !== 'MASTER' && user?.role !== 'MANAGER') {
             alert('권한이 없습니다 (Only Master/Manager allowed).');
             return;
+        }
+
+        // Duplicate check before confirming sending
+        if (isStockOrderChecked) {
+            const dups = checkDuplicates(poItems);
+            if (dups.length > 0) {
+                const dupMessages = dups.map(d => {
+                    const spec = `${d.currentItem.thickness || ''} ${d.currentItem.size || ''} ${d.currentItem.material || ''}`.trim();
+                    const matchedDetails = d.matchedItems.map(m => `  - PO: ${m.poNumber} (${m.poDate}) 수량: ${m.quantity}개`).join('\n');
+                    return `• ${d.currentItem.name} ${spec} (현재수량: ${d.currentItem.quantity}개)\n${matchedDetails}`;
+                }).join('\n\n');
+
+                if (!confirm(`⚠️ [중복 발주 경고]\n\n아래 품목들이 이미 미결 재고 발주분에 등록되어 있습니다:\n\n${dupMessages}\n\n정말로 이 발주서를 전송하시겠습니까?`)) {
+                    return;
+                }
+            }
         }
 
         const fileStatus = supplierPoFiles.length > 0 ? "있음 (새 첨부)" : (order.supplierPO ? "있음 (기존 파일)" : "없음");
@@ -1392,7 +1567,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     poSent: true,
                     supplierPO: newSupplierPO,
                     po_items: updatedPoItems
-                });
+                }, true);
 
             } else {
                 throw new Error("웹훅 호출 실패: " + response.statusText);
@@ -1695,6 +1870,15 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                         return null;
                                                     })()}
                                                 </div>
+                                                <label className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-white border border-indigo-200 px-2 py-1 rounded shadow-sm hover:bg-indigo-50 cursor-pointer select-none transition-colors shrink-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isStockOrderChecked}
+                                                        onChange={(e) => handleStockOrderToggle(e.target.checked)}
+                                                        className="w-3.5 h-3.5 text-indigo-600 rounded border-indigo-300 focus:ring-indigo-500 cursor-pointer"
+                                                    />
+                                                    <span>재고 발주분</span>
+                                                </label>
                                             </div>
                                         </div>
                                         <div className="flex flex-col gap-3">
@@ -1974,6 +2158,15 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                 return null;
                                             })()}
                                         </div>
+                                        <label className="flex items-center gap-1.5 text-xs font-bold text-teal-700 bg-white border border-teal-200 px-2 py-1 rounded shadow-sm hover:bg-teal-50 cursor-pointer select-none transition-colors mt-2 w-max shrink-0">
+                                            <input
+                                                type="checkbox"
+                                                checked={isStockOrderChecked}
+                                                onChange={(e) => handleStockOrderToggle(e.target.checked)}
+                                                className="w-3.5 h-3.5 text-teal-600 rounded border-teal-300 focus:ring-teal-500 cursor-pointer"
+                                            />
+                                            <span>재고 발주분</span>
+                                        </label>
                                     </div>
                                     <div>
                                         <span className="block text-slate-400 text-xs mb-1"> 영업 담당자(Managers) </span>
@@ -3089,7 +3282,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                         const updatedPoItems = order.po_items!.map(poItem => ({ ...poItem, transactionIssued: true }));
                                         const isPoOverallSent = order.poSent || !!order.supplierPO || (updatedPoItems.length > 0 && updatedPoItems.every(item => item.poSent));
                                         const newStatus = (updatedPoItems.every(item => item.transactionIssued) && isPoOverallSent) ? 'COMPLETED' : order.status;
-                                        await handleSave({ po_items: updatedPoItems, status: newStatus !== order.status ? newStatus : undefined });
+                                        await handleSave({ po_items: updatedPoItems, status: newStatus !== order.status ? newStatus : undefined }, true);
                                         alert('미결 리스트에서 성공적으로 강제 종료되었습니다.');
                                     }
                                 }}
@@ -3163,7 +3356,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                 await handleSave({
                                     po_items: updatedPoItems,
                                     status: newStatus !== order.status ? newStatus : undefined
-                                });
+                                }, true);
                             }
                         }}
                     />

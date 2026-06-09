@@ -172,6 +172,7 @@ export interface Order {
     linkedQuoteId?: string; // Link to original Quote if originated from one
     // Supplier PO Data
     poSent?: boolean; // [NEW] Track whether PO webhook was fired
+    isStockOrder?: boolean; // [NEW] Track if it is a stock replenishment order
     supplierInfo?: {
         company_name: string;
         contact_name: string;

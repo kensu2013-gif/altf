@@ -170,7 +170,7 @@ export default function PendingOrders() {
             const deliveryDateStr = order.adminResponse?.deliveryDate || poDateRaw;
 
             const targetCustomer = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName;
-            const isStock = isStockOrder(targetCustomer || '', order.customerName || '');
+            const isStock = order.isStockOrder !== undefined ? order.isStockOrder : isStockOrder(targetCustomer || '', order.customerName || '');
 
             order.po_items.forEach(poItem => {
                 const nameLower = (poItem.name || '').toLowerCase().trim();
@@ -276,7 +276,7 @@ export default function PendingOrders() {
             if (!order.po_items || order.po_items.length === 0) return;
 
             const targetCustomer = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
-            const isStock = isStockOrder(targetCustomer, order.customerName || '');
+            const isStock = order.isStockOrder !== undefined ? order.isStockOrder : isStockOrder(targetCustomer, order.customerName || '');
 
             order.po_items.forEach(poItem => {
                 const nameLower = (poItem.name || '').toLowerCase().trim();
@@ -310,8 +310,8 @@ export default function PendingOrders() {
             const poDateFormatted = new Date(poDateRaw).toLocaleDateString();
             const deliveryDateStr = order.adminResponse?.deliveryDate || poDateRaw;
             const targetCustomer = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
-
-            if (!isStockOrder(targetCustomer, order.customerName || '')) return;
+            const isStock = order.isStockOrder !== undefined ? order.isStockOrder : isStockOrder(targetCustomer, order.customerName || '');
+            if (!isStock) return;
 
             order.po_items.forEach(poItem => {
                 const nameLower = (poItem.name || '').toLowerCase().trim();
