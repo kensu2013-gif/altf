@@ -17,12 +17,21 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { EmailPackageAnimation } from '../components/ui/EmailPackageAnimation';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const isStockOrder = (targetCustomerName: string, customerName: string) => {
+    const displayCustomer = (targetCustomerName || customerName || '').toLowerCase();
+    const normalizedCustomer = displayCustomer.replace(/\s+/g, '');
+    return normalizedCustomer.includes('서울재고') ||
+        normalizedCustomer.includes('시화재고') ||
+        normalizedCustomer.includes('알트에프재고') ||
+        normalizedCustomer.includes('알트에프') ||
+        normalizedCustomer.includes('altf');
+};
 
 export default function QuotationEditor() {
     const { items, memo: quotationMemo } = useStore(useShallow((state) => state.quotation));
     // Use selector for stable reference
     const user = useStore(state => state.auth.user);
-    const { updateItem, removeItem, inventory, clearQuotation, incrementNewOrderCount, setQuotationMemo, uploadFile, pullDraftQuotation, uploadState, resetUpload } = useStore(useShallow((state) => ({
+    const { updateItem, removeItem, inventory, clearQuotation, incrementNewOrderCount, setQuotationMemo, uploadFile, pullDraftQuotation, uploadState, resetUpload, orders, setOrders } = useStore(useShallow((state) => ({
         updateItem: state.updateItem,
         removeItem: state.removeItem,
         inventory: state.inventory,
@@ -32,7 +41,9 @@ export default function QuotationEditor() {
         uploadFile: state.uploadFile,
         pullDraftQuotation: state.pullDraftQuotation,
         uploadState: state.uploadState,
-        resetUpload: state.resetUpload
+        resetUpload: state.resetUpload,
+        orders: state.orders,
+        setOrders: state.setOrders
     })));
 
     // Draft Sync Polling
@@ -49,6 +60,27 @@ export default function QuotationEditor() {
 
         return () => clearInterval(intervalId);
     }, [user, pullDraftQuotation]);
+
+    // Sync fresh orders list on mount for duplicate checking
+    useEffect(() => {
+        if (!user) return;
+
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+        };
+        const token = useStore.getState().auth.token;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        if (user.id) headers['x-requester-id'] = user.id;
+        if (user.role) headers['x-requester-role'] = user.role;
+
+        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`;
+        fetch(endpoint, { headers, cache: 'no-store' })
+            .then(res => res.ok ? res.json() : [])
+            .then(data => {
+                if (Array.isArray(data)) setOrders(data);
+            })
+            .catch(console.error);
+    }, [user, setOrders]);
 
     const navigate = useNavigate();
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -451,6 +483,58 @@ export default function QuotationEditor() {
     const handleSendOrder = async (overridePayload?: DocumentPayload): Promise<boolean> => {
         const payloadToUse = overridePayload || currentPayload;
         if (!payloadToUse || !savedDeliveryInfo) return false;
+
+        // Perform stock order duplicate check before submitting
+        const customerName = payloadToUse.customer?.company_name || '';
+        const isStock = isStockOrder(customerName, '');
+
+        if (isStock) {
+            const activeOrders = orders.filter(o => !['CANCELLED', 'WITHDRAWN', 'COMPLETED'].includes(o.status) && !o.isDeleted);
+            const pendingStockOrders = activeOrders.filter(order => {
+                const targetCustomer = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
+                return isStockOrder(targetCustomer, order.customerName || '');
+            });
+
+            const pendingStockItems: any[] = [];
+            pendingStockOrders.forEach(order => {
+                const itemsList = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
+                itemsList.forEach(pi => {
+                    if (!pi.transactionIssued) {
+                        pendingStockItems.push({
+                            poNumber: order.poNumber || 'N/A',
+                            poDate: new Date(order.createdAt).toLocaleDateString(),
+                            name: pi.name || pi.item_name || '',
+                            thickness: pi.thickness || '',
+                            size: pi.size || '',
+                            material: pi.material || '',
+                            quantity: pi.quantity || pi.qty || 0
+                        });
+                    }
+                });
+            });
+
+            const duplicateWarnings: string[] = [];
+            payloadToUse.items.forEach(cartItem => {
+                const match = pendingStockItems.find(pi => 
+                    (pi.name || '').trim().toLowerCase() === (cartItem.item_name || '').trim().toLowerCase() &&
+                    (pi.thickness || '').trim().toLowerCase() === (cartItem.thickness || '').trim().toLowerCase() &&
+                    (pi.size || '').trim().toLowerCase() === (cartItem.size || '').trim().toLowerCase() &&
+                    (pi.material || '').trim().toLowerCase() === (cartItem.material || '').trim().toLowerCase()
+                );
+                if (match) {
+                    duplicateWarnings.push(
+                        `• ${cartItem.item_name} ${[cartItem.thickness, cartItem.size, cartItem.material].filter(Boolean).join(' - ')} (이미 NO.${match.poNumber} [${match.poDate}]에 ${match.quantity}개 대기 중)`
+                    );
+                }
+            });
+
+            if (duplicateWarnings.length > 0) {
+                const proceed = window.confirm(
+                    `⚠️ 중복 발주 의심 안내\n\n아래 품목이 이미 재고 발주 미결 리스트에 존재합니다:\n\n${duplicateWarnings.join('\n')}\n\n정말로 이대로 중복 발주를 진행하시겠습니까?`
+                );
+                if (!proceed) return false;
+            }
+        }
 
         const uploadedAttachments: { name: string, url: string }[] = [];
         for (const file of attachmentFiles) {

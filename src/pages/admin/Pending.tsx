@@ -1,11 +1,22 @@
 import { useMemo, useState, useEffect, Fragment, useDeferredValue } from 'react';
 import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
-import type { User } from '../../types';
-import { FileText, PackageX, Calendar, Search, Filter, MessageSquare, Send, X, Trash2, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import type { User, Order } from '../../types';
+import { FileText, PackageX, Calendar, Search, Filter, MessageSquare, Send, X, Trash2, ChevronDown, ChevronUp, Download, Check, AlertTriangle } from 'lucide-react';
 import { CalmPageShell } from '../../components/ui/CalmPageShell';
 import { PageTransition } from '../../components/ui/PageTransition';
 import { ManagerMultiSelect } from '../../components/ui/ManagerMultiSelect';
+import { AdminOrderDetail } from './components/AdminOrderDetail';
+
+const isStockOrder = (targetCustomerName: string, customerName: string) => {
+    const displayCustomer = (targetCustomerName || customerName || '').toLowerCase();
+    const normalizedCustomer = displayCustomer.replace(/\s+/g, '');
+    return normalizedCustomer.includes('서울재고') ||
+        normalizedCustomer.includes('시화재고') ||
+        normalizedCustomer.includes('알트에프재고') ||
+        normalizedCustomer.includes('알트에프') ||
+        normalizedCustomer.includes('altf');
+};
 
 interface PendingItem {
     orderId: string;
@@ -60,6 +71,20 @@ export default function PendingOrders() {
 
     // Comment State
     const [activeCommentItemId, setActiveCommentItemId] = useState<string | null>(null);
+
+    // Tabs & New filters
+    const [activeTab, setActiveTab] = useState<'ALL' | 'STOCK'>('ALL');
+    const [showOnlyDuplicates, setShowOnlyDuplicates] = useState<boolean>(false);
+    const [selectedOrderDetailOrder, setSelectedOrderDetailOrder] = useState<Order | null>(null);
+    const [detailInitialMode, setDetailInitialMode] = useState<'CUSTOMER' | 'SUPPLIER'>('SUPPLIER');
+
+    const handleOpenOrder = (orderId: string, initialMode: 'CUSTOMER' | 'SUPPLIER' = 'SUPPLIER') => {
+        const o = orders.find(ord => ord.id === orderId);
+        if (o) {
+            setSelectedOrderDetailOrder(o);
+            setDetailInitialMode(initialMode);
+        }
+    };
 
     // Delete Item (MASTER only)
     const handleDeleteItem = async (orderId: string, itemId: string) => {
@@ -230,6 +255,135 @@ export default function PendingOrders() {
         return groups.sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
     }, [orders, deferredSearchCustomer, deferredSearchPo, dateFilter, tagFilter, searchManager, includeCompleted]);
 
+    // Unfiltered counts for tab badges
+    const { allPendingCount, stockPendingCount } = useMemo(() => {
+        let allCount = 0;
+        let stockCount = 0;
+
+        orders.forEach(order => {
+            if (order.isDeleted || order.status === 'CANCELLED') return;
+            if (!order.po_items || order.po_items.length === 0) return;
+
+            const targetCustomer = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
+            const isStock = isStockOrder(targetCustomer, order.customerName || '');
+
+            order.po_items.forEach(poItem => {
+                if (poItem.poSent && (includeCompleted || !poItem.transactionIssued)) {
+                    allCount++;
+                    if (isStock) {
+                        stockCount++;
+                    }
+                }
+            });
+        });
+
+        return { allPendingCount: allCount, stockPendingCount: stockCount };
+    }, [orders, includeCompleted]);
+
+    // Flat list of all stock order items
+    const allStockItems = useMemo(() => {
+        const list: PendingItem[] = [];
+        orders.forEach(order => {
+            if (order.isDeleted || order.status === 'CANCELLED') return;
+            if (!order.po_items || order.po_items.length === 0) return;
+
+            const poDateRaw = order.createdAt;
+            const poDateFormatted = new Date(poDateRaw).toLocaleDateString();
+            const deliveryDateStr = order.adminResponse?.deliveryDate || poDateRaw;
+            const targetCustomer = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
+
+            if (!isStockOrder(targetCustomer, order.customerName || '')) return;
+
+            order.po_items.forEach(poItem => {
+                if (poItem.poSent && (includeCompleted || !poItem.transactionIssued)) {
+                    list.push({
+                        orderId: order.id,
+                        poNumber: order.poNumber || 'N/A',
+                        poDate: poDateFormatted,
+                        customerName: order.customerName || '',
+                        targetCustomerName: targetCustomer,
+                        itemId: poItem.id,
+                        itemName: poItem.name,
+                        thickness: poItem.thickness || '',
+                        size: poItem.size || '',
+                        material: poItem.material || '',
+                        quantity: poItem.quantity,
+                        memo: order.memo || '',
+                        createdAt: order.createdAt,
+                        deliveryDate: deliveryDateStr,
+                        comments: poItem.comments || [],
+                        tags: poItem.tags || [],
+                        isCompleted: poItem.transactionIssued || false
+                    });
+                }
+            });
+        });
+        return list;
+    }, [orders, includeCompleted]);
+
+    // Group stock items by specification to check duplicates
+    const stockDuplicateMap = useMemo(() => {
+        const map = new Map<string, { count: number; items: PendingItem[] }>();
+        allStockItems.forEach(item => {
+            const specKey = `${item.itemName}::${item.thickness}::${item.size}::${item.material}`.trim();
+            if (!map.has(specKey)) {
+                map.set(specKey, { count: 0, items: [] });
+            }
+            const data = map.get(specKey)!;
+            data.count += 1;
+            data.items.push(item);
+        });
+        return map;
+    }, [allStockItems]);
+
+    // Filtered stock items based on search criteria
+    const filteredStockItems = useMemo(() => {
+        return allStockItems.filter(item => {
+            const matchCust = item.targetCustomerName.toLowerCase().includes(deferredSearchCustomer.toLowerCase()) ||
+                item.customerName.toLowerCase().includes(deferredSearchCustomer.toLowerCase());
+            const matchPo = item.poNumber.toLowerCase().includes(deferredSearchPo.toLowerCase());
+
+            let matchDate = true;
+            if (dateFilter === 'URGENT') {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const dDate = new Date(item.deliveryDate);
+                const diffTime = dDate.getTime() - today.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                matchDate = diffDays <= 7;
+            } else if (dateFilter === 'URGENT_NO_COMMENT') {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const dDate = new Date(item.deliveryDate);
+                const diffTime = dDate.getTime() - today.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                const hasComments = item.comments && item.comments.length > 0;
+                matchDate = diffDays < 0 && !hasComments;
+            }
+
+            let matchTag = true;
+            if (tagFilter !== 'ALL') {
+                matchTag = item.tags ? item.tags.includes(tagFilter) : false;
+            }
+
+            let matchDup = true;
+            if (showOnlyDuplicates) {
+                const specKey = `${item.itemName}::${item.thickness}::${item.size}::${item.material}`.trim();
+                const count = stockDuplicateMap.get(specKey)?.count || 0;
+                matchDup = count > 1;
+            }
+
+            let matchManager = true;
+            if (searchManager !== 'all') {
+                const originalOrder = orders.find(o => o.id === item.orderId);
+                const managers = originalOrder?.managers || (originalOrder?.manager ? [{id: originalOrder.manager.id, name: originalOrder.manager.name}] : []);
+                matchManager = managers.some(m => m.id === searchManager || m.name.includes(searchManager));
+            }
+
+            return matchCust && matchPo && matchDate && matchTag && matchDup && matchManager;
+        }).sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
+    }, [allStockItems, deferredSearchCustomer, deferredSearchPo, dateFilter, tagFilter, showOnlyDuplicates, searchManager, stockDuplicateMap, orders]);
+
     // Handlers
     const handleUpdateManagersForCustomer = async (targetCustomerName: string, managers: { id: string; name: string }[]) => {
         const matchingGroups = pendingOrderGroups.filter(g => g.targetCustomerName === targetCustomerName);
@@ -321,28 +475,34 @@ export default function PendingOrders() {
     };
 
     const handleExportCSV = () => {
-        if (pendingOrderGroups.length === 0) {
+        const itemsToExport = activeTab === 'ALL'
+            ? pendingOrderGroups.flatMap(g => g.items)
+            : filteredStockItems;
+
+        if (itemsToExport.length === 0) {
             alert("다운로드할 데이터가 없습니다.");
             return;
         }
 
-        const headers = ['고객명', '발주번호', '발주일자', '납기일자', '납기상태', '상태(태그)', '품목명', '규격', '수량', '메모(특이사항)', '코멘트'];
+        const headers = activeTab === 'ALL'
+            ? ['고객명', '발주번호', '발주일자', '납기일자', '납기상태', '상태(태그)', '품목명', '규격', '수량', '메모(특이사항)', '코멘트']
+            : ['품목명', '규격', '발주번호', '발주일자', '납기일자', '납기상태', '수량', '중복여부', '중복건수', '상태(태그)', '코멘트'];
         const csvRows = [headers.join(',')];
 
-        pendingOrderGroups.forEach(group => {
-            group.items.forEach(item => {
-                const spec = `${item.thickness || ''} ${item.size || ''} ${item.material || ''}`.trim();
-                const statusInfo = getDeliveryStatus(item.deliveryDate);
-                const statusText = statusInfo.type === 'DELAYED' ? statusInfo.text : (statusInfo.type === 'IMMINENT' ? '임박' : '정상');
+        itemsToExport.forEach(item => {
+            const spec = `${item.thickness || ''} ${item.size || ''} ${item.material || ''}`.trim();
+            const statusInfo = getDeliveryStatus(item.deliveryDate);
+            const statusText = statusInfo.type === 'DELAYED' ? statusInfo.text : (statusInfo.type === 'IMMINENT' ? '임박' : '정상');
 
-                const commentsString = item.comments && item.comments.length > 0
-                    ? item.comments.map(c => `[${c.author}] ${c.content}`).join(' | ')
-                    : '';
+            const commentsString = item.comments && item.comments.length > 0
+                ? item.comments.map(c => `[${c.author}] ${c.content}`).join(' | ')
+                : '';
 
-                const tagsString = item.tags && item.tags.length > 0
-                    ? item.tags.join(', ')
-                    : '';
+            const tagsString = item.tags && item.tags.length > 0
+                ? item.tags.join(', ')
+                : '';
 
+            if (activeTab === 'ALL') {
                 const row = [
                     `"${item.targetCustomerName || item.customerName}"`,
                     `"${item.poNumber}"`,
@@ -357,7 +517,28 @@ export default function PendingOrders() {
                     `"${commentsString.replace(/"/g, '""')}"`
                 ];
                 csvRows.push(row.join(','));
-            });
+            } else {
+                const specKey = `${item.itemName}::${item.thickness}::${item.size}::${item.material}`.trim();
+                const dupData = stockDuplicateMap.get(specKey);
+                const isDup = dupData && dupData.count > 1;
+                const dupText = isDup ? '중복발주' : '단독발주';
+                const dupCount = dupData?.count || 1;
+
+                const row = [
+                    `"${item.itemName}"`,
+                    `"${spec}"`,
+                    `"${item.poNumber}"`,
+                    `"${item.poDate}"`,
+                    `"${item.deliveryDate}"`,
+                    `"${statusText}"`,
+                    item.quantity,
+                    `"${dupText}"`,
+                    dupCount,
+                    `"${tagsString}"`,
+                    `"${commentsString.replace(/"/g, '""')}"`
+                ];
+                csvRows.push(row.join(','));
+            }
         });
 
         const csvString = csvRows.join('\n');
@@ -367,7 +548,8 @@ export default function PendingOrders() {
 
         const dateStr = new Date().toISOString().split('T')[0];
         link.setAttribute('href', url);
-        link.setAttribute('download', `미결관리록_${dateStr}.csv`);
+        const filename = activeTab === 'ALL' ? `미결관리록_${dateStr}.csv` : `재고발주_미결리스트_${dateStr}.csv`;
+        link.setAttribute('download', filename);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
@@ -386,6 +568,22 @@ export default function PendingOrders() {
                 <p className="text-sm text-slate-500">
                     매입발주서는 발송 완료되었으나 아직 거래명세서가 발행되지 않은 품목(납기 대기) 목록입니다. 납기 임박순으로 표시됩니다.
                 </p>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-slate-200 mb-4 bg-white p-1 rounded-lg shadow-sm w-fit border">
+                <button
+                    onClick={() => setActiveTab('ALL')}
+                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${activeTab === 'ALL' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    📋 전체 미결 현황 ({allPendingCount}건)
+                </button>
+                <button
+                    onClick={() => setActiveTab('STOCK')}
+                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${activeTab === 'STOCK' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    📦 재고 발주분 미결 ({stockPendingCount}건)
+                </button>
             </div>
 
             {/* Filters */}
@@ -454,6 +652,20 @@ export default function PendingOrders() {
                         ))}
                     </select>
                 </div>
+                {activeTab === 'STOCK' && (
+                    <label className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm hover:bg-slate-50 cursor-pointer transition-colors select-none">
+                        <input
+                            type="checkbox"
+                            checked={showOnlyDuplicates}
+                            onChange={(e) => setShowOnlyDuplicates(e.target.checked)}
+                            className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer"
+                        />
+                        <span className="flex items-center gap-1">
+                            <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                            중복 발주 의심 품목만 보기
+                        </span>
+                    </label>
+                )}
                 <div className="flex items-center gap-2 shrink-0 ml-auto">
                     <button
                         onClick={() => setIncludeCompleted(!includeCompleted)}
@@ -474,10 +686,11 @@ export default function PendingOrders() {
             <PageTransition>
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden text-sm">
                     <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] custom-scrollbar pb-4">
-                        <table className="w-full min-w-[1000px] text-left">
-                            <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 whitespace-nowrap sticky top-0 z-10">
-                                <tr>
-                                    <th scope="col" className="px-5 py-3 font-bold w-[13%] min-w-[120px]">고객명 (Customer)</th>
+                        {activeTab === 'ALL' ? (
+                            <table className="w-full min-w-[1000px] text-left">
+                                <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 whitespace-nowrap sticky top-0 z-10">
+                                    <tr>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[13%] min-w-[120px]">고객명 (Customer)</th>
                                     <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-[160px]">발주번호 / 납기일자</th>
                                     <th scope="col" className="px-5 py-3 font-bold w-[40%] text-right pr-12">품목 정보 (Item Spec)</th>
                                     <th scope="col" className="px-5 py-3 font-bold text-center w-[10%]">수량</th>
@@ -709,9 +922,257 @@ export default function PendingOrders() {
                                 )}
                             </tbody>
                         </table>
+                        ) : (
+                            <table className="w-full min-w-[1000px] text-left">
+                                <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 whitespace-nowrap sticky top-0 z-10">
+                                    <tr>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[25%] min-w-[200px]">아이템명 / 규격 (Item Spec)</th>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-[100px]">발주번호 (PO Number)</th>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-[100px] text-center">발주일자</th>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-[100px] text-center">납기예정일</th>
+                                        <th scope="col" className="px-5 py-3 font-bold text-center w-[8%] min-w-[80px]">수량</th>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[16%] min-w-[150px]">중복 발주 확인</th>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[20%] text-center min-w-[180px]">코멘트 (의견/일정 공유)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {filteredStockItems.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} className="px-6 py-16 text-center text-slate-400">
+                                                <div className="flex flex-col items-center gap-3">
+                                                    <div className="bg-slate-50 p-4 rounded-full border border-slate-100 shadow-inner">
+                                                        <PackageX className="w-8 h-8 text-slate-300" />
+                                                    </div>
+                                                    <span className="font-medium text-slate-500">
+                                                        재고 발주분 중 검색 조건에 맞는 미결 품목이 없습니다.
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        filteredStockItems.map((item) => {
+                                            const specKey = `${item.itemName}::${item.thickness}::${item.size}::${item.material}`.trim();
+                                            const dupData = stockDuplicateMap.get(specKey);
+                                            const isDuplicate = dupData && dupData.count > 1;
+                                            const statusObj = getDeliveryStatus(item.deliveryDate);
+                                            const uniqueId = `${item.orderId}-${item.itemId}`;
+                                            const isCommenting = activeCommentItemId === uniqueId;
+                                            const isDelayedAndNoComment = statusObj.type === 'DELAYED' && (!item.comments || item.comments.length === 0);
+
+                                            return (
+                                                <tr key={uniqueId} className={`hover:bg-slate-50 transition-colors group align-top ${isDelayedAndNoComment ? 'bg-red-50/60 shadow-inner' : ''}`}>
+                                                    {/* Item Spec */}
+                                                    <td className="px-5 py-4">
+                                                        <div className="flex flex-col gap-1 pr-4">
+                                                            <div className="font-bold text-slate-800 text-sm flex items-center gap-1.5 flex-wrap">
+                                                                {item.isCompleted && (
+                                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border bg-slate-200 text-slate-500 border-slate-300">
+                                                                        발행 완료
+                                                                    </span>
+                                                                )}
+                                                                {item.tags && item.tags.length > 0 && item.tags.map(tag => (
+                                                                    <span key={tag} className={`text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border ${tag === '관리' ? 'bg-red-50 text-red-700 border-red-200' : tag === '재고품' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : tag === '사급' ? 'bg-amber-50 text-amber-700 border-amber-200' : tag === '생산중' ? 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' : tag === '출고대기' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                                                        {tag}
+                                                                    </span>
+                                                                ))}
+                                                                <span className="text-slate-900 bg-teal-50 px-1.5 py-0.5 rounded mr-1 leading-tight">{item.itemName}</span>
+                                                            </div>
+                                                            {(item.thickness || item.size || item.material) && (
+                                                                <div className="text-xs text-slate-500 font-semibold pl-1">
+                                                                    {[item.thickness, item.size, item.material].filter(Boolean).join(' - ')}
+                                                                </div>
+                                                            )}
+                                                            <div className="text-[10px] text-slate-400 pl-1">
+                                                                원주문: {item.targetCustomerName}
+                                                            </div>
+
+                                                            {/* Tag Editor (Master/Manager) */}
+                                                            {user?.role && ['MASTER', 'MANAGER', 'admin'].includes(user.role) && (
+                                                                <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    {availableTags.map(tag => {
+                                                                        const hasTag = item.tags?.includes(tag);
+                                                                        return (
+                                                                            <button
+                                                                                key={tag}
+                                                                                onClick={() => handleToggleTag(item.orderId, item.itemId, tag)}
+                                                                                className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${hasTag ? 'bg-indigo-50 text-indigo-700 border-indigo-200 font-bold' : 'bg-white text-slate-400 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'}`}
+                                                                            >
+                                                                                {hasTag ? `- ${tag}` : `+ ${tag}`}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* PO Number */}
+                                                    <td className="px-5 py-4">
+                                                        <button
+                                                            onClick={() => handleOpenOrder(item.orderId, 'SUPPLIER')}
+                                                            className="font-mono font-bold text-indigo-700 text-xs bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-800 px-2 py-1 rounded border border-indigo-100 shadow-sm inline-flex items-center gap-1 transition-colors"
+                                                            title="상세 모달 열기"
+                                                        >
+                                                            NO.{item.poNumber.includes('-') ? item.poNumber.split('-')[1] : item.poNumber}
+                                                        </button>
+                                                    </td>
+
+                                                    {/* PO Date */}
+                                                    <td className="px-5 py-4 text-center text-slate-600 font-medium">
+                                                        {item.poDate}
+                                                    </td>
+
+                                                    {/* Delivery Date */}
+                                                    <td className="px-5 py-4 text-center">
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <span className={`text-xs inline-flex items-center gap-1 font-medium ${statusObj.type !== 'NORMAL' ? 'text-slate-800 font-bold' : 'text-slate-500'}`}>
+                                                                {new Date(item.deliveryDate).toLocaleDateString()}
+                                                            </span>
+                                                            {statusObj.type !== 'NORMAL' && (
+                                                                <span className={`px-1.5 py-0.5 ${statusObj.bg} ${statusObj.color} rounded text-[10px] font-bold shadow-sm inline-flex`}>
+                                                                    {statusObj.text}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Quantity */}
+                                                    <td className="px-5 py-4 text-center font-bold text-slate-900 font-mono text-base">
+                                                        <div className="flex items-center justify-center gap-1.5">
+                                                            {item.quantity.toLocaleString()}
+                                                            {user?.role === 'MASTER' && (
+                                                                <button
+                                                                    onClick={() => handleDeleteItem(item.orderId, item.itemId)}
+                                                                    className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                                                    title="품목 완전 삭제 (MASTER)"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Duplicate Check Warning */}
+                                                    <td className="px-5 py-4">
+                                                        {isDuplicate && dupData ? (
+                                                            <div className="flex flex-col gap-1 bg-red-50/50 p-2 rounded border border-red-100/50">
+                                                                <span className="inline-flex items-center gap-1 text-[11px] font-black text-red-700 bg-red-100 border border-red-200 px-1.5 py-0.5 rounded shadow-sm w-fit">
+                                                                    <AlertTriangle className="w-3 h-3 text-red-500" />
+                                                                    중복 발주 의심 ({dupData.count}건)
+                                                                </span>
+                                                                <div className="text-[10px] text-slate-500 pl-1 mt-1 space-y-1 max-h-[80px] overflow-y-auto custom-scrollbar">
+                                                                    {dupData.items.filter(i => i.orderId !== item.orderId || i.itemId !== item.itemId).map((other, idx) => (
+                                                                        <div key={idx} className="flex items-center justify-between gap-1 border-b border-slate-100/30 pb-0.5">
+                                                                            <button
+                                                                                onClick={() => handleOpenOrder(other.orderId, 'SUPPLIER')}
+                                                                                className="font-mono text-indigo-600 hover:text-indigo-800 font-bold hover:underline"
+                                                                                title="해당 발주서 열기"
+                                                                            >
+                                                                                NO.{other.poNumber}
+                                                                            </button>
+                                                                            <span className="text-slate-400">({other.poDate})</span>
+                                                                            <span className="font-bold text-slate-600">{other.quantity}개</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded shadow-sm">
+                                                                <Check className="w-3 h-3 text-emerald-500" />
+                                                                단독 발주
+                                                            </span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Comments System */}
+                                                    <td className="px-5 py-4">
+                                                        <div className="flex flex-col gap-2">
+                                                            {item.comments && item.comments.length > 0 && (
+                                                                <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
+                                                                    {item.comments.map((comment, idx) => (
+                                                                        <div key={idx} className="bg-slate-50 rounded-lg p-2 border border-slate-100 text-xs shadow-sm">
+                                                                            <div className="flex justify-between items-center mb-1">
+                                                                                <span className="font-bold text-slate-700">{comment.author}</span>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-[9px] text-slate-400">{new Date(comment.timestamp).toLocaleDateString()} {new Date(comment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                                    {user?.role === 'MASTER' && (
+                                                                                        <button
+                                                                                            onClick={() => handleDeleteComment(item.orderId, item.itemId, idx)}
+                                                                                            className="text-slate-300 hover:text-red-500 transition-colors p-0.5 rounded"
+                                                                                            title="코멘트 삭제 (MASTER 권한)"
+                                                                                        >
+                                                                                            <Trash2 className="w-3 h-3" />
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                            <p className="text-slate-600 leading-snug break-words whitespace-pre-wrap">{comment.content}</p>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+
+                                                            {!isCommenting ? (
+                                                                <button
+                                                                    onClick={() => setActiveCommentItemId(uniqueId)}
+                                                                    className="flex items-center justify-center gap-1.5 w-full py-1.5 mt-1 border border-dashed border-slate-300 rounded text-xs font-medium text-slate-500 hover:text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                                                                >
+                                                                    <MessageSquare className="w-3.5 h-3.5" />
+                                                                    {item.comments && item.comments.length > 0 ? '코멘트 추가' : '첫 코멘트 남기기'}
+                                                                </button>
+                                                            ) : (
+                                                                <div className="flex flex-col gap-2 mt-1 bg-white p-2 rounded border border-teal-200 shadow-md">
+                                                                    <textarea
+                                                                        autoFocus
+                                                                        value={newComment}
+                                                                        onChange={(e) => setNewComment(e.target.value)}
+                                                                        placeholder="담당자 의견, 배차 정보 등..."
+                                                                        className="w-full text-xs p-2 border border-slate-200 rounded outline-none focus:border-teal-400 resize-none h-[60px]"
+                                                                    />
+                                                                    <div className="flex justify-end gap-1">
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setActiveCommentItemId(null);
+                                                                                setNewComment('');
+                                                                            }}
+                                                                            className="p-1 text-slate-400 hover:bg-slate-100 rounded"
+                                                                            title="Cancel"
+                                                                            aria-label="Cancel commenting"
+                                                                        >
+                                                                            <X className="w-4 h-4" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleAddComment(item.orderId, item.itemId)}
+                                                                            disabled={!newComment.trim()}
+                                                                            className="flex items-center gap-1 px-3 py-1 bg-teal-600 disabled:bg-slate-300 text-white rounded text-xs font-bold hover:bg-teal-700 transition-colors"
+                                                                        >
+                                                                            <Send className="w-3 h-3" />
+                                                                            등록
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 </div>
-            </PageTransition >
-        </CalmPageShell >
+            </PageTransition>
+
+            {selectedOrderDetailOrder && (
+                <AdminOrderDetail
+                    order={selectedOrderDetailOrder}
+                    onClose={() => setSelectedOrderDetailOrder(null)}
+                    onUpdate={updateOrder}
+                    initialMode={detailInitialMode}
+                />
+            )}
+        </CalmPageShell>
     );
 }

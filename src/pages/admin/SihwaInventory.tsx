@@ -1583,11 +1583,55 @@ export default function SihwaInventory() {
     };
 
     const handleCreateOrder = (selectedSet: Set<string>, listType: 'CRITICAL' | 'WARNING' | 'REGULAR') => {
+        const listItems = listType === 'CRITICAL' ? stats.critical : listType === 'WARNING' ? stats.warning : stats.regular;
+        const selectedItemsWithPending = listItems.filter(item => selectedSet.has(item.product.id) && item.pendingOrderQty > 0);
+        
+        if (selectedItemsWithPending.length > 0) {
+            const warningLines = selectedItemsWithPending.map(item => {
+                const poDetails = item.pendingOrderDetails?.map(d => `NO.${d.poNumber.slice(-8)} (${d.qty}개)`).join(', ') || '';
+                return `• ${item.product.id} (${item.product.name}): 현재 +${item.pendingOrderQty}개 대기 중 [발주내역: ${poDetails}]`;
+            });
+            
+            const proceed = window.confirm(
+                `⚠️ 중복 발주 경고\n\n선택하신 품목 중 이미 미결 입고대기(발주 완료) 중인 품목이 존재합니다:\n\n${warningLines.join('\n')}\n\n그래도 발주서 작성을 진행하시겠습니까?`
+            );
+            if (!proceed) return;
+        }
+
         processOrderSet(selectedSet, listType);
         navigate('/cart');
     };
 
     const handleCreateGlobalOrder = () => {
+        const allSelectedItems: AnalyzedItem[] = [];
+        stats.critical.forEach(row => {
+            if (selectedCriticalIds.has(row.product.id) && row.pendingOrderQty > 0) {
+                allSelectedItems.push(row);
+            }
+        });
+        stats.warning.forEach(row => {
+            if (selectedWarningIds.has(row.product.id) && row.pendingOrderQty > 0) {
+                allSelectedItems.push(row);
+            }
+        });
+        stats.regular.forEach(row => {
+            if (selectedRegularIds.has(row.product.id) && row.pendingOrderQty > 0) {
+                allSelectedItems.push(row);
+            }
+        });
+        
+        if (allSelectedItems.length > 0) {
+            const warningLines = allSelectedItems.map(item => {
+                const poDetails = item.pendingOrderDetails?.map(d => `NO.${d.poNumber.slice(-8)} (${d.qty}개)`).join(', ') || '';
+                return `• ${item.product.id} (${item.product.name}): 현재 +${item.pendingOrderQty}개 대기 중 [발주내역: ${poDetails}]`;
+            });
+            
+            const proceed = window.confirm(
+                `⚠️ 중복 발주 경고\n\n선택하신 품목 중 이미 미결 입고대기(발주 완료) 중인 품목이 존재합니다:\n\n${warningLines.join('\n')}\n\n그래도 발주서 작성을 진행하시겠습니까?`
+            );
+            if (!proceed) return;
+        }
+
         if (selectedCriticalIds.size > 0) processOrderSet(selectedCriticalIds, 'CRITICAL');
         if (selectedWarningIds.size > 0) processOrderSet(selectedWarningIds, 'WARNING');
         if (selectedRegularIds.size > 0) processOrderSet(selectedRegularIds, 'REGULAR');
@@ -1596,6 +1640,20 @@ export default function SihwaInventory() {
 
     const handleCreateManualOrder = () => {
         if (selectedAllTableIds.size === 0) return;
+
+        const selectedItemsWithPending = analyzedInventory.filter(row => selectedAllTableIds.has(row.product.id) && row.pendingOrderQty > 0);
+        
+        if (selectedItemsWithPending.length > 0) {
+            const warningLines = selectedItemsWithPending.map(item => {
+                const poDetails = item.pendingOrderDetails?.map(d => `NO.${d.poNumber.slice(-8)} (${d.qty}개)`).join(', ') || '';
+                return `• ${item.product.id} (${item.product.name}): 현재 +${item.pendingOrderQty}개 대기 중 [발주내역: ${poDetails}]`;
+            });
+            
+            const proceed = window.confirm(
+                `⚠️ 중복 발주 경고\n\n선택하신 품목 중 이미 미결 입고대기(발주 완료) 중인 품목이 존재합니다:\n\n${warningLines.join('\n')}\n\n그래도 발주서 작성을 진행하시겠습니까?`
+            );
+            if (!proceed) return;
+        }
 
         analyzedInventory.forEach(row => {
             if (selectedAllTableIds.has(row.product.id)) {
