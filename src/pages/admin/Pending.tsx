@@ -173,7 +173,11 @@ export default function PendingOrders() {
             const isStock = order.isStockOrder !== undefined ? order.isStockOrder : isStockOrder(targetCustomer || '', order.customerName || '');
 
             order.po_items.forEach(poItem => {
-                const nameLower = (poItem.name || '').toLowerCase().trim();
+                const cleanName = (poItem.name || '').trim();
+                if (!cleanName || cleanName === '-' || cleanName === 'N/A') return;
+                if (poItem.quantity <= 0) return;
+
+                const nameLower = cleanName.toLowerCase();
                 const isDcOrFreight = nameLower === 'd/c' || nameLower === 'dc' || nameLower.includes('운임') || nameLower.includes('배송') || nameLower.includes('freight') || nameLower.includes('shipping') || nameLower.includes('discount') || nameLower.includes('할인');
                 if (isDcOrFreight) return;
 
@@ -207,8 +211,15 @@ export default function PendingOrders() {
 
         // Apply Filters
         const filtered = itemsList.filter(item => {
-            const matchCust = item.targetCustomerName.toLowerCase().includes(deferredSearchCustomer.toLowerCase()) ||
-                item.customerName.toLowerCase().includes(deferredSearchCustomer.toLowerCase());
+            const combinedSpec = [item.itemName, item.thickness, item.size, item.material].filter(Boolean).join('-').toLowerCase();
+            const searchLower = deferredSearchCustomer.toLowerCase();
+            const normalizedSpec = combinedSpec.replace(/[\s-]+/g, '');
+            const normalizedSearch = searchLower.replace(/[\s-]+/g, '');
+
+            const matchCustOrSpec = item.targetCustomerName.toLowerCase().includes(searchLower) ||
+                item.customerName.toLowerCase().includes(searchLower) ||
+                combinedSpec.includes(searchLower) ||
+                normalizedSpec.includes(normalizedSearch);
             const matchPo = item.poNumber.toLowerCase().includes(deferredSearchPo.toLowerCase());
 
             let matchDate = true;
@@ -236,7 +247,7 @@ export default function PendingOrders() {
                 matchTag = item.tags ? item.tags.includes(tagFilter) : false;
             }
 
-            return matchCust && matchPo && matchDate && matchTag;
+            return matchCustOrSpec && matchPo && matchDate && matchTag;
         });
 
         const groupedMap = new Map<string, PendingOrderGroup>();
@@ -279,7 +290,11 @@ export default function PendingOrders() {
             const isStock = order.isStockOrder !== undefined ? order.isStockOrder : isStockOrder(targetCustomer, order.customerName || '');
 
             order.po_items.forEach(poItem => {
-                const nameLower = (poItem.name || '').toLowerCase().trim();
+                const cleanName = (poItem.name || '').trim();
+                if (!cleanName || cleanName === '-' || cleanName === 'N/A') return;
+                if (poItem.quantity <= 0) return;
+
+                const nameLower = cleanName.toLowerCase();
                 const isDcOrFreight = nameLower === 'd/c' || nameLower === 'dc' || nameLower.includes('운임') || nameLower.includes('배송') || nameLower.includes('freight') || nameLower.includes('shipping') || nameLower.includes('discount') || nameLower.includes('할인');
                 if (isDcOrFreight) return;
 
@@ -314,7 +329,11 @@ export default function PendingOrders() {
             if (!isStock) return;
 
             order.po_items.forEach(poItem => {
-                const nameLower = (poItem.name || '').toLowerCase().trim();
+                const cleanName = (poItem.name || '').trim();
+                if (!cleanName || cleanName === '-' || cleanName === 'N/A') return;
+                if (poItem.quantity <= 0) return;
+
+                const nameLower = cleanName.toLowerCase();
                 const isDcOrFreight = nameLower === 'd/c' || nameLower === 'dc' || nameLower.includes('운임') || nameLower.includes('배송') || nameLower.includes('freight') || nameLower.includes('shipping') || nameLower.includes('discount') || nameLower.includes('할인');
                 if (isDcOrFreight) return;
 
@@ -362,8 +381,15 @@ export default function PendingOrders() {
     // Filtered stock items based on search criteria
     const filteredStockItems = useMemo(() => {
         return allStockItems.filter(item => {
-            const matchCust = item.targetCustomerName.toLowerCase().includes(deferredSearchCustomer.toLowerCase()) ||
-                item.customerName.toLowerCase().includes(deferredSearchCustomer.toLowerCase());
+            const combinedSpec = [item.itemName, item.thickness, item.size, item.material].filter(Boolean).join('-').toLowerCase();
+            const searchLower = deferredSearchCustomer.toLowerCase();
+            const normalizedSpec = combinedSpec.replace(/[\s-]+/g, '');
+            const normalizedSearch = searchLower.replace(/[\s-]+/g, '');
+
+            const matchCustOrSpec = item.targetCustomerName.toLowerCase().includes(searchLower) ||
+                item.customerName.toLowerCase().includes(searchLower) ||
+                combinedSpec.includes(searchLower) ||
+                normalizedSpec.includes(normalizedSearch);
             const matchPo = item.poNumber.toLowerCase().includes(deferredSearchPo.toLowerCase());
 
             let matchDate = true;
@@ -403,7 +429,7 @@ export default function PendingOrders() {
                 matchManager = managers.some(m => m.id === searchManager || m.name.includes(searchManager));
             }
 
-            return matchCust && matchPo && matchDate && matchTag && matchDup && matchManager;
+            return matchCustOrSpec && matchPo && matchDate && matchTag && matchDup && matchManager;
         }).sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
     }, [allStockItems, deferredSearchCustomer, deferredSearchPo, dateFilter, tagFilter, showOnlyDuplicates, searchManager, stockDuplicateMap, orders]);
 
@@ -674,7 +700,7 @@ export default function PendingOrders() {
                     <Search className="w-4 h-4 text-slate-400 mr-2" />
                     <input
                         type="text"
-                        placeholder="고객명 검색..."
+                        placeholder="고객명 또는 품목 규격 검색..."
                         value={searchCustomer}
                         onChange={(e) => setSearchCustomer(e.target.value)}
                         className="bg-transparent border-none outline-none text-sm w-full placeholder:text-slate-400 font-medium"
@@ -881,12 +907,9 @@ export default function PendingOrders() {
                                                                             </span>
                                                                         ))}
 
-                                                                        <span className="text-slate-900 bg-teal-50 px-1.5 py-0.5 rounded mr-1 leading-tight">{item.itemName}</span>
-                                                                        {(item.thickness || item.size || item.material) && (
-                                                                            <span className="text-slate-600 font-medium whitespace-nowrap">
-                                                                                - {[item.thickness, item.size, item.material].filter(Boolean).join(' - ')}
-                                                                            </span>
-                                                                        )}
+                                                                        <span className="text-slate-900 bg-teal-50 px-1.5 py-0.5 rounded leading-tight font-mono text-xs font-bold border border-teal-200/50">
+                                                                            {[item.itemName, item.thickness, item.size, item.material].filter(Boolean).join('-')}
+                                                                        </span>
                                                                     </div>
 
                                                                     {/* Tag Editor (Master/Manager) */}
@@ -1036,18 +1059,15 @@ export default function PendingOrders() {
                                                     <td className="px-5 py-4">
                                                         <div className="flex flex-col gap-1">
                                                             <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5 flex-wrap">
-                                                                <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs font-black border border-indigo-100">{group.itemName}</span>
+                                                                <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs font-black border border-indigo-100 font-mono">
+                                                                    {[group.itemName, group.thickness, group.size, group.material].filter(Boolean).join('-')}
+                                                                </span>
                                                                 {group.tags && group.tags.length > 0 && group.tags.map(tag => (
                                                                     <span key={tag} className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${tag === '관리' ? 'bg-red-50 text-red-700 border-red-200' : tag === '재고품' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : tag === '사급' ? 'bg-amber-50 text-amber-700 border-amber-200' : tag === '생산중' ? 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' : tag === '출고대기' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                                                                         {tag}
                                                                     </span>
                                                                 ))}
                                                             </div>
-                                                            {(group.thickness || group.size || group.material) && (
-                                                                <div className="text-xs text-slate-600 font-bold mt-1.5 pl-0.5">
-                                                                    {[group.thickness, group.size, group.material].filter(Boolean).join(' - ')}
-                                                                </div>
-                                                            )}
                                                         </div>
                                                     </td>
 
