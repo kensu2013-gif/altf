@@ -36,12 +36,17 @@ export function useInventoryIndex(inventory: Product[]) {
 
         // Priority 2: Generated SKU Match (Matches original AdminQuoteDetail logic)
         try {
-            // Use generateSku to see if we can find a product by its constructed ID
-            // This mimics: const candidateId = generateSku(item); inventory.find(p => p.id === candidateId);
-            const candidateId = generateSku(item);
-            if (candidateId) {
-                const byId = idMap.get(candidateId) || idMap.get(normalize(candidateId));
-                if (byId) return byId;
+            if (item.name) {
+                const candidateId = generateSku({
+                    name: item.name,
+                    thickness: item.thickness,
+                    size: item.size,
+                    material: item.material
+                });
+                if (candidateId) {
+                    const byId = idMap.get(candidateId) || idMap.get(normalize(candidateId));
+                    if (byId) return byId;
+                }
             }
         } catch (e) {
             // Ignore if item doesn't support SKU generation

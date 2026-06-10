@@ -1,100 +1,33 @@
-import { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useStore, type DeliveryInfo } from '../store/useStore';
-import { useShallow } from 'zustand/react/shallow';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { formatCurrency } from '../lib/utils';
-import { Trash2, Send, Plus, Minus, Search, RotateCcw, Printer, ArrowRight, User, X } from 'lucide-react';
+import { Trash2, Send, Plus, Minus, Search, RotateCcw, Printer, ArrowRight } from 'lucide-react';
 import type { LineItem } from '../types';
 import { PreviewModal } from '../components/ui/PreviewModal';
 import type { DocumentPayload, DocumentItem, DocumentType } from '../types/document';
 import { renderDocumentHTML } from '../lib/documentTemplate';
 import { OrderService } from '../services/orderService';
 import { CalmPageShell } from '../components/ui/CalmPageShell';
-import { DeliveryInfoModal } from '../components/ui/DeliveryInfoModal';
+import { OrderSubmissionOverlay } from '../components/ui/OrderSubmissionOverlay';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { EmailPackageAnimation } from '../components/ui/EmailPackageAnimation';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const isStockOrder = (targetCustomerName: string, customerName: string) => {
-    const displayCustomer = (targetCustomerName || customerName || '').toLowerCase();
-    const normalizedCustomer = displayCustomer.replace(/\s+/g, '');
-    return normalizedCustomer.includes('서울재고') ||
-        normalizedCustomer.includes('시화재고') ||
-        normalizedCustomer.includes('알트에프재고') ||
-        normalizedCustomer.includes('알트에프') ||
-        normalizedCustomer.includes('altf');
-};
-
 export default function QuotationEditor() {
-    const { items, memo: quotationMemo } = useStore(useShallow((state) => state.quotation));
+    const { items } = useStore((state) => state.quotation);
     // Use selector for stable reference
     const user = useStore(state => state.auth.user);
-    const { updateItem, removeItem, inventory, clearQuotation, incrementNewOrderCount, setQuotationMemo, uploadFile, pullDraftQuotation, uploadState, resetUpload, orders, setOrders } = useStore(useShallow((state) => ({
-        updateItem: state.updateItem,
-        removeItem: state.removeItem,
-        inventory: state.inventory,
-        clearQuotation: state.clearQuotation,
-        incrementNewOrderCount: state.incrementNewOrderCount,
-        setQuotationMemo: state.setQuotationMemo,
-        uploadFile: state.uploadFile,
-        pullDraftQuotation: state.pullDraftQuotation,
-        uploadState: state.uploadState,
-        resetUpload: state.resetUpload,
-        orders: state.orders,
-        setOrders: state.setOrders
-    })));
+    const { updateItem, removeItem, inventory, clearQuotation, incrementNewOrderCount } = useStore((state) => state);
 
-    // Draft Sync Polling
-    useEffect(() => {
-        if (!user) return;
-
-        // Initial pull
-        pullDraftQuotation();
-
-        // Poll every 10 seconds
-        const intervalId = setInterval(() => {
-            pullDraftQuotation();
-        }, 10000);
-
-        return () => clearInterval(intervalId);
-    }, [user, pullDraftQuotation]);
-
-    // Sync fresh orders list on mount for duplicate checking
-    useEffect(() => {
-        if (!user) return;
-
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json'
-        };
-        const token = useStore.getState().auth.token;
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        if (user.id) headers['x-requester-id'] = user.id;
-        if (user.role) headers['x-requester-role'] = user.role;
-
-        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`;
-        fetch(endpoint, { headers, cache: 'no-store' })
-            .then(res => res.ok ? res.json() : [])
-            .then(data => {
-                if (Array.isArray(data)) setOrders(data);
-            })
-            .catch(console.error);
-    }, [user, setOrders]);
-
-    const navigate = useNavigate();
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
-    const [attachmentFiles, setAttachmentFiles] = useState<File[]>(uploadState.attachedFile ? [uploadState.attachedFile] : []);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
     const [currentPayload, setCurrentPayload] = useState<DocumentPayload | null>(null);
+    const [quotationMemo, setQuotationMemo] = useState(''); // Inquiry Memo
     const submitButtonRef = useRef<HTMLButtonElement>(null);
-
-    // AI Upload Sync
-    useEffect(() => {
-        if (uploadState.attachedFile) {
-            resetUpload(); // Clear memory after it has been grabbed above
-        }
-    }, [uploadState.attachedFile, resetUpload]);
 
     // --- Custom Confirm Dialog State ---
     const [confirmConfig, setConfirmConfig] = useState<{
@@ -112,81 +45,15 @@ export default function QuotationEditor() {
     });
 
     // --- Success Info Dialog State ---
-    const [successConfig, setSuccessConfig] = useState({
+    const [successConfig, setSuccessConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        description: string;
+    }>({
         isOpen: false,
         title: '',
-        description: '',
-        navigateOnConfirm: true
+        description: ''
     });
-
-    // Standalone Customer Info for Quotation
-    const [quotationCustomerInfo, setQuotationCustomerInfo] = useState({
-        companyName: '',
-        contactName: '',
-        phone: '',
-        email: '',
-        address: '',
-        bizNo: ''
-    });
-
-    interface CrmCustomerOption {
-        id: string;
-        companyName: string;
-        businessNumber?: string;
-        ceo?: string;
-        contactName?: string;
-        phone?: string;
-        email?: string;
-        address?: string;
-        isDeleted?: boolean;
-    }
-
-    // CRM Auto-fill State
-    const [crmCustomers, setCrmCustomers] = useState<CrmCustomerOption[]>([]);
-    const [showSuggestions, setShowSuggestions] = useState(false);
-    
-    useEffect(() => {
-        if (!user) return;
-        fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
-            headers: { 'x-requester-role': user.role || 'GUEST' }
-        })
-        .then(res => res.ok ? res.json() : [])
-        .then(data => setCrmCustomers(data.filter((c: CrmCustomerOption) => !c.isDeleted)))
-        .catch(console.error);
-    }, [user]);
-
-    const stripCorpName = (name: string) => (name || '').replace(/[()주식회사\s]/g, '').trim();
-
-    const handleCustomerSelect = (c: CrmCustomerOption) => {
-        if (window.confirm(`[${c.companyName}]의 연락처, 이메일, 담당자 등 전체 정보를 자동으로 덮어씌울까요?\n(현대배관 등 여러 지점이 있는 업체의 경우 '취소'를 누르시면 상호명만 적용됩니다)`)) {
-            setQuotationCustomerInfo(prev => ({
-                ...prev,
-                companyName: c.companyName,
-                contactName: c.contactName || c.ceo || prev.contactName,
-                phone: c.phone || prev.phone,
-                email: c.email || prev.email,
-                address: c.address || prev.address,
-                bizNo: c.businessNumber || prev.bizNo
-            }));
-        } else {
-            setQuotationCustomerInfo(prev => ({ 
-                ...prev, 
-                companyName: c.companyName,
-                bizNo: c.businessNumber || prev.bizNo 
-            }));
-        }
-        setShowSuggestions(false);
-    };
-
-    const crmSuggestions = crmCustomers.filter(c => 
-        quotationCustomerInfo.companyName && 
-        stripCorpName(c.companyName).includes(stripCorpName(quotationCustomerInfo.companyName))
-    );
-
-    // Delivery Info State
-    const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
-    const [pendingDocType, setPendingDocType] = useState<DocumentType | null>(null);
-    const [savedDeliveryInfo, setSavedDeliveryInfo] = useState<DeliveryInfo | null>(null);
 
     const handleClearAll = () => {
         if (items.length === 0) return;
@@ -211,10 +78,7 @@ export default function QuotationEditor() {
         }
     };
 
-    // Helper to calculate total
-    const calculateTotal = (items: LineItem[]) => items.reduce((sum, item) => sum + item.amount, 0);
-
-    const totalAmount = calculateTotal(items);
+    const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
 
     const allSelected = items.length > 0 && items.every(item => selectedIds.includes(item.id));
 
@@ -244,16 +108,20 @@ export default function QuotationEditor() {
                 updates.location = match.location;
                 updates.maker = match.maker;
                 updates.locationStock = match.locationStock;
-                updates.marking_wait_qty = match.marking_wait_qty;
             } else {
                 updates.productId = null;
                 updates.stockStatus = undefined;
                 updates.currentStock = undefined;
                 updates.location = undefined;
                 updates.maker = undefined;
-                updates.marking_wait_qty = undefined;
+
+                // Keep unitPrice as is or reset?
+                // updates.unitPrice = 0; 
             }
         }
+
+        // Recalculate amount if needed (store handles this too, but for UI feedback loop)
+        // Store updateItem handles amount recalc usually.
 
         updateItem(id, updates);
     };
@@ -295,7 +163,7 @@ export default function QuotationEditor() {
         const docItems: DocumentItem[] = items.map((item, idx) => {
             return {
                 no: idx + 1,
-                item_id: item.itemId,
+                item_id: item.itemId, // Pass Back Data
                 item_name: item.name,
                 thickness: item.thickness,
                 size: item.size,
@@ -331,13 +199,12 @@ export default function QuotationEditor() {
                 business_no: '838-05-01054'
             },
             customer: {
-                company_name: type === 'QUOTATION' ? quotationCustomerInfo.companyName : (user?.companyName || '고객사 (Guest)'),
-                contact_name: type === 'QUOTATION' ? quotationCustomerInfo.contactName : (user?.contactName || (user?.email ? user.email.split('@')[0] : '-')),
-                tel: type === 'QUOTATION' ? quotationCustomerInfo.phone : (user?.phone || '-'),
-                email: type === 'QUOTATION' ? quotationCustomerInfo.email : (user?.email || '-'),
-                address: type === 'QUOTATION' ? quotationCustomerInfo.address : (user?.address || '-'),
-                business_no: type === 'QUOTATION' ? quotationCustomerInfo.bizNo : (user?.bizNo || '-'),
-                memo: type === 'QUOTATION' ? quotationMemo : undefined
+                company_name: user?.companyName || '고객사 (Guest)',
+                contact_name: user?.contactName || (user?.email ? user.email.split('@')[0] : '-'),
+                tel: user?.phone || '-',
+                email: user?.email || '-',
+                address: user?.address || '-',
+                memo: type === 'QUOTATION' ? quotationMemo : undefined // Pass Inquiry Memo for Quotation
             },
             items: docItems,
             totals: {
@@ -347,64 +214,38 @@ export default function QuotationEditor() {
         };
     };
 
-    const handleSaveQuotation = async (extraMemo?: string, silentSave: boolean = false) => {
+    const handleSaveQuotation = async () => {
         if (!user) return;
 
         try {
-            const uploadedAttachments: { name: string, url: string }[] = [];
-            for (const file of attachmentFiles) {
-                const refId = user.companyName + '_' + Date.now().toString();
-                const res = await uploadFile(file, 'quote', refId);
-                if (res) uploadedAttachments.push(res);
-            }
+            await fetch('/api/my/quotations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user.id,
+                    items: items,
+                    totalAmount: totalAmount,
+                    customerName: user.companyName || 'Guest',
+                    memo: quotationMemo // Save Inquiry Memo
+                })
+            });
 
-            const payloadData = {
+            // Persist to Local Store for Admin Visibility
+            useStore.getState().addQuotation({
                 userId: user.id,
-                customerName: quotationCustomerInfo.companyName || user.companyName || 'Guest',
                 customerNumber: user.companyName || 'Guest',
-                customerInfo: quotationCustomerInfo,
                 items: items,
+                status: 'DRAFT',
                 totalAmount: totalAmount,
-                memo: extraMemo ? (quotationMemo ? `${quotationMemo}\n${extraMemo}` : extraMemo) : quotationMemo,
-                status: 'SUBMITTED' as const,
-                attachments: uploadedAttachments
-            };
+                memo: quotationMemo
+            });
 
-            try {
-                const apiRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payloadData)
-                });
-                if (!apiRes.ok) {
-                    console.error('Failed to save quotation to backend API');
-                    alert(`서버 저장에 실패했습니다. (${apiRes.status}) 잠시 후 다시 시도해주세요.`);
-                    return;
-                }
-            } catch (err) {
-                console.error('API Error saving quotation:', err);
-                alert('서버 통신 네트워크 오류가 발생했습니다.');
-                return;
-            }
-
-            useStore.getState().addQuotation(payloadData);
-
-            if (silentSave) {
-                // Instead of completely suppressing, show notification but do NOT navigate away
-                setSuccessConfig({
-                    isOpen: true,
-                    title: '견적서 저장 완료',
-                    description: '견적서가 성공적으로 저장되었습니다.\n나의 페이지에서 확인하실 수 있습니다.',
-                    navigateOnConfirm: false
-                });
-            } else {
-                setSuccessConfig({
-                    isOpen: true,
-                    title: '견적서 저장 완료',
-                    description: '견적서가 성공적으로 저장되었습니다.\n나의 페이지에서 확인하실 수 있습니다.',
-                    navigateOnConfirm: true
-                });
-            }
+            console.log('Quotation saved to history');
+            setSuccessConfig({
+                isOpen: true,
+                title: '견적서 저장 완료',
+                description: '견적서가 성공적으로 저장되었습니다.\n나의 페이지에서 확인하실 수 있습니다.'
+            });
         } catch (error) {
             console.error('Failed to save quotation:', error);
         }
@@ -416,6 +257,15 @@ export default function QuotationEditor() {
             const newPayload = { ...currentPayload };
             if (newPayload.customer) {
                 newPayload.customer.memo = newMemo;
+            } else {
+                newPayload.customer = {
+                    company_name: user?.companyName || 'Guest',
+                    contact_name: user?.contactName || '-',
+                    tel: user?.phone || '-',
+                    email: user?.email || '-',
+                    address: user?.address || '-',
+                    memo: newMemo
+                };
             }
             setCurrentPayload(newPayload);
             const html = renderDocumentHTML(newPayload);
@@ -424,140 +274,43 @@ export default function QuotationEditor() {
     };
 
     const handleDocAction = (type: DocumentType) => {
-        if (type === 'ORDER' && items.length === 0) return;
-        
-        if (type === 'QUOTATION') {
-            const payload = generatePayload(type);
-            setCurrentPayload(payload);
+        const payload = generatePayload(type);
+        setCurrentPayload(payload);
+
+        if (type === 'ORDER') {
+            if (items.length === 0) return;
+            setIsSubmitting(true);
+        } else {
             setPreviewDocType(type);
             const html = renderDocumentHTML(payload);
             setPreviewContent(html);
-            // 견적서 발급 시 즉시 뒷단(서버)에 저장되도록 변경
-            handleSaveQuotation(undefined, true);
-        } else {
-            setPendingDocType(type);
-            setIsDeliveryModalOpen(true);
         }
     };
 
-    const handleDeliveryComplete = (deliveryInfo: DeliveryInfo) => {
-        setIsDeliveryModalOpen(false);
-        setSavedDeliveryInfo(deliveryInfo);
+    const handleSendOrder = async (deliveryInfo: DeliveryInfo): Promise<boolean> => {
+        if (!currentPayload) return false;
 
-        if (!pendingDocType) return;
+        const finalPayload = { ...currentPayload };
+        if (finalPayload.customer) {
+            const deliveryNote = `[배송: ${deliveryInfo.method === 'FREIGHT' ? '화물' : '택배'}] ` +
+                `${deliveryInfo.method === 'FREIGHT' ? deliveryInfo.branchName : deliveryInfo.address} ` +
+                `| 담당자: ${deliveryInfo.contactName} (${deliveryInfo.contactPhone})` +
+                (deliveryInfo.additionalRequest ? ` | 요청: ${deliveryInfo.additionalRequest}` : '');
 
-        const payload = generatePayload(pendingDocType);
-
-        const deliveryNote = `[배송: ${deliveryInfo.method === 'FREIGHT' ? '화물' : '택배'}] ` +
-            `${deliveryInfo.method === 'FREIGHT' ? deliveryInfo.branchName : deliveryInfo.address} ` +
-            `| 담당자: ${deliveryInfo.contactName} (${deliveryInfo.contactPhone})` +
-            (deliveryInfo.additionalRequest ? ` | 요청: ${deliveryInfo.additionalRequest}` : '');
-
-        if (payload.customer) {
-            payload.customer.contact_name = deliveryInfo.contactName;
-            payload.customer.tel = deliveryInfo.contactPhone;
-
-            const methodPrefix = deliveryInfo.method === 'FREIGHT' ? '[화물] ' : '[택배] ';
-            const addressDetail = deliveryInfo.method === 'FREIGHT' ? deliveryInfo.branchName : deliveryInfo.address;
-            payload.customer.address = `${methodPrefix}${addressDetail}`;
-
-            payload.customer.memo = payload.customer.memo
-                ? `${payload.customer.memo}\n${deliveryNote}`
+            finalPayload.customer.memo = finalPayload.customer.memo
+                ? `${finalPayload.customer.memo}\n${deliveryNote}`
                 : deliveryNote;
         }
 
-        // Store the delivery note in the state so handleSaveQuotation can access it since we removed extraMemo argument passing logic from confirm.
-        // Actually, handleSaveQuotation doesn't get called directly from DeliveryModal anymore, it gets called from PreviewModal.
-        // And when called from PreviewModal, `handleSaveQuotation` expects no argument, it relies on State.
-        // So we need to find a way to inject deliveryNote. Wait, `handleSaveQuotation` in `Cart.tsx` 
-        // does take `extraMemo?: string`! But `PreviewModal` `onPrint` calls `() => handleSaveQuotation()`. 
-        // Oh! We need to ensure we pass `deliveryNote` there, OR update `quotationMemo` state right here.
-        setQuotationMemo(quotationMemo ? `${quotationMemo}\n${deliveryNote}` : deliveryNote);
-
-        setCurrentPayload(payload);
-        setPreviewDocType(pendingDocType);
-        const html = renderDocumentHTML(payload);
-        setPreviewContent(html);
-    };
-
-    const handleSendOrder = async (overridePayload?: DocumentPayload): Promise<boolean> => {
-        const payloadToUse = overridePayload || currentPayload;
-        if (!payloadToUse || !savedDeliveryInfo) return false;
-
-        // Perform stock order duplicate check before submitting
-        const customerName = payloadToUse.customer?.company_name || '';
-        const isStock = isStockOrder(customerName, '');
-
-        if (isStock) {
-            const activeOrders = orders.filter(o => !['CANCELLED', 'WITHDRAWN', 'COMPLETED'].includes(o.status) && !o.isDeleted);
-            const pendingStockOrders = activeOrders.filter(order => {
-                const targetCustomer = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
-                return isStockOrder(targetCustomer, order.customerName || '');
-            });
-
-            const pendingStockItems: any[] = [];
-            pendingStockOrders.forEach(order => {
-                const itemsList = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
-                itemsList.forEach(pi => {
-                    if (!pi.transactionIssued) {
-                        pendingStockItems.push({
-                            poNumber: order.poNumber || 'N/A',
-                            poDate: new Date(order.createdAt).toLocaleDateString(),
-                            name: pi.name || pi.item_name || '',
-                            thickness: pi.thickness || '',
-                            size: pi.size || '',
-                            material: pi.material || '',
-                            quantity: pi.quantity || pi.qty || 0
-                        });
-                    }
-                });
-            });
-
-            const duplicateWarnings: string[] = [];
-            payloadToUse.items.forEach(cartItem => {
-                const match = pendingStockItems.find(pi => 
-                    (pi.name || '').trim().toLowerCase() === (cartItem.item_name || '').trim().toLowerCase() &&
-                    (pi.thickness || '').trim().toLowerCase() === (cartItem.thickness || '').trim().toLowerCase() &&
-                    (pi.size || '').trim().toLowerCase() === (cartItem.size || '').trim().toLowerCase() &&
-                    (pi.material || '').trim().toLowerCase() === (cartItem.material || '').trim().toLowerCase()
-                );
-                if (match) {
-                    duplicateWarnings.push(
-                        `• ${cartItem.item_name} ${[cartItem.thickness, cartItem.size, cartItem.material].filter(Boolean).join(' - ')} (이미 NO.${match.poNumber} [${match.poDate}]에 ${match.quantity}개 대기 중)`
-                    );
-                }
-            });
-
-            if (duplicateWarnings.length > 0) {
-                const proceed = window.confirm(
-                    `⚠️ 중복 발주 의심 안내\n\n아래 품목이 이미 재고 발주 미결 리스트에 존재합니다:\n\n${duplicateWarnings.join('\n')}\n\n정말로 이대로 중복 발주를 진행하시겠습니까?`
-                );
-                if (!proceed) return false;
-            }
-        }
-
-        const uploadedAttachments: { name: string, url: string }[] = [];
-        for (const file of attachmentFiles) {
-            const refId = user?.companyName + '_' + Date.now().toString();
-            const res = await uploadFile(file, 'order', refId);
-            if (res) uploadedAttachments.push(res);
-        }
-
-        const payloadWithFiles = {
-            ...payloadToUse,
-            customerPO: uploadedAttachments.length > 0 ? uploadedAttachments[0] : undefined,
-            payload: {
-                attachments: uploadedAttachments
-            }
-        };
-
-        const result = await OrderService.submitOrder(payloadWithFiles as unknown as DocumentPayload);
+        const result = await OrderService.submitOrder(finalPayload);
         if (result.success) {
+            setIsSubmitting(false);
             incrementNewOrderCount();
             setShowSuccessAnimation(true);
             return true;
         } else {
             alert('발주서 전송에 실패했습니다.');
+            setIsSubmitting(false);
             return false;
         }
     };
@@ -565,13 +318,13 @@ export default function QuotationEditor() {
     const handleAnimationComplete = () => {
         setShowSuccessAnimation(false);
         clearQuotation();
-        navigate('/my', { state: { activeTab: 'orders' } });
     };
 
     return (
         <CalmPageShell className="pb-32">
             <AnimatePresence mode="wait">
                 {items.length === 0 ? (
+                    /* EMPTY STATE */
                     <motion.div
                         key="empty"
                         initial={{ opacity: 0, scale: 0.95 }}
@@ -596,10 +349,20 @@ export default function QuotationEditor() {
                         </div>
                     </motion.div>
                 ) : (
+                    /* CART CONTENT */
                     <motion.div
                         key="cart"
                         exit={{ opacity: 0, y: 20, transition: { duration: 0.3 } }}
                     >
+                        <OrderSubmissionOverlay
+                            isOpen={isSubmitting}
+                            onClose={() => setIsSubmitting(false)}
+                            onConfirm={handleSendOrder}
+                            basePayload={currentPayload}
+                            buttonRef={submitButtonRef}
+                        />
+
+                        {/* Header */}
                         <div className="flex items-center justify-between pb-6 mb-2">
                             <motion.div
                                 initial={{ opacity: 0, x: -20 }}
@@ -627,19 +390,14 @@ export default function QuotationEditor() {
                                 htmlContent={previewContent}
                                 onClose={() => setPreviewContent(null)}
                                 docType={previewDocType}
-                                onSend={previewDocType === 'ORDER' ? () => handleSendOrder() : undefined}
-                                onPrint={undefined}
+                                onSend={undefined} // Order uses Overlay, not PreviewModal
+                                onPrint={previewDocType === 'QUOTATION' ? handleSaveQuotation : undefined}
                                 memo={quotationMemo}
                                 onMemoChange={handlePreviewMemoChange}
                             />
                         )}
 
-                        <DeliveryInfoModal
-                            isOpen={isDeliveryModalOpen}
-                            onClose={() => setIsDeliveryModalOpen(false)}
-                            onConfirm={handleDeliveryComplete}
-                        />
-
+                        {/* Glassmorphic Table Container */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -802,6 +560,7 @@ export default function QuotationEditor() {
                                                                         {item.stockStatus === 'CHECK_LEAD_TIME' && <Badge color="amber" className="bg-amber-100 text-amber-700 px-2 py-0.5 text-[10px] border border-amber-200 shadow-sm font-bold">납기확인</Badge>}
                                                                     </>
                                                                 )}
+                                                                {/* Marking Wait Indicator */}
                                                                 {(item.marking_wait_qty || 0) > 0 && (
                                                                     <Badge color="purple" className="bg-purple-100 text-purple-700 px-2 py-0.5 text-[10px] border border-violet-200 shadow-sm font-bold mt-1">
                                                                         마킹 대기: {item.marking_wait_qty}
@@ -871,7 +630,12 @@ export default function QuotationEditor() {
                                     </tbody>
                                     <tfoot className="bg-slate-50/90 border-t border-slate-200 backdrop-blur-sm">
                                         <tr>
-                                            <td colSpan={11} className="px-4 py-4 text-right text-slate-500 font-extrabold text-sm uppercase tracking-wide">
+                                            <td colSpan={2} className="px-4 py-4">
+                                                <td colSpan={2} className="px-4 py-4">
+                                                    {/* Button Moved to Bottom Bar */}
+                                                </td>
+                                            </td>
+                                            <td colSpan={8} className="px-4 py-4 text-right text-slate-500 font-extrabold text-sm uppercase tracking-wide">
                                                 총 합계금액(부가세 제외)
                                             </td>
                                             <td className="px-4 py-4 text-right text-xl font-extrabold text-teal-700 font-mono border-l border-slate-200">
@@ -882,150 +646,19 @@ export default function QuotationEditor() {
                                 </table >
                             </div >
 
+                            {/* Quick Add Row */}
                             <div className="p-3 bg-slate-50/50 border-t border-slate-200/50 backdrop-blur-sm" >
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => navigate('/search', { state: { returnToSearch: true } })}
-                                    className="w-full text-slate-500 hover:text-teal-700 hover:bg-teal-50/50 gap-2 font-bold border border-dashed border-slate-300 hover:border-teal-300 rounded-xl h-10 transition-all"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    제품 추가하기 (Add Item)
-                                </Button>
+                                <Link to="/search" state={{ returnToSearch: true }}>
+                                    <Button variant="ghost" size="sm" className="w-full text-slate-500 hover:text-teal-700 hover:bg-teal-50/50 gap-2 font-bold border border-dashed border-slate-300 hover:border-teal-300 rounded-xl h-10 transition-all">
+                                        <Plus className="w-4 h-4" />
+                                        제품 추가하기 (Add Item)
+                                    </Button>
+                                </Link>
                             </div >
                         </motion.div>
 
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
-                            className="mt-6 p-5 bg-white/70 backdrop-blur-xl border border-white/40 rounded-3xl shadow-lg ring-1 ring-white/60 mb-6"
-                        >
-                            <h3 className="text-[15px] font-extrabold text-slate-800 mb-3 flex items-center gap-2">
-                                <Search className="w-4 h-4 text-teal-600" />
-                                도면 및 요청서 첨부 (선택)
-                            </h3>
-                            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                                <input
-                                    type="file"
-                                    multiple
-                                    ref={(input) => {
-                                        if (input && attachmentFiles.length > 0) {
-                                            try {
-                                                const dt = new DataTransfer();
-                                                attachmentFiles.forEach(file => dt.items.add(file));
-                                                if (input.files?.length !== attachmentFiles.length) {
-                                                    input.files = dt.files;
-                                                }
-                                            } catch (e) {
-                                                console.error('DataTransfer not supported', e);
-                                            }
-                                        }
-                                    }}
-                                    aria-label="도면 및 요청서 첨부"
-                                    title="도면 및 요청서 첨부"
-                                    className="text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-5 file:rounded-xl file:border border-slate-200 file:text-sm file:font-bold file:bg-white file:text-slate-700 hover:file:bg-slate-50 transition-all cursor-pointer w-full sm:w-auto"
-                                    onChange={(e) => setAttachmentFiles(Array.from(e.target.files || []))}
-                                />
-                                {attachmentFiles.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-600">
-                                        {attachmentFiles.map(f => (
-                                            <span key={f.name} className="px-3 py-1 bg-slate-100 rounded-full border border-slate-200 shadow-sm flex items-center gap-1">
-                                                {f.name}
-                                                <button onClick={(e) => {
-                                                    e.preventDefault();
-                                                    setAttachmentFiles(prev => prev.filter(file => file.name !== f.name));
-                                                }} className="text-slate-400 hover:text-red-500 ml-1" aria-label="첨부파일 삭제" title="첨부파일 삭제">
-                                                    <X className="w-3 h-3" />
-                                                </button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </motion.div>
-
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
-                            className="mt-6 p-5 bg-white/70 backdrop-blur-xl border border-white/40 rounded-3xl shadow-lg ring-1 ring-white/60 mb-6"
-                        >
-                            <h3 className="text-[15px] font-extrabold text-slate-800 mb-4 flex items-center gap-2">
-                                <User className="w-4 h-4 text-teal-600" />
-                                견적 요청자 정보 (발송 시 적용됨)
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-                                <div className="space-y-1 relative">
-                                    <label className="text-xs font-bold text-slate-500">회사/기관명</label>
-                                    <input
-                                        type="text"
-                                        value={quotationCustomerInfo.companyName}
-                                        onChange={e => {
-                                            setQuotationCustomerInfo(p => ({ ...p, companyName: e.target.value }));
-                                            setShowSuggestions(true);
-                                        }}
-                                        onFocus={() => setShowSuggestions(true)}
-                                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                                        className="w-full text-sm py-2 px-3 border border-slate-200 rounded-lg focus:border-teal-500 outline-none"
-                                        placeholder="회사명 입력"
-                                    />
-                                    {showSuggestions && quotationCustomerInfo.companyName && crmSuggestions.length > 0 && (
-                                        <div className="absolute top-full left-0 w-full bg-white border border-slate-200 shadow-xl rounded-lg mt-1 z-50 max-h-60 overflow-y-auto">
-                                            {crmSuggestions.map(c => (
-                                                <button
-                                                    key={c.id}
-                                                    type="button"
-                                                    className="w-full text-left px-3 py-2 text-sm hover:bg-teal-50 transition-colors border-b border-slate-100 last:border-0"
-                                                    onClick={() => handleCustomerSelect(c)}
-                                                >
-                                                    <span className="font-bold text-teal-800">{c.companyName}</span>
-                                                    {c.ceo && <span className="text-[10px] text-slate-400 ml-2">({c.ceo} 대표)</span>}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-500">사업자번호</label>
-                                    <input
-                                        type="text"
-                                        value={quotationCustomerInfo.bizNo}
-                                        onChange={e => setQuotationCustomerInfo(p => ({ ...p, bizNo: e.target.value }))}
-                                        className="w-full text-sm py-2 px-3 border border-slate-200 rounded-lg focus:border-teal-500 outline-none"
-                                        placeholder="***-**-*****"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-500">담당자 성함</label>
-                                    <input
-                                        type="text"
-                                        value={quotationCustomerInfo.contactName}
-                                        onChange={e => setQuotationCustomerInfo(p => ({ ...p, contactName: e.target.value }))}
-                                        className="w-full text-sm py-2 px-3 border border-slate-200 rounded-lg focus:border-teal-500 outline-none"
-                                        placeholder="담당자 입력"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-500">연락처</label>
-                                    <input
-                                        type="text"
-                                        value={quotationCustomerInfo.phone}
-                                        onChange={e => setQuotationCustomerInfo(p => ({ ...p, phone: e.target.value }))}
-                                        className="w-full text-sm py-2 px-3 border border-slate-200 rounded-lg focus:border-teal-500 outline-none"
-                                        placeholder="연락처 입력"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-500">이메일</label>
-                                    <input
-                                        type="email"
-                                        value={quotationCustomerInfo.email}
-                                        onChange={e => setQuotationCustomerInfo(p => ({ ...p, email: e.target.value }))}
-                                        className="w-full text-sm py-2 px-3 border border-slate-200 rounded-lg focus:border-teal-500 outline-none"
-                                        placeholder="이메일 입력"
-                                    />
-                                </div>
-                            </div>
-                        </motion.div>
-
-                        <motion.div
+                        {/* Legend / Status */}
+                        < motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ delay: 0.5 }}
@@ -1050,7 +683,8 @@ export default function QuotationEditor() {
                             </div>
                         </motion.div>
 
-                        <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-white/50 p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-100 flex items-center justify-between">
+                        {/* Sticky Bottom Actions */}
+                        <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-white/50 p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-[100] flex items-center justify-between">
                             <div className="max-w-[1400px] mx-auto w-full flex items-center justify-end gap-3 px-4">
                                 {selectedIds.length > 0 && (
                                     <Button
@@ -1087,6 +721,7 @@ export default function QuotationEditor() {
                 onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
             />
 
+            {/* Success Info Dialog */}
             <ConfirmDialog
                 isOpen={successConfig.isOpen}
                 title={successConfig.title}
@@ -1095,12 +730,7 @@ export default function QuotationEditor() {
                 ))}
                 confirmText="확인"
                 confirmVariant="primary"
-                onConfirm={() => {
-                    setSuccessConfig(prev => ({ ...prev, isOpen: false }));
-                    if (successConfig.navigateOnConfirm) {
-                        navigate('/my');
-                    }
-                }}
+                onConfirm={() => setSuccessConfig(prev => ({ ...prev, isOpen: false }))}
             // No onCancel provided -> Renders single OK button
             />
 

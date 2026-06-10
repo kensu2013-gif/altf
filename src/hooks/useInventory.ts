@@ -2,9 +2,8 @@ import useSWR from 'swr';
 import { useStore } from '../store/useStore';
 import { useEffect } from 'react';
 import type { Product } from '../types';
-import { parseSku } from '../lib/sku';
 
-const INVENTORY_URL = (import.meta.env.VITE_API_URL || '') + '/api/inventory/inventory.json';
+const INVENTORY_URL = '/api/inventory/inventory.json';
 
 interface RawInventoryItem {
     // S3 snake_case keys
@@ -16,12 +15,6 @@ interface RawInventoryItem {
     od_eq_key?: string;
     location1?: string;
     sh_qty?: number | string;
-
-    // Supplier fields
-    base_price?: number;
-    rate_pct?: number;
-    rate_act?: number;
-    rate_act2?: number;
 
     // Client camelCase keys (fallbacks)
     id?: string;
@@ -45,87 +38,44 @@ interface RawInventoryItem {
 }
 
 // Fetcher function
-const fetcher = async (url: string) => {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+const fetcher = (url: string, bypassCache = false) => {
+    const finalUrl = bypassCache ? `${url}?t=${Date.now()}` : url;
+    const options = bypassCache ? { cache: 'no-store' as const } : {};
+    return fetch(finalUrl, options).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+    });
 };
 
 export function useInventory() {
     const setInventory = useStore((state) => state.setInventory);
     const existingInventory = useStore((state) => state.inventory);
 
-    const { data, error, isLoading, isValidating, mutate } = useSWR(INVENTORY_URL, fetcher, {
-        revalidateIfStale: true, // Allow background revalidation on mount
-        revalidateOnFocus: true,  // Revalidate when admin switches windows
+    const { data, error, isLoading, isValidating, mutate } = useSWR(INVENTORY_URL, (url) => fetcher(url, false), {
+        revalidateIfStale: false, // Don't revalidate if we have data (unless expired)
+        revalidateOnFocus: false,
         revalidateOnReconnect: true,
-        dedupingInterval: 60000,  // Reduce deduping window to 1 minute
-        keepPreviousData: true,   // Keep showing old data while fetching new
+        dedupingInterval: 300000, // 5 minutes (Increased from 1 min)
+        keepPreviousData: true, // Keep showing old data while fetching new
     });
 
     const refresh = async () => {
         try {
-            console.log('[useInventory] Forced refresh initiated. Fetching bypass URL...');
-            const forceUrl = INVENTORY_URL + (INVENTORY_URL.includes('?') ? '&' : '?') + 'refresh=true';
-            const updated = await fetcher(forceUrl);
-            
-            // Format and update state directly
-            const arr = Array.isArray(updated) ? updated : (Array.isArray(updated?.items) ? updated.items : []);
-            const processed = arr.map((item: RawInventoryItem) => {
-                const locationStock: Record<string, number> = {};
-                if (item.locationStock && Object.keys(item.locationStock).length > 0) {
-                    for (const [key, qty] of Object.entries(item.locationStock)) {
-                        const newKey = (key === '서울' || key === '서울재고') ? '시화' : key;
-                        locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
-                    }
-                } else {
-                    if (item.location1 && item.sh_qty) {
-                        const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
-                        locationStock[loc1] = Number(item.sh_qty);
-                    }
-                    if (item.location && item.ready_qty) {
-                        const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
-                        locationStock[primaryLoc] = Number(item.ready_qty);
-                    }
-                }
-                const currentStock = item.ready_qty !== undefined ? Number(item.ready_qty) : (Number(item.currentStock) || 0);
-                let stockStatus = item.stockStatus;
-                if (!stockStatus) {
-                    stockStatus = currentStock > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK';
-                }
-                const mappedLocation = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
-                const id = (item.sku_key || item.id || '') as string;
-                const parsed = parseSku(id);
-                const finalSize = parsed.size.replace(/^[A-Z]+-?/, '').trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
-
-                return {
-                    ...item,
-                    id,
-                    name: item.item || item.name || '',
-                    thickness: parsed.thickness || item.thickness || '',
-                    size: finalSize || item.size || '',
-                    material: parsed.material || item.material || '',
-                    location: mappedLocation,
-                    unitPrice: item.final_price !== undefined ? item.final_price : item.unitPrice,
-                    currentStock,
-                    stockStatus,
-                    odEqKey: item.od_eq_key || item.odEqKey,
-                    locationStock,
-                    maker1: item.maker1,
-                    marking_wait_qty: Number(item.marking_wait_qty) || 0
-                } as Product;
-            });
-
-            if (processed.length > 0) {
-                setInventory(processed);
+            // 1. Trigger backend to pull latest inventory from S3
+            const syncRes = await fetch('/api/admin/inventory/update', { method: 'POST' });
+            if (!syncRes.ok) {
+                throw new Error(`Backend sync failed with HTTP ${syncRes.status}`);
             }
-            
-            // Also mutate SWR cache
-            await mutate(updated, { revalidate: false });
-            console.log('[useInventory] Forced refresh completed successfully.');
+            const syncData = await syncRes.json();
+            console.log('[useInventory] Backend sync response:', syncData);
+
+            // 2. Fetch the newly saved local file with cache bypassing
+            const freshData = await fetcher(INVENTORY_URL, true);
+            await mutate(freshData, { revalidate: false });
+            return freshData;
         } catch (err) {
-            console.warn('[useInventory] Forced refresh failed. Falling back to standard revalidation.', err);
-            await mutate();
+            console.error('[useInventory] Refresh failed:', err);
+            throw err;
         }
     };
 
@@ -135,39 +85,47 @@ export function useInventory() {
             const arr = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
 
             // Anti-Gravity: Data Adapter for S3 (snake_case) vs Client (camelCase)
-
+            console.log('[useInventory] Raw Data from S3:', data);
 
             // The live S3 data uses 'item' for name, 'ready_qty' for stock, 'final_price' for price.
             // We map it here to ensure the Product interface is satisfied.
             const processed = arr.map((item: RawInventoryItem) => {
                 // 1. Calculate Location Stock Map
                 // 1. Calculate Location Stock Map
-                // Anti-Gravity: Prefer server-provided locationStock if available, mapped '서울' -> '시화'
-                const locationStock: Record<string, number> = {};
+                // Anti-Gravity: Prefer server-provided locationStock if available (it has explicit '시화'/'양산' keys)
+                const locationStock: Record<string, number> = (item.locationStock && Object.keys(item.locationStock).length > 0)
+                    ? { ...item.locationStock }
+                    : {};
 
-                if (item.locationStock && Object.keys(item.locationStock).length > 0) {
-                    for (const [key, qty] of Object.entries(item.locationStock)) {
-                        const newKey = (key === '서울' || key === '서울재고') ? '시화' : key;
-                        locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
-                    }
-                } else {
-                    // 1. Process Secondary Location (Sihwa)
-                    if (item.location1 && item.sh_qty) {
-                        const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
-                        locationStock[loc1] = Number(item.sh_qty);
-                    }
-
-                    // 2. Process Primary Location (Daekyung/Yangsan)
+                // Only calculate if empty (fail-safe)
+                if (Object.keys(locationStock).length === 0) {
+                    // Primary Location (location / ready_qty)
                     if (item.location && item.ready_qty) {
-                        const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
-                        locationStock[primaryLoc] = Number(item.ready_qty);
+                        locationStock[item.location] = Number(item.ready_qty);
                     }
+
+                    // Secondary Location (location1 / sh_qty)
+                    if (item.location1 && item.sh_qty) {
+                        // Logic: If location names are same, add qty. If different, set new key.
+                        // Usually they are different (Yangsan vs Sihwa)
+                        const loc1 = item.location1;
+                        const qty1 = Number(item.sh_qty);
+                        locationStock[loc1] = (locationStock[loc1] || 0) + qty1;
+                    }
+
                 }
 
-                // The user explicitly stated: "Do not do other operations on inventory.json"
-                // "90e(l)-s10s-100a-sts304-w MUST be 8165. Other numbers should not appear (5536 is wrong)."
-                // Therefore, currentStock is exactly ready_qty.
-                const currentStock = item.ready_qty !== undefined ? Number(item.ready_qty) : (Number(item.currentStock) || 0);
+                // Calculate Total Stock from components
+                // If user provided raw currentStock, we might fallback, but here we prefer calculated total.
+                let totalStock = 0;
+                if (Object.keys(locationStock).length > 0) {
+                    totalStock = Object.values(locationStock).reduce((sum, q) => sum + q, 0);
+                } else {
+                    // Fallback to ready_qty or currentStock if no location breakdown found
+                    totalStock = item.ready_qty !== undefined ? Number(item.ready_qty) : (Number(item.currentStock) || 0);
+                }
+
+                const currentStock = totalStock;
 
                 // Derive status if missing (S3 data lacks stockStatus)
                 let stockStatus = item.stockStatus;
@@ -175,21 +133,11 @@ export function useInventory() {
                     stockStatus = currentStock > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK';
                 }
 
-                // Map main location property as well
-                const mappedLocation = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
-
-                const id = (item.sku_key || item.id || '') as string;
-                const parsed = parseSku(id);
-                const finalSize = parsed.size.replace(/^[A-Z]+-?/, '').trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
-
                 return {
                     ...item, // Keep original props
-                    id: id,
-                    name: item.item || item.name || '',
-                    thickness: parsed.thickness || item.thickness || '',
-                    size: finalSize || item.size || '',
-                    material: parsed.material || item.material || '',
-                    location: mappedLocation,
+                    id: item.sku_key || item.id, // S3 uses sku_key
+                    name: item.item || item.name, // S3 uses item
+                    // thickness, size, material, location, maker usually match keys
                     unitPrice: item.final_price !== undefined ? item.final_price : item.unitPrice,
                     currentStock: currentStock,
                     stockStatus: stockStatus,
@@ -220,11 +168,9 @@ export function useInventory() {
 
     return {
         inventory: data ? useStore.getState().inventory : existingInventory, // Prefer processed store data
-        lastModified: data?.lastModified || null,
         isLoading,
         isValidating,
         error: error ? String(error) : null,
         refresh
     };
 }
-

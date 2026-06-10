@@ -58785,8 +58785,8 @@
     },
     "90E(L)-S10S-80A-STS304-W": {
       "name": "90E(L)",
-      "stock": 1168,
-      "ys_qty": 1168
+      "stock": 13,
+      "ys_qty": 13
     },
     "90E(L)-S40S-80A-STS304-W": {
       "name": "90E(L)",
@@ -88244,8 +88244,8 @@
     },
     "90E(L)-S10S-80A-STS304-W": {
       "name": "90E(L)",
-      "stock": 1168,
-      "ys_qty": 1168
+      "stock": 13,
+      "ys_qty": 13
     },
     "90E(L)-S40S-80A-STS304-W": {
       "name": "90E(L)",
@@ -113156,15 +113156,6 @@
           "change": -26,
           "from": 1763,
           "to": 1737,
-          "location": "양산",
-          "maker": "대경"
-        },
-        {
-          "id": "90E(L)-S10S-80A-STS304-W",
-          "name": "90E(L)",
-          "change": 1155,
-          "from": 13,
-          "to": 1168,
           "location": "양산",
           "maker": "대경"
         },
