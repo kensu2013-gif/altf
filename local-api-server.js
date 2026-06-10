@@ -3,7 +3,7 @@ import aromanize from 'aromanize';
 import crypto from 'crypto';
 import { exec } from 'child_process';
 import { ListObjectVersionsCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
-import { s3Client, BUCKET_NAME } from './s3-db.js';
+import { s3Client, BUCKET_NAME, loadDbFromS3, saveDbToS3 } from './s3-db.js';
 const DB_KEY = 'database/db.json';
 
 const PORT = 3001;
@@ -31,22 +31,32 @@ let db = {
 };
 
 // Load Data
-function loadData() {
+async function loadData() {
     try {
-        if (fs.existsSync(DATA_FILE)) {
-            const fileData = fs.readFileSync(DATA_FILE, 'utf8');
-            const json = JSON.parse(fileData);
+        const json = await loadDbFromS3();
+        if (json) {
             db.users = json.users || [];
             db.quotations = json.quotations || [];
             db.orders = json.orders || [];
-            console.log(`[API] Loaded data: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders`);
+            db.loginLogs = json.loginLogs || [];
+            db.inventoryHistory = json.inventoryHistory || [];
+            db.customers = json.customers || [];
+            db.lastSnapshotDate = json.lastSnapshotDate || '';
+            db.lastSnapshot = json.lastSnapshot || {};
+            db.currentSnapshot = json.currentSnapshot || {};
+            db.lastDaekyungSnapshot = json.lastDaekyungSnapshot || {};
+            db.currentDaekyungSnapshot = json.currentDaekyungSnapshot || {};
+            db.inventorySnapshot = json.inventorySnapshot || {};
+            db.daekyungSnapshot = json.daekyungSnapshot || {};
+            db.daekyungHistory = json.daekyungHistory || [];
+            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders`);
         } else {
-            // Seed Initial Admin if file doesn't exist
+            // Seed Initial Admin if S3 doesn't have it
             db.users = [
                 {
                     id: 'admin-user-id',
                     email: 'admin@altf.kr',
-                    password: 'admin1234!',
+                    password: '1127foa12^^',
                     companyName: 'AltF Admin',
                     bizNo: '000-00-00000',
                     contactName: 'Admin',
@@ -64,22 +74,38 @@ function loadData() {
             saveData();
         }
     } catch (e) {
-        console.error('[API] Failed to load data:', e);
+        console.error('[API] Failed to load data from S3:', e);
+        // Fallback to local data/db.json
+        try {
+            if (fs.existsSync(DATA_FILE)) {
+                const fileData = fs.readFileSync(DATA_FILE, 'utf8');
+                const json = JSON.parse(fileData);
+                db.users = json.users || [];
+                db.quotations = json.quotations || [];
+                db.orders = json.orders || [];
+                db.loginLogs = json.loginLogs || [];
+                db.inventoryHistory = json.inventoryHistory || [];
+                db.customers = json.customers || [];
+                console.log(`[API] Loaded data from local fallback: ${db.users.length} users`);
+            }
+        } catch (localErr) {
+            console.error('[API] Failed to load local fallback:', localErr);
+        }
     }
 }
 
 // Save Data
 function saveData() {
+    saveDbToS3(db).catch(e => console.error('[API] S3 Save failed:', e));
     try {
         fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2), 'utf8');
-        // console.log('[API] Data saved');
     } catch (e) {
-        console.error('[API] Failed to save data:', e);
+        console.error('[API] Local Save failed:', e);
     }
 }
 
 // Initialize
-loadData();
+await loadData();
 
 // References for easier access (optional since we operate on db object directly now)
 // We will use db.users, db.quotations, db.orders directly in code.
