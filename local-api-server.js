@@ -2,6 +2,9 @@ import http from 'http';
 import aromanize from 'aromanize';
 import crypto from 'crypto';
 import { exec } from 'child_process';
+import { ListObjectVersionsCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { s3Client, BUCKET_NAME } from './s3-db.js';
+const DB_KEY = 'database/db.json';
 
 const PORT = 3001;
 
@@ -111,6 +114,103 @@ const server = http.createServer((req, res) => {
             console.log(`[API] Inventory update output: ${stdout}`);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true, output: stdout }));
+        });
+        return;
+    }
+
+    // GET /api/admin/db-versions
+    if (req.method === 'GET' && url.pathname === '/api/admin/db-versions') {
+        try {
+            console.log('[API] Listing S3 database versions...');
+            const command = new ListObjectVersionsCommand({
+                Bucket: BUCKET_NAME,
+                Prefix: DB_KEY
+            });
+            const response = await s3Client.send(command);
+            const versions = (response.Versions || []).map(v => ({
+                versionId: v.VersionId,
+                lastModified: v.LastModified,
+                isLatest: v.IsLatest,
+                size: v.Size
+            }));
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(versions));
+        } catch (e) {
+            console.error('[API] Failed to list DB versions:', e);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Failed to list DB versions', message: e.message }));
+        }
+        return;
+    }
+
+    // POST /api/admin/db-restore
+    if (req.method === 'POST' && url.pathname === '/api/admin/db-restore') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { versionId } = JSON.parse(body);
+                if (!versionId) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing versionId' }));
+                    return;
+                }
+
+                console.log(`[API] Restoring DB version: ${versionId}`);
+                
+                // 1. Fetch target version from S3
+                const getCommand = new GetObjectCommand({
+                    Bucket: BUCKET_NAME,
+                    Key: DB_KEY,
+                    VersionId: versionId
+                });
+                const s3Res = await s3Client.send(getCommand);
+                
+                const streamToString = (stream) =>
+                    new Promise((resolve, reject) => {
+                        const chunks = [];
+                        stream.on('data', (chunk) => chunks.push(chunk));
+                        stream.on('error', reject);
+                        stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+                    });
+                
+                const bodyContent = await streamToString(s3Res.Body);
+                const restoredDb = JSON.parse(bodyContent);
+
+                // 2. Validate DB Structure
+                if (!restoredDb.users || !restoredDb.orders) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Invalid DB structure in target version' }));
+                    return;
+                }
+
+                // 3. Put this content as the latest version in S3
+                const putCommand = new PutObjectCommand({
+                    Bucket: BUCKET_NAME,
+                    Key: DB_KEY,
+                    Body: JSON.stringify(restoredDb, null, 2),
+                    ContentType: 'application/json'
+                });
+                await s3Client.send(putCommand);
+                console.log('[API] Restored version written to S3 as latest.');
+
+                // 4. Update memory & local file
+                db = restoredDb;
+                saveData();
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    message: 'Database restored successfully',
+                    users: db.users.length,
+                    orders: db.orders.length,
+                    quotes: db.quotations.length
+                }));
+            } catch (e) {
+                console.error('[API] Restore error:', e);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Restore failed', message: e.message }));
+            }
         });
         return;
     }
