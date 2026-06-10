@@ -146,6 +146,9 @@ async function updateInventory() {
                 stockStatus = currentStock > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK';
             }
 
+            const basePriceVal = row.base_price !== undefined ? row.base_price : row.basePrice;
+            const ratePctVal = row.rate_pct !== undefined ? row.rate_pct : row.ratePct;
+
             return {
                 id,
                 name: name ? name.trim() : '',
@@ -163,7 +166,9 @@ async function updateInventory() {
                 location1: row.location1,
                 maker1: row.maker1,
                 shQty: shQty,
-                marking_wait_qty: Number(row.marking_wait_qty) || 0
+                marking_wait_qty: Number(row.marking_wait_qty) || 0,
+                base_price: basePriceVal !== undefined ? Number(basePriceVal) : undefined,
+                rate_pct: ratePctVal !== undefined ? Number(ratePctVal) : undefined
             };
         });
 
