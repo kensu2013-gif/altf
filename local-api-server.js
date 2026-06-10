@@ -210,6 +210,25 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // GET /api/inventory/inventory.json
+    if (req.method === 'GET' && url.pathname === '/api/inventory/inventory.json') {
+        const filePath = path.join(__dirname, 'public/api/inventory/inventory.json');
+        if (fs.existsSync(filePath)) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            fs.createReadStream(filePath).pipe(res);
+        } else {
+            const fallbackPath = path.join(__dirname, 'src/data/mock_inventory.json');
+            if (fs.existsSync(fallbackPath)) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                fs.createReadStream(fallbackPath).pipe(res);
+            } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Inventory file not found' }));
+            }
+        }
+        return;
+    }
+
     // Helper: Generate Custom ID
     function generateId(type, userId, customerName, list) {
         // 1. Company Abbr (Romanized, First 5 chars or 'GUEST')
