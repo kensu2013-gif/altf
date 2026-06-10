@@ -172,6 +172,10 @@ async function updateInventory() {
         }
 
         const jsonContent = JSON.stringify(processed, null, 2);
+        const outputDir = path.dirname(OUTPUT_PATH);
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+        }
         fs.writeFileSync(OUTPUT_PATH, jsonContent, 'utf-8');
 
         console.log(`✅ Successfully updated ${OUTPUT_PATH}`);
