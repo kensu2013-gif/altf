@@ -313,7 +313,7 @@ export default function AdminPage() {
     }
 
     return (
-        <CalmPageShell>
+        <CalmPageShell clean>
             <div className="mb-6 flex flex-col gap-1">
                 <h1 className="text-2xl font-bold text-slate-900">관리자 대시보드</h1>
                 <p className="text-sm text-slate-500">전체 주문 내역 및 상태 관리</p>

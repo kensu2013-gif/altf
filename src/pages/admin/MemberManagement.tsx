@@ -24,7 +24,7 @@ export default function MemberManagement() {
     };
 
     return (
-        <CalmPageShell>
+        <CalmPageShell clean>
             {/* Header Area */}
             <div className="mb-6 flex flex-col gap-1">
                 <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">

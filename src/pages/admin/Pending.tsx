@@ -665,7 +665,7 @@ export default function PendingOrders() {
     };
 
     return (
-        <CalmPageShell>
+        <CalmPageShell clean>
             <div className="mb-6 flex flex-col gap-1">
                 <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
