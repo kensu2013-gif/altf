@@ -83,6 +83,7 @@ export default function MyPage() {
     const navigate = useNavigate();
     const location = useLocation();
     const user = useStore((state) => state.auth.user);
+    const token = useStore((state) => state.auth.token);
     const loadQuotation = useStore((state) => state.loadQuotation);
 
     const [activeTab, setActiveTab] = useState<'profile' | 'quotes' | 'orders'>(
@@ -121,15 +122,26 @@ export default function MyPage() {
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json'
+            };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
             // Fetch Quotations
-            const quotesRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations?userId=${user?.id}&limit=2000`, { cache: 'no-store' });
+            const quotesRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations?userId=${user?.id}&limit=2000`, { 
+                headers,
+                cache: 'no-store' 
+            });
             if (quotesRes.ok) {
                 const quotes = await quotesRes.json();
                 setQuotations(quotes.filter((q: QuotationRecord) => !('isDeleted' in q && q.isDeleted)));
             }
 
             // Fetch Orders
-            const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders?userId=${user?.id}&limit=2000`, { cache: 'no-store' });
+            const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders?userId=${user?.id}&limit=2000`, { 
+                headers,
+                cache: 'no-store' 
+            });
             if (ordersRes.ok) {
                 const orders = await ordersRes.json();
                 setOrders(orders.filter((o: OrderRecord) => !('isDeleted' in o && o.isDeleted)));
@@ -139,7 +151,7 @@ export default function MyPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [user]);
+    }, [user, token]);
 
     useEffect(() => {
         if (!user) {
@@ -212,7 +224,12 @@ export default function MyPage() {
         }
         else if (type === 'DELETE_QUOTE' && targetId) {
             try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${targetId}`, { method: 'DELETE' });
+                const headers: Record<string, string> = {};
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${targetId}`, { 
+                    method: 'DELETE',
+                    headers
+                });
                 if (res.ok) {
                     setQuotations(prev => prev.filter(q => q.id !== targetId));
                 } else {
@@ -225,7 +242,12 @@ export default function MyPage() {
         }
         else if (type === 'DELETE_ORDER' && targetId) {
             try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders/${targetId}`, { method: 'DELETE' });
+                const headers: Record<string, string> = {};
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders/${targetId}`, { 
+                    method: 'DELETE',
+                    headers
+                });
                 if (res.ok) {
                     setOrders(prev => prev.filter(o => o.id !== targetId));
                 } else {
