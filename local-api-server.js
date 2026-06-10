@@ -6,7 +6,7 @@ import { ListObjectVersionsCommand, GetObjectCommand, PutObjectCommand } from '@
 import { s3Client, BUCKET_NAME, loadDbFromS3, saveDbToS3 } from './s3-db.js';
 const DB_KEY = 'database/db.json';
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 // --- Persistence Setup ---
 import fs from 'fs';
