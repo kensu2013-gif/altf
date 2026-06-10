@@ -13,9 +13,5 @@
   "location1": "",
   "maker1": "",
   "shQty": 0,
-  "marking_wait_qty": 0,
-  "base_price": 1759590,
-  "rate_pct": 35,
-  "rate_act": 0,
-  "rate_act2": 0
+  "marking_wait_qty": 0
 }

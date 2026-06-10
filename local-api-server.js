@@ -144,6 +144,47 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // POST /api/admin/inventory/upload
+    if (req.method === 'POST' && url.pathname === '/api/admin/inventory/upload') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { uploadInventoryToS3 } = await import('./s3-db.js');
+                const rawData = JSON.parse(body);
+                let arr = [];
+                if (Array.isArray(rawData)) {
+                    arr = rawData;
+                } else if (rawData && Array.isArray(rawData.items)) {
+                    arr = rawData.items;
+                } else {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Invalid data format, expected array or {items: []}' }));
+                    return;
+                }
+
+                console.log(`[API] Uploading ${arr.length} inventory items to S3...`);
+                await uploadInventoryToS3(arr);
+
+                // Run update-inventory script immediately to refresh local file cache on Render
+                exec('node scripts/update-inventory.js', (error, stdout, stderr) => {
+                    if (error) {
+                        console.error(`[API] Post-upload update-inventory script error: ${error}`);
+                    }
+                    console.log(`[API] Post-upload update-inventory output: ${stdout}`);
+                });
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, count: arr.length, message: 'Uploaded and refresh triggered' }));
+            } catch (e) {
+                console.error('[API] Inventory upload failed:', e);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to upload inventory', message: e.message }));
+            }
+        });
+        return;
+    }
+
     // GET /api/admin/db-versions
     if (req.method === 'GET' && url.pathname === '/api/admin/db-versions') {
         try {
