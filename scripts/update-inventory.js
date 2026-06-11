@@ -130,13 +130,14 @@ async function updateInventory() {
     try {
         if (!localFileUsed) {
             const localRawPath = path.join(__dirname, '../s3_raw.json');
+            const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
 
-            if (fs.existsSync(localRawPath)) {
-                console.log(`[Inventory Source] Prioritizing local raw source: ${localRawPath}`);
+            if (fs.existsSync(localRawPath) && !isProd) {
+                console.log(`[Inventory Source] Local development detected. Prioritizing local raw source: ${localRawPath}`);
                 const localRawContent = fs.readFileSync(localRawPath, 'utf8');
                 rawData = JSON.parse(localRawContent);
             } else {
-                console.log(`[Inventory Source] Local raw source not found. Fetching from S3: ${INVENTORY_URL}...`);
+                console.log(`[Inventory Source] Production environment or missing local source. Fetching from S3: ${INVENTORY_URL}...`);
                 const response = await fetch(INVENTORY_URL);
                 if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
                 rawData = await response.json();
