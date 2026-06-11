@@ -81,63 +81,80 @@ export async function getInventoryFromS3() {
         }
     }
 
+    const PROCESSED_KEY = 'public/inventory/processed_inventory.json';
+    const ORIGINAL_KEY = 'public/inventory/inventory.json';
+
     try {
-        const INVENTORY_KEY = 'public/inventory/inventory.json';
         const command = new GetObjectCommand({
             Bucket: BUCKET_NAME,
-            Key: INVENTORY_KEY
+            Key: PROCESSED_KEY
         });
         const response = await s3Client.send(command);
         const bodyContent = await streamToString(response.Body);
-        console.log(`[S3] Fetched ${INVENTORY_KEY} from S3. Last Modified: ${response.LastModified}`);
+        console.log(`[S3] Fetched processed inventory (${PROCESSED_KEY}) from S3. Last Modified: ${response.LastModified}`);
         return {
             items: JSON.parse(bodyContent),
             lastModified: response.LastModified
         };
     } catch (error) {
-        console.warn('[S3] Failed to fetch inventory from S3. Trying local file fallback...', error.message);
+        console.warn(`[S3] Failed to fetch processed inventory from S3. Trying original raw file as fallback...`, error.message);
         try {
-            const fs = await import('fs');
-            const path = await import('path');
-            const { fileURLToPath } = await import('url');
+            const command = new GetObjectCommand({
+                Bucket: BUCKET_NAME,
+                Key: ORIGINAL_KEY
+            });
+            const response = await s3Client.send(command);
+            const bodyContent = await streamToString(response.Body);
+            console.log(`[S3 Fallback] Fetched original raw inventory (${ORIGINAL_KEY}) from S3. Last Modified: ${response.LastModified}`);
+            return {
+                items: JSON.parse(bodyContent),
+                lastModified: response.LastModified
+            };
+        } catch (fallbackError) {
+            console.warn('[S3 Fallback] Failed to fetch original raw file. Trying local file fallback...', fallbackError.message);
+            try {
+                const fs = await import('fs');
+                const path = await import('path');
+                const { fileURLToPath } = await import('url');
 
-            const __filename = fileURLToPath(import.meta.url);
-            const __dirname = path.dirname(__filename);
-            const localPath = path.join(__dirname, 'public/api/inventory/inventory.json');
-            
-            if (fs.existsSync(localPath)) {
-                console.log(`[S3 Fallback] Reading local file: ${localPath}`);
-                const localData = fs.readFileSync(localPath, 'utf8');
-                return {
-                    items: JSON.parse(localData),
-                    lastModified: fs.statSync(localPath).mtime
-                };
-            } else {
-                console.warn(`[S3 Fallback] Local file does not exist at ${localPath}`);
+                const __filename = fileURLToPath(import.meta.url);
+                const __dirname = path.dirname(__filename);
+                const localPath = path.join(__dirname, 'public/api/inventory/inventory.json');
+                
+                if (fs.existsSync(localPath)) {
+                    console.log(`[S3 Fallback] Reading local file: ${localPath}`);
+                    const localData = fs.readFileSync(localPath, 'utf8');
+                    return {
+                        items: JSON.parse(localData),
+                        lastModified: fs.statSync(localPath).mtime
+                    };
+                } else {
+                    console.warn(`[S3 Fallback] Local file does not exist at ${localPath}`);
+                }
+            } catch (localError) {
+                console.error('[S3 Fallback] Failed to read local file fallback:', localError);
             }
-        } catch (localError) {
-            console.error('[S3 Fallback] Failed to read local file fallback:', localError);
-        }
 
-        try {
-            console.log('[S3 Fallback] Fetching inventory from public HTTP URL...');
-            const publicUrl = 'https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/public/inventory/inventory.json';
-            const response = await fetch(publicUrl);
-            if (response.ok) {
-                const bodyContent = await response.json();
-                console.log('[S3 Fallback] Successfully fetched from public HTTP URL.');
-                return {
-                    items: bodyContent,
-                    lastModified: new Date()
-                };
-            } else {
-                console.warn(`[S3 Fallback] HTTP fetch failed with status ${response.status}`);
+            try {
+                console.log('[S3 Fallback] Fetching inventory from public HTTP URL...');
+                const publicUrl = `https://${BUCKET_NAME}.s3.ap-northeast-2.amazonaws.com/${PROCESSED_KEY}`;
+                const response = await fetch(publicUrl);
+                if (response.ok) {
+                    const bodyContent = await response.json();
+                    console.log('[S3 Fallback] Successfully fetched from public HTTP URL.');
+                    return {
+                        items: bodyContent,
+                        lastModified: new Date()
+                    };
+                } else {
+                    console.warn(`[S3 Fallback] HTTP fetch failed with status ${response.status}`);
+                }
+            } catch (fetchError) {
+                console.error('[S3 Fallback] Failed to fetch from public HTTP URL:', fetchError);
             }
-        } catch (fetchError) {
-            console.error('[S3 Fallback] Failed to fetch from public HTTP URL:', fetchError);
-        }
 
-        throw error;
+            throw error;
+        }
     }
 }
 
@@ -250,16 +267,16 @@ export async function getPresignedUrlToS3(key) {
 
 export async function uploadInventoryToS3(jsonData) {
     try {
-        const INVENTORY_KEY = 'public/inventory/inventory.json';
+        const PROCESSED_KEY = 'public/inventory/processed_inventory.json';
         const command = new PutObjectCommand({
             Bucket: BUCKET_NAME,
-            Key: INVENTORY_KEY,
+            Key: PROCESSED_KEY,
             Body: JSON.stringify(jsonData, null, 2),
             ContentType: 'application/json'
         });
 
         await s3Client.send(command);
-        console.log(`[S3] Successfully uploaded ${INVENTORY_KEY} to S3.`);
+        console.log(`[S3] Successfully uploaded processed inventory (${PROCESSED_KEY}) to S3.`);
         return true;
     } catch (error) {
         console.error('[S3] Failed to upload inventory to S3:', error.message);
