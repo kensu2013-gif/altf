@@ -79,11 +79,11 @@ export function useInventory() {
                         locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
                     }
                 } else {
-                    if (item.location1 && item.sh_qty) {
+                    if (item.location1 && item.sh_qty !== undefined && item.sh_qty !== null && item.sh_qty !== '') {
                         const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
                         locationStock[loc1] = Number(item.sh_qty);
                     }
-                    if (item.location && item.ready_qty) {
+                    if (item.location && item.ready_qty !== undefined && item.ready_qty !== null && item.ready_qty !== '') {
                         const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
                         locationStock[primaryLoc] = Number(item.ready_qty);
                     }
@@ -152,13 +152,13 @@ export function useInventory() {
                     }
                 } else {
                     // 1. Process Secondary Location (Sihwa)
-                    if (item.location1 && item.sh_qty) {
+                    if (item.location1 && item.sh_qty !== undefined && item.sh_qty !== null && item.sh_qty !== '') {
                         const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
                         locationStock[loc1] = Number(item.sh_qty);
                     }
 
                     // 2. Process Primary Location (Daekyung/Yangsan)
-                    if (item.location && item.ready_qty) {
+                    if (item.location && item.ready_qty !== undefined && item.ready_qty !== null && item.ready_qty !== '') {
                         const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
                         locationStock[primaryLoc] = Number(item.ready_qty);
                     }

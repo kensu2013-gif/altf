@@ -54,26 +54,31 @@ export async function loadDbFromS3() {
 }
 
 export async function getInventoryFromS3() {
+    const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+
     // Prioritize local file if it exists (useful for local overrides or builds)
-    try {
-        const fs = await import('fs');
-        const path = await import('path');
-        const { fileURLToPath } = await import('url');
+    // In production, skip local check and always read from S3 to ensure multi-instance consistency.
+    if (!isProd) {
+        try {
+            const fs = await import('fs');
+            const path = await import('path');
+            const { fileURLToPath } = await import('url');
 
-        const __filename = fileURLToPath(import.meta.url);
-        const __dirname = path.dirname(__filename);
-        const localPath = path.join(__dirname, 'public/api/inventory/inventory.json');
+            const __filename = fileURLToPath(import.meta.url);
+            const __dirname = path.dirname(__filename);
+            const localPath = path.join(__dirname, 'public/api/inventory/inventory.json');
 
-        if (fs.existsSync(localPath)) {
-            console.log(`[Inventory Source] Prioritizing local file: ${localPath}`);
-            const localData = fs.readFileSync(localPath, 'utf8');
-            return {
-                items: JSON.parse(localData),
-                lastModified: fs.statSync(localPath).mtime
-            };
+            if (fs.existsSync(localPath)) {
+                console.log(`[Inventory Source] Prioritizing local file: ${localPath}`);
+                const localData = fs.readFileSync(localPath, 'utf8');
+                return {
+                    items: JSON.parse(localData),
+                    lastModified: fs.statSync(localPath).mtime
+                };
+            }
+        } catch (localErr) {
+            console.warn('[Inventory Source] Failed to read local inventory file first:', localErr.message);
         }
-    } catch (localErr) {
-        console.warn('[Inventory Source] Failed to read local inventory file first:', localErr.message);
     }
 
     try {
