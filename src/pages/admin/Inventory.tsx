@@ -7,8 +7,9 @@ import type { Product } from '../../types';
 
 export default function AdminInventory() {
     // Use the hook which handles SWR fetching and data mapping automatically
-    const { inventory, lastModified, isLoading, isValidating } = useInventory();
+    const { inventory, lastModified, isLoading, isValidating, refresh: refreshInventory } = useInventory();
     const [selectedItem, setSelectedItem] = useState<{ id: string, name: string } | null>(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     // Search filters state
     const [itemName, setItemName] = useState('');
@@ -18,10 +19,19 @@ export default function AdminInventory() {
     const [location, setLocation] = useState('');
     const [maker, setMaker] = useState('');
 
-    const isBusy = isLoading || isValidating;
+    const isBusy = isLoading || isValidating || isRefreshing;
 
-    const handleRefresh = () => {
-        window.location.reload(); // Simple brute force refresh for admin to be sure
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        try {
+            if (refreshInventory) {
+                await refreshInventory();
+            }
+        } catch (err) {
+            console.error('[AdminInventory] Failed to refresh data:', err);
+        } finally {
+            setIsRefreshing(false);
+        }
     };
 
     // Flatten inventory to separate Yangsan and Sihwa stocks
@@ -116,7 +126,7 @@ export default function AdminInventory() {
                 </div>
                 <Button
                     onClick={handleRefresh}
-                    disabled={isLoading}
+                    disabled={isLoading || isRefreshing}
                     className="flex items-center gap-2"
                     variant="outline"
                 >

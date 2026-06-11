@@ -413,7 +413,23 @@ const server = http.createServer(async (req, res) => {
             const now = Date.now();
             const forceRefresh = url.searchParams.get('refresh') === 'true' || url.searchParams.get('bypass') === 'true';
             if (forceRefresh) {
-                console.log('[API] Forced refresh requested. Invalidating memory cache...');
+                console.log('[API] Forced refresh requested. Running update-inventory.js script...');
+                
+                // Trigger update-inventory.js with FORCE_S3 env variable to fetch latest raw data and overwrite local JSON file
+                await new Promise((resolve, reject) => {
+                    exec('node scripts/update-inventory.js', { env: { ...process.env, FORCE_S3: 'true' } }, (error, stdout, stderr) => {
+                        if (error) {
+                            console.error(`[API Refresh] Failed to execute update-inventory.js:`, error);
+                            reject(error);
+                        } else {
+                            console.log(`[API Refresh] update-inventory.js executed successfully:`, stdout);
+                            if (stderr) console.warn(`[API Refresh] update-inventory.js stderr:`, stderr);
+                            resolve(stdout);
+                        }
+                    });
+                });
+
+                console.log('[API] Invalidating memory cache...');
                 inventoryCache.gzippedData = null;
                 inventoryCache.rawData = null;
                 inventoryCache.timestamp = 0;

@@ -130,7 +130,10 @@ async function updateInventory() {
     try {
         if (!localFileUsed) {
             const localRawPath = path.join(__dirname, '../s3_raw.json');
-            if (fs.existsSync(localRawPath)) {
+            const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+            const forceS3 = process.env.FORCE_S3 === 'true';
+
+            if (fs.existsSync(localRawPath) && !isProd && !process.env.AWS_ACCESS_KEY_ID && !forceS3) {
                 console.log(`[Local Development] Found local raw source: ${localRawPath}`);
                 console.log(`Reading local raw data...`);
                 const localRawContent = fs.readFileSync(localRawPath, 'utf8');
