@@ -1004,6 +1004,12 @@ const server = http.createServer(async (req, res) => {
 
     // GET /api/admin/db-versions
     if (req.method === 'GET' && url.pathname === '/api/admin/db-versions') {
+        const secret = url.searchParams.get('secret');
+        if (secret !== 'antigravity-secret-key-2026') {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Forbidden: Invalid secret key' }));
+            return;
+        }
         try {
             console.log('[API] Listing S3 database versions...');
             const command = new ListObjectVersionsCommand({
@@ -1029,6 +1035,12 @@ const server = http.createServer(async (req, res) => {
 
     // POST /api/admin/db-restore
     if (req.method === 'POST' && url.pathname === '/api/admin/db-restore') {
+        const secret = url.searchParams.get('secret');
+        if (secret !== 'antigravity-secret-key-2026') {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Forbidden: Invalid secret key' }));
+            return;
+        }
         let body = '';
         req.on('data', chunk => body += chunk.toString());
         req.on('end', async () => {
@@ -1081,6 +1093,11 @@ const server = http.createServer(async (req, res) => {
                 // 4. Update memory
                 db = restoredDb;
                 await saveData();
+
+                // 5. Invalidate memory cache to force snapshot recalculation
+                inventoryCache.gzippedData = null;
+                inventoryCache.rawData = null;
+                inventoryCache.timestamp = 0;
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
