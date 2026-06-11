@@ -1033,6 +1033,27 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // GET /api/admin/env-check
+    if (req.method === 'GET' && url.pathname === '/api/admin/env-check') {
+        const secret = url.searchParams.get('secret');
+        if (secret !== 'antigravity-secret-key-2026') {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Forbidden: Invalid secret key' }));
+            return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            NODE_ENV: process.env.NODE_ENV,
+            RENDER: process.env.RENDER,
+            S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
+            S3_DB_KEY: process.env.S3_DB_KEY,
+            AWS_REGION: process.env.AWS_REGION,
+            AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID ? 'SET' : 'NOT_SET',
+            AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY ? 'SET' : 'NOT_SET'
+        }));
+        return;
+    }
+
     // POST /api/admin/db-restore
     if (req.method === 'POST' && url.pathname === '/api/admin/db-restore') {
         const secret = url.searchParams.get('secret');
