@@ -130,16 +130,13 @@ async function updateInventory() {
     try {
         if (!localFileUsed) {
             const localRawPath = path.join(__dirname, '../s3_raw.json');
-            const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
-            const forceS3 = process.env.FORCE_S3 === 'true';
 
-            if (fs.existsSync(localRawPath) && !isProd && !process.env.AWS_ACCESS_KEY_ID && !forceS3) {
-                console.log(`[Local Development] Found local raw source: ${localRawPath}`);
-                console.log(`Reading local raw data...`);
+            if (fs.existsSync(localRawPath)) {
+                console.log(`[Inventory Source] Prioritizing local raw source: ${localRawPath}`);
                 const localRawContent = fs.readFileSync(localRawPath, 'utf8');
                 rawData = JSON.parse(localRawContent);
             } else {
-                console.log(`Fetching inventory from ${INVENTORY_URL}...`);
+                console.log(`[Inventory Source] Local raw source not found. Fetching from S3: ${INVENTORY_URL}...`);
                 const response = await fetch(INVENTORY_URL);
                 if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
                 rawData = await response.json();
@@ -197,8 +194,25 @@ async function updateInventory() {
 
             // LocationStock Logic
             // User confirmed: ready_qty = Yangsan, sh_qty = Sihwa
-            const shQty = Number(row.sh_qty) || 0;
-            const ysQty = Number(row.ready_qty) || 0;
+            // Fallback to camelCase fields if raw snake_case keys are missing (to prevent zeroing out already-processed JSONs)
+            let shQty = 0;
+            if (row.sh_qty !== undefined && row.sh_qty !== null && row.sh_qty !== '') {
+                shQty = Number(row.sh_qty);
+            } else if (row.shQty !== undefined) {
+                shQty = Number(row.shQty);
+            } else if (row.locationStock && row.locationStock['시화'] !== undefined) {
+                shQty = Number(row.locationStock['시화']);
+            }
+
+            let ysQty = 0;
+            if (row.ready_qty !== undefined && row.ready_qty !== null && row.ready_qty !== '') {
+                ysQty = Number(row.ready_qty);
+            } else if (row.locationStock && row.locationStock['양산'] !== undefined) {
+                ysQty = Number(row.locationStock['양산']);
+            } else if (row.currentStock !== undefined) {
+                // In already-processed JSON, ysQty equals currentStock - shQty
+                ysQty = Math.max(0, (Number(row.currentStock) || 0) - shQty);
+            }
 
             // Recalculate Total Stock as the sum
             const currentStock = shQty + ysQty;
