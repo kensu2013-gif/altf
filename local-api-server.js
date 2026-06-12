@@ -1014,11 +1014,35 @@ const server = http.createServer(async (req, res) => {
             });
         }
 
+        let lastUndefinedShQtyCount = 0;
+        if (db.lastSnapshot) {
+            Object.values(db.lastSnapshot).forEach(v => {
+                if (v && v.sh_qty === undefined) lastUndefinedShQtyCount++;
+            });
+        }
+
+        let currentUndefinedShQtyCount = 0;
+        if (db.currentSnapshot) {
+            Object.values(db.currentSnapshot).forEach(v => {
+                if (v && v.sh_qty === undefined) currentUndefinedShQtyCount++;
+            });
+        }
+
+        let lastDaekyungUndefinedYsQtyCount = 0;
+        if (db.lastDaekyungSnapshot) {
+            Object.values(db.lastDaekyungSnapshot).forEach(v => {
+                if (v && v.ys_qty === undefined) lastDaekyungUndefinedYsQtyCount++;
+            });
+        }
+
         sendJsonResponse(req, res, 200, {
             lastSnapshotKeysCount,
             currentSnapshotKeysCount,
             lastDaekyungSnapshotKeysCount,
             currentDaekyungSnapshotKeysCount,
+            lastUndefinedShQtyCount,
+            currentUndefinedShQtyCount,
+            lastDaekyungUndefinedYsQtyCount,
             lastSnapshotSample,
             currentSnapshotSample,
             lastSnapshotDate: db.lastSnapshotDate
