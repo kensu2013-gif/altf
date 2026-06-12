@@ -993,6 +993,39 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // GET /api/admin/debug-snapshots
+    if (req.method === 'GET' && url.pathname === '/api/admin/debug-snapshots') {
+        const lastSnapshotKeysCount = db.lastSnapshot ? Object.keys(db.lastSnapshot).length : 0;
+        const currentSnapshotKeysCount = db.currentSnapshot ? Object.keys(db.currentSnapshot).length : 0;
+        const lastDaekyungSnapshotKeysCount = db.lastDaekyungSnapshot ? Object.keys(db.lastDaekyungSnapshot).length : 0;
+        const currentDaekyungSnapshotKeysCount = db.currentDaekyungSnapshot ? Object.keys(db.currentDaekyungSnapshot).length : 0;
+        
+        // Take samples
+        const lastSnapshotSample = {};
+        if (db.lastSnapshot) {
+            Object.keys(db.lastSnapshot).slice(0, 5).forEach(k => {
+                lastSnapshotSample[k] = db.lastSnapshot[k];
+            });
+        }
+        const currentSnapshotSample = {};
+        if (db.currentSnapshot) {
+            Object.keys(db.currentSnapshot).slice(0, 5).forEach(k => {
+                currentSnapshotSample[k] = db.currentSnapshot[k];
+            });
+        }
+
+        sendJsonResponse(req, res, 200, {
+            lastSnapshotKeysCount,
+            currentSnapshotKeysCount,
+            lastDaekyungSnapshotKeysCount,
+            currentDaekyungSnapshotKeysCount,
+            lastSnapshotSample,
+            currentSnapshotSample,
+            lastSnapshotDate: db.lastSnapshotDate
+        });
+        return;
+    }
+
     // POST /api/admin/inventory/update
     if (req.method === 'POST' && url.pathname === '/api/admin/inventory/update') {
         console.log('[API] Triggering inventory update from S3...');
