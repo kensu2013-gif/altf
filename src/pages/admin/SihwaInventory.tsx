@@ -350,7 +350,10 @@ export default function SihwaInventory() {
             });
             if (res.ok) {
                 const data = await res.json();
-                const ignoreDates = ['2026-04-14', '2026-04-15', '2026-04-16'];
+                const ignoreDates = [
+                    '2026-04-14', '2026-04-15', '2026-04-16',
+                    '2026-06-08', '2026-06-09', '2026-06-10', '2026-06-11', '2026-06-12'
+                ];
                 if (data.inventoryHistory) {
                     const filteredHistory = data.inventoryHistory.filter((h: { date: string }) => !ignoreDates.includes(h.date));
                     const filteredDkHistory = (data.daekyungHistory || []).filter((h: { date: string }) => !ignoreDates.includes(h.date));

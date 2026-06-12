@@ -29,7 +29,9 @@ let db = {
     lastSnapshot: null,
     currentSnapshot: null,
     lastDaekyungSnapshot: null,
-    currentDaekyungSnapshot: null
+    currentDaekyungSnapshot: null,
+    june12Snapshot: null,
+    june12DaekyungSnapshot: null
 };
 
 // Load Data
@@ -49,6 +51,8 @@ async function loadData() {
             db.currentSnapshot = json.currentSnapshot || json.inventorySnapshot || null;
             db.lastDaekyungSnapshot = json.lastDaekyungSnapshot || json.daekyungSnapshot || null;
             db.currentDaekyungSnapshot = json.currentDaekyungSnapshot || json.daekyungSnapshot || null;
+            db.june12Snapshot = json.june12Snapshot || null;
+            db.june12DaekyungSnapshot = json.june12DaekyungSnapshot || null;
             db.daekyungHistory = json.daekyungHistory || [];
             db.customers = json.customers || [];
             console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.loginLogs.length} logs, ${db.inventoryHistory.length} history, Snapshot Date: ${db.lastSnapshotDate}`);
@@ -680,8 +684,14 @@ const server = http.createServer(async (req, res) => {
                         console.log(`[API] Initialized daily baseline snapshot ledger system.`);
                     } else if (db.lastSnapshotDate !== today) {
                         // Day transition: previous day's final state (currentSnapshot) becomes today's baseline (lastSnapshot)
-                        db.lastSnapshot = (db.currentSnapshot && Object.keys(db.currentSnapshot).length > 0) ? db.currentSnapshot : sihwaStockMap;
-                        db.lastDaekyungSnapshot = (db.currentDaekyungSnapshot && Object.keys(db.currentDaekyungSnapshot).length > 0) ? db.currentDaekyungSnapshot : ysStockMap;
+                        if (today === '2026-06-14' && db.june12Snapshot && Object.keys(db.june12Snapshot).length > 0) {
+                            db.lastSnapshot = db.june12Snapshot;
+                            db.lastDaekyungSnapshot = db.june12DaekyungSnapshot || ysStockMap;
+                            console.log(`[API] Day transitioned to ${today}. Baseline forced to June 12th snapshot per user request.`);
+                        } else {
+                            db.lastSnapshot = (db.currentSnapshot && Object.keys(db.currentSnapshot).length > 0) ? db.currentSnapshot : sihwaStockMap;
+                            db.lastDaekyungSnapshot = (db.currentDaekyungSnapshot && Object.keys(db.currentDaekyungSnapshot).length > 0) ? db.currentDaekyungSnapshot : ysStockMap;
+                        }
                         db.lastSnapshotDate = today;
                         console.log(`[API] Day transitioned to ${today}. Baseline snapshots updated.`);
                     }
@@ -770,6 +780,12 @@ const server = http.createServer(async (req, res) => {
                     // Update current snapshots to reflect the latest values
                     db.currentSnapshot = sihwaStockMap;
                     db.currentDaekyungSnapshot = ysStockMap;
+                    
+                    if (today === '2026-06-12') {
+                        db.june12Snapshot = sihwaStockMap;
+                        db.june12DaekyungSnapshot = ysStockMap;
+                    }
+                    
                     // Retain legacy keys for backward compatibility
                     db.inventorySnapshot = sihwaStockMap;
                     db.daekyungSnapshot = ysStockMap;
