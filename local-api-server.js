@@ -1026,6 +1026,78 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // GET /api/admin/debug-raw-versions
+    if (req.method === 'GET' && url.pathname === '/api/admin/debug-raw-versions') {
+        try {
+            const { ListObjectVersionsCommand, GetObjectCommand } = await import('@aws-sdk/client-s3');
+            const versionsRes = await s3Client.send(new ListObjectVersionsCommand({
+                Bucket: BUCKET_NAME,
+                Prefix: 'public/inventory/inventory.json'
+            }));
+
+            const targetSkus = ['90E(L)-S10S-50A-STS304-W', '90E(L)-S10S-65A-STS304-W', '90E(L)-S10S-100A-STS304-W'];
+            const results = [];
+
+            if (versionsRes.Versions && versionsRes.Versions.length > 0) {
+                // Sort by last modified descending
+                const sortedVersions = [...versionsRes.Versions].sort((a, b) => new Date(b.LastModified) - new Date(a.LastModified)).slice(0, 5);
+
+                const getVContent = async (versionId) => {
+                    const res = await s3Client.send(new GetObjectCommand({
+                        Bucket: BUCKET_NAME,
+                        Key: 'public/inventory/inventory.json',
+                        VersionId: versionId
+                    }));
+                    const chunks = [];
+                    for await (const chunk of res.Body) {
+                        chunks.push(chunk);
+                    }
+                    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+                };
+
+                for (const v of sortedVersions) {
+                    try {
+                        const invData = await getVContent(v.VersionId);
+                        const items = Array.isArray(invData) ? invData : (invData.items || []);
+                        const skuValues = {};
+                        targetSkus.forEach(sku => {
+                            const match = items.find(x => (x.sku_key || x.id) === sku);
+                            if (match) {
+                                skuValues[sku] = {
+                                    sh_qty: match.sh_qty,
+                                    ready_qty: match.ready_qty,
+                                    location: match.location,
+                                    location1: match.location1,
+                                    maker: match.maker,
+                                    maker1: match.maker1
+                                };
+                            } else {
+                                skuValues[sku] = 'NOT_FOUND';
+                            }
+                        });
+                        results.push({
+                            versionId: v.VersionId,
+                            lastModified: v.LastModified,
+                            skus: skuValues
+                        });
+                    } catch (e) {
+                        results.push({
+                            versionId: v.VersionId,
+                            lastModified: v.LastModified,
+                            error: e.message
+                        });
+                    }
+                }
+            }
+
+            sendJsonResponse(req, res, 200, results);
+        } catch (err) {
+            console.error('[API] Failed to debug raw S3 versions:', err);
+            sendJsonResponse(req, res, 500, { error: err.message });
+        }
+        return;
+    }
+
     // POST /api/admin/inventory/update
     if (req.method === 'POST' && url.pathname === '/api/admin/inventory/update') {
         console.log('[API] Triggering inventory update from S3...');
