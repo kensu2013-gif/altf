@@ -91,6 +91,50 @@ async function loadData() {
                     console.log(`[RECOVERY] S3 version recovery not available: ${s3Err.message}`);
                 }
             }
+
+            // Temporary self-healing block to correct the June 8, 11, and 12 history anomalies
+            try {
+                let historyCorrupted = false;
+                const targetDates = ['2026-06-08', '2026-06-11', '2026-06-12'];
+
+                // Clean inventoryHistory
+                if (db.inventoryHistory && Array.isArray(db.inventoryHistory)) {
+                    db.inventoryHistory.forEach(h => {
+                        if (targetDates.includes(h.date)) {
+                            const originalLength = h.diff ? h.diff.length : 0;
+                            h.diff = (h.diff || []).filter(d => Math.abs(d.change) < 50);
+                            const newLength = h.diff.length;
+                            if (originalLength !== newLength) {
+                                historyCorrupted = true;
+                                console.log(`[CLEANUP] Filtered inventoryHistory on ${h.date}: ${originalLength} -> ${newLength}`);
+                            }
+                        }
+                    });
+                }
+
+                // Clean daekyungHistory
+                if (db.daekyungHistory && Array.isArray(db.daekyungHistory)) {
+                    db.daekyungHistory.forEach(h => {
+                        if (targetDates.includes(h.date)) {
+                            const originalLength = h.diff ? h.diff.length : 0;
+                            h.diff = (h.diff || []).filter(d => Math.abs(d.change) < 50);
+                            const newLength = h.diff.length;
+                            if (originalLength !== newLength) {
+                                historyCorrupted = true;
+                                console.log(`[CLEANUP] Filtered daekyungHistory on ${h.date}: ${originalLength} -> ${newLength}`);
+                            }
+                        }
+                    });
+                }
+
+                if (historyCorrupted) {
+                    console.log('[CLEANUP] Saving corrected database to S3...');
+                    await saveData();
+                    console.log('[CLEANUP] Corrected database saved successfully.');
+                }
+            } catch (cleanupErr) {
+                console.error('[CLEANUP] Error during self-healing database cleanup:', cleanupErr);
+            }
         } else {
             // Seed Initial Admin if file doesn't exist
             db.users = [
