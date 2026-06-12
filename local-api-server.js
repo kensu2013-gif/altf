@@ -176,7 +176,7 @@ async function loadData() {
                     for (const [id, liveQty] of Object.entries(sihwaStockMap)) {
                         const prev = db.lastSnapshot[id];
                         if (prev) {
-                            const sh_from = prev.sh_qty !== undefined ? prev.sh_qty : prev.stock;
+                            const sh_from = prev.sh_qty ?? 0;
                             if (Math.abs(liveQty - sh_from) >= 50) {
                                 console.log(`[CLEANUP-BASELINE] Sihwa item ${id} baseline aligned: ${sh_from} -> ${liveQty}`);
                                 prev.sh_qty = liveQty;
@@ -221,7 +221,7 @@ async function loadData() {
                     for (const [id, liveQty] of Object.entries(ysStockMap)) {
                         const prev = db.lastDaekyungSnapshot[id];
                         if (prev) {
-                            const ys_from = prev.ys_qty !== undefined ? prev.ys_qty : prev.stock;
+                            const ys_from = prev.ys_qty ?? 0;
                             if (Math.abs(liveQty - ys_from) >= 50) {
                                 console.log(`[CLEANUP-BASELINE] Daekyung item ${id} baseline aligned: ${ys_from} -> ${liveQty}`);
                                 prev.ys_qty = liveQty;
@@ -701,7 +701,7 @@ const server = http.createServer(async (req, res) => {
                     for (const [id, curr] of Object.entries(sihwaStockMap)) {
                         if (!isValidItem(curr.name)) continue;
                         const prev = db.lastSnapshot[id];
-                        const sh_from = prev ? (prev.sh_qty !== undefined ? prev.sh_qty : prev.stock) : 0;
+                        const sh_from = prev ? (prev.sh_qty ?? 0) : 0;
                         const sh_to = curr.sh_qty ?? 0;
                         const sh_change = sh_to - sh_from;
                         if (sh_change !== 0) {
@@ -718,7 +718,7 @@ const server = http.createServer(async (req, res) => {
                     for (const [id, prev] of Object.entries(db.lastSnapshot)) {
                         if (!isValidItem(prev.name)) continue;
                         if (sihwaStockMap[id] === undefined) {
-                            const sh_from = prev.sh_qty !== undefined ? prev.sh_qty : prev.stock;
+                            const sh_from = prev.sh_qty ?? 0;
                             if (sh_from !== 0) {
                                 changesObj[id] = { 
                                     name: prev.name, 
@@ -736,7 +736,7 @@ const server = http.createServer(async (req, res) => {
                     for (const [id, curr] of Object.entries(ysStockMap)) {
                         if (!isValidItem(curr.name)) continue;
                         const prev = db.lastDaekyungSnapshot[id];
-                        const ys_from = prev ? (prev.ys_qty !== undefined ? prev.ys_qty : prev.stock) : 0;
+                        const ys_from = prev ? (prev.ys_qty ?? 0) : 0;
                         const ys_to = curr.ys_qty ?? 0;
                         const ys_change = ys_to - ys_from;
                         if (ys_change !== 0) {
@@ -753,7 +753,7 @@ const server = http.createServer(async (req, res) => {
                     for (const [id, prev] of Object.entries(db.lastDaekyungSnapshot)) {
                         if (!isValidItem(prev.name)) continue;
                         if (ysStockMap[id] === undefined) {
-                            const ys_from = prev.ys_qty !== undefined ? prev.ys_qty : prev.stock;
+                            const ys_from = prev.ys_qty ?? 0;
                             if (ys_from !== 0) {
                                 daekyungChangesObj[id] = { 
                                     name: prev.name, 
@@ -1321,7 +1321,7 @@ const server = http.createServer(async (req, res) => {
         const lastSnapshot = db.lastSnapshot || {};
         for (const [id, curr] of Object.entries(sihwaStockMap)) {
             const prev = lastSnapshot[id];
-            const sh_from = prev ? (prev.sh_qty !== undefined ? prev.sh_qty : prev.stock) : 0;
+            const sh_from = prev ? (prev.sh_qty ?? 0) : 0;
             const sh_to = curr.sh_qty ?? 0;
             const sh_change = sh_to - sh_from;
             if (sh_change !== 0) {
@@ -1330,7 +1330,7 @@ const server = http.createServer(async (req, res) => {
         }
         for (const [id, prev] of Object.entries(lastSnapshot)) {
             if (sihwaStockMap[id] === undefined) {
-                const sh_from = prev.sh_qty !== undefined ? prev.sh_qty : prev.stock;
+                const sh_from = prev.sh_qty ?? 0;
                 if (sh_from !== 0) {
                     mockChanges[id] = { name: prev.name, change: -sh_from, from: sh_from, to: 0 };
                 }
@@ -1432,7 +1432,7 @@ const server = http.createServer(async (req, res) => {
 
                 for (const [id, curr] of Object.entries(latestMap)) {
                     const prev = prevMap[id];
-                    const sh_from = prev ? (prev.sh_qty !== undefined ? prev.sh_qty : prev.stock) : 0;
+                    const sh_from = prev ? (prev.sh_qty ?? 0) : 0;
                     const sh_to = curr.sh_qty ?? 0;
                     const sh_change = sh_to - sh_from;
                     if (sh_change !== 0) {
@@ -1449,7 +1449,7 @@ const server = http.createServer(async (req, res) => {
                 }
                 for (const [id, prev] of Object.entries(prevMap)) {
                     if (latestMap[id] === undefined) {
-                        const sh_from = prev.sh_qty !== undefined ? prev.sh_qty : prev.stock;
+                        const sh_from = prev.sh_qty ?? 0;
                         if (sh_from !== 0) {
                             s3InventoryChanges.push({ 
                                 id, 
