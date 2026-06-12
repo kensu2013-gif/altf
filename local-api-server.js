@@ -127,6 +127,109 @@ async function loadData() {
                     });
                 }
 
+                // Correct baseline (lastSnapshot / lastDaekyungSnapshot) for today (June 12th) to prevent recalculated spikes
+                if (db.lastSnapshot && db.currentSnapshot && db.lastSnapshotDate === '2026-06-12') {
+                    let baselineRepaired = false;
+                    const inventoryData = await getInventoryFromS3();
+                    const itemsArr = Array.isArray(inventoryData) ? inventoryData : (inventoryData.items || []);
+                    
+                    const sihwaStockMap = {};
+                    itemsArr.forEach(item => {
+                        const maker = item.maker || item.maker1 || '';
+                        if (maker !== '대경') return;
+
+                        let shStock = 0;
+                        let isSihwa = false;
+                        const locationStock = {};
+                        if (item.locationStock && Object.keys(item.locationStock).length > 0) {
+                            for (const [key, qty] of Object.entries(item.locationStock)) {
+                                const newKey = (key === '서울' || key === '서울재고') ? '시화' : key;
+                                locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
+                            }
+                        } else {
+                            if (item.location1 && item.sh_qty !== undefined) {
+                                const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
+                                locationStock[loc1] = (locationStock[loc1] || 0) + Number(item.sh_qty);
+                            }
+                        }
+                        if (locationStock['시화'] !== undefined) {
+                            shStock = locationStock['시화'];
+                            isSihwa = true;
+                        }
+                        const id = item.sku_key || item.id;
+                        if (id && isSihwa) {
+                            sihwaStockMap[id] = shStock;
+                        }
+                    });
+
+                    for (const [id, liveQty] of Object.entries(sihwaStockMap)) {
+                        const prev = db.lastSnapshot[id];
+                        if (prev) {
+                            const sh_from = prev.sh_qty !== undefined ? prev.sh_qty : prev.stock;
+                            if (Math.abs(liveQty - sh_from) >= 50) {
+                                console.log(`[CLEANUP-BASELINE] Sihwa item ${id} baseline aligned: ${sh_from} -> ${liveQty}`);
+                                prev.sh_qty = liveQty;
+                                prev.stock = liveQty;
+                                baselineRepaired = true;
+                            }
+                        } else {
+                            if (liveQty >= 50) {
+                                console.log(`[CLEANUP-BASELINE] Sihwa item ${id} added to baseline to prevent jump: 0 -> ${liveQty}`);
+                                db.lastSnapshot[id] = { name: id.split('-')[0], stock: liveQty, sh_qty: liveQty };
+                                baselineRepaired = true;
+                            }
+                        }
+                    }
+
+                    const ysStockMap = {};
+                    itemsArr.forEach(item => {
+                        const maker = item.maker || item.maker1 || '';
+                        if (maker !== '대경') return;
+
+                        let ysStock = 0;
+                        const locationStock = {};
+                        if (item.locationStock && Object.keys(item.locationStock).length > 0) {
+                            for (const [key, qty] of Object.entries(item.locationStock)) {
+                                locationStock[key] = (locationStock[key] || 0) + Number(qty);
+                            }
+                        } else {
+                            if (item.location && item.ready_qty !== undefined) {
+                                locationStock[item.location] = (locationStock[item.location] || 0) + Number(item.ready_qty);
+                            }
+                        }
+                        if (locationStock['양산'] !== undefined) {
+                            ysStock = locationStock['양산'];
+                        }
+                        const id = item.sku_key || item.id;
+                        if (id) {
+                            ysStockMap[id] = ysStock;
+                        }
+                    });
+
+                    for (const [id, liveQty] of Object.entries(ysStockMap)) {
+                        const prev = db.lastDaekyungSnapshot[id];
+                        if (prev) {
+                            const ys_from = prev.ys_qty !== undefined ? prev.ys_qty : prev.stock;
+                            if (Math.abs(liveQty - ys_from) >= 50) {
+                                console.log(`[CLEANUP-BASELINE] Daekyung item ${id} baseline aligned: ${ys_from} -> ${liveQty}`);
+                                prev.ys_qty = liveQty;
+                                prev.stock = liveQty;
+                                baselineRepaired = true;
+                            }
+                        } else {
+                            if (liveQty >= 50) {
+                                console.log(`[CLEANUP-BASELINE] Daekyung item ${id} added to baseline to prevent jump: 0 -> ${liveQty}`);
+                                db.lastDaekyungSnapshot[id] = { name: id.split('-')[0], stock: liveQty, ys_qty: liveQty };
+                                baselineRepaired = true;
+                            }
+                        }
+                    }
+
+                    if (baselineRepaired) {
+                        historyCorrupted = true;
+                    }
+                }
+
                 if (historyCorrupted) {
                     console.log('[CLEANUP] Saving corrected database to S3...');
                     await saveData();
