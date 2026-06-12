@@ -246,11 +246,9 @@ async function updateInventory() {
                 location: location || '',
                 maker: maker || '',
                 locationStock,
-                // Pass others if needed
-                // markingWaitQty removed
                 location1: row.location1,
                 maker1: row.maker1,
-                shQty: Number(row.sh_qty) || 0,
+                shQty: shQty,
                 marking_wait_qty: Number(row.marking_wait_qty) || 0,
 
                 // Supplier fields

@@ -67,8 +67,12 @@ async function loadData() {
             }
 
             // Self-healing recovery for missing daily diffs due to initialization overwrite
-            if (!db.lastSnapshot || Object.keys(db.lastSnapshot).length === 0 || !db.lastDaekyungSnapshot || Object.keys(db.lastDaekyungSnapshot).length === 0) {
+            if (!db.lastSnapshot || Object.keys(db.lastSnapshot).length === 0 || 
+                !db.currentSnapshot || Object.keys(db.currentSnapshot).length === 0 ||
+                !db.lastDaekyungSnapshot || Object.keys(db.lastDaekyungSnapshot).length === 0 ||
+                !db.currentDaekyungSnapshot || Object.keys(db.currentDaekyungSnapshot).length === 0) {
                 console.log(`[RECOVERY] Snapshot empty or missing. Recovering baseline snapshot...`);
+                let recovered = false;
                 // Try S3 version recovery to get the exact previous state
                 try {
                     console.log('[RECOVERY] Attempting S3 database version recovery...');
@@ -80,15 +84,21 @@ async function loadData() {
                             db.lastSnapshot = recoveredSihwa;
                             db.currentSnapshot = recoveredSihwa;
                             console.log('[RECOVERY] Restored Sihwa lastSnapshot from S3 version history.');
+                            recovered = true;
                         }
                         if (recoveredDaekyung && Object.keys(recoveredDaekyung).length > 0) {
                             db.lastDaekyungSnapshot = recoveredDaekyung;
                             db.currentDaekyungSnapshot = recoveredDaekyung;
                             console.log('[RECOVERY] Restored Daekyung lastDaekyungSnapshot from S3 version history.');
+                            recovered = true;
                         }
                     }
                 } catch (s3Err) {
                     console.log(`[RECOVERY] S3 version recovery not available: ${s3Err.message}`);
+                }
+                if (recovered) {
+                    console.log('[RECOVERY] Saving recovered snapshots to S3...');
+                    await saveData();
                 }
             }
 
@@ -147,9 +157,10 @@ async function loadData() {
                                 locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
                             }
                         } else {
-                            if (item.location1 && item.sh_qty !== undefined) {
+                            const shQtyVal = item.sh_qty !== undefined ? item.sh_qty : item.shQty;
+                            if (item.location1 && shQtyVal !== undefined) {
                                 const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
-                                locationStock[loc1] = (locationStock[loc1] || 0) + Number(item.sh_qty);
+                                locationStock[loc1] = (locationStock[loc1] || 0) + Number(shQtyVal);
                             }
                         }
                         if (locationStock['시화'] !== undefined) {
@@ -193,8 +204,9 @@ async function loadData() {
                                 locationStock[key] = (locationStock[key] || 0) + Number(qty);
                             }
                         } else {
-                            if (item.location && item.ready_qty !== undefined) {
-                                locationStock[item.location] = (locationStock[item.location] || 0) + Number(item.ready_qty);
+                            const ysQtyVal = item.ready_qty !== undefined ? item.ready_qty : item.ysQty;
+                            if (item.location && ysQtyVal !== undefined) {
+                                locationStock[item.location] = (locationStock[item.location] || 0) + Number(ysQtyVal);
                             }
                         }
                         if (locationStock['양산'] !== undefined) {
@@ -622,13 +634,15 @@ const server = http.createServer(async (req, res) => {
                                 locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
                             }
                         } else {
-                            if (item.location1 && item.sh_qty !== undefined) {
+                            const shQtyVal = item.sh_qty !== undefined ? item.sh_qty : item.shQty;
+                            const ysQtyVal = item.ready_qty !== undefined ? item.ready_qty : item.ysQty;
+                            if (item.location1 && shQtyVal !== undefined) {
                                 const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
-                                locationStock[loc1] = (locationStock[loc1] || 0) + Number(item.sh_qty);
+                                locationStock[loc1] = (locationStock[loc1] || 0) + Number(shQtyVal);
                             }
-                            if (item.location && item.ready_qty !== undefined) {
+                            if (item.location && ysQtyVal !== undefined) {
                                 const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
-                                locationStock[primaryLoc] = (locationStock[primaryLoc] || 0) + Number(item.ready_qty);
+                                locationStock[primaryLoc] = (locationStock[primaryLoc] || 0) + Number(ysQtyVal);
                             }
                         }
 
@@ -642,7 +656,7 @@ const server = http.createServer(async (req, res) => {
 
                         const id = item.sku_key || item.id;
                         if (id) {
-                            if (isSihwa) sihwaStockMap[id] = { name: item.item || item.name, stock: shStock, sh_qty: shStock };
+                            sihwaStockMap[id] = { name: item.item || item.name, stock: shStock, sh_qty: shStock };
                             ysStockMap[id] = { name: item.item || item.name, stock: ysStock, ys_qty: ysStock };
                         }
                     });
@@ -654,10 +668,10 @@ const server = http.createServer(async (req, res) => {
                     // Initialize if missing
                     if (!db.lastSnapshotDate) {
                         db.lastSnapshotDate = today;
-                        if (!db.lastSnapshot) db.lastSnapshot = sihwaStockMap;
-                        if (!db.currentSnapshot) db.currentSnapshot = sihwaStockMap;
-                        if (!db.lastDaekyungSnapshot) db.lastDaekyungSnapshot = ysStockMap;
-                        if (!db.currentDaekyungSnapshot) db.currentDaekyungSnapshot = ysStockMap;
+                        if (!db.lastSnapshot || Object.keys(db.lastSnapshot).length === 0) db.lastSnapshot = sihwaStockMap;
+                        if (!db.currentSnapshot || Object.keys(db.currentSnapshot).length === 0) db.currentSnapshot = sihwaStockMap;
+                        if (!db.lastDaekyungSnapshot || Object.keys(db.lastDaekyungSnapshot).length === 0) db.lastDaekyungSnapshot = ysStockMap;
+                        if (!db.currentDaekyungSnapshot || Object.keys(db.currentDaekyungSnapshot).length === 0) db.currentDaekyungSnapshot = ysStockMap;
                         
                         if (history.length === 0) history.push({ date: today, diff: [] });
                         if (daekyungHistory.length === 0) daekyungHistory.push({ date: today, diff: [] });
@@ -666,8 +680,8 @@ const server = http.createServer(async (req, res) => {
                         console.log(`[API] Initialized daily baseline snapshot ledger system.`);
                     } else if (db.lastSnapshotDate !== today) {
                         // Day transition: previous day's final state (currentSnapshot) becomes today's baseline (lastSnapshot)
-                        db.lastSnapshot = db.currentSnapshot || sihwaStockMap;
-                        db.lastDaekyungSnapshot = db.currentDaekyungSnapshot || ysStockMap;
+                        db.lastSnapshot = (db.currentSnapshot && Object.keys(db.currentSnapshot).length > 0) ? db.currentSnapshot : sihwaStockMap;
+                        db.lastDaekyungSnapshot = (db.currentDaekyungSnapshot && Object.keys(db.currentDaekyungSnapshot).length > 0) ? db.currentDaekyungSnapshot : ysStockMap;
                         db.lastSnapshotDate = today;
                         console.log(`[API] Day transitioned to ${today}. Baseline snapshots updated.`);
                     }
@@ -1389,13 +1403,15 @@ const server = http.createServer(async (req, res) => {
                                 locationStock[cleanKey] = (locationStock[cleanKey] || 0) + Number(qty);
                             }
                         } else {
-                            if (item.location1 && item.sh_qty !== undefined) {
+                            const shQtyVal = item.sh_qty !== undefined ? item.sh_qty : item.shQty;
+                            const ysQtyVal = item.ready_qty !== undefined ? item.ready_qty : item.ysQty;
+                            if (item.location1 && shQtyVal !== undefined) {
                                 const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
-                                locationStock[loc1] = (locationStock[loc1] || 0) + Number(item.sh_qty);
+                                locationStock[loc1] = (locationStock[loc1] || 0) + Number(shQtyVal);
                             }
-                            if (item.location && item.ready_qty !== undefined) {
+                            if (item.location && ysQtyVal !== undefined) {
                                 const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
-                                locationStock[primaryLoc] = (locationStock[primaryLoc] || 0) + Number(item.ready_qty);
+                                locationStock[primaryLoc] = (locationStock[primaryLoc] || 0) + Number(ysQtyVal);
                             }
                         }
 
@@ -1404,7 +1420,7 @@ const server = http.createServer(async (req, res) => {
                             isSihwa = true;
                         }
 
-                        if (id && isSihwa) {
+                        if (id) {
                             map[id] = { name: item.item || item.name, stock: shStock, sh_qty: shStock };
                         }
                     });
