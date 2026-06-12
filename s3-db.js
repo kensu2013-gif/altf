@@ -35,6 +35,13 @@ export async function loadDbFromS3() {
             console.log(`[S3] ${DB_KEY} not found in S3. Returning null for initial seed.`);
             return null;
         }
+        
+        const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+        if (isProd) {
+            console.error('[S3] Critical error: Failed to load database from S3 in production. Fallback to local DB is disabled to prevent data overwriting.');
+            throw error;
+        }
+
         console.warn('[S3] Failed to load from S3. Falling back to local data/db.json...', error.message);
         try {
             const fs = await import('fs');
@@ -169,6 +176,12 @@ export async function saveDbToS3(dbObject) {
         await s3Client.send(command);
         console.log('[S3] Data saved successfully to S3');
     } catch (error) {
+        const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+        if (isProd) {
+            console.error('[S3] Critical error: Failed to save database to S3 in production. Local fallback saving is disabled to prevent silent data loss.', error.message);
+            throw error;
+        }
+
         console.error('[S3] Failed to save to S3. Falling back to saving locally...', error.message);
         try {
             const fs = await import('fs');

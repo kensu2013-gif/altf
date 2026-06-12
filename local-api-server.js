@@ -116,6 +116,11 @@ async function loadData() {
         }
     } catch (e) {
         console.error('[API] Failed to load data from S3:', e);
+        const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+        if (isProd) {
+            console.error('[API] Critical error: Database load failed in production. Crashing server to prevent corrupted state.');
+            throw e;
+        }
     }
 }
 
