@@ -31,6 +31,8 @@ export default function AdminQuotes() {
     const [previewHtml, setPreviewHtml] = useState<string | null>(null);
 
     const user = useStore((state) => state.auth.user);
+    const userRole = user?.role as string;
+    const canManageTrash = ['MASTER', 'admin', 'manager', 'MANAGER'].includes(userRole);
 
     // Sync with Server on Mount and Focus
     useEffect(() => {
@@ -367,7 +369,7 @@ export default function AdminQuotes() {
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
-                                            {user?.role === 'MASTER' && (
+                                            {canManageTrash && (
                                                 <>
                                                     {filterStatus === 'TRASH' ? (
                                                         <>
