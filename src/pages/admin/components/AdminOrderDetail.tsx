@@ -2499,6 +2499,12 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                             if (!isNaN(val)) {
                                                                                 const newItems = displayedItems.map(item => {
                                                                                     const product = findProduct({ productId: item.productId });
+                                                                                    // 요율이 0인 품목은 일괄 적용 대상에서 제외
+                                                                                    const productRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
+                                                                                    if (productRate === 0) {
+                                                                                        return item;
+                                                                                    }
+
                                                                                     // Calculate new price based on base price and bulk discount
                                                                                     const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
                                                                                     if (basePrice > 0) {

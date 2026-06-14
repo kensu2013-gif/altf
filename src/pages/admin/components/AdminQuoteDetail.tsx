@@ -1016,6 +1016,12 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                                     if (!isNaN(val)) {
                                                                         const newItems = items.map(item => {
                                                                             const product = getProductInfo(item.productId);
+                                                                            // 요율이 0인 품목은 일괄 적용 대상에서 제외
+                                                                            const productRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
+                                                                            if (productRate === 0) {
+                                                                                return item;
+                                                                            }
+
                                                                             const standardPrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0; // Use Base Price, fallback to UnitPrice, then 0
                                                                             if (standardPrice === 0) return item;
 

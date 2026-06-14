@@ -12,6 +12,8 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const INVENTORY_URL = 'https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/public/inventory/inventory.json';
 const OUTPUT_PATH = path.join(__dirname, '../public/api/inventory/inventory.json');
+const EFFECTIVE_DATE = new Date('2026-06-15T00:00:00+09:00');
+
 
 // --- Helper Functions ---
 
@@ -190,8 +192,31 @@ async function updateInventory() {
             const locStockRaw = row.locationStock;
 
             // Safe Parsing
+            const base_price_raw = Number(row.base_price) || 0;
+            let rate_pct = Number(row.rate_pct) || 0;
+            let rate_act = Number(row.rate_act) || 0;
+            let rate_act2 = Number(row.rate_act2) || 0;
 
-            const unitPrice = Number(priceVal) || 0;
+            const isAfterEffectiveDate = Date.now() >= EFFECTIVE_DATE.getTime();
+            if (isAfterEffectiveDate) {
+                if (rate_pct === 65) rate_pct = 47;
+                else if (rate_pct === 35) rate_pct = 25;
+
+                if (rate_act === 65) rate_act = 47;
+                else if (rate_act === 35) rate_act = 25;
+
+                if (rate_act2 === 65) rate_act2 = 47;
+                else if (rate_act2 === 35) rate_act2 = 25;
+            }
+
+            let unitPrice = Number(priceVal) || 0;
+            if (isAfterEffectiveDate && base_price_raw > 0) {
+                if (rate_pct > 0) {
+                    unitPrice = Math.round((base_price_raw * (100 - rate_pct) / 100) / 10) * 10;
+                } else {
+                    unitPrice = base_price_raw;
+                }
+            }
 
             // LocationStock Logic
             // User confirmed: ready_qty = Yangsan, sh_qty = Sihwa
@@ -252,10 +277,10 @@ async function updateInventory() {
                 marking_wait_qty: Number(row.marking_wait_qty) || 0,
 
                 // Supplier fields
-                base_price: Number(row.base_price) || 0,
-                rate_pct: Number(row.rate_pct) || 0,
-                rate_act: Number(row.rate_act) || 0,
-                rate_act2: Number(row.rate_act2) || 0
+                base_price: base_price_raw,
+                rate_pct,
+                rate_act,
+                rate_act2
             };
         });
 
