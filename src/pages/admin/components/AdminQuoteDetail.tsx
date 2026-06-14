@@ -211,6 +211,10 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             // 1. Try to find product using unified helper
             const product = findMatchingProduct(item, inventory);
 
+            const EFFECTIVE_DATE = new Date('2026-06-15T00:00:00+09:00');
+            const quoteDate = quote.createdAt ? new Date(quote.createdAt) : new Date();
+            const isQuoteAfterEffectiveDate = quoteDate.getTime() >= EFFECTIVE_DATE.getTime();
+
             // Try to infer discount rate if standard price exists
             let initialRate = item.discountRate; // Undefined if not in DB
             const standardPrice = product?.base_price ?? product?.unitPrice ?? 0;
@@ -234,11 +238,22 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 }
             }
 
+            // Apply 6/15 rate conversion if the quote is created after the effective date
+            if (isQuoteAfterEffectiveDate) {
+                if (initialRate === 65) initialRate = 47;
+                else if (initialRate === 35) initialRate = 25;
+            }
+
 
             // Initialize supplierRate from item or inventory default
             // Priority: Item (saved) > Inventory (current) > 0
             const defaultSupplierRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
-            const supplierRate = item.supplierRate ?? defaultSupplierRate;
+            let supplierRate = item.supplierRate ?? defaultSupplierRate;
+
+            if (isQuoteAfterEffectiveDate) {
+                if (supplierRate === 65) supplierRate = 47;
+                else if (supplierRate === 35) supplierRate = 25;
+            }
 
             return {
                 ...item,
