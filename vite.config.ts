@@ -31,18 +31,6 @@ export default defineConfig({
   server: {
     allowedHosts: true,
     proxy: {
-      '/api/inventory': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-      },
-      '/api/admin': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-      },
-      '/api/quote': {
-        target: 'https://altf-api.onrender.com',
-        changeOrigin: true,
-      },
       '/api/geo': {
         target: 'http://localhost:8787',
         changeOrigin: true,
@@ -51,20 +39,8 @@ export default defineConfig({
         target: 'http://localhost:8787',
         changeOrigin: true,
       },
-      '/api/my': {
-        target: 'https://altf-api.onrender.com',
-        changeOrigin: true,
-      },
-      '/api/auth': {
-        target: 'https://altf-api.onrender.com',
-        changeOrigin: true,
-      },
-      '/api/users': {
-        target: 'https://altf-api.onrender.com',
-        changeOrigin: true,
-      },
-      '/api/customers': {
-        target: 'https://altf-api.onrender.com',
+      '/api': {
+        target: 'http://localhost:3001',
         changeOrigin: true,
       },
     },
