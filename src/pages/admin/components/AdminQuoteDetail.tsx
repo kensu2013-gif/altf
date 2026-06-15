@@ -458,7 +458,9 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
             // Initialize supplierRate from item or calculate using rules based on date
             let supplierRate = item.supplierRate;
-            if (supplierRate === undefined || supplierRate === null) {
+            const numericSize = getPrimaryASize(item.size);
+            const isUninitializedZero = supplierRate === 0 && numericSize <= 400;
+            if (supplierRate === undefined || supplierRate === null || isUninitializedZero) {
                 if (isQuoteAfterEffectiveDate) {
                     supplierRate = calculateSupplierRate(
                         item.name,
