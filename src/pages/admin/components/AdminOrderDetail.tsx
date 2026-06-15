@@ -141,14 +141,51 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         return val.replace(/\uFFFD{1,3}동대로/g, '낙동대로').replace(/[\uFFFC\uFFFD]/g, '');
     });
 
-    const [items, setItems] = useState<LineItem[]>(order.items || []);
+    const EFFECTIVE_DATE = new Date('2026-06-15T00:00:00+09:00');
+    const orderDate = order.createdAt ? new Date(order.createdAt) : new Date();
+    const isOrderAfterEffectiveDate = orderDate.getTime() >= EFFECTIVE_DATE.getTime();
+
+    const [items, setItems] = useState<LineItem[]>(() => {
+        const initialItems = order.items || [];
+        return initialItems.map(item => {
+            let discountRate = item.discountRate;
+            if (isOrderAfterEffectiveDate) {
+                if (discountRate === 65) discountRate = 47;
+                else if (discountRate === 35) discountRate = 25;
+            }
+            return {
+                ...item,
+                discountRate
+            };
+        });
+    });
     const [poItems, setPoItems] = useState<LineItem[]>(() => {
-        // [FIX] If PO Items specific list exists, use it.
-        // If not, clone the Customer Items as the starting point for the PO.
-        if (order.po_items && order.po_items.length > 0) {
-            return order.po_items;
-        }
-        return order.items ? [...order.items] : [];
+        const initialPoItems = (order.po_items && order.po_items.length > 0)
+            ? order.po_items
+            : (order.items ? [...order.items] : []);
+
+        return initialPoItems.map(item => {
+            let discountRate = item.discountRate;
+            if (isOrderAfterEffectiveDate) {
+                if (discountRate === 65) discountRate = 47;
+                else if (discountRate === 35) discountRate = 25;
+            }
+
+            // 신규 발주서 작성이거나 supplierRate가 없을 때 인벤토리에서 매입율을 매칭
+            let supplierRate = item.supplierRate;
+            if (!order.po_items || order.po_items.length === 0 || supplierRate === undefined) {
+                const product = findProduct(item);
+                if (product) {
+                    supplierRate = product.rate_act2 ?? product.rate_act ?? product.rate_pct ?? 0;
+                }
+            }
+
+            return {
+                ...item,
+                discountRate,
+                supplierRate: supplierRate ?? 0
+            };
+        });
     });
 
     const [isStockOrderChecked, setIsStockOrderChecked] = useState(() => {
@@ -1052,28 +1089,36 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         const matchedProduct = findProduct(updatedItem);
 
         if (matchedProduct) {
-            // [Refactor] Align with User Cart Logic: Direct Price Application
-
             // 1. Set IDs and Status
             updatedItem.productId = matchedProduct.id;
             updatedItem.currentStock = matchedProduct.currentStock;
             updatedItem.stockStatus = matchedProduct.stockStatus;
             updatedItem.marking_wait_qty = matchedProduct.marking_wait_qty || 0;
 
-            // 2. Set Prices
-            // User Logic: Just use the product's unitPrice (Sales Price) directly
-            updatedItem.unitPrice = matchedProduct.unitPrice;
-            updatedItem.amount = updatedItem.unitPrice * updatedItem.quantity;
-
-            // 3. Set Base Price (Reference) & Back-calculate Discount
+            // 3. Set Base Price (Reference) & Discount Rate
             const basePrice = matchedProduct.base_price ?? matchedProduct.unitPrice ?? 0;
             updatedItem.base_price = basePrice;
 
-            if (basePrice > 0 && updatedItem.unitPrice < basePrice) {
-                updatedItem.discountRate = Math.round((1 - updatedItem.unitPrice / basePrice) * 100);
-            } else {
-                updatedItem.discountRate = 0;
+            // 기본 요율 결정
+            let initialRate = matchedProduct.rate_pct ?? 0;
+            if (initialRate === 0 && basePrice > 0 && matchedProduct.unitPrice > 0) {
+                initialRate = Math.round((1 - matchedProduct.unitPrice / basePrice) * 100);
             }
+
+            // 6/15 요율 보정 적용
+            if (isOrderAfterEffectiveDate) {
+                if (initialRate === 65) initialRate = 47;
+                else if (initialRate === 35) initialRate = 25;
+            }
+            updatedItem.discountRate = initialRate;
+
+            // 2. Set Prices based on adjusted discountRate
+            if (initialRate > 0 && basePrice > 0) {
+                updatedItem.unitPrice = Math.round(Math.round(basePrice * (1 - initialRate / 100)) / 10) * 10;
+            } else {
+                updatedItem.unitPrice = matchedProduct.unitPrice;
+            }
+            updatedItem.amount = updatedItem.unitPrice * updatedItem.quantity;
 
             // 4. Supplier Logic (Keep existing defaults)
             updatedItem.supplierRate = matchedProduct.rate_act2 ?? matchedProduct.rate_act ?? matchedProduct.rate_pct ?? 0;
@@ -2738,22 +2783,39 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                         </div>
                                                                         {(() => {
                                                                             const product = findProduct({ productId: item.productId });
+                                                                            const defaultRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
+                                                                            if (defaultRate > 0) {
+                                                                                return (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleSupplierRateChange(idx, defaultRate)}
+                                                                                        className="px-1.5 py-1 text-[10px] bg-indigo-50 text-indigo-600 border border-indigo-200 rounded hover:bg-indigo-100 font-bold whitespace-nowrap shadow-sm"
+                                                                                        title={`기본 매입율 적용: ${defaultRate}%`}>
+                                                                                        {defaultRate}%
+                                                                                    </button>
+                                                                                );
+                                                                            }
+                                                                            return null;
+                                                                        })()}
+                                                                        {(() => {
+                                                                            const product = findProduct({ productId: item.productId });
                                                                             const mat = item.material?.toUpperCase() || product?.material?.toUpperCase() || '';
                                                                             const nm = item.name?.toUpperCase() || product?.name?.toUpperCase() || '';
-
+ 
                                                                             const is316W = mat === 'STS316L-W' || mat === 'WP316L-W';
                                                                             const isCap316S = nm === 'CAP' && (mat === 'STS316L-S' || mat === 'WP316L-S');
-
+ 
                                                                             if (is316W || isCap316S) {
                                                                                 return (
                                                                                     <button
+                                                                                        type="button"
                                                                                         onClick={() => {
                                                                                             const newItems = [...displayedItems];
                                                                                             const targetItem = { ...newItems[idx] };
                                                                                             const product = findProduct({ productId: targetItem.productId });
                                                                                             const productBasePrice = product?.base_price ?? targetItem.base_price ?? product?.unitPrice ?? 0;
                                                                                             const rate = targetItem.supplierRate ?? 0;
-
+ 
                                                                                             if (productBasePrice > 0) {
                                                                                                 const targetPrice = Math.ceil(((productBasePrice / 2) * ((100 - rate) / 100) * 1.9) / 10) * 10;
                                                                                                 targetItem.supplierPriceOverride = targetPrice;
