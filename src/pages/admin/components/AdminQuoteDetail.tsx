@@ -208,6 +208,12 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const setMobileModalOpen = useStore((state) => state.setMobileModalOpen);
     const customerUser = useStore((state) => state.users.find(u => u.id === quote.userId));
 
+    const isQuoteAfterEffectiveDate = useMemo(() => {
+        const EFFECTIVE_DATE = new Date('2026-06-15T00:00:00+09:00');
+        const quoteDate = quote.createdAt ? new Date(quote.createdAt) : new Date();
+        return quoteDate.getTime() >= EFFECTIVE_DATE.getTime();
+    }, [quote.createdAt]);
+
     useEffect(() => {
         setMobileModalOpen(true);
         return () => setMobileModalOpen(false);
@@ -372,10 +378,6 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             // 1. Try to find product using unified helper
             const product = findMatchingProduct(item, inventory);
 
-            const EFFECTIVE_DATE = new Date('2026-06-15T00:00:00+09:00');
-            const quoteDate = quote.createdAt ? new Date(quote.createdAt) : new Date();
-            const isQuoteAfterEffectiveDate = quoteDate.getTime() >= EFFECTIVE_DATE.getTime();
-
             // Try to infer discount rate if standard price exists
             let initialRate = item.discountRate; // Undefined if not in DB
             const standardPrice = product?.base_price ?? product?.unitPrice ?? 0;
@@ -406,15 +408,19 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             }
 
 
-            // Initialize supplierRate from item or calculate using new rules
+            // Initialize supplierRate from item or calculate using rules based on date
             let supplierRate = item.supplierRate;
             if (supplierRate === undefined || supplierRate === null) {
-                supplierRate = calculateSupplierRate(
-                    item.name,
-                    item.size,
-                    item.material,
-                    product ? product.id : null
-                );
+                if (isQuoteAfterEffectiveDate) {
+                    supplierRate = calculateSupplierRate(
+                        item.name,
+                        item.size,
+                        item.material,
+                        product ? product.id : null
+                    );
+                } else {
+                    supplierRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
+                }
             }
 
             return {
@@ -545,12 +551,14 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 }
 
                 // 4. Supplier Logic
-                updatedItem.supplierRate = calculateSupplierRate(
-                    updatedItem.name,
-                    updatedItem.size,
-                    updatedItem.material,
-                    matchedProduct.id
-                );
+                updatedItem.supplierRate = isQuoteAfterEffectiveDate
+                    ? calculateSupplierRate(
+                        updatedItem.name,
+                        updatedItem.size,
+                        updatedItem.material,
+                        matchedProduct.id
+                    )
+                    : (matchedProduct.rate_act2 ?? matchedProduct.rate_act ?? matchedProduct.rate_pct ?? 0);
 
             } else {
                 // No Match: Unlink
@@ -565,7 +573,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             newItems[index] = updatedItem;
             return newItems;
         });
-    }, [inventory]);
+    }, [inventory, isQuoteAfterEffectiveDate]);
 
     const handleSupplierRateChange = useCallback((index: number, value: number) => {
         setItems(prev => {
