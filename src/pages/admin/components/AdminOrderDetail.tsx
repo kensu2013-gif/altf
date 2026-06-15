@@ -142,20 +142,36 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     });
 
     const EFFECTIVE_DATE = new Date('2026-06-15T00:00:00+09:00');
+    const AUTO_RATE_EFFECTIVE_DATE = new Date('2026-05-16T00:00:00+09:00');
     const orderDate = order.createdAt ? new Date(order.createdAt) : new Date();
     const isOrderAfterEffectiveDate = orderDate.getTime() >= EFFECTIVE_DATE.getTime();
+    const isOrderAfterAutoRateDate = orderDate.getTime() >= AUTO_RATE_EFFECTIVE_DATE.getTime();
 
     const [items, setItems] = useState<LineItem[]>(() => {
         const initialItems = order.items || [];
         return initialItems.map(item => {
             let discountRate = item.discountRate;
+
+            // 5월 16일 이후 주문 건이고 할인율 정보가 누락되었거나 0인 경우 요율 자동 유추 및 인벤토리 매칭
+            if (isOrderAfterAutoRateDate && (discountRate === undefined || discountRate === 0)) {
+                const product = findProduct(item);
+                const standardPrice = product?.base_price ?? product?.unitPrice ?? 0;
+                
+                if (product && product.rate_pct !== undefined) {
+                    discountRate = product.rate_pct;
+                } else if (standardPrice > 0 && item.unitPrice > 0) {
+                    discountRate = Math.round((1 - item.unitPrice / standardPrice) * 100);
+                }
+            }
+
+            // 6월 15일 이후 주문 건에 대해 65->47, 35->25 요율 변경 보정 적용
             if (isOrderAfterEffectiveDate) {
                 if (discountRate === 65) discountRate = 47;
                 else if (discountRate === 35) discountRate = 25;
             }
             return {
                 ...item,
-                discountRate
+                discountRate: discountRate ?? 0
             };
         });
     });
@@ -166,6 +182,18 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
         return initialPoItems.map(item => {
             let discountRate = item.discountRate;
+
+            if (isOrderAfterAutoRateDate && (discountRate === undefined || discountRate === 0)) {
+                const product = findProduct(item);
+                const standardPrice = product?.base_price ?? product?.unitPrice ?? 0;
+                
+                if (product && product.rate_pct !== undefined) {
+                    discountRate = product.rate_pct;
+                } else if (standardPrice > 0 && item.unitPrice > 0) {
+                    discountRate = Math.round((1 - item.unitPrice / standardPrice) * 100);
+                }
+            }
+
             if (isOrderAfterEffectiveDate) {
                 if (discountRate === 65) discountRate = 47;
                 else if (discountRate === 35) discountRate = 25;
@@ -182,7 +210,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
             return {
                 ...item,
-                discountRate,
+                discountRate: discountRate ?? 0,
                 supplierRate: supplierRate ?? 0
             };
         });
