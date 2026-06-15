@@ -37,6 +37,167 @@ interface CrmCustomerOption {
     isDeleted?: boolean;
 }
 
+function getPrimaryASize(sizeStr: string): number {
+    const clean = (sizeStr || '').toUpperCase().trim();
+    if (!clean) return 0;
+    
+    // Split by X or x to get the primary size
+    const parts = clean.split(/X/i);
+    const primaryPart = parts[0].trim();
+    
+    // Check if it's an A size, e.g., "100A"
+    if (primaryPart.includes('A')) {
+        const match = primaryPart.match(/(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+    }
+    
+    // Otherwise, treat as inch size (e.g. 1-1/2", 10", etc.)
+    const inchToAMap: { [key: string]: number } = {
+        '1/2': 15,
+        '3/4': 20,
+        '1': 25,
+        '1-1/4': 32,
+        '1.1/4': 32,
+        '1 1/4': 32,
+        '1-1/2': 40,
+        '1.1/2': 40,
+        '1 1/2': 40,
+        '2': 50,
+        '2-1/2': 65,
+        '2.1/2': 65,
+        '2 1/2': 65,
+        '3': 80,
+        '4': 100,
+        '5': 125,
+        '6': 150,
+        '8': 200,
+        '10': 250,
+        '12': 300,
+        '14': 350,
+        '16': 400,
+        '18': 450,
+        '20': 500,
+        '22': 550,
+        '24': 600,
+        '26': 650,
+        '28': 700,
+        '30': 750,
+        '32': 800,
+        '36': 900,
+        '40': 1000,
+    };
+
+    // Strip out quotes
+    const stripped = primaryPart.replace(/"/g, '').trim();
+    
+    // Try exact match in map
+    if (inchToAMap[stripped] !== undefined) {
+        return inchToAMap[stripped];
+    }
+    
+    // Parse decimal or fraction
+    let decimalVal = 0;
+    if (stripped.includes('/') || stripped.includes('-') || stripped.includes(' ')) {
+        const subParts = stripped.split(/[- ]/);
+        let whole = 0;
+        let fracStr = stripped;
+        if (subParts.length > 1) {
+            whole = parseFloat(subParts[0]) || 0;
+            fracStr = subParts[1];
+        }
+        if (fracStr.includes('/')) {
+            const [num, den] = fracStr.split('/').map(Number);
+            decimalVal = whole + (den ? num / den : 0);
+        } else {
+            decimalVal = parseFloat(stripped) || 0;
+        }
+    } else {
+        decimalVal = parseFloat(stripped) || 0;
+    }
+    
+    const decimalMap: { [key: number]: number } = {
+        0.5: 15,
+        0.75: 20,
+        1: 25,
+        1.25: 32,
+        1.5: 40,
+        2: 50,
+        2.5: 65,
+        3: 80,
+        4: 100,
+        5: 125,
+        6: 150,
+        8: 200,
+        10: 250,
+        12: 300,
+        14: 350,
+        16: 400,
+        18: 450,
+        20: 500,
+        22: 550,
+        24: 600,
+        26: 650,
+        28: 700,
+        30: 750,
+        32: 800,
+        36: 900,
+        40: 1000
+    };
+    
+    if (decimalMap[decimalVal] !== undefined) {
+        return decimalMap[decimalVal];
+    }
+    
+    if (decimalVal >= 15) {
+        return decimalVal;
+    }
+    
+    return 0;
+}
+
+function calculateSupplierRate(name: string, size: string, material: string, productId: string | null): number {
+    const cleanName = (name || '').toUpperCase().trim();
+    const cleanMaterial = (material || '').toUpperCase().trim();
+    const cleanId = (productId || '').toUpperCase().trim();
+
+    // Parse size to equivalent A/mm size
+    const numericSize = getPrimaryASize(size);
+
+    // 1. Large sizes (450A and above / 18" and above) -> 0%
+    if (numericSize >= 450) {
+        return 0;
+    }
+
+    // 2. SML'S (Seamless, except CAP) -> 35%
+    const isSeamless = (cleanMaterial.endsWith('-S') || cleanId.endsWith('-S')) && !cleanName.includes('CAP');
+    if (isSeamless) {
+        return 35;
+    }
+
+    // 3. CAP 400A and below -> 55%
+    const isCap = cleanName.includes('CAP');
+    if (isCap && numericSize <= 400) {
+        return 55;
+    }
+
+    // 4. Elbow, Tee, Reducer 100A and below -> 55%
+    const isElbow = cleanName.includes('ELBOW') || cleanName.includes('90E') || cleanName.includes('45E') || cleanName.includes('E(L)') || cleanName.includes('E(S)');
+    const isTee = cleanName.includes('TEE') || cleanName.includes('T(S)') || cleanName.includes('T(R)') || cleanName.includes('T(E)');
+    const isReducer = cleanName.includes('REDUCER') || cleanName.includes('C.R') || cleanName.includes('E.R') || cleanName.includes('R(C)') || cleanName.includes('R(E)') || cleanName.includes('CON(R)') || cleanName.includes('ECC(R)');
+
+    if ((isElbow || isTee || isReducer) && numericSize <= 100) {
+        return 55;
+    }
+
+    // 5. Up to 400A -> 60%
+    if (numericSize <= 400) {
+        return 60;
+    }
+
+    return 0;
+}
+
+
 export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQuoteDetailProps) {
     const inventory = useStore((state) => state.inventory);
     const user = useStore((state) => state.auth.user); // Get Admin User
@@ -245,14 +406,15 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             }
 
 
-            // Initialize supplierRate from item or inventory default
-            // Priority: Item (saved) > Inventory (current) > 0
-            const defaultSupplierRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
-            let supplierRate = item.supplierRate ?? defaultSupplierRate;
-
-            if (isQuoteAfterEffectiveDate) {
-                if (supplierRate === 65) supplierRate = 47;
-                else if (supplierRate === 35) supplierRate = 25;
+            // Initialize supplierRate from item or calculate using new rules
+            let supplierRate = item.supplierRate;
+            if (supplierRate === undefined || supplierRate === null) {
+                supplierRate = calculateSupplierRate(
+                    item.name,
+                    item.size,
+                    item.material,
+                    product ? product.id : null
+                );
             }
 
             return {
@@ -383,7 +545,12 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 }
 
                 // 4. Supplier Logic
-                updatedItem.supplierRate = matchedProduct.rate_act2 ?? matchedProduct.rate_act ?? matchedProduct.rate_pct ?? 0;
+                updatedItem.supplierRate = calculateSupplierRate(
+                    updatedItem.name,
+                    updatedItem.size,
+                    updatedItem.material,
+                    matchedProduct.id
+                );
 
             } else {
                 // No Match: Unlink
