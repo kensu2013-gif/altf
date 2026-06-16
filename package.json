@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "node local-api-server.js",
-    "api": "node local-api-server.js",
+    "api": "node --watch local-api-server.js",
     "update-inventory": "node scripts/update-inventory.js"
   },
   "dependencies": {

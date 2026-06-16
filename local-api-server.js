@@ -604,15 +604,16 @@ const server = http.createServer(async (req, res) => {
             }
 
             // Check memory cache first
-            if (!inventoryCache.gzippedData || (now - inventoryCache.timestamp) > CACHE_TTL) {
-                console.log('[API] Cache miss. Fetching inventory from S3...');
-                const inventoryData = await getInventoryFromS3();
+            // Check memory cache first
+            const hasCache = !!inventoryCache.gzippedData;
+            const isExpired = (now - inventoryCache.timestamp) > CACHE_TTL;
 
+            const performInventoryUpdate = async (inventoryData, timestamp) => {
                 // --- Daily Sihwa/Daekyung Inventory Snapshot Logic ---
                 // CRITICAL PRESERVATION RULE: Do not change, bypass, or rewrite this daily snapshot logic.
                 // Daekyung rolling average stock evaluation relies strictly on these daily ledger snapshots (db.daekyungHistory).
                 try {
-                    const kstDate = new Date(now + 9 * 60 * 60 * 1000); // KST
+                    const kstDate = new Date(timestamp + 9 * 60 * 60 * 1000); // KST
                     const today = kstDate.toISOString().slice(0, 10);
                     
                     
@@ -812,17 +813,63 @@ const server = http.createServer(async (req, res) => {
                         .filter(d => d.change !== 0);
 
                     await saveData();
-                    // REPLACED SECTION END
 
                 } catch (snapErr) {
                     console.error('[API] Error creating daily inventory snapshot:', snapErr);
                 }
-                // --- End Daily Snapshot Logic ---
 
                 const rawJson = JSON.stringify(inventoryData);
                 inventoryCache.rawData = Buffer.from(rawJson, 'utf-8');
                 inventoryCache.gzippedData = zlib.gzipSync(inventoryCache.rawData);
-                inventoryCache.timestamp = now;
+                inventoryCache.timestamp = timestamp;
+            };
+
+            if (hasCache && isExpired && !forceRefresh) {
+                console.log('[API] Stale-while-revalidate hit. Serving expired cache instantly, updating in background...');
+                
+                const acceptEncoding = req.headers['accept-encoding'] || '';
+                const cacheControl = 'no-store, no-cache, must-revalidate';
+                
+                if (acceptEncoding.includes('gzip')) {
+                    res.writeHead(200, {
+                        'Content-Type': 'application/json',
+                        'Content-Encoding': 'gzip',
+                        'Cache-Control': cacheControl
+                    });
+                    res.end(inventoryCache.gzippedData);
+                } else {
+                    res.writeHead(200, {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': cacheControl
+                    });
+                    res.end(inventoryCache.rawData);
+                }
+
+                // Asynchronous background update
+                (async () => {
+                    if (global.isUpdatingInventoryCache) {
+                        console.log('[API Background] Skip background update. Already in progress.');
+                        return;
+                    }
+                    global.isUpdatingInventoryCache = true;
+                    try {
+                        console.log('[API Background] Fetching inventory from S3 in background...');
+                        const inventoryData = await getInventoryFromS3();
+                        await performInventoryUpdate(inventoryData, Date.now());
+                        console.log('[API Background] Inventory cache updated successfully in background.');
+                    } catch (bgErr) {
+                        console.error('[API Background] Failed to update inventory cache in background:', bgErr);
+                    } finally {
+                        global.isUpdatingInventoryCache = false;
+                    }
+                })();
+                return;
+            }
+
+            if (!hasCache || forceRefresh) {
+                console.log('[API] Cache miss or Force refresh. Fetching inventory from S3 (Blocking)...');
+                const inventoryData = await getInventoryFromS3();
+                await performInventoryUpdate(inventoryData, now);
             } else {
                 console.log('[API] Cache hit. Serving inventory from memory.');
             }
@@ -934,16 +981,16 @@ const server = http.createServer(async (req, res) => {
                         }
                     }
 
-                    // Enforce 2-device limit: If there are already 2 or more, remove the oldest until we have space for the new one (so 1 remaining)
-                    if (userSessions.length >= 2) {
+                    // Enforce 20-device limit: If there are already 20 or more, remove the oldest until we have space for the new one (so 19 remaining)
+                    if (userSessions.length >= 20) {
                         // Sort by lastSeen (ascending = oldest first)
                         userSessions.sort((a, b) => a.lastSeen - b.lastSeen);
-                        // Calculate how many we need to remove to leave exactly 1 session (so adding the new one makes it 2)
-                        const overLimitCount = userSessions.length - 1;
+                        // Calculate how many we need to remove to leave exactly 19 sessions (so adding the new one makes it 20)
+                        const overLimitCount = userSessions.length - 19;
                         for (let i = 0; i < overLimitCount; i++) {
                             const oldestSession = userSessions[i];
                             activeSessions.delete(oldestSession.token);
-                            console.log(`[API] Device limit reached. Cleared oldest session for user ${email}`);
+                            console.log(`[API] Device limit reached (20). Cleared oldest session for user ${email}`);
                         }
                     }
 
@@ -2089,6 +2136,31 @@ const server = http.createServer(async (req, res) => {
     res.end();
 });
 
+server.on('error', (e) => {
+    if (e.code === 'EADDRINUSE') {
+        console.error(`\n===============================================================`);
+        console.error(`[FATAL ERROR] Port ${PORT} is already in use by another process.`);
+        console.error(`Please kill the existing process or use a different port.`);
+        console.error(`Troubleshooting command: lsof -i :${PORT} -t | xargs kill -9`);
+        console.error(`===============================================================\n`);
+        process.exit(1);
+    } else {
+        console.error(`[API Server Error]`, e);
+    }
+});
+
 server.listen(PORT, () => {
     console.log(`Local API Server running at http://localhost:${PORT}`);
+});
+
+// --- Global Exception & Rejection Handlers to prevent server crash ---
+process.on('uncaughtException', (err) => {
+    console.error(`\n[CRITICAL] Uncaught Exception occurred at:`, new Date().toISOString());
+    console.error(err.stack || err);
+    console.error(`Server will continue running despite the error.\n`);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error(`\n[CRITICAL] Unhandled Rejection at Promise:`, promise, 'reason:', reason);
+    console.error(`Server will continue running despite the rejection.\n`);
 });

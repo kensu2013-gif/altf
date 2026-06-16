@@ -1,8 +1,15 @@
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 dotenv.config();
+
+export function hasAwsCredentials() {
+    return !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
+}
 
 export const s3Client = new S3Client({
     region: process.env.AWS_REGION || 'ap-northeast-2'
@@ -21,6 +28,22 @@ const streamToString = (stream) =>
     });
 
 export async function loadDbFromS3() {
+    if (!hasAwsCredentials()) {
+        console.log('[S3] No AWS credentials detected. Operating in local mode. Loading from local fallback...');
+        try {
+            const LOCAL_DB = './data/db.json';
+            if (fs.existsSync(LOCAL_DB)) {
+                const localContent = fs.readFileSync(LOCAL_DB, 'utf8');
+                console.log(`[Local DB] Successfully loaded data from local fallback: ${LOCAL_DB}`);
+                return JSON.parse(localContent);
+            }
+            console.warn('[Local DB] Local fallback DB file does not exist. Returning null to allow seeding.');
+            return null;
+        } catch (localError) {
+            console.error('[Local DB] Failed to load from local fallback DB:', localError);
+            return null;
+        }
+    }
     try {
         const command = new GetObjectCommand({
             Bucket: BUCKET_NAME,
@@ -61,6 +84,23 @@ export async function loadDbFromS3() {
 }
 
 export async function getInventoryFromS3() {
+    if (!hasAwsCredentials()) {
+        console.log('[S3] No AWS credentials detected. Operating in local mode. Loading inventory from local file...');
+        try {
+            const localPath = './public/api/inventory/inventory.json';
+            if (fs.existsSync(localPath)) {
+                const localData = fs.readFileSync(localPath, 'utf8');
+                return {
+                    items: JSON.parse(localData),
+                    lastModified: fs.statSync(localPath).mtime
+                };
+            }
+            console.warn('[Local Inventory] Local inventory file does not exist.');
+        } catch (localErr) {
+            console.error('[Local Inventory] Failed to read local inventory:', localErr.message);
+        }
+        throw new Error('Local inventory file missing and AWS credentials not configured.');
+    }
     const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
 
     // Prioritize local file if it exists (useful for local overrides or builds)
@@ -166,6 +206,22 @@ export async function getInventoryFromS3() {
 }
 
 export async function saveDbToS3(dbObject) {
+    if (!hasAwsCredentials()) {
+        // console.log('[S3] No AWS credentials detected. Saving locally...');
+        try {
+            const dir = './data';
+            const LOCAL_DB = path.join(dir, 'db.json');
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            fs.writeFileSync(LOCAL_DB, JSON.stringify(dbObject, null, 2), 'utf8');
+            // console.log(`[Local DB] Successfully saved database to local fallback: ${LOCAL_DB}`);
+            return;
+        } catch (localError) {
+            console.error('[Local DB] Critical: Failed to save to local fallback DB:', localError);
+            throw localError;
+        }
+    }
     try {
         const command = new PutObjectCommand({
             Bucket: BUCKET_NAME,
@@ -203,6 +259,9 @@ export async function saveDbToS3(dbObject) {
 }
 
 export async function getPreviousDbVersion(cutoffDateStr) {
+    if (!hasAwsCredentials()) {
+        return null;
+    }
     try {
         const { ListObjectVersionsCommand, GetObjectCommand } = await import('@aws-sdk/client-s3');
         const versionsRes = await s3Client.send(new ListObjectVersionsCommand({
@@ -245,6 +304,9 @@ export async function getPreviousDbVersion(cutoffDateStr) {
  * returns the public S3 URL.
  */
 export async function uploadFileToS3(folderPath, fileName, fileBuffer, contentType) {
+    if (!hasAwsCredentials()) {
+        throw new Error('AWS credentials not configured. S3 upload is disabled in local mode.');
+    }
     try {
         const fullKey = `${folderPath}/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
         const command = new PutObjectCommand({
@@ -265,6 +327,9 @@ export async function uploadFileToS3(folderPath, fileName, fileBuffer, contentTy
 }
 
 export async function getPresignedUrlToS3(key) {
+    if (!hasAwsCredentials()) {
+        throw new Error('AWS credentials not configured. Cannot generate presigned URL.');
+    }
     try {
         const command = new GetObjectCommand({
             Bucket: BUCKET_NAME,
@@ -279,6 +344,9 @@ export async function getPresignedUrlToS3(key) {
 }
 
 export async function uploadInventoryToS3(jsonData) {
+    if (!hasAwsCredentials()) {
+        throw new Error('AWS credentials not configured. Cannot upload inventory to S3.');
+    }
     try {
         const PROCESSED_KEY = 'public/inventory/processed_inventory.json';
         const command = new PutObjectCommand({
