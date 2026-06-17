@@ -9,6 +9,7 @@ import { useInventoryIndex } from '../../../hooks/useInventoryIndex';
 
 
 import { formatCurrency } from '../../../lib/utils';
+import { calculateCustomerGrade } from '../../../lib/customerUtils';
 import { renderDocumentHTML } from '../../../lib/documentTemplate';
 import type { DocumentPayload } from '../../../types/document';
 import { PreviewModal } from '../../../components/ui/PreviewModal';
@@ -140,6 +141,45 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         const val = order.poEndCustomer || order.customerName || '';
         return val.replace(/\uFFFD{1,3}동대로/g, '낙동대로').replace(/[\uFFFC\uFFFD]/g, '');
     });
+
+    const orders = useStore((state) => state.orders);
+
+    const customerStats = useMemo(() => {
+        return calculateCustomerGrade(
+            orders,
+            poEndCustomer || order.customerName || '',
+            editableCustomerInfo.bizNo,
+            order.userId
+        );
+    }, [orders, poEndCustomer, order.customerName, editableCustomerInfo.bizNo, order.userId]);
+
+    const recommendation = useMemo(() => {
+        const { grade, orderCount, totalSales } = customerStats;
+        let recommendedRate = 47;
+        let reason = '';
+
+        if (grade === '우수') {
+            recommendedRate = 50;
+            reason = `우수 등급 (90일 발주 ${orderCount}회, 매출 ${formatCurrency(totalSales)})`;
+        } else if (grade === '성장') {
+            recommendedRate = 48;
+            reason = `성장 등급 (90일 발주 ${orderCount}회, 매출 ${formatCurrency(totalSales)})`;
+        } else if (grade === '일반') {
+            recommendedRate = 47;
+            reason = `일반 등급 (90일 발주 ${orderCount}회)`;
+        } else if (grade === '이탈위험') {
+            recommendedRate = 47;
+            reason = `이탈위험 등급 (최근 90일 거래 없음)`;
+        } else { // 신규
+            recommendedRate = 47;
+            reason = `신규 등급 (거래 없음)`;
+        }
+
+        return {
+            recommendedRate,
+            reason
+        };
+    }, [customerStats]);
 
     const EFFECTIVE_DATE = new Date('2026-06-15T00:00:00+09:00');
     const orderDate = order.createdAt ? new Date(order.createdAt) : new Date();
@@ -2148,9 +2188,14 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         ) : (
                             /* Order & Shipping Info */
                             <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                                <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 mb-3 flex items-center gap-2">
-                                    <User className="w-4 h-4 text-teal-600" />
-                                    주문 및 배송 정보(Order & Shipping Info)
+                                <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 mb-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <User className="w-4 h-4 text-teal-600" />
+                                        주문 및 배송 정보(Order & Shipping Info)
+                                    </div>
+                                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border shadow-sm transition-all ${customerStats.badgeColor}`} title={customerStats.reason}>
+                                        고객 등급: {customerStats.grade}
+                                    </span>
                                 </h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                                     <div className="col-span-2 text-[10px] text-teal-600 bg-teal-50 px-2 py-1.5 rounded -mb-1 shadow-inner border border-teal-100 flex items-center justify-center font-bold">
@@ -2557,7 +2602,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                     <th className="px-2 py-3 text-right text-slate-500 w-[7%]"> 기준단가(Base) </th>
                                                     <th className="px-4 py-3 text-center w-[8%]">
                                                         <div className="flex flex-col items-center gap-1">
-                                                            <span className="text-xs"> Rate(요율) </span>
+                                                            <span className="text-xs font-bold text-slate-600"> Rate(요율) </span>
                                                             <div className="flex items-center gap-1 w-full max-w-[80px]">
                                                                 <input
                                                                     type="number"
@@ -2570,13 +2615,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                             if (!isNaN(val)) {
                                                                                 const newItems = displayedItems.map(item => {
                                                                                     const product = findProduct({ productId: item.productId });
-                                                                                    // 요율이 0인 품목은 일괄 적용 대상에서 제외
                                                                                     const productRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
                                                                                     if (productRate === 0) {
                                                                                         return item;
                                                                                     }
-
-                                                                                    // Calculate new price based on base price and bulk discount
                                                                                     const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
                                                                                     if (basePrice > 0) {
                                                                                         const newPrice = Math.round(Math.round(basePrice * (1 - val / 100)) / 10) * 10;
@@ -2596,7 +2638,6 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 />
                                                                 <button
                                                                     onClick={() => {
-                                                                        // Accept All: Reset discount to 0 and match base price
                                                                         const newItems = displayedItems.map(item => {
                                                                             const product = findProduct({ productId: item.productId });
                                                                             const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
@@ -2614,6 +2655,42 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     All
                                                                 </button>
                                                             </div>
+                                                            {recommendation.recommendedRate && (
+                                                                <div className="mt-1 flex flex-col items-center gap-0.5">
+                                                                    <div className="flex items-center gap-1 text-[10px] text-teal-800 font-bold bg-teal-50 border border-teal-200/50 rounded px-1.5 py-0.5 shadow-sm whitespace-nowrap">
+                                                                        <span>추천:</span>
+                                                                        <span className="text-teal-600 font-extrabold">{recommendation.recommendedRate}%</span>
+                                                                    </div>
+                                                                    <span className="text-slate-400 text-[8px] whitespace-normal text-center scale-90 leading-tight max-w-[120px]" title={recommendation.reason}>
+                                                                        {recommendation.reason}
+                                                                    </span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            const recRate = recommendation.recommendedRate;
+                                                                            if (!recRate) return;
+                                                                            const newItems = displayedItems.map(item => {
+                                                                                const product = findProduct({ productId: item.productId });
+                                                                                const base = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0;
+                                                                                if (base > 0) {
+                                                                                    const newPrice = Math.round(Math.round(base * (1 - recRate / 100)) / 10) * 10;
+                                                                                    return {
+                                                                                        ...item,
+                                                                                        discountRate: recRate,
+                                                                                        unitPrice: newPrice,
+                                                                                        amount: newPrice * item.quantity
+                                                                                    };
+                                                                                }
+                                                                                return { ...item, discountRate: recRate };
+                                                                            });
+                                                                            setDisplayedItems(newItems);
+                                                                        }}
+                                                                        className="mt-0.5 bg-teal-600 hover:bg-teal-700 text-white font-bold px-1.5 py-0.5 rounded text-[8px] transition-all whitespace-nowrap cursor-pointer active:scale-95 shadow-sm"
+                                                                    >
+                                                                        일괄 적용
+                                                                    </button>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </th>
                                                     <th className="px-2 py-3 text-right w-[7%]"> 판매단가 </th>
@@ -2651,11 +2728,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                     }
                                                 }
                                             };
-                                            // 1. Try to find live product
                                             let product = getProductStock(item);
-
-                                            // 2. If not found, but we have stored data, create a "Fallback Product"
-                                            //    This ensures the UI shows the stored values instead of "Unlinked" / "-"
                                             if (!product && item.base_price && item.base_price > 0) {
                                                 product = {
                                                     id: item.productId || item.itemId || 'fallback-' + idx,
@@ -2669,36 +2742,21 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                     location: item.location,
                                                     maker: item.maker,
                                                     base_price: item.base_price,
-                                                    // items from order/quote might not have all fields, but we fill what controls the UI
                                                 } as Product;
                                             }
-
                                             const currentStock = product ? product.currentStock : 0;
                                             const isStockInsufficient = item.quantity > currentStock;
-
-                                            // It is only "Unlinked" if we strictly have NO product (live OR fallback)
                                             const isUnlinked = !product;
-
-                                            // Standard price is the linked product's price, or item.base_price (snapshot), or unitPrice as last resort
                                             const standardPrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? 0;
                                             const isPriceModified = !isUnlinked && item.unitPrice !== standardPrice;
-
-                                            // Supplier Logic
-                                            // Use robust matching to find the product LIVE from inventory
                                             const liveProduct = getProductStock(item);
-                                            // Logic: Live Base -> Stored Base -> Live Unit -> 0
                                             const basePrice = liveProduct?.base_price ?? item.base_price ?? liveProduct?.unitPrice ?? 0;
-
                                             const supplierRate = item.supplierRate ?? 0;
-                                            // Formula: Base * (100 - Rate) / 100
-
-                                            // Use override if available
                                             let supplierPrice = item.supplierPriceOverride;
                                             if (supplierPrice === undefined) {
                                                 supplierPrice = Math.round((basePrice * (100 - supplierRate) / 100) / 10) * 10;
                                             }
                                             const supplierAmount = supplierPrice * item.quantity;
-                                            // Profit = (Customer Sales Price - Supplier Cost Price) * Quantity
                                             const profit = (item.unitPrice - supplierPrice) * item.quantity;
                                             const isSelected = item.isSelected !== false;
 
@@ -2783,7 +2841,6 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
                                                     {
                                                         isSupplierMode ? (
-                                                            /* Supplier Mode Cells */
                                                             <>
                                                                 <td className="px-4 py-3 text-right align-middle text-slate-700 font-mono text-xs font-bold">
                                                                     {formatCurrency(item.unitPrice)}
@@ -2906,7 +2963,6 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 </td>
                                                             </>
                                                         ) : (
-                                                            /* Customer Mode Row Cells */
                                                             <>
                                                                 <td className="px-2 py-3 text-center align-middle whitespace-nowrap">
                                                                     {isUnlinked ? (
@@ -2994,6 +3050,23 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                         />
                                                                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">% </span>
                                                                     </div>
+                                                                    {recommendation.recommendedRate && (
+                                                                        <div className="flex flex-col items-center gap-0.5 mt-0.5">
+                                                                            <span className="text-[9px] text-slate-400 font-semibold whitespace-nowrap">
+                                                                                (추천: {recommendation.recommendedRate}%)
+                                                                            </span>
+                                                                            {item.discountRate !== recommendation.recommendedRate && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleDiscountChange(idx, recommendation.recommendedRate!)}
+                                                                                    className="text-[9px] text-teal-600 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded px-1 py-0.5 font-bold whitespace-nowrap transition-all cursor-pointer active:scale-95"
+                                                                                    title={`${recommendation.recommendedRate}% 요율 적용하기 (${recommendation.reason})`}
+                                                                                >
+                                                                                    적용
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
                                                                 </td>
                                                                 <td className="px-4 py-3 text-right align-middle">
                                                                     <input

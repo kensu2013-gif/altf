@@ -1,6 +1,7 @@
 import { useState, useEffect, useDeferredValue } from 'react';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
+import { calculateCustomerGrade } from '../lib/customerUtils';
 import { CalmPageShell } from '../components/ui/CalmPageShell';
 import { PageTransition } from '../components/ui/PageTransition';
 import {
@@ -433,20 +434,24 @@ export default function AdminPage() {
                                                 // [FIX] Include item.base_price for unlinked items
                                                 const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
 
-                                                // [FIX] Check for manual overrides first
                                                 if (item.supplierPriceOverride !== undefined) {
                                                     cost = item.supplierPriceOverride;
                                                 } else if (item.supplierRate !== undefined) {
-                                                    // Cost = Base - (Base * Rate)
                                                     cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
                                                 } else {
-                                                    // Fallback: Use base price and default rate
                                                     const rate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
                                                     cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
                                                 }
 
                                                 return acc + (cost * item.quantity);
                                             }, 0);
+
+                                            const customerStats = calculateCustomerGrade(
+                                                orders,
+                                                order.poEndCustomer || order.payload?.customer?.company_name || order.customerName || '',
+                                                order.customerBizNo || (order.payload?.customer as Record<string, string> | undefined)?.business_no || (order.payload?.customer as Record<string, string> | undefined)?.biz_no || '',
+                                                order.userId
+                                            );
 
                                             return (
                                                 <tr
@@ -483,6 +488,9 @@ export default function AdminPage() {
                                                             <div className="flex items-center gap-1.5 font-bold text-slate-700 flex-wrap">
                                                                 <Building2 className="w-3.5 h-3.5 text-slate-400" />
                                                                 {order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName}
+                                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border leading-none scale-95 origin-left ${customerStats.badgeColor}`} title={customerStats.reason}>
+                                                                    {customerStats.grade}
+                                                                </span>
                                                                 {(order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name) && ((order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name) !== order.customerName) && (
                                                                     <span className="text-[10px] font-normal text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-100">수정됨</span>
                                                                 )}

@@ -1,11 +1,12 @@
 
-import type { Quotation, LineItem } from '../../../types';
+import type { Quotation, LineItem, Order } from '../../../types';
 import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User, Image } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { formatCurrency } from '../../../lib/utils';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore, type DeliveryInfo, type CustomPriceRecord } from '../../../store/useStore';
+import { calculateCustomerGrade } from '../../../lib/customerUtils';
 import { renderDocumentHTML } from '../../../lib/documentTemplate';
 
 import type { DocumentPayload, DocumentItem } from '../../../types/document';
@@ -499,6 +500,89 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             };
         })
     );
+
+    const [orders, setOrders] = useState<Order[]>([]);
+
+    useEffect(() => {
+        if (!user) return;
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+        };
+        const token = useStore.getState().auth.token;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        if (user.id) headers['x-requester-id'] = user.id;
+        if (user.role) headers['x-requester-role'] = user.role;
+
+        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`;
+        fetch(endpoint, { headers, cache: 'no-store' })
+            .then(res => {
+                if (res.ok) return res.json();
+                throw new Error('Failed to fetch orders');
+            })
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setOrders(data);
+                }
+            })
+            .catch(console.error);
+    }, [user]);
+
+    const customerStats = useMemo(() => {
+        return calculateCustomerGrade(orders, customerInfo.companyName, customerInfo.bizNo, quote.userId);
+    }, [orders, customerInfo.companyName, customerInfo.bizNo, quote.userId]);
+
+    const recommendation = useMemo(() => {
+        const { grade, orderCount, totalSales } = customerStats;
+        let recommendedRate = 47;
+        let reason = '';
+
+        if (grade === '우수') {
+            recommendedRate = 50;
+            reason = `우수 등급 (90일 발주 ${orderCount}회, 매출 ${formatCurrency(totalSales)})`;
+        } else if (grade === '성장') {
+            recommendedRate = 48;
+            reason = `성장 등급 (90일 발주 ${orderCount}회, 매출 ${formatCurrency(totalSales)})`;
+        } else if (grade === '일반') {
+            recommendedRate = 47;
+            reason = `일반 등급 (90일 발주 ${orderCount}회)`;
+        } else if (grade === '이탈위험') {
+            recommendedRate = 47;
+            reason = `이탈위험 등급 (최근 90일 거래 없음)`;
+        } else { // 신규
+            recommendedRate = 47;
+            reason = `신규 등급 (거래 없음)`;
+        }
+
+        return {
+            recommendedRate,
+            reason
+        };
+    }, [customerStats]);
+
+    const handleApplyRecommendedRate = useCallback(() => {
+        const recRate = recommendation.recommendedRate;
+        if (!recRate) return;
+
+        setItems(prev => {
+            let hasChanges = false;
+            const newItems = prev.map(item => {
+                if (item.discountRate === recRate) return item;
+                const product = inventory.find(p => p.id === item.productId);
+                const base = product?.base_price || item.base_price || product?.unitPrice || item.unitPrice || 0;
+                if (base === 0) return item;
+
+                hasChanges = true;
+                const newPrice = Math.round(Math.round(base * (1 - recRate / 100)) / 10) * 10;
+                return {
+                    ...item,
+                    discountRate: recRate,
+                    unitPrice: newPrice,
+                    amount: newPrice * item.quantity
+                };
+            });
+            return hasChanges ? newItems : prev;
+        });
+    }, [recommendation.recommendedRate, inventory]);
 
     // ... (keep helper functions)
 
@@ -1029,9 +1113,16 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                     <div className="space-y-6">
                         {/* Customer Info Edit Section */}
                         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                            <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-                                <User className="w-4 h-4 text-teal-600" />
-                                고객 정보 (Customer Info)
+                            <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <User className="w-4 h-4 text-teal-600" />
+                                    고객 정보 (Customer Info)
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border shadow-sm transition-all ${customerStats.badgeColor}`} title={customerStats.reason}>
+                                        고객 등급: {customerStats.grade}
+                                    </span>
+                                </div>
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <div className="relative group/autocomplete">
@@ -1242,7 +1333,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             </th>
 
                                             {/* Rate (Previously Discount Rate) */}
-                                            <th className="px-2 py-3 text-center w-[5%]">
+                                            <th className="px-2 py-3 text-center w-[10%]">
                                                 <div className="flex flex-col items-center gap-1">
                                                     <span className="text-xs font-bold text-slate-600">요율 (%)</span>
                                                     <div className="flex items-center gap-1 w-full max-w-[80px] mx-auto">
@@ -1256,16 +1347,14 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                                     if (!isNaN(val)) {
                                                                         const newItems = items.map(item => {
                                                                             const product = getProductInfo(item.productId);
-                                                                            // 요율이 0인 품목은 일괄 적용 대상에서 제외
                                                                             const productRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
                                                                             if (productRate === 0) {
                                                                                 return item;
                                                                             }
 
-                                                                            const standardPrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0; // Use Base Price, fallback to UnitPrice, then 0
+                                                                            const standardPrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0; 
                                                                             if (standardPrice === 0) return item;
 
-                                                                            // Calculate Sales Price based on Base Price * (1 - Rate/100)
                                                                             const newPrice = Math.round(Math.round(standardPrice * (1 - val / 100)) / 10) * 10;
 
                                                                             return {
@@ -1281,6 +1370,24 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                             }}
                                                         />
                                                     </div>
+                                                    {recommendation.recommendedRate && (
+                                                        <div className="mt-1 flex flex-col items-center gap-0.5">
+                                                            <div className="flex items-center gap-1 text-[10px] text-teal-800 font-bold bg-teal-50 border border-teal-200/50 rounded px-1.5 py-0.5 shadow-sm whitespace-nowrap">
+                                                                <span>추천:</span>
+                                                                <span className="text-teal-600 font-extrabold">{recommendation.recommendedRate}%</span>
+                                                            </div>
+                                                            <span className="text-slate-400 text-[8px] whitespace-normal text-center scale-90 leading-tight max-w-[120px]" title={recommendation.reason}>
+                                                                {recommendation.reason}
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleApplyRecommendedRate}
+                                                                className="mt-0.5 bg-teal-600 hover:bg-teal-700 text-white font-bold px-1.5 py-0.5 rounded text-[8px] transition-all whitespace-nowrap cursor-pointer active:scale-95 shadow-sm"
+                                                            >
+                                                                일괄 적용
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </th>
 
@@ -1309,6 +1416,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                 onItemSelect={handleItemSelect}
                                                 customPriceRecord={customPrices[[item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim()]}
                                                 onApplyCustomPrice={(record) => handleApplyCustomPrice(idx, record)}
+                                                recommendedRate={recommendation.recommendedRate}
+                                                recommendationReason={recommendation.reason}
                                             />
                                         ))}
                                     </tbody>

@@ -21,6 +21,8 @@ interface QuoteItemRowProps {
     onItemSelect?: (index: number, isSelected: boolean) => void;
     customPriceRecord?: CustomPriceRecord;
     onApplyCustomPrice?: (record: CustomPriceRecord) => void;
+    recommendedRate?: number | null;
+    recommendationReason?: string;
 }
 
 export const QuoteItemRow = React.memo(({
@@ -34,7 +36,9 @@ export const QuoteItemRow = React.memo(({
     isSelected = true,
     onItemSelect,
     customPriceRecord,
-    onApplyCustomPrice
+    onApplyCustomPrice,
+    recommendedRate,
+    recommendationReason
 }: QuoteItemRowProps) => {
 
     // Memoize product lookup to prevent unnecessary recalcs if inventory/item identity changes but data is same
@@ -234,16 +238,35 @@ export const QuoteItemRow = React.memo(({
 
             {/* Rate (Discount Rate) */}
             <td className="px-4 py-3 text-center align-middle">
-                <div className="relative w-full">
-                    <input
-                        type="number"
-                        value={item.discountRate || ''}
-                        placeholder={String(product?.rate_pct || 0)}
-                        title="Rate (Discount Percentage)"
-                        className="w-16 text-center px-1 py-1.5 rounded border border-slate-200 text-sm outline-none focus:border-teal-500 font-bold text-red-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        onChange={(e) => onDiscountRateChange(index, Number(e.target.value))}
-                        onKeyDown={handleKeyDown}
-                    />
+                <div className="flex flex-col items-center gap-1">
+                    <div className="relative w-full flex justify-center">
+                        <input
+                            type="number"
+                            value={item.discountRate || ''}
+                            placeholder={String(product?.rate_pct || 0)}
+                            title="Rate (Discount Percentage)"
+                            className="w-16 text-center px-1 py-1.5 rounded border border-slate-200 text-sm outline-none focus:border-teal-500 font-bold text-red-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            onChange={(e) => onDiscountRateChange(index, Number(e.target.value))}
+                            onKeyDown={handleKeyDown}
+                        />
+                    </div>
+                    {recommendedRate && (
+                        <div className="flex flex-col items-center gap-0.5 mt-0.5">
+                            <span className="text-[9px] text-slate-400 font-semibold whitespace-nowrap">
+                                (추천: {recommendedRate}%)
+                            </span>
+                            {item.discountRate !== recommendedRate && (
+                                <button
+                                    type="button"
+                                    onClick={() => onDiscountRateChange(index, recommendedRate)}
+                                    className="text-[9px] text-teal-600 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded px-1 py-0.5 font-bold whitespace-nowrap transition-all cursor-pointer active:scale-95"
+                                    title={`${recommendedRate}% 요율 적용하기 (${recommendationReason})`}
+                                >
+                                    적용
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
             </td>
             {/* User Price (Reference) */}
@@ -284,7 +307,9 @@ export const QuoteItemRow = React.memo(({
         prev.item === next.item && // Item identity check (requires immutable updates)
         prev.index === next.index &&
         prev.inventory === next.inventory &&
-        prev.onItemChange === next.onItemChange
+        prev.onItemChange === next.onItemChange &&
+        prev.recommendedRate === next.recommendedRate &&
+        prev.recommendationReason === next.recommendationReason
         // other handlers assumed stable
     );
 });
