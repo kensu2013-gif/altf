@@ -299,12 +299,17 @@ async function saveData() {
 }
 
 // Initialize
-try {
-    console.log('[API Startup] Generating inventory from local raw source s3_raw.json...');
-    execSync('node scripts/update-inventory.js', { stdio: 'inherit' });
-    console.log('[API Startup] Inventory generation completed successfully.');
-} catch (e) {
-    console.error('[API Startup] Failed to generate inventory on startup:', e.message);
+const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+if (!isProd) {
+    try {
+        console.log('[API Startup] Generating inventory from local raw source s3_raw.json...');
+        execSync('node scripts/update-inventory.js', { stdio: 'inherit' });
+        console.log('[API Startup] Inventory generation completed successfully.');
+    } catch (e) {
+        console.error('[API Startup] Failed to generate inventory on startup:', e.message);
+    }
+} else {
+    console.log('[API Startup] Production environment detected. Skipping synchronous inventory generation on startup.');
 }
 
 await loadData();
