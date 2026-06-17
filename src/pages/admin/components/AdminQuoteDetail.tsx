@@ -533,34 +533,34 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
     const recommendation = useMemo(() => {
         const { grade, orderCount, totalSales } = customerStats;
-        let bonusRate = 0;
+        let recommendedRate = 47;
         let reason = '';
 
         if (grade === '우수') {
-            bonusRate = 3;
-            reason = `우수 등급 (+3% 추가 할인 / 60일 발주 ${orderCount}회, 매출 ${formatCurrency(totalSales)})`;
+            recommendedRate = 50;
+            reason = `우수 등급 (60일 발주 ${orderCount}회, 매출 ${formatCurrency(totalSales)})`;
         } else if (grade === '성장') {
-            bonusRate = 1;
-            reason = `성장 등급 (+1% 추가 할인 / 60일 발주 ${orderCount}회, 매출 ${formatCurrency(totalSales)})`;
+            recommendedRate = 48;
+            reason = `성장 등급 (60일 발주 ${orderCount}회, 매출 ${formatCurrency(totalSales)})`;
         } else if (grade === '일반') {
-            bonusRate = 0;
-            reason = `일반 등급 (기본 할인 적용 / 60일 발주 ${orderCount}회)`;
+            recommendedRate = 47;
+            reason = `일반 등급 (60일 발주 ${orderCount}회)`;
         } else if (grade === '이탈위험') {
-            bonusRate = 0;
+            recommendedRate = 47;
             reason = `이탈위험 등급 (최근 60일 거래 없음)`;
         } else { // 신규
-            bonusRate = 0;
+            recommendedRate = 47;
             reason = `신규 등급 (거래 없음)`;
         }
 
         return {
-            bonusRate,
+            recommendedRate,
             reason
         };
     }, [customerStats]);
 
     const handleApplyRecommendedRate = useCallback(() => {
-        const { bonusRate } = recommendation;
+        const { recommendedRate } = recommendation;
 
         setItems(prev => {
             let hasChanges = false;
@@ -584,7 +584,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                     else if (initialRate === 35) initialRate = 25;
                 }
 
-                const targetRate = initialRate === 47 ? (initialRate + bonusRate) : initialRate;
+                const targetRate = initialRate === 47 ? recommendedRate : initialRate;
                 if (item.discountRate === targetRate) return item;
 
                 hasChanges = true;
@@ -1385,11 +1385,11 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                             }}
                                                         />
                                                     </div>
-                                                    {recommendation.bonusRate !== undefined && (
+                                                    {recommendation.recommendedRate !== undefined && (
                                                         <div className="mt-1 flex flex-col items-center gap-0.5">
                                                             <div className="flex items-center gap-1 text-[10px] text-teal-800 font-bold bg-teal-50 border border-teal-200/50 rounded px-1.5 py-0.5 shadow-sm whitespace-nowrap">
                                                                 <span>추천:</span>
-                                                                <span className="text-teal-600 font-extrabold">등급 우대 (+{recommendation.bonusRate}%)</span>
+                                                                <span className="text-teal-600 font-extrabold">{recommendation.recommendedRate}%</span>
                                                             </div>
                                                             <span className="text-slate-400 text-[8px] whitespace-normal text-center scale-90 leading-tight max-w-[120px]" title={recommendation.reason}>
                                                                 {recommendation.reason}

@@ -1675,7 +1675,8 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(403);
             return res.end(JSON.stringify({ error: 'Forbidden' }));
         }
-        sendJsonResponse(req, res, 200, db.customers || []);
+        const enriched = enrichCustomersWithGrade(db.customers || [], db.orders || []);
+        sendJsonResponse(req, res, 200, enriched);
         return;
     }
 
@@ -2164,3 +2165,152 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error(`\n[CRITICAL] Unhandled Rejection at Promise:`, promise, 'reason:', reason);
     console.error(`Server will continue running despite the rejection.\n`);
 });
+
+// --- CRM Customer Grade Enrichment Helpers ---
+
+function resolveOrderDate(o) {
+    const parseDateStr = (yy, mm, dd) => {
+        const year = yy.length === 2 ? `20${yy}` : yy;
+        return new Date(`${year}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T12:00:00Z`);
+    };
+
+    const identifiers = [o.poNumber, o.id].filter(Boolean);
+    for (const str of identifiers) {
+        if (typeof str !== 'string') continue;
+        
+        let m = str.match(/\D(20\d{6})(-|$)/);
+        if (m) return parseDateStr(m[1].slice(0, 4), m[1].slice(4, 6), m[1].slice(6, 8));
+        
+        m = str.match(/\D(\d{6})(-|$)/);
+        if (m) return parseDateStr(m[1].slice(0, 2), m[1].slice(2, 4), m[1].slice(4, 6));
+    }
+
+    const kDateStr = o.payload?.meta?.created_at;
+    if (typeof kDateStr === 'string') {
+        const kDateMatch = kDateStr.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
+        if (kDateMatch) return parseDateStr(kDateMatch[1], kDateMatch[2], kDateMatch[3]);
+    }
+    
+    const d = new Date(o.createdAt || new Date());
+    if (!isNaN(d.getTime())) {
+        return new Date(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T12:00:00Z`);
+    }
+    return new Date();
+}
+
+function stripCorp(name) {
+    if (!name) return '';
+    return name.replace(/\(주\)|주식회사/g, '')
+               .replace(/[^a-zA-Z0-9가-힣]/g, '')
+               .trim();
+}
+
+function matchCustomerToCrm(order, customersList) {
+    let bizNo = '';
+    if (order.payload?.customer?.business_no) bizNo = order.payload.customer.business_no;
+    else if (order.customerInfo?.bizNo) bizNo = order.customerInfo.bizNo;
+    else if (order.customerBizNo) bizNo = order.customerBizNo;
+    bizNo = (bizNo || '').replace(/[^0-9]/g, '');
+
+    if (bizNo && bizNo.length >= 5) {
+        const matched = customersList.find(c => {
+            const crmBizNo = (c.businessNumber || '').replace(/[^0-9]/g, '');
+            return crmBizNo === bizNo;
+        });
+        if (matched) return matched;
+    }
+
+    let rawName = '';
+    if (order.poEndCustomer) rawName = order.poEndCustomer;
+    else if (order.payload?.customer?.company_name) rawName = order.payload.customer.company_name;
+    else if (order.customerInfo?.companyName) rawName = order.customerInfo.companyName;
+    else if (order.customerInfo?.company_name) rawName = order.customerInfo.company_name;
+    else if (order.customerName) rawName = order.customerName;
+
+    rawName = (rawName || '').trim().toLowerCase();
+    if (rawName) {
+        const exactMatch = customersList.find(c => (c.companyName || '').trim().toLowerCase() === rawName);
+        if (exactMatch) return exactMatch;
+    }
+
+    const cleanOrderName = stripCorp(order.customerName || rawName);
+    if (!cleanOrderName) return undefined;
+
+    return customersList.find(c => {
+        const cleanCrm = stripCorp(c.companyName);
+        if (!cleanCrm) return false;
+        return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
+    });
+}
+
+function enrichCustomersWithGrade(customers, orders) {
+    const now = new Date();
+    const cutoffDate = new Date();
+    cutoffDate.setDate(now.getDate() - 60);
+    const cutoffTime = cutoffDate.getTime();
+
+    return (customers || []).map(c => {
+        const customerOrders = (orders || []).filter(order => {
+            if (order.isDeleted) return false;
+            if (order.status === 'CANCELLED' || order.status === 'WITHDRAWN') return false;
+
+            const fullCustomerName = (order.poEndCustomer || order.payload?.customer?.company_name || order.customerName || '').toLowerCase();
+            if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return false;
+
+            const orderCrm = matchCustomerToCrm(order, customers);
+            if (orderCrm && orderCrm.companyName === c.companyName) {
+                return true;
+            }
+
+            const targetBizNo = (c.businessNumber || '').replace(/[^0-9]/g, '');
+            const orderBizNo = (order.customerBizNo || '').replace(/[^0-9]/g, '');
+            if (targetBizNo && orderBizNo === targetBizNo) return true;
+
+            const targetNameClean = c.companyName.replace(/[\s()주식회사]/g, '').toLowerCase();
+            const orderNameClean = (order.customerName || order.payload?.customer?.company_name || '').replace(/[\s()주식회사]/g, '').toLowerCase();
+            if (targetNameClean && orderNameClean === targetNameClean) return true;
+
+            return false;
+        });
+
+        const totalHistoricalOrders = customerOrders.length;
+        const recentOrders = customerOrders.filter(order => {
+            const orderDate = resolveOrderDate(order);
+            return !isNaN(orderDate.getTime()) && orderDate.getTime() >= cutoffTime;
+        });
+
+        const orderCount = recentOrders.length;
+        const totalSales = recentOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+
+        let grade = '일반';
+        let badgeColor = 'bg-slate-50 text-slate-700 border-slate-200';
+        let reason = `일반 고객 (60일 발주 ${orderCount}회)`;
+
+        if (totalHistoricalOrders === 0) {
+            grade = '신규';
+            badgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
+            reason = '신규 고객 (거래 없음)';
+        } else if (orderCount === 0) {
+            grade = '이탈위험';
+            badgeColor = 'bg-red-50 text-red-700 border-red-200';
+            reason = '이탈위험 (최근 60일 거래 없음)';
+        } else if (orderCount >= 15 || totalSales >= 20000000) {
+            grade = '우수';
+            badgeColor = 'bg-purple-50 text-purple-700 border-purple-200';
+            reason = `우수 고객 (60일 발주 ${orderCount}회, 매출 ₩${new Intl.NumberFormat('ko-KR').format(totalSales)})`;
+        } else if (orderCount >= 10 || totalSales >= 10000000) {
+            grade = '성장';
+            badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+            reason = `성장 고객 (60일 발주 ${orderCount}회, 매출 ₩${new Intl.NumberFormat('ko-KR').format(totalSales)})`;
+        }
+
+        return {
+            ...c,
+            orderCount60Days: orderCount,
+            totalSales60Days: totalSales,
+            grade,
+            badgeColor,
+            reason
+        };
+    });
+}

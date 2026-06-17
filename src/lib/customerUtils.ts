@@ -12,6 +12,11 @@ export interface CrmCustomer {
     id?: string;
     companyName: string;
     businessNumber?: string;
+    grade?: string;
+    orderCount60Days?: number;
+    totalSales60Days?: number;
+    badgeColor?: string;
+    reason?: string;
 }
 
 const stripCorp = (name: string) => {
@@ -125,20 +130,7 @@ export function calculateCustomerGrade(
     userId?: string,
     crmCustomers: CrmCustomer[] = []
 ): CustomerStats {
-    const normalizeCompanyName = (name?: string) => {
-        if (!name) return '';
-        return name.replace(/[\s()주식회사]/g, '').toLowerCase();
-    };
-
-    const normalizeBizNo = (no?: string) => {
-        if (!no) return '';
-        return no.replace(/[^0-9]/g, '');
-    };
-
-    const targetCompanyClean = normalizeCompanyName(companyName);
-    const targetBizNoClean = normalizeBizNo(bizNo);
-
-    // 1. Find the target CRM customer standard record first
+    // Find matching customer in CRM
     const targetItemDummy = {
         customerName: companyName,
         customerBizNo: bizNo,
@@ -146,97 +138,22 @@ export function calculateCustomerGrade(
     };
     const targetCrm = matchCustomerToCrm(targetItemDummy, crmCustomers);
 
-    // 2. Filter orders that match the target (with CRM matching falling back to text matching)
-    const customerOrders = (orders || []).filter(order => {
-        if (order.isDeleted) return false;
-        if (order.status === 'CANCELLED' || order.status === 'WITHDRAWN') return false;
-
-        // Exclude internal stock orders
-        const fullCustomerName = (order.poEndCustomer || order.payload?.customer?.company_name || order.customerName || '').toLowerCase();
-        if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return false;
-
-        // A. Match by CRM if target CRM is found
-        if (targetCrm) {
-            const orderCrm = matchCustomerToCrm(order, crmCustomers);
-            if (orderCrm && orderCrm.companyName === targetCrm.companyName) {
-                return true;
-            }
-        }
-
-        // B. Fallback: Match by userId
-        if (userId && order.userId === userId) return true;
-
-        // C. Fallback: Match by business number
-        if (targetBizNoClean && normalizeBizNo(order.customerBizNo) === targetBizNoClean) return true;
-
-        // D. Fallback: Match by company name
-        const orderCompanyClean = normalizeCompanyName(order.customerName || order.payload?.customer?.company_name || '');
-        if (targetCompanyClean && orderCompanyClean === targetCompanyClean) return true;
-
-        return false;
-    });
-
-    const totalHistoricalOrders = customerOrders.length;
-
-    // Calculate 60 days stats
-    const now = new Date();
-    const cutoffDate = new Date();
-    cutoffDate.setDate(now.getDate() - 60);
-    const cutoffTime = cutoffDate.getTime();
-
-    const recentOrders = customerOrders.filter(order => {
-        const orderDate = resolveOrderDate(order);
-        return !isNaN(orderDate.getTime()) && orderDate.getTime() >= cutoffTime;
-    });
-
-    const orderCount = recentOrders.length;
-    const totalSales = recentOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
-
-    if (totalHistoricalOrders === 0) {
+    if (targetCrm && targetCrm.grade) {
         return {
-            grade: '신규',
-            orderCount,
-            totalSales,
-            badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
-            reason: '신규 고객 (거래 없음)'
+            grade: targetCrm.grade as any,
+            orderCount: targetCrm.orderCount60Days || 0,
+            totalSales: targetCrm.totalSales60Days || 0,
+            badgeColor: targetCrm.badgeColor || 'bg-slate-50 text-slate-700 border-slate-200',
+            reason: targetCrm.reason || `일반 고객`
         };
     }
 
-    if (orderCount === 0) {
-        return {
-            grade: '이탈위험',
-            orderCount,
-            totalSales,
-            badgeColor: 'bg-red-50 text-red-700 border-red-200',
-            reason: '이탈위험 (최근 60일 거래 없음)'
-        };
-    }
-
-    if (orderCount >= 15 || totalSales >= 20000000) {
-        return {
-            grade: '우수',
-            orderCount,
-            totalSales,
-            badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
-            reason: `우수 고객 (60일 발주 ${orderCount}회, 매출 ₩${new Intl.NumberFormat('ko-KR').format(totalSales)})`
-        };
-    }
-
-    if (orderCount >= 10 || totalSales >= 10000000) {
-        return {
-            grade: '성장',
-            orderCount,
-            totalSales,
-            badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-            reason: `성장 고객 (60일 발주 ${orderCount}회, 매출 ₩${new Intl.NumberFormat('ko-KR').format(totalSales)})`
-        };
-    }
-
+    // Fallback if not found in CRM (treat as new)
     return {
-        grade: '일반',
-        orderCount,
-        totalSales,
-        badgeColor: 'bg-slate-50 text-slate-700 border-slate-200',
-        reason: `일반 고객 (60일 발주 ${orderCount}회)`
+        grade: '신규',
+        orderCount: 0,
+        totalSales: 0,
+        badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
+        reason: '신규 고객 (CRM 미등록)'
     };
 }
