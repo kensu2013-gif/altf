@@ -21,7 +21,6 @@ interface QuoteItemRowProps {
     onItemSelect?: (index: number, isSelected: boolean) => void;
     customPriceRecord?: CustomPriceRecord;
     onApplyCustomPrice?: (record: CustomPriceRecord) => void;
-    recommendedRate?: number | null;
 }
 
 export const QuoteItemRow = React.memo(({
@@ -35,8 +34,7 @@ export const QuoteItemRow = React.memo(({
     isSelected = true,
     onItemSelect,
     customPriceRecord,
-    onApplyCustomPrice,
-    recommendedRate
+    onApplyCustomPrice
 }: QuoteItemRowProps) => {
 
     // Memoize product lookup to prevent unnecessary recalcs if inventory/item identity changes but data is same
@@ -289,8 +287,7 @@ export const QuoteItemRow = React.memo(({
         prev.item === next.item && // Item identity check (requires immutable updates)
         prev.index === next.index &&
         prev.inventory === next.inventory &&
-        prev.onItemChange === next.onItemChange &&
-        prev.recommendedRate === next.recommendedRate
+        prev.onItemChange === next.onItemChange
         // other handlers assumed stable
     );
 });
