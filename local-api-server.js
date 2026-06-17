@@ -298,38 +298,44 @@ async function saveData() {
     }
 }
 
-// Database Serialization Mutex Lock to prevent concurrency conflicts (RMW race conditions)
-let dbLockPromise = Promise.resolve();
+// Database Serialization Mutex Lock to prevent concurrency conflicts (RMW race conditions) in the background
+let isSavingS3 = false;
+let saveS3Pending = false;
+
+async function queueSave() {
+    if (isSavingS3) {
+        saveS3Pending = true;
+        return;
+    }
+    isSavingS3 = true;
+    try {
+        await saveData();
+    } catch (e) {
+        console.error('[API Queue] Background save to S3 failed:', e);
+    } finally {
+        isSavingS3 = false;
+        if (saveS3Pending) {
+            saveS3Pending = false;
+            // Schedule in next tick to prevent stack overflow
+            setImmediate(queueSave);
+        }
+    }
+}
 
 async function updateDb(updater) {
-    return new Promise((resolve, reject) => {
-        dbLockPromise = dbLockPromise.then(async () => {
-            try {
-                // 1. Reload latest database from S3
-                await loadData();
-                
-                // 2. Perform modification
-                const result = await updater();
-                
-                // 3. Save updated database back to S3 (unless bypassed)
-                if (!result || result._bypassSave !== true) {
-                    await saveData();
-                }
-                
-                if (result && result._bypassSave === true) {
-                    resolve(result.data);
-                } else {
-                    resolve(result);
-                }
-            } catch (err) {
-                console.error('[API] Error in updateDb transaction:', err);
-                reject(err);
-            }
-        }).catch((err) => {
-            console.error('[API] Lock chain error:', err);
-            reject(err);
-        });
-    });
+    try {
+        const result = await updater();
+        if (!result || result._bypassSave !== true) {
+            queueSave();
+        }
+        if (result && result._bypassSave === true) {
+            return result.data;
+        }
+        return result;
+    } catch (err) {
+        console.error('[API] Error in updateDb operation:', err);
+        throw err;
+    }
 }
 
 // Initialize
@@ -374,6 +380,7 @@ let inventoryCache = {
     timestamp: 0
 };
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let inventoryLoadPromise = null; // deduplicates concurrent cache-miss S3 fetches
 
 // Watch local inventory file for changes in development to automatically invalidate memory cache
 if (process.env.NODE_ENV !== 'production') {
@@ -855,7 +862,9 @@ const server = http.createServer(async (req, res) => {
 
                 const rawJson = JSON.stringify(inventoryData);
                 inventoryCache.rawData = Buffer.from(rawJson, 'utf-8');
-                inventoryCache.gzippedData = zlib.gzipSync(inventoryCache.rawData);
+                inventoryCache.gzippedData = await new Promise((resolve, reject) =>
+                    zlib.gzip(inventoryCache.rawData, (err, buf) => err ? reject(err) : resolve(buf))
+                );
                 inventoryCache.timestamp = timestamp;
             };
 
@@ -902,9 +911,16 @@ const server = http.createServer(async (req, res) => {
             }
 
             if (!hasCache || forceRefresh) {
-                console.log('[API] Cache miss or Force refresh. Fetching inventory from S3 (Blocking)...');
-                const inventoryData = await getInventoryFromS3();
-                await performInventoryUpdate(inventoryData, now);
+                if (forceRefresh || !inventoryLoadPromise) {
+                    console.log('[API] Cache miss or Force refresh. Fetching inventory from S3...');
+                    inventoryLoadPromise = (async () => {
+                        const inventoryData = await getInventoryFromS3();
+                        await performInventoryUpdate(inventoryData, now);
+                    })().finally(() => { inventoryLoadPromise = null; });
+                } else {
+                    console.log('[API] Cache miss - joining in-flight S3 fetch...');
+                }
+                await inventoryLoadPromise;
             } else {
                 console.log('[API] Cache hit. Serving inventory from memory.');
             }
@@ -1218,13 +1234,26 @@ const server = http.createServer(async (req, res) => {
 
     // GET /api/admin/debug-db-status
     if (req.method === 'GET' && url.pathname === '/api/admin/debug-db-status') {
+        const reload = url.searchParams.get('reload') === 'true';
+        if (reload) {
+            try {
+                console.log('[API Debug] Forced database reload from S3 requested...');
+                await loadData();
+            } catch (err) {
+                console.error('[API Debug] Failed to reload database from S3:', err);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to reload database', details: err.message }));
+                return;
+            }
+        }
         sendJsonResponse(req, res, 200, {
             customersCount: db.customers ? db.customers.length : 0,
             usersCount: db.users ? db.users.length : 0,
             quotationsCount: db.quotations ? db.quotations.length : 0,
             ordersCount: db.orders ? db.orders.length : 0,
             hasAws: hasAwsCredentials(),
-            bucket: BUCKET_NAME
+            bucket: BUCKET_NAME,
+            reloaded: reload
         });
         return;
     }
@@ -2347,7 +2376,7 @@ function stripCorp(name) {
                .trim();
 }
 
-function matchCustomerToCrm(order, customersList) {
+function matchCustomerToCrmFast(order, bizNoMap, exactNameMap, cleanNameMap) {
     let bizNo = '';
     if (order.payload?.customer?.business_no) bizNo = order.payload.customer.business_no;
     else if (order.customerInfo?.bizNo) bizNo = order.customerInfo.bizNo;
@@ -2355,10 +2384,7 @@ function matchCustomerToCrm(order, customersList) {
     bizNo = (bizNo || '').replace(/[^0-9]/g, '');
 
     if (bizNo && bizNo.length >= 5) {
-        const matched = customersList.find(c => {
-            const crmBizNo = (c.businessNumber || '').replace(/[^0-9]/g, '');
-            return crmBizNo === bizNo;
-        });
+        const matched = bizNoMap.get(bizNo);
         if (matched) return matched;
     }
 
@@ -2369,20 +2395,26 @@ function matchCustomerToCrm(order, customersList) {
     else if (order.customerInfo?.company_name) rawName = order.customerInfo.company_name;
     else if (order.customerName) rawName = order.customerName;
 
-    rawName = (rawName || '').trim().toLowerCase();
-    if (rawName) {
-        const exactMatch = customersList.find(c => (c.companyName || '').trim().toLowerCase() === rawName);
+    const lowerName = (rawName || '').trim().toLowerCase();
+    if (lowerName) {
+        const exactMatch = exactNameMap.get(lowerName);
         if (exactMatch) return exactMatch;
     }
 
     const cleanOrderName = stripCorp(order.customerName || rawName);
     if (!cleanOrderName) return undefined;
 
-    return customersList.find(c => {
-        const cleanCrm = stripCorp(c.companyName);
-        if (!cleanCrm) return false;
-        return cleanCrm === cleanOrderName || (cleanOrderName.length > 1 && cleanCrm.includes(cleanOrderName));
-    });
+    const cleanExact = cleanNameMap.get(cleanOrderName);
+    if (cleanExact) return cleanExact;
+
+    // Partial match fallback — O(N) but only reached when all map lookups miss
+    if (cleanOrderName.length > 1) {
+        for (const [key, c] of cleanNameMap) {
+            if (key && key.includes(cleanOrderName)) return c;
+        }
+    }
+
+    return undefined;
 }
 
 function enrichCustomersWithGrade(customers, orders) {
@@ -2391,38 +2423,85 @@ function enrichCustomersWithGrade(customers, orders) {
     cutoffDate.setDate(now.getDate() - 60);
     const cutoffTime = cutoffDate.getTime();
 
-    return (customers || []).map(c => {
-        const customerOrders = (orders || []).filter(order => {
-            if (order.isDeleted) return false;
-            if (order.status === 'CANCELLED' || order.status === 'WITHDRAWN') return false;
+    // Pre-build lookup maps once — avoids O(N) scan inside per-order matching
+    const bizNoMap = new Map();
+    const exactNameMap = new Map();
+    const cleanNameMap = new Map();
+    const simplifiedNameMap = new Map();
 
-            const fullCustomerName = (order.poEndCustomer || order.payload?.customer?.company_name || order.customerName || '').toLowerCase();
-            if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return false;
+    (customers || []).forEach(c => {
+        const bizNo = (c.businessNumber || '').replace(/[^0-9]/g, '');
+        if (bizNo && bizNo.length >= 5) bizNoMap.set(bizNo, c);
 
-            const orderCrm = matchCustomerToCrm(order, customers);
-            if (orderCrm && orderCrm.companyName === c.companyName) {
-                return true;
+        const name = (c.companyName || '').trim().toLowerCase();
+        if (name) exactNameMap.set(name, c);
+
+        const clean = stripCorp(c.companyName);
+        if (clean && !cleanNameMap.has(clean)) cleanNameMap.set(clean, c);
+
+        const simplified = (c.companyName || '').replace(/[\s()주식회사]/g, '').toLowerCase();
+        if (simplified && !simplifiedNameMap.has(simplified)) simplifiedNameMap.set(simplified, c);
+    });
+
+    // Assign each order to matching customer(s) once — O(M) instead of O(N×M)
+    const INTERNAL_KEYWORDS = ['서울재고', '시화재고', '알트에프', 'altf', '재고입고', 'stock'];
+    const ordersByCompany = new Map(); // companyName -> { allSet: Set, recentSet: Set }
+
+    const addOrder = (companyName, order, isRecent) => {
+        if (!ordersByCompany.has(companyName)) {
+            ordersByCompany.set(companyName, { allSet: new Set(), recentSet: new Set() });
+        }
+        const bucket = ordersByCompany.get(companyName);
+        bucket.allSet.add(order);
+        if (isRecent) bucket.recentSet.add(order);
+    };
+
+    (orders || []).forEach(order => {
+        if (order.isDeleted) return;
+        if (order.status === 'CANCELLED' || order.status === 'WITHDRAWN') return;
+
+        const fullName = (order.poEndCustomer || order.payload?.customer?.company_name || order.customerName || '').toLowerCase();
+        if (INTERNAL_KEYWORDS.some(kw => fullName.includes(kw))) return;
+
+        const orderDate = resolveOrderDate(order);
+        const isRecent = !isNaN(orderDate.getTime()) && orderDate.getTime() >= cutoffTime;
+
+        const matchedNames = new Set();
+
+        // Condition 1: CRM-style match (bizNo → exact name → clean name)
+        const crmMatch = matchCustomerToCrmFast(order, bizNoMap, exactNameMap, cleanNameMap);
+        if (crmMatch) {
+            matchedNames.add(crmMatch.companyName);
+            addOrder(crmMatch.companyName, order, isRecent);
+        }
+
+        // Condition 2: direct customerBizNo match (fallback from original logic)
+        const orderBizNo = (order.customerBizNo || '').replace(/[^0-9]/g, '');
+        if (orderBizNo) {
+            const bizMatch = bizNoMap.get(orderBizNo);
+            if (bizMatch && !matchedNames.has(bizMatch.companyName)) {
+                matchedNames.add(bizMatch.companyName);
+                addOrder(bizMatch.companyName, order, isRecent);
             }
+        }
 
-            const targetBizNo = (c.businessNumber || '').replace(/[^0-9]/g, '');
-            const orderBizNo = (order.customerBizNo || '').replace(/[^0-9]/g, '');
-            if (targetBizNo && orderBizNo === targetBizNo) return true;
+        // Condition 3: simplified name match (fallback from original logic)
+        const orderNameSimplified = (order.customerName || order.payload?.customer?.company_name || '').replace(/[\s()주식회사]/g, '').toLowerCase();
+        if (orderNameSimplified) {
+            const simpleMatch = simplifiedNameMap.get(orderNameSimplified);
+            if (simpleMatch && !matchedNames.has(simpleMatch.companyName)) {
+                matchedNames.add(simpleMatch.companyName);
+                addOrder(simpleMatch.companyName, order, isRecent);
+            }
+        }
+    });
 
-            const targetNameClean = c.companyName.replace(/[\s()주식회사]/g, '').toLowerCase();
-            const orderNameClean = (order.customerName || order.payload?.customer?.company_name || '').replace(/[\s()주식회사]/g, '').toLowerCase();
-            if (targetNameClean && orderNameClean === targetNameClean) return true;
-
-            return false;
-        });
-
-        const totalHistoricalOrders = customerOrders.length;
-        const recentOrders = customerOrders.filter(order => {
-            const orderDate = resolveOrderDate(order);
-            return !isNaN(orderDate.getTime()) && orderDate.getTime() >= cutoffTime;
-        });
-
-        const orderCount = recentOrders.length;
-        const totalSales = recentOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+    return (customers || []).map(c => {
+        const bucket = ordersByCompany.get(c.companyName);
+        const totalHistoricalOrders = bucket ? bucket.allSet.size : 0;
+        const recentSet = bucket ? bucket.recentSet : new Set();
+        const orderCount = recentSet.size;
+        const totalSales = [...recentSet].reduce((sum, order) => sum + (order.totalAmount || 0), 0);
 
         let grade = '일반';
         let badgeColor = 'bg-slate-50 text-slate-700 border-slate-200';
