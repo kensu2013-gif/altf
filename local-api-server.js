@@ -1178,6 +1178,19 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // GET /api/admin/debug-db-status
+    if (req.method === 'GET' && url.pathname === '/api/admin/debug-db-status') {
+        sendJsonResponse(req, res, 200, {
+            customersCount: db.customers ? db.customers.length : 0,
+            usersCount: db.users ? db.users.length : 0,
+            quotationsCount: db.quotations ? db.quotations.length : 0,
+            ordersCount: db.orders ? db.orders.length : 0,
+            hasAws: hasAwsCredentials(),
+            bucket: BUCKET_NAME
+        });
+        return;
+    }
+
     // GET /api/admin/debug-snapshots
     if (req.method === 'GET' && url.pathname === '/api/admin/debug-snapshots') {
         const lastSnapshotKeysCount = db.lastSnapshot ? Object.keys(db.lastSnapshot).length : 0;
