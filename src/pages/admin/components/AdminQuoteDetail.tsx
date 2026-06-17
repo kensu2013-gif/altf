@@ -528,61 +528,77 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     }, [user]);
 
     const customerStats = useMemo(() => {
-        return calculateCustomerGrade(orders, customerInfo.companyName, customerInfo.bizNo, quote.userId);
-    }, [orders, customerInfo.companyName, customerInfo.bizNo, quote.userId]);
+        return calculateCustomerGrade(orders, customerInfo.companyName, customerInfo.bizNo, quote.userId, crmCustomers);
+    }, [orders, customerInfo.companyName, customerInfo.bizNo, quote.userId, crmCustomers]);
 
     const recommendation = useMemo(() => {
         const { grade, orderCount, totalSales } = customerStats;
-        let recommendedRate = 47;
+        let bonusRate = 0;
         let reason = '';
 
         if (grade === '우수') {
-            recommendedRate = 50;
-            reason = `우수 등급 (90일 발주 ${orderCount}회, 매출 ${formatCurrency(totalSales)})`;
+            bonusRate = 3;
+            reason = `우수 등급 (+3% 추가 할인 / 60일 발주 ${orderCount}회, 매출 ${formatCurrency(totalSales)})`;
         } else if (grade === '성장') {
-            recommendedRate = 48;
-            reason = `성장 등급 (90일 발주 ${orderCount}회, 매출 ${formatCurrency(totalSales)})`;
+            bonusRate = 1;
+            reason = `성장 등급 (+1% 추가 할인 / 60일 발주 ${orderCount}회, 매출 ${formatCurrency(totalSales)})`;
         } else if (grade === '일반') {
-            recommendedRate = 47;
-            reason = `일반 등급 (90일 발주 ${orderCount}회)`;
+            bonusRate = 0;
+            reason = `일반 등급 (기본 할인 적용 / 60일 발주 ${orderCount}회)`;
         } else if (grade === '이탈위험') {
-            recommendedRate = 47;
-            reason = `이탈위험 등급 (최근 90일 거래 없음)`;
+            bonusRate = 0;
+            reason = `이탈위험 등급 (최근 60일 거래 없음)`;
         } else { // 신규
-            recommendedRate = 47;
+            bonusRate = 0;
             reason = `신규 등급 (거래 없음)`;
         }
 
         return {
-            recommendedRate,
+            bonusRate,
             reason
         };
     }, [customerStats]);
 
     const handleApplyRecommendedRate = useCallback(() => {
-        const recRate = recommendation.recommendedRate;
-        if (!recRate) return;
+        const { bonusRate } = recommendation;
 
         setItems(prev => {
             let hasChanges = false;
             const newItems = prev.map(item => {
-                if (item.discountRate === recRate) return item;
                 const product = inventory.find(p => p.id === item.productId);
                 const base = product?.base_price || item.base_price || product?.unitPrice || item.unitPrice || 0;
                 if (base === 0) return item;
 
+                // 기본 할인율 결정
+                let initialRate = product?.rate_pct ?? item.discountRate ?? 0;
+                if (initialRate === 0 && product) {
+                    const standardPrice = product.base_price ?? product.unitPrice ?? 0;
+                    if (standardPrice > 0 && product.unitPrice > 0) {
+                        initialRate = Math.round((1 - product.unitPrice / standardPrice) * 100);
+                    }
+                }
+
+                // 6/15 요율 보정 적용
+                if (isQuoteAfterEffectiveDate) {
+                    if (initialRate === 65) initialRate = 47;
+                    else if (initialRate === 35) initialRate = 25;
+                }
+
+                const targetRate = initialRate === 47 ? (initialRate + bonusRate) : initialRate;
+                if (item.discountRate === targetRate) return item;
+
                 hasChanges = true;
-                const newPrice = Math.round(Math.round(base * (1 - recRate / 100)) / 10) * 10;
+                const newPrice = Math.round(Math.round(base * (1 - targetRate / 100)) / 10) * 10;
                 return {
                     ...item,
-                    discountRate: recRate,
+                    discountRate: targetRate,
                     unitPrice: newPrice,
                     amount: newPrice * item.quantity
                 };
             });
             return hasChanges ? newItems : prev;
         });
-    }, [recommendation.recommendedRate, inventory]);
+    }, [recommendation, inventory, isQuoteAfterEffectiveDate]);
 
     // ... (keep helper functions)
 
@@ -1351,7 +1367,6 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                                             if (productRate === 0) {
                                                                                 return item;
                                                                             }
-
                                                                             const standardPrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0; 
                                                                             if (standardPrice === 0) return item;
 
@@ -1370,11 +1385,11 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                             }}
                                                         />
                                                     </div>
-                                                    {recommendation.recommendedRate && (
+                                                    {recommendation.bonusRate !== undefined && (
                                                         <div className="mt-1 flex flex-col items-center gap-0.5">
                                                             <div className="flex items-center gap-1 text-[10px] text-teal-800 font-bold bg-teal-50 border border-teal-200/50 rounded px-1.5 py-0.5 shadow-sm whitespace-nowrap">
                                                                 <span>추천:</span>
-                                                                <span className="text-teal-600 font-extrabold">{recommendation.recommendedRate}%</span>
+                                                                <span className="text-teal-600 font-extrabold">등급 우대 (+{recommendation.bonusRate}%)</span>
                                                             </div>
                                                             <span className="text-slate-400 text-[8px] whitespace-normal text-center scale-90 leading-tight max-w-[120px]" title={recommendation.reason}>
                                                                 {recommendation.reason}

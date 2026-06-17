@@ -27,11 +27,7 @@ export default function AdminPage() {
     })));
     const user = useStore((state) => state.auth.user);
     const { findProduct } = useInventoryIndex(inventory);
-
-    // ... (rest of component)
-    // We need to inject findProduct usage into the cost calculation loop deeper in the file
-    // But replace_file_content is not good for "injecting variable at top" and "using it at bottom" in one go if they are far apart.
-    // So I will just add the initialization here.
+    const [crmCustomers, setCrmCustomers] = useState<any[]>([]);
 
 
     // Sync Orders on Mount
@@ -72,6 +68,15 @@ export default function AdminPage() {
 
         fetchOrders();
         fetchUsers();
+
+        fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, { headers })
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setCrmCustomers(data.filter(c => !c.isDeleted));
+                }
+            })
+            .catch(console.error);
 
         window.addEventListener('focus', fetchOrders);
         return () => window.removeEventListener('focus', fetchOrders);
@@ -450,7 +455,8 @@ export default function AdminPage() {
                                                 orders,
                                                 order.poEndCustomer || order.payload?.customer?.company_name || order.customerName || '',
                                                 order.customerBizNo || (order.payload?.customer as Record<string, string> | undefined)?.business_no || (order.payload?.customer as Record<string, string> | undefined)?.biz_no || '',
-                                                order.userId
+                                                order.userId,
+                                                crmCustomers
                                             );
 
                                             return (
