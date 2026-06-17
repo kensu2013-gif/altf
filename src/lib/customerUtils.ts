@@ -47,10 +47,10 @@ export function calculateCustomerGrade(
 
     const totalHistoricalOrders = customerOrders.length;
 
-    // Calculate 90 days stats
+    // Calculate 60 days stats
     const now = new Date();
     const cutoffDate = new Date();
-    cutoffDate.setDate(now.getDate() - 90);
+    cutoffDate.setDate(now.getDate() - 60);
     const cutoffTime = cutoffDate.getTime();
 
     const recentOrders = customerOrders.filter(order => {
@@ -77,27 +77,27 @@ export function calculateCustomerGrade(
             orderCount,
             totalSales,
             badgeColor: 'bg-red-50 text-red-700 border-red-200',
-            reason: '이탈위험 (최근 90일 거래 없음)'
+            reason: '이탈위험 (최근 60일 거래 없음)'
         };
     }
 
-    if (orderCount >= 10 || totalSales >= 10000000) {
+    if (orderCount >= 15 || totalSales >= 20000000) {
         return {
             grade: '우수',
             orderCount,
             totalSales,
             badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
-            reason: `우수 고객 (90일 발주 ${orderCount}회, 매출 ₩${new Intl.NumberFormat('ko-KR').format(totalSales)})`
+            reason: `우수 고객 (60일 발주 ${orderCount}회, 매출 ₩${new Intl.NumberFormat('ko-KR').format(totalSales)})`
         };
     }
 
-    if (orderCount >= 5 || totalSales >= 5000000) {
+    if (orderCount >= 10 || totalSales >= 10000000) {
         return {
             grade: '성장',
             orderCount,
             totalSales,
             badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-            reason: `성장 고객 (90일 발주 ${orderCount}회, 매출 ₩${new Intl.NumberFormat('ko-KR').format(totalSales)})`
+            reason: `성장 고객 (60일 발주 ${orderCount}회, 매출 ₩${new Intl.NumberFormat('ko-KR').format(totalSales)})`
         };
     }
 
@@ -106,6 +106,6 @@ export function calculateCustomerGrade(
         orderCount,
         totalSales,
         badgeColor: 'bg-slate-50 text-slate-700 border-slate-200',
-        reason: `일반 고객 (90일 발주 ${orderCount}회)`
+        reason: `일반 고객 (60일 발주 ${orderCount}회)`
     };
 }
