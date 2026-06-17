@@ -22,7 +22,6 @@ interface QuoteItemRowProps {
     customPriceRecord?: CustomPriceRecord;
     onApplyCustomPrice?: (record: CustomPriceRecord) => void;
     recommendedRate?: number | null;
-    recommendationReason?: string;
 }
 
 export const QuoteItemRow = React.memo(({
@@ -37,8 +36,7 @@ export const QuoteItemRow = React.memo(({
     onItemSelect,
     customPriceRecord,
     onApplyCustomPrice,
-    recommendedRate,
-    recommendationReason
+    recommendedRate
 }: QuoteItemRowProps) => {
 
     // Memoize product lookup to prevent unnecessary recalcs if inventory/item identity changes but data is same
@@ -292,8 +290,7 @@ export const QuoteItemRow = React.memo(({
         prev.index === next.index &&
         prev.inventory === next.inventory &&
         prev.onItemChange === next.onItemChange &&
-        prev.recommendedRate === next.recommendedRate &&
-        prev.recommendationReason === next.recommendationReason
+        prev.recommendedRate === next.recommendedRate
         // other handlers assumed stable
     );
 });
