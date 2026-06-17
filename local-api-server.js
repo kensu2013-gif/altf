@@ -311,10 +311,16 @@ async function updateDb(updater) {
                 // 2. Perform modification
                 const result = await updater();
                 
-                // 3. Save updated database back to S3
-                await saveData();
+                // 3. Save updated database back to S3 (unless bypassed)
+                if (!result || result._bypassSave !== true) {
+                    await saveData();
+                }
                 
-                resolve(result);
+                if (result && result._bypassSave === true) {
+                    resolve(result.data);
+                } else {
+                    resolve(result);
+                }
             } catch (err) {
                 console.error('[API] Error in updateDb transaction:', err);
                 reject(err);
@@ -1736,8 +1742,45 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(403);
             return res.end(JSON.stringify({ error: 'Forbidden' }));
         }
-        const enriched = enrichCustomersWithGrade(db.customers || [], db.orders || []);
-        sendJsonResponse(req, res, 200, enriched);
+
+        try {
+            const enriched = await updateDb(() => {
+                const enrichedList = enrichCustomersWithGrade(db.customers || [], db.orders || []);
+                
+                // Compare to see if there are actual changes in grades, order counts, or sales
+                let hasChanges = false;
+                if ((db.customers || []).length !== enrichedList.length) {
+                    hasChanges = true;
+                } else {
+                    for (let i = 0; i < enrichedList.length; i++) {
+                        const current = db.customers[i];
+                        const enrichedItem = enrichedList[i];
+                        if (
+                            current.grade !== enrichedItem.grade ||
+                            current.orderCount60Days !== enrichedItem.orderCount60Days ||
+                            current.totalSales60Days !== enrichedItem.totalSales60Days
+                        ) {
+                            hasChanges = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (hasChanges) {
+                    db.customers = enrichedList;
+                    console.log('[API] CRM customer grades or order counts changed. Saving to S3 database...');
+                    return enrichedList; // updateDb will run saveData()
+                } else {
+                    return { _bypassSave: true, data: enrichedList }; // skip S3 write
+                }
+            });
+
+            sendJsonResponse(req, res, 200, enriched);
+        } catch (e) {
+            console.error('[API] Error loading/enriching customers:', e);
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'Server Error' }));
+        }
         return;
     }
 
