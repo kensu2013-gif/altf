@@ -1416,8 +1416,6 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                 onItemSelect={handleItemSelect}
                                                 customPriceRecord={customPrices[[item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim()]}
                                                 onApplyCustomPrice={(record) => handleApplyCustomPrice(idx, record)}
-                                                recommendedRate={recommendation.recommendedRate}
-                                                recommendationReason={recommendation.reason}
                                             />
                                         ))}
                                     </tbody>
