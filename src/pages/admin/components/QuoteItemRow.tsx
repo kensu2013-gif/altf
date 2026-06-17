@@ -250,23 +250,7 @@ export const QuoteItemRow = React.memo(({
                             onKeyDown={handleKeyDown}
                         />
                     </div>
-                    {recommendedRate && (
-                        <div className="flex flex-col items-center gap-0.5 mt-0.5">
-                            <span className="text-[9px] text-slate-400 font-semibold whitespace-nowrap">
-                                (추천: {recommendedRate}%)
-                            </span>
-                            {item.discountRate !== recommendedRate && (
-                                <button
-                                    type="button"
-                                    onClick={() => onDiscountRateChange(index, recommendedRate)}
-                                    className="text-[9px] text-teal-600 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded px-1 py-0.5 font-bold whitespace-nowrap transition-all cursor-pointer active:scale-95"
-                                    title={`${recommendedRate}% 요율 적용하기 (${recommendationReason})`}
-                                >
-                                    적용
-                                </button>
-                            )}
-                        </div>
-                    )}
+
                 </div>
             </td>
             {/* User Price (Reference) */}

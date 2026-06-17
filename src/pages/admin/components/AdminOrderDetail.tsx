@@ -3050,23 +3050,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                         />
                                                                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">% </span>
                                                                     </div>
-                                                                    {recommendation.recommendedRate && (
-                                                                        <div className="flex flex-col items-center gap-0.5 mt-0.5">
-                                                                            <span className="text-[9px] text-slate-400 font-semibold whitespace-nowrap">
-                                                                                (추천: {recommendation.recommendedRate}%)
-                                                                            </span>
-                                                                            {item.discountRate !== recommendation.recommendedRate && (
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => handleDiscountChange(idx, recommendation.recommendedRate!)}
-                                                                                    className="text-[9px] text-teal-600 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded px-1 py-0.5 font-bold whitespace-nowrap transition-all cursor-pointer active:scale-95"
-                                                                                    title={`${recommendation.recommendedRate}% 요율 적용하기 (${recommendation.reason})`}
-                                                                                >
-                                                                                    적용
-                                                                                </button>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
+
                                                                 </td>
                                                                 <td className="px-4 py-3 text-right align-middle">
                                                                     <input
