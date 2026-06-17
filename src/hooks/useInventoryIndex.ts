@@ -43,7 +43,7 @@ export function useInventoryIndex(inventory: Product[]) {
                 const byId = idMap.get(candidateId) || idMap.get(normalize(candidateId));
                 if (byId) return byId;
             }
-        } catch (e) {
+        } catch {
             // Ignore if item doesn't support SKU generation
         }
 

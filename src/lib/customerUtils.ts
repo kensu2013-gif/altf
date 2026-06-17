@@ -26,45 +26,7 @@ const stripCorp = (name: string) => {
                .trim();
 };
 
-const resolveOrderDate = (o: {
-    poNumber?: string;
-    id?: string;
-    payload?: {
-        meta?: {
-            created_at?: string;
-        };
-        [key: string]: unknown;
-    };
-    createdAt?: string;
-}): Date => {
-    const parseDateStr = (yy: string, mm: string, dd: string) => {
-        const year = yy.length === 2 ? `20${yy}` : yy;
-        return new Date(`${year}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T12:00:00Z`);
-    };
 
-    const identifiers = [o.poNumber, o.id].filter(Boolean);
-    for (const str of identifiers) {
-        if (typeof str !== 'string') continue;
-        
-        let m = str.match(/\D(20\d{6})(-|$)/);
-        if (m) return parseDateStr(m[1].slice(0, 4), m[1].slice(4, 6), m[1].slice(6, 8));
-        
-        m = str.match(/\D(\d{6})(-|$)/);
-        if (m) return parseDateStr(m[1].slice(0, 2), m[1].slice(2, 4), m[1].slice(4, 6));
-    }
-
-    const kDateStr = o.payload?.meta?.created_at;
-    if (typeof kDateStr === 'string') {
-        const kDateMatch = kDateStr.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
-        if (kDateMatch) return parseDateStr(kDateMatch[1], kDateMatch[2], kDateMatch[3]);
-    }
-    
-    const d = new Date(o.createdAt || new Date());
-    if (!isNaN(d.getTime())) {
-        return new Date(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T12:00:00Z`);
-    }
-    return new Date();
-};
 
 const matchCustomerToCrm = (
     item: {
@@ -124,10 +86,10 @@ const matchCustomerToCrm = (
 };
 
 export function calculateCustomerGrade(
-    orders: Order[],
+    _orders: Order[],
     companyName: string,
     bizNo: string,
-    userId?: string,
+    _userId?: string,
     crmCustomers: CrmCustomer[] = []
 ): CustomerStats {
     // Find matching customer in CRM
@@ -140,7 +102,7 @@ export function calculateCustomerGrade(
 
     if (targetCrm && targetCrm.grade) {
         return {
-            grade: targetCrm.grade as any,
+            grade: targetCrm.grade as CustomerStats['grade'],
             orderCount: targetCrm.orderCount60Days || 0,
             totalSales: targetCrm.totalSales60Days || 0,
             badgeColor: targetCrm.badgeColor || 'bg-slate-50 text-slate-700 border-slate-200',
