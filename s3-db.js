@@ -44,16 +44,25 @@ export async function loadDbFromS3() {
             return null;
         }
     }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+        console.warn('[S3] loadDbFromS3 request timed out after 10s. Aborting...');
+        controller.abort();
+    }, 10000);
+
     try {
         const command = new GetObjectCommand({
             Bucket: BUCKET_NAME,
             Key: DB_KEY
         });
-        const response = await s3Client.send(command);
+        const response = await s3Client.send(command, { abortSignal: controller.signal });
         const bodyContent = await streamToString(response.Body);
         console.log(`[S3] Loaded data from ${BUCKET_NAME}/${DB_KEY}`);
         return JSON.parse(bodyContent);
     } catch (error) {
+        if (error.name === 'AbortError') {
+            console.error('[S3] loadDbFromS3 command aborted due to timeout.');
+        }
         if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
             console.log(`[S3] ${DB_KEY} not found in S3. Returning null for initial seed.`);
             return null;

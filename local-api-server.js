@@ -298,6 +298,34 @@ async function saveData() {
     }
 }
 
+// Database Serialization Mutex Lock to prevent concurrency conflicts (RMW race conditions)
+let dbLockPromise = Promise.resolve();
+
+async function updateDb(updater) {
+    return new Promise((resolve, reject) => {
+        dbLockPromise = dbLockPromise.then(async () => {
+            try {
+                // 1. Reload latest database from S3
+                await loadData();
+                
+                // 2. Perform modification
+                const result = await updater();
+                
+                // 3. Save updated database back to S3
+                await saveData();
+                
+                resolve(result);
+            } catch (err) {
+                console.error('[API] Error in updateDb transaction:', err);
+                reject(err);
+            }
+        }).catch((err) => {
+            console.error('[API] Lock chain error:', err);
+            reject(err);
+        });
+    });
+}
+
 // Initialize
 const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
 if (!isProd) {
@@ -618,207 +646,203 @@ const server = http.createServer(async (req, res) => {
                 // CRITICAL PRESERVATION RULE: Do not change, bypass, or rewrite this daily snapshot logic.
                 // Daekyung rolling average stock evaluation relies strictly on these daily ledger snapshots (db.daekyungHistory).
                 try {
-                    const kstDate = new Date(timestamp + 9 * 60 * 60 * 1000); // KST
-                    const today = kstDate.toISOString().slice(0, 10);
-                    
-                    
-                    const itemsArr = Array.isArray(inventoryData) ? inventoryData : (inventoryData.items || []);
-                    const sihwaStockMap = {};
-                    const ysStockMap = {};
-                    
-                    itemsArr.forEach(item => {
-                        let shStock = 0;
-                        let ysStock = 0;
-                        let isSihwa = false;
-
-                        // Only track maker '대경' for Sihwa/Daekyung and Yangsan/Daekyung history
-                        const maker = item.maker || item.maker1 || '';
-                        if (maker !== '대경') {
-                            return;
-                        }
-
-                        const locationStock = {};
-                        if (item.locationStock && Object.keys(item.locationStock).length > 0) {
-                            for (const [key, qty] of Object.entries(item.locationStock)) {
-                                const newKey = (key === '서울' || key === '서울재고') ? '시화' : key;
-                                locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
-                            }
-                        } else {
-                            const shQtyVal = item.sh_qty !== undefined ? item.sh_qty : item.shQty;
-                            const ysQtyVal = item.ready_qty !== undefined ? item.ready_qty : item.ysQty;
-                            if (item.location1 && shQtyVal !== undefined) {
-                                const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
-                                locationStock[loc1] = (locationStock[loc1] || 0) + Number(shQtyVal);
-                            }
-                            if (item.location && ysQtyVal !== undefined) {
-                                const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
-                                locationStock[primaryLoc] = (locationStock[primaryLoc] || 0) + Number(ysQtyVal);
-                            }
-                        }
-
-                        if (locationStock['시화'] !== undefined) {
-                            shStock = locationStock['시화'];
-                            isSihwa = true;
-                        }
-                        if (locationStock['양산'] !== undefined) {
-                            ysStock = locationStock['양산'];
-                        }
-
-                        const id = item.sku_key || item.id;
-                        if (id) {
-                            sihwaStockMap[id] = { name: item.item || item.name, stock: shStock, sh_qty: shStock };
-                            ysStockMap[id] = { name: item.item || item.name, stock: ysStock, ys_qty: ysStock };
-                        }
-                    });
-
-                    const history = db.inventoryHistory;
-                    const daekyungHistory = db.daekyungHistory || []; 
-                    db.daekyungHistory = daekyungHistory; // Ensure linked
-                    
-                    // Initialize if missing
-                    if (!db.lastSnapshotDate) {
-                        db.lastSnapshotDate = today;
-                        if (!db.lastSnapshot || Object.keys(db.lastSnapshot).length === 0) db.lastSnapshot = sihwaStockMap;
-                        if (!db.currentSnapshot || Object.keys(db.currentSnapshot).length === 0) db.currentSnapshot = sihwaStockMap;
-                        if (!db.lastDaekyungSnapshot || Object.keys(db.lastDaekyungSnapshot).length === 0) db.lastDaekyungSnapshot = ysStockMap;
-                        if (!db.currentDaekyungSnapshot || Object.keys(db.currentDaekyungSnapshot).length === 0) db.currentDaekyungSnapshot = ysStockMap;
+                    await updateDb(async () => {
+                        const kstDate = new Date(timestamp + 9 * 60 * 60 * 1000); // KST
+                        const today = kstDate.toISOString().slice(0, 10);
                         
-                        if (history.length === 0) history.push({ date: today, diff: [] });
-                        if (daekyungHistory.length === 0) daekyungHistory.push({ date: today, diff: [] });
+                        const itemsArr = Array.isArray(inventoryData) ? inventoryData : (inventoryData.items || []);
+                        const sihwaStockMap = {};
+                        const ysStockMap = {};
                         
-                        await saveData();
-                        console.log(`[API] Initialized daily baseline snapshot ledger system.`);
-                    } else if (db.lastSnapshotDate !== today) {
-                        // Day transition: previous day's final state (currentSnapshot) becomes today's baseline (lastSnapshot)
-                        if (today === '2026-06-14' && db.june12Snapshot && Object.keys(db.june12Snapshot).length > 0) {
-                            db.lastSnapshot = db.june12Snapshot;
-                            db.lastDaekyungSnapshot = db.june12DaekyungSnapshot || ysStockMap;
-                            console.log(`[API] Day transitioned to ${today}. Baseline forced to June 12th snapshot per user request.`);
-                        } else {
-                            db.lastSnapshot = (db.currentSnapshot && Object.keys(db.currentSnapshot).length > 0) ? db.currentSnapshot : sihwaStockMap;
-                            db.lastDaekyungSnapshot = (db.currentDaekyungSnapshot && Object.keys(db.currentDaekyungSnapshot).length > 0) ? db.currentDaekyungSnapshot : ysStockMap;
-                        }
-                        db.lastSnapshotDate = today;
-                        console.log(`[API] Day transitioned to ${today}. Baseline snapshots updated.`);
-                    }
+                        itemsArr.forEach(item => {
+                            let shStock = 0;
+                            let ysStock = 0;
+                            let isSihwa = false;
 
-                    // Compute diff against start-of-day baseline (lastSnapshot / lastDaekyungSnapshot)
-                    const changesObj = {};
-                    const daekyungChangesObj = {};
-                    
-                    const isValidItem = (name) => {
-                        if (!name) return false;
-                        const nameUpper = name.toUpperCase();
-                        const isCompositeOrStubend = nameUpper.startsWith('COMPOSITE') || nameUpper.startsWith('STUBEND');
-                        const validPrefixes = ['90', '45', 'R', 'T', 'CAP'];
-                        return !isCompositeOrStubend && validPrefixes.some(p => nameUpper.startsWith(p));
-                    };
-                    
-                    for (const [id, curr] of Object.entries(sihwaStockMap)) {
-                        if (!isValidItem(curr.name)) continue;
-                        const prev = db.lastSnapshot[id];
-                        const sh_from = prev ? (prev.sh_qty ?? 0) : 0;
-                        const sh_to = curr.sh_qty ?? 0;
-                        const sh_change = sh_to - sh_from;
-                        if (sh_change !== 0) {
-                            changesObj[id] = { 
-                                name: curr.name, 
-                                change: sh_change, 
-                                from: sh_from, 
-                                to: sh_to,
-                                location: '시화',
-                                maker: '대경'
-                            };
+                            // Only track maker '대경' for Sihwa/Daekyung and Yangsan/Daekyung history
+                            const maker = item.maker || item.maker1 || '';
+                            if (maker !== '대경') {
+                                return;
+                            }
+
+                            const locationStock = {};
+                            if (item.locationStock && Object.keys(item.locationStock).length > 0) {
+                                for (const [key, qty] of Object.entries(item.locationStock)) {
+                                    const newKey = (key === '서울' || key === '서울재고') ? '시화' : key;
+                                    locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
+                                }
+                            } else {
+                                const shQtyVal = item.sh_qty !== undefined ? item.sh_qty : item.shQty;
+                                const ysQtyVal = item.ready_qty !== undefined ? item.ready_qty : item.ysQty;
+                                if (item.location1 && shQtyVal !== undefined) {
+                                    const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
+                                    locationStock[loc1] = (locationStock[loc1] || 0) + Number(shQtyVal);
+                                }
+                                if (item.location && ysQtyVal !== undefined) {
+                                    const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
+                                    locationStock[primaryLoc] = (locationStock[primaryLoc] || 0) + Number(ysQtyVal);
+                                }
+                            }
+
+                            if (locationStock['시화'] !== undefined) {
+                                shStock = locationStock['시화'];
+                                isSihwa = true;
+                            }
+                            if (locationStock['양산'] !== undefined) {
+                                ysStock = locationStock['양산'];
+                            }
+
+                            const id = item.sku_key || item.id;
+                            if (id) {
+                                sihwaStockMap[id] = { name: item.item || item.name, stock: shStock, sh_qty: shStock };
+                                ysStockMap[id] = { name: item.item || item.name, stock: ysStock, ys_qty: ysStock };
+                            }
+                        });
+
+                        const history = db.inventoryHistory;
+                        const daekyungHistory = db.daekyungHistory || []; 
+                        db.daekyungHistory = daekyungHistory; // Ensure linked
+                        
+                        // Initialize if missing
+                        if (!db.lastSnapshotDate) {
+                            db.lastSnapshotDate = today;
+                            if (!db.lastSnapshot || Object.keys(db.lastSnapshot).length === 0) db.lastSnapshot = sihwaStockMap;
+                            if (!db.currentSnapshot || Object.keys(db.currentSnapshot).length === 0) db.currentSnapshot = sihwaStockMap;
+                            if (!db.lastDaekyungSnapshot || Object.keys(db.lastDaekyungSnapshot).length === 0) db.lastDaekyungSnapshot = ysStockMap;
+                            if (!db.currentDaekyungSnapshot || Object.keys(db.currentDaekyungSnapshot).length === 0) db.currentDaekyungSnapshot = ysStockMap;
+                            
+                            if (history.length === 0) history.push({ date: today, diff: [] });
+                            if (daekyungHistory.length === 0) daekyungHistory.push({ date: today, diff: [] });
+                            
+                            console.log(`[API] Initialized daily baseline snapshot ledger system.`);
+                        } else if (db.lastSnapshotDate !== today) {
+                            if (today === '2026-06-14' && db.june12Snapshot && Object.keys(db.june12Snapshot).length > 0) {
+                                db.lastSnapshot = db.june12Snapshot;
+                                db.lastDaekyungSnapshot = db.june12DaekyungSnapshot || ysStockMap;
+                                console.log(`[API] Day transitioned to ${today}. Baseline forced to June 12th snapshot per user request.`);
+                            } else {
+                                db.lastSnapshot = (db.currentSnapshot && Object.keys(db.currentSnapshot).length > 0) ? db.currentSnapshot : sihwaStockMap;
+                                db.lastDaekyungSnapshot = (db.currentDaekyungSnapshot && Object.keys(db.currentDaekyungSnapshot).length > 0) ? db.currentDaekyungSnapshot : ysStockMap;
+                            }
+                            db.lastSnapshotDate = today;
+                            console.log(`[API] Day transitioned to ${today}. Baseline snapshots updated.`);
                         }
-                    }
-                    for (const [id, prev] of Object.entries(db.lastSnapshot)) {
-                        if (!isValidItem(prev.name)) continue;
-                        if (sihwaStockMap[id] === undefined) {
-                            const sh_from = prev.sh_qty ?? 0;
-                            if (sh_from !== 0) {
+
+                        // Compute diff against start-of-day baseline (lastSnapshot / lastDaekyungSnapshot)
+                        const changesObj = {};
+                        const daekyungChangesObj = {};
+                        
+                        const isValidItem = (name) => {
+                            if (!name) return false;
+                            const nameUpper = name.toUpperCase();
+                            const isCompositeOrStubend = nameUpper.startsWith('COMPOSITE') || nameUpper.startsWith('STUBEND');
+                            const validPrefixes = ['90', '45', 'R', 'T', 'CAP'];
+                            return !isCompositeOrStubend && validPrefixes.some(p => nameUpper.startsWith(p));
+                        };
+                        
+                        for (const [id, curr] of Object.entries(sihwaStockMap)) {
+                            if (!isValidItem(curr.name)) continue;
+                            const prev = db.lastSnapshot[id];
+                            const sh_from = prev ? (prev.sh_qty ?? 0) : 0;
+                            const sh_to = curr.sh_qty ?? 0;
+                            const sh_change = sh_to - sh_from;
+                            if (sh_change !== 0) {
                                 changesObj[id] = { 
-                                    name: prev.name, 
-                                    change: -sh_from, 
+                                    name: curr.name, 
+                                    change: sh_change, 
                                     from: sh_from, 
-                                    to: 0,
+                                    to: sh_to,
                                     location: '시화',
                                     maker: '대경'
                                 };
                             }
                         }
-                    }
-                    
-                    // Daekyung
-                    for (const [id, curr] of Object.entries(ysStockMap)) {
-                        if (!isValidItem(curr.name)) continue;
-                        const prev = db.lastDaekyungSnapshot[id];
-                        const ys_from = prev ? (prev.ys_qty ?? 0) : 0;
-                        const ys_to = curr.ys_qty ?? 0;
-                        const ys_change = ys_to - ys_from;
-                        if (ys_change !== 0) {
-                            daekyungChangesObj[id] = { 
-                                name: curr.name, 
-                                change: ys_change, 
-                                from: ys_from, 
-                                to: ys_to,
-                                location: '양산',
-                                maker: '대경'
-                            };
+                        for (const [id, prev] of Object.entries(db.lastSnapshot)) {
+                            if (!isValidItem(prev.name)) continue;
+                            if (sihwaStockMap[id] === undefined) {
+                                const sh_from = prev.sh_qty ?? 0;
+                                if (sh_from !== 0) {
+                                    changesObj[id] = { 
+                                        name: prev.name, 
+                                        change: -sh_from, 
+                                        from: sh_from, 
+                                        to: 0,
+                                        location: '시화',
+                                        maker: '대경'
+                                    };
+                                }
+                            }
                         }
-                    }
-                    for (const [id, prev] of Object.entries(db.lastDaekyungSnapshot)) {
-                        if (!isValidItem(prev.name)) continue;
-                        if (ysStockMap[id] === undefined) {
-                            const ys_from = prev.ys_qty ?? 0;
-                            if (ys_from !== 0) {
+                        
+                        // Daekyung
+                        for (const [id, curr] of Object.entries(ysStockMap)) {
+                            if (!isValidItem(curr.name)) continue;
+                            const prev = db.lastDaekyungSnapshot[id];
+                            const ys_from = prev ? (prev.ys_qty ?? 0) : 0;
+                            const ys_to = curr.ys_qty ?? 0;
+                            const ys_change = ys_to - ys_from;
+                            if (ys_change !== 0) {
                                 daekyungChangesObj[id] = { 
-                                    name: prev.name, 
-                                    change: -ys_from, 
+                                    name: curr.name, 
+                                    change: ys_change, 
                                     from: ys_from, 
-                                    to: 0,
+                                    to: ys_to,
                                     location: '양산',
                                     maker: '대경'
                                 };
                             }
                         }
-                    }
+                        for (const [id, prev] of Object.entries(db.lastDaekyungSnapshot)) {
+                            if (!isValidItem(prev.name)) continue;
+                            if (ysStockMap[id] === undefined) {
+                                const ys_from = prev.ys_qty ?? 0;
+                                if (ys_from !== 0) {
+                                    daekyungChangesObj[id] = { 
+                                        name: prev.name, 
+                                        change: -ys_from, 
+                                        from: ys_from, 
+                                        to: 0,
+                                        location: '양산',
+                                        maker: '대경'
+                                    };
+                                }
+                            }
+                        }
 
-                    // Update current snapshots to reflect the latest values
-                    db.currentSnapshot = sihwaStockMap;
-                    db.currentDaekyungSnapshot = ysStockMap;
-                    
-                    if (today === '2026-06-12') {
-                        db.june12Snapshot = sihwaStockMap;
-                        db.june12DaekyungSnapshot = ysStockMap;
-                    }
-                    
-                    // Retain legacy keys for backward compatibility
-                    db.inventorySnapshot = sihwaStockMap;
-                    db.daekyungSnapshot = ysStockMap;
+                        // Update current snapshots to reflect the latest values
+                        db.currentSnapshot = sihwaStockMap;
+                        db.currentDaekyungSnapshot = ysStockMap;
+                        
+                        if (today === '2026-06-12') {
+                            db.june12Snapshot = sihwaStockMap;
+                            db.june12DaekyungSnapshot = ysStockMap;
+                        }
+                        
+                        // Retain legacy keys for backward compatibility
+                        db.inventorySnapshot = sihwaStockMap;
+                        db.daekyungSnapshot = ysStockMap;
 
-                    // Update history record by overwriting its daily diff with the complete change from start-of-day
-                    let todayRecord = history.find(h => h.date === today);
-                    if (!todayRecord) {
-                        todayRecord = { date: today, diff: [] };
-                        history.push(todayRecord);
-                        if (history.length > 61) history.shift();
-                    }
-                    todayRecord.diff = Object.entries(changesObj)
-                        .map(([id, changeData]) => ({ id, ...changeData }))
-                        .filter(d => d.change !== 0);
+                        // Update history record by overwriting its daily diff with the complete change from start-of-day
+                        let todayRecord = history.find(h => h.date === today);
+                        if (!todayRecord) {
+                            todayRecord = { date: today, diff: [] };
+                            history.push(todayRecord);
+                            if (history.length > 61) history.shift();
+                        }
+                        todayRecord.diff = Object.entries(changesObj)
+                            .map(([id, changeData]) => ({ id, ...changeData }))
+                            .filter(d => d.change !== 0);
 
-                    let todayDaekyungRecord = daekyungHistory.find(h => h.date === today);
-                    if (!todayDaekyungRecord) {
-                        todayDaekyungRecord = { date: today, diff: [] };
-                        daekyungHistory.push(todayDaekyungRecord);
-                        if (daekyungHistory.length > 185) daekyungHistory.shift();
-                    }
-                    todayDaekyungRecord.diff = Object.entries(daekyungChangesObj)
-                        .map(([id, changeData]) => ({ id, ...changeData }))
-                        .filter(d => d.change !== 0);
-
-                    await saveData();
-
+                        let todayDaekyungRecord = daekyungHistory.find(h => h.date === today);
+                        if (!todayDaekyungRecord) {
+                            todayDaekyungRecord = { date: today, diff: [] };
+                            daekyungHistory.push(todayDaekyungRecord);
+                            if (daekyungHistory.length > 185) daekyungHistory.shift();
+                        }
+                        todayDaekyungRecord.diff = Object.entries(daekyungChangesObj)
+                            .map(([id, changeData]) => ({ id, ...changeData }))
+                            .filter(d => d.change !== 0);
+                    });
                 } catch (snapErr) {
                     console.error('[API] Error creating daily inventory snapshot:', snapErr);
                 }
@@ -959,56 +983,17 @@ const server = http.createServer(async (req, res) => {
                 const { email, password } = JSON.parse(body);
                 console.log(`[API] Login attempt: Email=${email}, Password=${password}`); // DEBUG LOG
 
-                const user = db.users.find(u => u.email === email && u.password === password);
-
-                if (user) {
-                    if (user.role !== 'MASTER' && user.status !== 'APPROVED') {
-                        console.log(`[API] Login failed: User ${email} is pending approval`);
-                        res.writeHead(403, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ error: 'PENDING_APPROVAL' }));
-                        return;
+                const loginResult = await updateDb(() => {
+                    const user = db.users.find(u => u.email === email && u.password === password);
+                    if (!user) {
+                        return { error: 'Invalid credentials', status: 401 };
                     }
+                    if (user.role !== 'MASTER' && user.status !== 'APPROVED') {
+                        return { error: 'PENDING_APPROVAL', status: 403 };
+                    }
+
                     // Update lastLoginAt
                     user.lastLoginAt = Date.now();
-                    
-                    // Return user without password
-                    const { password, ...userWithoutPassword } = user;
-                    console.log(`[API] Login success: ${email}`);
-
-                    // Generate a new unique token for this login session
-                    const loginToken = crypto.randomUUID();
-
-                    // Find all existing sessions for this user
-                    const userSessions = [];
-                    for (const [existingToken, session] of activeSessions.entries()) {
-                        if (session.userId === user.id) {
-                            userSessions.push({ token: existingToken, ...session });
-                        }
-                    }
-
-                    // Enforce 20-device limit: If there are already 20 or more, remove the oldest until we have space for the new one (so 19 remaining)
-                    if (userSessions.length >= 20) {
-                        // Sort by lastSeen (ascending = oldest first)
-                        userSessions.sort((a, b) => a.lastSeen - b.lastSeen);
-                        // Calculate how many we need to remove to leave exactly 19 sessions (so adding the new one makes it 20)
-                        const overLimitCount = userSessions.length - 19;
-                        for (let i = 0; i < overLimitCount; i++) {
-                            const oldestSession = userSessions[i];
-                            activeSessions.delete(oldestSession.token);
-                            console.log(`[API] Device limit reached (20). Cleared oldest session for user ${email}`);
-                        }
-                    }
-
-                    // Store new session
-                    activeSessions.set(loginToken, {
-                        userId: user.id,
-                        email: user.email,
-                        companyName: user.companyName,
-                        role: user.role,
-                        lastSeen: Date.now(),
-                        activity: 'Logging in...',
-                        ip: req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'Unknown'
-                    });
 
                     // Add to login logs
                     const loginLog = {
@@ -1022,20 +1007,57 @@ const server = http.createServer(async (req, res) => {
                         ip: req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'Unknown'
                     };
                     db.loginLogs.push(loginLog);
-                    // Keep only last 1000 logs
                     if (db.loginLogs.length > 1000) db.loginLogs.shift();
-                    
-                    // Save to S3
-                    await saveData();
 
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    // Send token along with user data
-                    res.end(JSON.stringify({ user: userWithoutPassword, token: loginToken }));
-                } else {
-                    console.log(`[API] Login failed: Invalid credentials for ${email}`);
-                    res.writeHead(401, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Invalid credentials' }));
+                    const { password: _, ...userWithoutPassword } = user;
+                    return { user: userWithoutPassword };
+                });
+
+                if (loginResult.error) {
+                    console.log(`[API] Login failed: ${loginResult.error} for ${email}`);
+                    res.writeHead(loginResult.status, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: loginResult.error }));
+                    return;
                 }
+
+                const { user: userWithoutPassword } = loginResult;
+                console.log(`[API] Login success: ${email}`);
+
+                // Generate a new unique token for this login session
+                const loginToken = crypto.randomUUID();
+
+                // Find all existing sessions for this user
+                const userSessions = [];
+                for (const [existingToken, session] of activeSessions.entries()) {
+                    if (session.userId === userWithoutPassword.id) {
+                        userSessions.push({ token: existingToken, ...session });
+                    }
+                }
+
+                // Enforce 20-device limit
+                if (userSessions.length >= 20) {
+                    userSessions.sort((a, b) => a.lastSeen - b.lastSeen);
+                    const overLimitCount = userSessions.length - 19;
+                    for (let i = 0; i < overLimitCount; i++) {
+                        const oldestSession = userSessions[i];
+                        activeSessions.delete(oldestSession.token);
+                        console.log(`[API] Device limit reached (20). Cleared oldest session for user ${email}`);
+                    }
+                }
+
+                // Store new session
+                activeSessions.set(loginToken, {
+                    userId: userWithoutPassword.id,
+                    email: userWithoutPassword.email,
+                    companyName: userWithoutPassword.companyName,
+                    role: userWithoutPassword.role,
+                    lastSeen: Date.now(),
+                    activity: 'Logging in...',
+                    ip: req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'Unknown'
+                });
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ user: userWithoutPassword, token: loginToken }));
             } catch (e) {
                 console.error('[API] Login error:', e);
                 res.writeHead(500);
@@ -1082,14 +1104,23 @@ const server = http.createServer(async (req, res) => {
                 if (activity) session.activity = activity;
 
                 // Update persistent user lastLoginAt
+                let needsSave = false;
                 const dbUser = db.users.find(u => u.id === session.userId);
                 if (dbUser) {
                     // To avoid spamming S3 on every heartbeat, only save if it's been more than 5 minutes
                     const lastLogin = dbUser.lastLoginAt || 0;
                     if (now - lastLogin > 5 * 60 * 1000) {
-                        dbUser.lastLoginAt = now;
-                        await saveData();
+                        needsSave = true;
                     }
+                }
+
+                if (needsSave) {
+                    await updateDb(() => {
+                        const targetUser = db.users.find(u => u.id === session.userId);
+                        if (targetUser) {
+                            targetUser.lastLoginAt = now;
+                        }
+                    });
                 }
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1129,20 +1160,21 @@ const server = http.createServer(async (req, res) => {
                 }
 
                 if (logoutUserId) {
-                    // Add to login logs
-                    const logoutLog = {
-                        id: crypto.randomUUID(),
-                        userId: logoutUserId,
-                        email: logoutEmail,
-                        companyName: logoutCompanyName,
-                        role: logoutRole,
-                        action: 'LOGOUT',
-                        timestamp: Date.now(),
-                        ip: req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'Unknown'
-                    };
-                    db.loginLogs.push(logoutLog);
-                    if (db.loginLogs.length > 1000) db.loginLogs.shift();
-                    await saveData();
+                    await updateDb(() => {
+                        // Add to login logs
+                        const logoutLog = {
+                            id: crypto.randomUUID(),
+                            userId: logoutUserId,
+                            email: logoutEmail,
+                            companyName: logoutCompanyName,
+                            role: logoutRole,
+                            action: 'LOGOUT',
+                            timestamp: Date.now(),
+                            ip: req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'Unknown'
+                        };
+                        db.loginLogs.push(logoutLog);
+                        if (db.loginLogs.length > 1000) db.loginLogs.shift();
+                    });
                     console.log(`[API] Logged out user ${logoutEmail}`);
                 }
                 res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1593,28 +1625,34 @@ const server = http.createServer(async (req, res) => {
         req.on('end', async () => {
             try {
                 const data = JSON.parse(body);
-                if (db.users.some(u => u.email === data.email)) {
-                    res.writeHead(409, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Email already exists' }));
-                    return;
+                const result = await updateDb(() => {
+                    if (db.users.some(u => u.email === data.email)) {
+                        return { error: 'Email already exists', status: 409 };
+                    }
+
+                    const newUser = {
+                        id: crypto.randomUUID(),
+                        ...data,
+                        role: data.role || 'CUSTOMER', // Default
+                        status: data.status || 'PENDING',
+                        createdAt: new Date().toISOString()
+                    };
+
+                    db.users.push(newUser);
+                    return { user: newUser };
+                });
+
+                if (result.error) {
+                    res.writeHead(result.status, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: result.error }));
+                } else {
+                    console.log(`[API] Created user: ${result.user.email} (${result.user.role})`);
+                    res.writeHead(201, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(result.user));
                 }
 
-                const newUser = {
-                    id: crypto.randomUUID(),
-                    ...data,
-                    role: data.role || 'CUSTOMER', // Default
-                    status: data.status || 'PENDING',
-                    createdAt: new Date().toISOString()
-                };
-
-                db.users.push(newUser);
-                await saveData(); // <--- SAVE
-                console.log(`[API] Created user: ${newUser.email} (${newUser.role})`);
-
-                res.writeHead(201, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(newUser));
-
             } catch (e) {
+                console.error('[API] Error creating user:', e);
                 res.writeHead(500);
                 res.end(JSON.stringify({ error: 'Server Error' }));
             }
@@ -1630,30 +1668,24 @@ const server = http.createServer(async (req, res) => {
         req.on('end', async () => {
             try {
                 const updates = JSON.parse(body);
-                const index = db.users.findIndex(u => u.id === id);
-                if (index !== -1) {
-                    // Handle legacy managerId update for backward compatibility if needed, 
-                    // but primarily we expect 'managerIds' now or we map managerId to managerIds.
-                    if (updates.managerId) {
-                        updates.managerIds = [updates.managerId];
-                        delete updates.managerId;
+                const result = await updateDb(() => {
+                    const index = db.users.findIndex(u => u.id === id);
+                    if (index !== -1) {
+                        if (updates.managerId) {
+                            updates.managerIds = [updates.managerId];
+                            delete updates.managerId;
+                        }
+
+                        db.users[index] = { ...db.users[index], ...updates };
+                        return db.users[index];
                     }
+                    return null;
+                });
 
-                    // Save original state for rollback
-                    const originalState = { ...db.users[index] };
-                    db.users[index] = { ...db.users[index], ...updates };
-
-                    try {
-                        await saveData(); // <--- SAVE
-                        console.log(`[API] Updated user ${id}`);
-                        res.writeHead(200, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify(db.users[index]));
-                    } catch (saveError) {
-                        // Rollback on S3 save failure
-                        db.users[index] = originalState;
-                        throw saveError;
-                    }
-
+                if (result) {
+                    console.log(`[API] Updated user ${id}`);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(result));
                 } else {
                     res.writeHead(404);
                     res.end(JSON.stringify({ error: 'Not found' }));
@@ -1670,17 +1702,28 @@ const server = http.createServer(async (req, res) => {
     // DELETE /api/users/:id
     if (req.method === 'DELETE' && url.pathname.startsWith('/api/users/')) {
         const id = url.pathname.split('/').pop();
-        const index = db.users.findIndex(u => u.id === id);
-        if (index !== -1) {
-            db.users.splice(index, 1);
-            await saveData(); // <--- SAVE
-            console.log(`[API] Deleted user ${id}`);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true }));
+        try {
+            const success = await updateDb(() => {
+                const index = db.users.findIndex(u => u.id === id);
+                if (index !== -1) {
+                    db.users.splice(index, 1);
+                    return true;
+                }
+                return false;
+            });
 
-        } else {
-            res.writeHead(404);
-            res.end(JSON.stringify({ error: 'Not found' }));
+            if (success) {
+                console.log(`[API] Deleted user ${id}`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+            } else {
+                res.writeHead(404);
+                res.end(JSON.stringify({ error: 'Not found' }));
+            }
+        } catch (e) {
+            console.error('[API] Error deleting user:', e);
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'Server Error' }));
         }
         return;
     }
@@ -1710,13 +1753,15 @@ const server = http.createServer(async (req, res) => {
         req.on('end', async () => {
             try {
                 const newData = JSON.parse(body);
-                const newCustomer = {
-                    id: 'CRM-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-                    ...newData
-                };
-                db.customers = db.customers || [];
-                db.customers.unshift(newCustomer);
-                await saveData();
+                const newCustomer = await updateDb(() => {
+                    const customer = {
+                        id: 'CRM-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+                        ...newData
+                    };
+                    db.customers = db.customers || [];
+                    db.customers.unshift(customer);
+                    return customer;
+                });
                 res.writeHead(201, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(newCustomer));
             } catch(e) {
@@ -1736,35 +1781,36 @@ const server = http.createServer(async (req, res) => {
             return res.end(JSON.stringify({ error: 'Forbidden' }));
         }
         try {
-            let list = db.customers || [];
-            const originalCount = list.length;
-            
-            // 1. Remove entries lacking essential info
-            list = list.filter(c => 
-                c.address && c.address.trim() !== '' &&
-                c.contactName && c.contactName.trim() !== '' &&
-                c.email && c.email.trim() !== '' &&
-                c.phone && c.phone.trim() !== ''
-            );
+            const result = await updateDb(() => {
+                let list = db.customers || [];
+                const originalCount = list.length;
+                
+                // 1. Remove entries lacking essential info
+                list = list.filter(c => 
+                    c.address && c.address.trim() !== '' &&
+                    c.contactName && c.contactName.trim() !== '' &&
+                    c.email && c.email.trim() !== '' &&
+                    c.phone && c.phone.trim() !== ''
+                );
 
-            // 2. Remove duplicates based on businessNumber (Keep first occurrence)
-            const seenBizNos = new Set();
-            const deduplicated = [];
-            for (const c of list) {
-                if (c.businessNumber && c.businessNumber.trim() !== '') {
-                    if (seenBizNos.has(c.businessNumber)) {
-                        continue; // skip duplicate
+                // 2. Remove duplicates based on businessNumber (Keep first occurrence)
+                const seenBizNos = new Set();
+                const deduplicated = [];
+                for (const c of list) {
+                    if (c.businessNumber && c.businessNumber.trim() !== '') {
+                        if (seenBizNos.has(c.businessNumber)) {
+                            continue; // skip duplicate
+                        }
+                        seenBizNos.add(c.businessNumber);
                     }
-                    seenBizNos.add(c.businessNumber);
+                    deduplicated.push(c);
                 }
-                deduplicated.push(c);
-            }
-            db.customers = deduplicated;
-            
-            await saveData();
+                db.customers = deduplicated;
+                return { originalCount, newCount: db.customers.length };
+            });
             
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, originalCount, newCount: db.customers.length }));
+            res.end(JSON.stringify({ success: true, originalCount: result.originalCount, newCount: result.newCount }));
         } catch(e) {
             console.error('[API] Error purging customers:', e);
             res.writeHead(500);
@@ -1786,12 +1832,18 @@ const server = http.createServer(async (req, res) => {
         req.on('end', async () => {
             try {
                 const updates = JSON.parse(body);
-                const index = (db.customers || []).findIndex(c => c.id === id);
-                if (index !== -1) {
-                    db.customers[index] = { ...db.customers[index], ...updates };
-                    await saveData();
+                const updatedCustomer = await updateDb(() => {
+                    const index = (db.customers || []).findIndex(c => c.id === id);
+                    if (index !== -1) {
+                        db.customers[index] = { ...db.customers[index], ...updates };
+                        return db.customers[index];
+                    }
+                    return null;
+                });
+                
+                if (updatedCustomer) {
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(db.customers[index]));
+                    res.end(JSON.stringify(updatedCustomer));
                 } else {
                     res.writeHead(404);
                     res.end(JSON.stringify({ error: 'Not found' }));
@@ -1821,25 +1873,25 @@ const server = http.createServer(async (req, res) => {
                     return;
                 }
 
-                const newId = generateId('Q', data.userId, data.customerName, db.quotations);
-
-                const newQuote = {
-                    id: newId,
-                    userId: data.userId,
-                    items: data.items,
-                    totalAmount: data.totalAmount || 0,
-                    customerName: data.customerName || '',
-                    customerNumber: data.customerNumber || '',
-                    customerInfo: data.customerInfo,
-                    status: data.status || 'SUBMITTED',
-                    createdAt: new Date().toISOString(),
-                    memo: data.memo, // Save Inquiry Memo
-                    attachments: data.attachments || []
-                };
-
-                db.quotations.unshift(newQuote); // Add to beginning
-                await saveData(); // <--- SAVE
-                console.log(`[API] Saved quotation ${newId} for user ${data.userId}`);
+                const newQuote = await updateDb(() => {
+                    const newId = generateId('Q', data.userId, data.customerName, db.quotations);
+                    const quote = {
+                        id: newId,
+                        userId: data.userId,
+                        items: data.items,
+                        totalAmount: data.totalAmount || 0,
+                        customerName: data.customerName || '',
+                        customerNumber: data.customerNumber || '',
+                        customerInfo: data.customerInfo,
+                        status: data.status || 'SUBMITTED',
+                        createdAt: new Date().toISOString(),
+                        memo: data.memo, // Save Inquiry Memo
+                        attachments: data.attachments || []
+                    };
+                    db.quotations.unshift(quote); // Add to beginning
+                    return quote;
+                });
+                console.log(`[API] Saved quotation ${newQuote.id} for user ${data.userId}`);
 
                 // Invalidate cache to force snapshot recalculation on next fetch
                 inventoryCache.gzippedData = null;
@@ -1894,11 +1946,16 @@ const server = http.createServer(async (req, res) => {
         req.on('end', async () => {
             try {
                 const updates = JSON.parse(body);
-                const index = db.quotations.findIndex(q => q.id === id);
+                const updatedQuote = await updateDb(() => {
+                    const index = db.quotations.findIndex(q => q.id === id);
+                    if (index !== -1) {
+                        db.quotations[index] = { ...db.quotations[index], ...updates };
+                        return db.quotations[index];
+                    }
+                    return null;
+                });
 
-                if (index !== -1) {
-                    db.quotations[index] = { ...db.quotations[index], ...updates };
-                    await saveData();
+                if (updatedQuote) {
                     console.log(`[API] Updated quotation ${id}`);
 
                     // Invalidate cache to force snapshot recalculation on next fetch
@@ -1907,7 +1964,7 @@ const server = http.createServer(async (req, res) => {
                     inventoryCache.timestamp = 0;
 
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(db.quotations[index]));
+                    res.end(JSON.stringify(updatedQuote));
                 } else {
                     res.writeHead(404, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Quotation not found' }));
@@ -1930,27 +1987,26 @@ const server = http.createServer(async (req, res) => {
                 const data = JSON.parse(body);
 
                 // Extract Customer Name (try top level or inside customer object)
-                const custName = data.customerName || (data.customer && data.customer.company_name) || '';
-
-                const newId = generateId('PO', data.userId, custName, db.orders);
-
-                const newOrder = {
-                    id: newId,
-                    userId: data.userId,
-                    items: data.items,
-                    totalAmount: data.totalAmount || 0,
-                    customerName: custName,
-                    customerNumber: data.customerNumber || '',
-                    customerInfo: data.customerInfo,
-                    status: data.status || 'submitted',
-                    createdAt: new Date().toISOString(),
-                    memo: data.memo,
-                    attachments: data.attachments || []
-                };
-
-                db.orders.unshift(newOrder);
-                await saveData(); // <--- SAVE
-                console.log(`[API] Created order ${newId}`);
+                const newOrder = await updateDb(() => {
+                    const custName = data.customerName || (data.customer && data.customer.company_name) || '';
+                    const newId = generateId('PO', data.userId, custName, db.orders);
+                    const order = {
+                        id: newId,
+                        userId: data.userId,
+                        items: data.items,
+                        totalAmount: data.totalAmount || 0,
+                        customerName: custName,
+                        customerNumber: data.customerNumber || '',
+                        customerInfo: data.customerInfo,
+                        status: data.status || 'submitted',
+                        createdAt: new Date().toISOString(),
+                        memo: data.memo,
+                        attachments: data.attachments || []
+                    };
+                    db.orders.unshift(order);
+                    return order;
+                });
+                console.log(`[API] Created order ${newOrder.id}`);
 
                 // Invalidate cache to force snapshot recalculation on next fetch
                 inventoryCache.gzippedData = null;
@@ -2004,12 +2060,16 @@ const server = http.createServer(async (req, res) => {
         req.on('end', async () => {
             try {
                 const updates = JSON.parse(body);
-                const index = db.orders.findIndex(o => o.id === id);
+                const updatedOrder = await updateDb(() => {
+                    const index = db.orders.findIndex(o => o.id === id);
+                    if (index !== -1) {
+                        db.orders[index] = { ...db.orders[index], ...updates };
+                        return db.orders[index];
+                    }
+                    return null;
+                });
 
-                if (index !== -1) {
-                    // Update the order in memory
-                    db.orders[index] = { ...db.orders[index], ...updates };
-                    await saveData(); // <--- SAVE
+                if (updatedOrder) {
                     console.log(`[API] Updated order ${id}`);
 
                     // Invalidate cache to force snapshot recalculation on next fetch
@@ -2018,8 +2078,7 @@ const server = http.createServer(async (req, res) => {
                     inventoryCache.timestamp = 0;
 
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(db.orders[index]));
-
+                    res.end(JSON.stringify(updatedOrder));
                 } else {
                     res.writeHead(404, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Not found' }));
@@ -2036,34 +2095,33 @@ const server = http.createServer(async (req, res) => {
     // POST /api/admin/orders/:id/retract (Retract Order to Quote)
     if (req.method === 'POST' && url.pathname.startsWith('/api/admin/orders/') && url.pathname.endsWith('/retract')) {
         const id = url.pathname.split('/')[4];
-        const orderIndex = db.orders.findIndex(o => o.id === id);
+        try {
+            const result = await updateDb(() => {
+                const orderIndex = db.orders.findIndex(o => o.id === id);
+                if (orderIndex !== -1) {
+                    const order = db.orders[orderIndex];
+                    const newQuote = {
+                        ...order,
+                        id: (order.meta && order.meta.linkedQuoteId) ? order.meta.linkedQuoteId : (order.poNumber || order.id),
+                        status: 'SUBMITTED',
+                        document_type: 'QUOTATION'
+                    };
 
-        if (orderIndex !== -1) {
-            const order = db.orders[orderIndex];
-            
-            // Construct a Quote object from the Order back to SUBMITTED status
-            const newQuote = {
-                ...order,
-                id: (order.meta && order.meta.linkedQuoteId) ? order.meta.linkedQuoteId : (order.poNumber || order.id), // Re-use Original Quote ID if possible
-                status: 'SUBMITTED', // '견적접수' state
-                document_type: 'QUOTATION'
-            };
+                    db.orders.splice(orderIndex, 1);
 
-            // Remove order from db.orders
-            db.orders.splice(orderIndex, 1);
+                    const quoteIndex = db.quotations.findIndex(q => q.id === newQuote.id);
+                    if (quoteIndex !== -1) {
+                        db.quotations[quoteIndex] = { ...db.quotations[quoteIndex], ...newQuote };
+                    } else {
+                        db.quotations.unshift(newQuote);
+                    }
+                    return { quote: newQuote };
+                }
+                return null;
+            });
 
-            // Add or update in db.quotations
-            const quoteIndex = db.quotations.findIndex(q => q.id === newQuote.id);
-            if (quoteIndex !== -1) {
-                // If the quote already existed, overwrite it to bring it back to SUBMITTED with the latest order details
-                db.quotations[quoteIndex] = { ...db.quotations[quoteIndex], ...newQuote };
-            } else {
-                db.quotations.unshift(newQuote);
-            }
-
-            try {
-                await saveData();
-                console.log(`[API] Retracted order ${id} to quote ${newQuote.id}`);
+            if (result) {
+                console.log(`[API] Retracted order ${id} to quote ${result.quote.id}`);
 
                 // Invalidate cache to force snapshot recalculation on next fetch
                 inventoryCache.gzippedData = null;
@@ -2071,15 +2129,15 @@ const server = http.createServer(async (req, res) => {
                 inventoryCache.timestamp = 0;
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true, quote: newQuote }));
-            } catch (e) {
-                console.error(e);
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Server Error saving data' }));
+                res.end(JSON.stringify({ success: true, quote: result.quote }));
+            } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Order not found' }));
             }
-        } else {
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Order not found' }));
+        } catch (e) {
+            console.error(e);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Server Error' }));
         }
         return;
     }
@@ -2092,16 +2150,19 @@ const server = http.createServer(async (req, res) => {
         req.on('end', async () => {
             try {
                 const updates = JSON.parse(body);
-                const index = db.quotations.findIndex(q => q.id === id);
+                const updatedQuote = await updateDb(() => {
+                    const index = db.quotations.findIndex(q => q.id === id);
+                    if (index !== -1) {
+                        db.quotations[index] = { ...db.quotations[index], ...updates };
+                        return db.quotations[index];
+                    }
+                    return null;
+                });
 
-                if (index !== -1) {
-                    // Update the quotation in memory
-                    db.quotations[index] = { ...db.quotations[index], ...updates };
-                    await saveData(); // <--- SAVE
+                if (updatedQuote) {
                     console.log(`[API] Updated quotation ${id}`);
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(db.quotations[index]));
-
+                    res.end(JSON.stringify(updatedQuote));
                 } else {
                     res.writeHead(404, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Not found' }));
@@ -2118,18 +2179,28 @@ const server = http.createServer(async (req, res) => {
     // DELETE /api/my/quotations/:id
     if (req.method === 'DELETE' && url.pathname.startsWith('/api/my/quotations/')) {
         const id = url.pathname.split('/').pop();
-        const index = db.quotations.findIndex(q => q.id === id);
+        try {
+            const success = await updateDb(() => {
+                const index = db.quotations.findIndex(q => q.id === id);
+                if (index !== -1) {
+                    db.quotations.splice(index, 1);
+                    return true;
+                }
+                return false;
+            });
 
-        if (index !== -1) {
-            db.quotations.splice(index, 1);
-            await saveData(); // <--- SAVE
-            console.log(`[API] Deleted quotation ${id}`);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true }));
-
-        } else {
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Not found' }));
+            if (success) {
+                console.log(`[API] Deleted quotation ${id}`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+            } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Not found' }));
+            }
+        } catch (e) {
+            console.error(e);
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'Server Error' }));
         }
         return;
     }
@@ -2137,18 +2208,28 @@ const server = http.createServer(async (req, res) => {
     // DELETE /api/my/orders/:id
     if (req.method === 'DELETE' && url.pathname.startsWith('/api/my/orders/')) {
         const id = url.pathname.split('/').pop();
-        const index = db.orders.findIndex(o => o.id === id);
+        try {
+            const success = await updateDb(() => {
+                const index = db.orders.findIndex(o => o.id === id);
+                if (index !== -1) {
+                    db.orders.splice(index, 1);
+                    return true;
+                }
+                return false;
+            });
 
-        if (index !== -1) {
-            db.orders.splice(index, 1);
-            await saveData(); // <--- SAVE
-            console.log(`[API] Deleted order ${id}`);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true }));
-
-        } else {
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Not found' }));
+            if (success) {
+                console.log(`[API] Deleted order ${id}`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+            } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Not found' }));
+            }
+        } catch (e) {
+            console.error(e);
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'Server Error' }));
         }
         return;
     }
