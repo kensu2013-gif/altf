@@ -3,6 +3,7 @@ import { Users, MapPin, Building2, TrendingUp, Search, Contact, Activity, AlertT
 import { useStore } from '../../store/useStore';
 import { useInventory } from '../../hooks/useInventory';
 import type { Product, Quotation } from '../../types';
+import { calculateCustomerGrade } from '../../lib/customerUtils';
 
 interface Customer {
     id: string;
@@ -75,6 +76,11 @@ interface CompanyIntelCard {
   ltv: number;                   // LTV: 연환산 매출 (12개월 기준)
   marketingAction: string;
   marketingTargetItems: string[]; // 추가 제안 가능한 품목
+  customerGrade?: {
+    grade: '신규' | '성장' | '우수' | '일반' | '이탈위험';
+    badgeColor: string;
+    reason: string;
+  };
 }
 
 // 마케팅 타겟 판단 기준
@@ -1489,6 +1495,15 @@ const actionIntel = useMemo(() => {
         'T(R)-S10S-40A X 25A-STS304-W','R(C)-S10S-50A X 40A-STS304-W',
       ].filter(k => !orderedKeys.has(k)).slice(0, 3);
 
+      const matchedCustForBiz = customersList.find(cust => cust.companyName === c.companyName);
+      const customerGrade = calculateCustomerGrade(
+        orders,
+        c.companyName,
+        matchedCustForBiz?.businessNumber || '',
+        undefined,
+        customersList
+      );
+
       return {
         companyName: c.companyName, region: c.region,
         contactName: c.contactName, phone: c.phone,
@@ -1500,6 +1515,7 @@ const actionIntel = useMemo(() => {
         lastOrderDate:  lastOrder?.toISOString().split('T')[0]  || null,
         status, growthRate, urgencyScore, marketingAction, suggestItems,
         monthlyData, topItems,
+        customerGrade
       };
     });
 
@@ -2430,6 +2446,11 @@ const actionIntel = useMemo(() => {
                                       card.region === '전라도' ? 'bg-rose-100 text-rose-700' :
                                       'bg-slate-100 text-slate-600'
                                     }`}>{card.region}</span>
+                                    {card.customerGrade && (
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border leading-none scale-95 origin-left ${card.customerGrade.badgeColor}`} title={card.customerGrade.reason}>
+                                        {card.customerGrade.grade}
+                                      </span>
+                                    )}
                                     <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
                                       card.status === 'CHURN_RISK' ? 'bg-rose-200 text-rose-700' :
                                       card.status === 'DORMANT'    ? 'bg-amber-200 text-amber-700' :
