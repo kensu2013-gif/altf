@@ -124,6 +124,7 @@ interface MockImportedItem {
 export default function Search() {
     const navigate = useNavigate();
     const { addItem, quotation, logout, inventory, fetchInventory, startUpload } = useStore();
+    const user = useStore(state => state.auth.user);
     const { isLoading, error: loadError } = useInventory(); // Using hook to ensure data is fetched
 
     // --- State Management ---
@@ -579,6 +580,13 @@ export default function Search() {
             : `${apiUrl}/api/quote/import`;
 
         formData.append('callback_url', callbackUrl);
+
+        if (user) {
+            formData.append('user_id', user.id || '');
+            formData.append('user_email', user.email || '');
+            formData.append('company_name', user.companyName || '');
+            formData.append('contact_name', user.contactName || '');
+        }
 
         try {
             // 3. Send to Make.com Webhook
