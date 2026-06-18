@@ -437,15 +437,7 @@ export default function QuotationEditor() {
             useStore.getState().addQuotation(payloadData);
             incrementNewOrderCount();
 
-            if (silentSave) {
-                // Instead of completely suppressing, show notification but do NOT navigate away
-                setSuccessConfig({
-                    isOpen: true,
-                    title: '견적서 저장 완료',
-                    description: '견적서가 성공적으로 저장되었습니다.\n나의 페이지에서 확인하실 수 있습니다.',
-                    navigateOnConfirm: false
-                });
-            } else {
+            if (!silentSave) {
                 setSuccessConfig({
                     isOpen: true,
                     title: '견적서 저장 완료',
@@ -682,7 +674,12 @@ export default function QuotationEditor() {
                         {previewContent && (
                             <PreviewModal
                                 htmlContent={previewContent}
-                                onClose={() => setPreviewContent(null)}
+                                onClose={() => {
+                                    setPreviewContent(null);
+                                    if (previewDocType === 'QUOTATION') {
+                                        clearQuotation();
+                                    }
+                                }}
                                 docType={previewDocType}
                                 onSend={previewDocType === 'ORDER' ? () => handleSendOrder() : undefined}
                                 onPrint={undefined}
