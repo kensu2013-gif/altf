@@ -82,6 +82,34 @@ export default function QuotationEditor() {
             .catch(console.error);
     }, [user, setOrders]);
 
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowIndex: number, colIndex: number) => {
+        let nextRow = rowIndex;
+        let nextCol = colIndex;
+
+        if (e.key === 'ArrowUp') {
+            nextRow = rowIndex - 1;
+        } else if (e.key === 'ArrowDown' || e.key === 'Enter') {
+            nextRow = rowIndex + 1;
+        } else if (e.key === 'ArrowLeft') {
+            nextCol = colIndex - 1;
+        } else if (e.key === 'ArrowRight') {
+            nextCol = colIndex + 1;
+        } else {
+            return;
+        }
+
+        if (nextRow !== rowIndex || nextCol !== colIndex) {
+            e.preventDefault();
+            const nextInput = document.querySelector(`input[data-row="${nextRow}"][data-col="${nextCol}"]`) as HTMLInputElement | null;
+            if (nextInput) {
+                nextInput.focus();
+                if (nextInput.type === 'text' || nextInput.type === 'number') {
+                    nextInput.select();
+                }
+            }
+        }
+    };
+
     const navigate = useNavigate();
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [attachmentFiles, setAttachmentFiles] = useState<File[]>(uploadState.attachedFile ? [uploadState.attachedFile] : []);
@@ -120,14 +148,33 @@ export default function QuotationEditor() {
     });
 
     // Standalone Customer Info for Quotation
-    const [quotationCustomerInfo, setQuotationCustomerInfo] = useState({
-        companyName: '',
-        contactName: '',
-        phone: '',
-        email: '',
-        address: '',
-        bizNo: ''
+    const [quotationCustomerInfo, setQuotationCustomerInfo] = useState(() => {
+        const currentUser = useStore.getState().auth.user;
+        return {
+            companyName: currentUser?.companyName || '',
+            contactName: currentUser?.contactName || '',
+            phone: currentUser?.phone || '',
+            email: currentUser?.email || '',
+            address: currentUser?.address || '',
+            bizNo: currentUser?.bizNo || ''
+        };
     });
+
+    useEffect(() => {
+        if (user) {
+            const timer = setTimeout(() => {
+                setQuotationCustomerInfo({
+                    companyName: user.companyName || '',
+                    contactName: user.contactName || '',
+                    phone: user.phone || '',
+                    email: user.email || '',
+                    address: user.address || '',
+                    bizNo: user.bizNo || ''
+                });
+            }, 0);
+            return () => clearTimeout(timer);
+        }
+    }, [user]);
 
     interface CrmCustomerOption {
         id: string;
@@ -388,6 +435,7 @@ export default function QuotationEditor() {
             }
 
             useStore.getState().addQuotation(payloadData);
+            incrementNewOrderCount();
 
             if (silentSave) {
                 // Instead of completely suppressing, show notification but do NOT navigate away
@@ -495,7 +543,16 @@ export default function QuotationEditor() {
                 return isStockOrder(targetCustomer, order.customerName || '');
             });
 
-            const pendingStockItems: any[] = [];
+            interface PendingStockItem {
+                poNumber: string;
+                poDate: string;
+                name: string;
+                thickness: string;
+                size: string;
+                material: string;
+                quantity: number;
+            }
+            const pendingStockItems: PendingStockItem[] = [];
             pendingStockOrders.forEach(order => {
                 const itemsList = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
                 itemsList.forEach(pi => {
@@ -565,7 +622,7 @@ export default function QuotationEditor() {
     const handleAnimationComplete = () => {
         setShowSuccessAnimation(false);
         clearQuotation();
-        navigate('/my', { state: { activeTab: 'orders' } });
+        navigate('/my-page', { state: { activeTab: 'orders' } });
     };
 
     return (
@@ -755,6 +812,9 @@ export default function QuotationEditor() {
                                                             <input
                                                                 type="text"
                                                                 aria-label="Item Name"
+                                                                data-row={index}
+                                                                data-col={0}
+                                                                onKeyDown={(e) => handleKeyDown(e, index, 0)}
                                                                 className="w-full h-full px-3 py-3 bg-transparent border-none outline-none focus:bg-white focus:ring-2 focus:ring-inset focus:ring-teal-500 text-center text-slate-900 font-bold text-sm"
                                                                 value={item.name}
                                                                 onChange={(e) => handleUpdate(item.id, 'name', e.target.value)}
@@ -764,6 +824,9 @@ export default function QuotationEditor() {
                                                             <input
                                                                 type="text"
                                                                 aria-label="Thickness"
+                                                                data-row={index}
+                                                                data-col={1}
+                                                                onKeyDown={(e) => handleKeyDown(e, index, 1)}
                                                                 className="w-full h-full px-3 py-3 bg-transparent border-none outline-none focus:bg-white focus:ring-2 focus:ring-inset focus:ring-teal-500 text-center text-slate-600 font-medium"
                                                                 value={item.thickness}
                                                                 onChange={(e) => handleUpdate(item.id, 'thickness', e.target.value)}
@@ -773,6 +836,9 @@ export default function QuotationEditor() {
                                                             <input
                                                                 type="text"
                                                                 aria-label="Size"
+                                                                data-row={index}
+                                                                data-col={2}
+                                                                onKeyDown={(e) => handleKeyDown(e, index, 2)}
                                                                 className="w-full h-full px-3 py-3 bg-transparent border-none outline-none focus:bg-white focus:ring-2 focus:ring-inset focus:ring-teal-500 text-center text-slate-700 font-bold"
                                                                 value={item.size}
                                                                 onChange={(e) => handleUpdate(item.id, 'size', e.target.value)}
@@ -782,6 +848,9 @@ export default function QuotationEditor() {
                                                             <input
                                                                 type="text"
                                                                 aria-label="Material"
+                                                                data-row={index}
+                                                                data-col={3}
+                                                                onKeyDown={(e) => handleKeyDown(e, index, 3)}
                                                                 className="w-full h-full px-3 py-3 bg-transparent border-none outline-none focus:bg-white focus:ring-2 focus:ring-inset focus:ring-teal-500 text-center text-slate-600 font-medium"
                                                                 value={item.material}
                                                                 onChange={(e) => handleUpdate(item.id, 'material', e.target.value)}
@@ -837,6 +906,9 @@ export default function QuotationEditor() {
                                                                         type="number"
                                                                         min="1"
                                                                         aria-label="Quantity"
+                                                                        data-row={index}
+                                                                        data-col={4}
+                                                                        onKeyDown={(e) => handleKeyDown(e, index, 4)}
                                                                         className="w-full text-center font-bold text-slate-900 bg-transparent border-none outline-none focus:ring-0 p-0 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                         value={item.quantity}
                                                                         onChange={(e) => handleUpdate(item.id, 'quantity', parseInt(e.target.value) || 1)}
@@ -958,7 +1030,30 @@ export default function QuotationEditor() {
                                         type="text"
                                         value={quotationCustomerInfo.companyName}
                                         onChange={e => {
-                                            setQuotationCustomerInfo(p => ({ ...p, companyName: e.target.value }));
+                                            const newCompanyName = e.target.value;
+                                            setQuotationCustomerInfo(p => {
+                                                if (user && newCompanyName !== user.companyName) {
+                                                    return {
+                                                        companyName: newCompanyName,
+                                                        contactName: '',
+                                                        phone: '',
+                                                        email: '',
+                                                        address: '',
+                                                        bizNo: ''
+                                                    };
+                                                }
+                                                if (user && newCompanyName === user.companyName) {
+                                                    return {
+                                                        companyName: user.companyName || '',
+                                                        contactName: user.contactName || '',
+                                                        phone: user.phone || '',
+                                                        email: user.email || '',
+                                                        address: user.address || '',
+                                                        bizNo: user.bizNo || ''
+                                                    };
+                                                }
+                                                return { ...p, companyName: newCompanyName };
+                                            });
                                             setShowSuggestions(true);
                                         }}
                                         onFocus={() => setShowSuggestions(true)}
@@ -1097,8 +1192,9 @@ export default function QuotationEditor() {
                 confirmVariant="primary"
                 onConfirm={() => {
                     setSuccessConfig(prev => ({ ...prev, isOpen: false }));
+                    clearQuotation();
                     if (successConfig.navigateOnConfirm) {
-                        navigate('/my');
+                        navigate('/my-page');
                     }
                 }}
             // No onCancel provided -> Renders single OK button

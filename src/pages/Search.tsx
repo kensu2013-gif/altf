@@ -69,7 +69,7 @@ const ITEM_CATEGORIES = [
     {
         label: "엘보 (ELBOW)",
         value: "ELBOW",
-        keywords: ["ELBOW", "E/L", "45E", "90E"],
+        keywords: ["ELBOW", "E/L", "45E", "90E", "E(L)", "E(S)"],
         subs: [
             { label: "90° 롱(LONG)", value: "90E(L)" },
             { label: "90° 숏(SHORT)", value: "90E(S)" },
@@ -80,7 +80,7 @@ const ITEM_CATEGORIES = [
     {
         label: "티 (TEE)",
         value: "TEE",
-        keywords: ["TEE"],
+        keywords: ["TEE", "T(S)", "T(R)"],
         subs: [
             { label: "동일(STRAIGHT)", value: "T(S)" },
             { label: "이종(REDUCING)", value: "T(R)" },
@@ -89,7 +89,7 @@ const ITEM_CATEGORIES = [
     {
         label: "레듀샤 (REDUCER)",
         value: "REDUCER",
-        keywords: ["REDUCER", "C.R", "E.R"],
+        keywords: ["REDUCER", "C.R", "E.R", "R(C)", "R(E)"],
         subs: [
             { label: "동심(CON)", value: "R(C)" },
             { label: "편심(ECC)", value: "R(E)" },
@@ -98,7 +98,7 @@ const ITEM_CATEGORIES = [
     {
         label: "캡 (CAP)",
         value: "CAP",
-        keywords: ["CAP"],
+        keywords: ["CAP", "Cap", "cap"],
         subs: []
     }
 ];
@@ -255,8 +255,8 @@ export default function Search() {
                     // Specific Subs
                     filtered = filtered.filter(item => selectedNameFilters.some(sub => item.name.includes(sub)));
                 } else {
-                    // Broad Category Match
-                    filtered = filtered.filter(item => categoryDef.keywords.some(k => item.name.includes(k)));
+                    // Broad Category Match (Case-insensitive)
+                    filtered = filtered.filter(item => categoryDef.keywords.some(k => item.name.toLowerCase().includes(k.toLowerCase())));
                 }
             }
         }
@@ -834,7 +834,7 @@ export default function Search() {
                             transition={{ delay: 0.2 }}
                             className="flex flex-col items-center gap-2"
                         >
-                            <div className="flex bg-white/60 backdrop-blur-md p-1.5 rounded-xl border border-white/40 shadow-sm flex items-center gap-1 ring-1 ring-slate-200/50">
+                            <div className="flex items-center gap-1 bg-white/60 backdrop-blur-md p-1.5 rounded-xl border border-white/40 shadow-sm ring-1 ring-slate-200/50">
                                 {Object.values(STANDARD_SYSTEMS).map((sys) => (
                                     <button
                                         key={sys.value}
@@ -1232,7 +1232,7 @@ export default function Search() {
                         )}
 
                         {/* Sticky Bottom Action Bar */}
-                        <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-white/40 p-4 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-[100] flex items-center justify-between">
+                        <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-white/40 p-4 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-100 flex items-center justify-between">
                             <div className="max-w-[1240px] mx-auto w-full flex items-center justify-between px-4">
                                 <button
                                     onClick={() => {
@@ -1361,7 +1361,7 @@ export default function Search() {
                         initial={{ opacity: 0, y: 20, x: "-50%" }}
                         animate={{ opacity: 1, y: 0, x: "-50%" }}
                         exit={{ opacity: 0, y: 20, x: "-50%" }}
-                        className="fixed bottom-40 left-1/2 bg-slate-900/90 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 z-[110] backdrop-blur"
+                        className="fixed bottom-40 left-1/2 bg-slate-900/90 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 z-110 backdrop-blur"
                     >
                         <CheckCircle className="w-5 h-5 text-teal-400" />
                         <span className="text-sm font-medium">{notification}</span>
