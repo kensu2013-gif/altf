@@ -255,42 +255,7 @@ async function loadData() {
                 console.error('[CLEANUP] Error during self-healing database cleanup:', cleanupErr);
             }
 
-            // Temporary self-healing block to delete June 19, 2026 data and allow recalculation on refresh
-            try {
-                let j19Updated = false;
-                const targetDate = '2026-06-19';
-
-                if (db.inventoryHistory && Array.isArray(db.inventoryHistory)) {
-                    const originalLength = db.inventoryHistory.length;
-                    db.inventoryHistory = db.inventoryHistory.filter(h => h.date !== targetDate);
-                    if (db.inventoryHistory.length !== originalLength) {
-                        j19Updated = true;
-                        console.log(`[CLEANUP-J19] Deleted inventoryHistory on ${targetDate}`);
-                    }
-                }
-
-                if (db.daekyungHistory && Array.isArray(db.daekyungHistory)) {
-                    const originalLength = db.daekyungHistory.length;
-                    db.daekyungHistory = db.daekyungHistory.filter(h => h.date !== targetDate);
-                    if (db.daekyungHistory.length !== originalLength) {
-                        j19Updated = true;
-                        console.log(`[CLEANUP-J19] Deleted daekyungHistory on ${targetDate}`);
-                    }
-                }
-
-                if (db.lastSnapshotDate === targetDate) {
-                    db.lastSnapshotDate = '2026-06-18';
-                    j19Updated = true;
-                    console.log(`[CLEANUP-J19] Reset lastSnapshotDate from ${targetDate} to 2026-06-18`);
-                }
-
-                if (j19Updated) {
-                    console.log('[CLEANUP-J19] Saving database after June 19 cleanup...');
-                    await saveData();
-                }
-            } catch (cleanupErr) {
-                console.error('[CLEANUP-J19] Error during June 19 self-healing database cleanup:', cleanupErr);
-            }
+            // June 19 self-healing block removed
         } else {
             // Seed Initial Admin if file doesn't exist
             db.users = [
@@ -1866,6 +1831,40 @@ const server = http.createServer(async (req, res) => {
 
         try {
             await updateDb(async () => {
+                // Restore baseline from the to-be-deleted record before actual deletion to prevent baseline corruption
+                const sihwaRecord = db.inventoryHistory ? db.inventoryHistory.find(h => h.date === dateToDelete) : null;
+                if (sihwaRecord && Array.isArray(sihwaRecord.diff)) {
+                    sihwaRecord.diff.forEach(diff => {
+                        const prev = db.lastSnapshot[diff.id];
+                        if (prev) {
+                            prev.sh_qty = diff.from;
+                            prev.stock = diff.from;
+                        } else {
+                            db.lastSnapshot[diff.id] = {
+                                name: diff.name,
+                                stock: diff.from,
+                                sh_qty: diff.from
+                            };
+                        }
+                    });
+                }
+                const daekyungRecord = db.daekyungHistory ? db.daekyungHistory.find(h => h.date === dateToDelete) : null;
+                if (daekyungRecord && Array.isArray(daekyungRecord.diff)) {
+                    daekyungRecord.diff.forEach(diff => {
+                        const prev = db.lastDaekyungSnapshot[diff.id];
+                        if (prev) {
+                            prev.ys_qty = diff.from;
+                            prev.stock = diff.from;
+                        } else {
+                            db.lastDaekyungSnapshot[diff.id] = {
+                                name: diff.name,
+                                stock: diff.from,
+                                ys_qty: diff.from
+                            };
+                        }
+                    });
+                }
+
                 db.inventoryHistory = (db.inventoryHistory || []).filter(h => h.date !== dateToDelete);
                 db.daekyungHistory = (db.daekyungHistory || []).filter(h => h.date !== dateToDelete);
 
@@ -1886,11 +1885,57 @@ const server = http.createServer(async (req, res) => {
                 }
             });
 
-            console.log(`[API] Deleted inventory history for date: ${dateToDelete}`);
+            console.log(`[API] Deleted inventory history for date: ${dateToDelete} and restored baseline values.`);
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, message: `Successfully deleted history for ${dateToDelete}` }));
+            res.end(JSON.stringify({ success: true, message: `Successfully deleted history for ${dateToDelete} and restored baseline.` }));
         } catch (e) {
             console.error('[API] Failed to delete inventory history:', e);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Internal Server Error' }));
+        }
+        return;
+    }
+
+    // POST /api/admin/inventory-history/restore-baseline
+    if (req.method === 'POST' && url.pathname === '/api/admin/inventory-history/restore-baseline') {
+        const session = getAuthenticatedSession(req);
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
+            res.writeHead(403);
+            return res.end(JSON.stringify({ error: 'Forbidden' }));
+        }
+
+        try {
+            const { getPreviousDbVersion } = await import('./s3-db.js');
+            const cutoffDate = '2026-06-19T00:00:00+09:00'; 
+            console.log(`[API] Restoring baseline from S3 DB version older than ${cutoffDate}...`);
+            const prevDb = await getPreviousDbVersion(cutoffDate);
+            if (!prevDb) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ error: 'No previous S3 DB version found before 6/19' }));
+            }
+
+            await updateDb(async () => {
+                if (prevDb.lastSnapshot) {
+                    db.lastSnapshot = prevDb.lastSnapshot;
+                }
+                if (prevDb.lastDaekyungSnapshot) {
+                    db.lastDaekyungSnapshot = prevDb.lastDaekyungSnapshot;
+                }
+                db.lastSnapshotDate = '2026-06-18';
+                
+                // Hotpatch target item to ensure 146 EA baseline
+                const targetSku = '90E(L)-S10S-25A-STS304-W';
+                if (db.lastSnapshot[targetSku]) {
+                    db.lastSnapshot[targetSku].sh_qty = 146;
+                    db.lastSnapshot[targetSku].stock = 146;
+                }
+            });
+
+            console.log(`[API] Successfully restored baseline snapshots to 6/18 state.`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, message: 'Successfully restored baseline snapshots to 6/18 state.' }));
+        } catch (e) {
+            console.error('[API] Failed to restore baseline:', e);
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Internal Server Error' }));
         }
