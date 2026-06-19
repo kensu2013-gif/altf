@@ -1483,54 +1483,7 @@ const server = http.createServer(async (req, res) => {
             }
         }
 
-        // Daekyung (양산) Pending Diff Calculation (Includes already confirmed changes of today)
-        for (const [id, curr] of Object.entries(ysStockMap)) {
-            if (!isValidItem(curr.name)) continue;
-            if (!isYangsanDaekyung(id)) continue;
-            const prev = lastDaekyungSnapshot[id];
-            const ys_from_base = prev ? (prev.ys_qty ?? 0) : 0;
-            const ys_to = curr.ys_qty ?? 0;
-
-            const hist = histDaekyungMap[id];
-            const hist_change = hist ? hist.change : 0;
-            const ys_from = hist ? hist.from : ys_from_base;
-            const ys_change = (ys_to - ys_from_base) + hist_change;
-
-            if (ys_change !== 0) {
-                daekyungPending.push({
-                    id,
-                    name: curr.name,
-                    from: ys_from,
-                    to: ys_to,
-                    change: ys_change,
-                    location: '양산',
-                    maker: '대경'
-                });
-            }
-        }
-        for (const [id, prev] of Object.entries(lastDaekyungSnapshot)) {
-            if (!isValidItem(prev.name)) continue;
-            if (!isYangsanDaekyung(id)) continue;
-            if (ysStockMap[id] === undefined) {
-                const ys_from_base = prev.ys_qty ?? 0;
-                const hist = histDaekyungMap[id];
-                const hist_change = hist ? hist.change : 0;
-                const ys_from = hist ? hist.from : ys_from_base;
-                const ys_change = (0 - ys_from_base) + hist_change;
-
-                if (ys_change !== 0) {
-                    daekyungPending.push({
-                        id,
-                        name: prev.name,
-                        from: ys_from,
-                        to: 0,
-                        change: ys_change,
-                        location: '양산',
-                        maker: '대경'
-                    });
-                }
-            }
-        }
+        // Daekyung (양산) Pending Diff Calculation - Disabled per user request (Only Sihwa stock is analyzed)
 
         sendJsonResponse(req, res, 200, {
             date: today,
@@ -1638,47 +1591,7 @@ const server = http.createServer(async (req, res) => {
                         }
                     });
 
-                    if (isTodayConfirm) {
-                        // First, reset all existing entries in lastDaekyungSnapshot to 0
-                        for (const id of Object.keys(db.lastDaekyungSnapshot)) {
-                            if (db.lastDaekyungSnapshot[id]) {
-                                db.lastDaekyungSnapshot[id].ys_qty = 0;
-                                db.lastDaekyungSnapshot[id].stock = 0;
-                            }
-                        }
-
-                        // Then, sync all items in currentDaekyungSnapshot to lastDaekyungSnapshot (Default baseline)
-                        const ysStockMap = db.currentDaekyungSnapshot || {};
-                        for (const [id, curr] of Object.entries(ysStockMap)) {
-                            const ysQty = curr.ys_qty ?? 0;
-                            if (db.lastDaekyungSnapshot[id]) {
-                                db.lastDaekyungSnapshot[id].ys_qty = ysQty;
-                                db.lastDaekyungSnapshot[id].stock = ysQty;
-                                db.lastDaekyungSnapshot[id].name = curr.name;
-                            } else {
-                                db.lastDaekyungSnapshot[id] = {
-                                    name: curr.name,
-                                    stock: ysQty,
-                                    ys_qty: ysQty
-                                };
-                            }
-                        }
-                    }
-
-                    // Overwrite with confirmed/modified diffs for Yangsan (Custom baseline values)
-                    daekyungDiffs.forEach(diff => {
-                        const prev = db.lastDaekyungSnapshot[diff.id];
-                        if (prev) {
-                            prev.ys_qty = diff.to;
-                            prev.stock = diff.to;
-                        } else {
-                            db.lastDaekyungSnapshot[diff.id] = {
-                                name: diff.name,
-                                stock: diff.to,
-                                ys_qty: diff.to
-                            };
-                        }
-                    });
+                    // Daekyung (양산) baseline sync and updates disabled per user request (Only Sihwa stock is processed)
 
                     db.lastSnapshotDate = date;
                 });
