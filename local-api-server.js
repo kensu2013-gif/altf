@@ -1518,11 +1518,36 @@ const server = http.createServer(async (req, res) => {
                     }
                     todayDaekyungRecord.diff = daekyungDiffs;
 
-                    // 3. Update baselines (lastSnapshot / lastDaekyungSnapshot) ONLY for confirmed diffs
+                    // 3. Update baselines (lastSnapshot / lastDaekyungSnapshot)
                     db.lastSnapshot = db.lastSnapshot || {};
                     db.lastDaekyungSnapshot = db.lastDaekyungSnapshot || {};
 
-                    // Update lastSnapshot for Sihwa based on confirmed diffs
+                    // First, reset all existing entries in lastSnapshot to 0 (to handle deleted items)
+                    for (const id of Object.keys(db.lastSnapshot)) {
+                        if (db.lastSnapshot[id]) {
+                            db.lastSnapshot[id].sh_qty = 0;
+                            db.lastSnapshot[id].stock = 0;
+                        }
+                    }
+
+                    // Then, sync all items in currentSnapshot to lastSnapshot (Default baseline)
+                    const sihwaStockMap = db.currentSnapshot || {};
+                    for (const [id, curr] of Object.entries(sihwaStockMap)) {
+                        const shQty = curr.sh_qty ?? 0;
+                        if (db.lastSnapshot[id]) {
+                            db.lastSnapshot[id].sh_qty = shQty;
+                            db.lastSnapshot[id].stock = shQty;
+                            db.lastSnapshot[id].name = curr.name;
+                        } else {
+                            db.lastSnapshot[id] = {
+                                name: curr.name,
+                                stock: shQty,
+                                sh_qty: shQty
+                            };
+                        }
+                    }
+
+                    // Overwrite with confirmed/modified diffs for Sihwa (Custom baseline values)
                     sihwaDiffs.forEach(diff => {
                         const prev = db.lastSnapshot[diff.id];
                         if (prev) {
@@ -1537,7 +1562,32 @@ const server = http.createServer(async (req, res) => {
                         }
                     });
 
-                    // Update lastDaekyungSnapshot for Yangsan based on confirmed diffs
+                    // First, reset all existing entries in lastDaekyungSnapshot to 0
+                    for (const id of Object.keys(db.lastDaekyungSnapshot)) {
+                        if (db.lastDaekyungSnapshot[id]) {
+                            db.lastDaekyungSnapshot[id].ys_qty = 0;
+                            db.lastDaekyungSnapshot[id].stock = 0;
+                        }
+                    }
+
+                    // Then, sync all items in currentDaekyungSnapshot to lastDaekyungSnapshot (Default baseline)
+                    const ysStockMap = db.currentDaekyungSnapshot || {};
+                    for (const [id, curr] of Object.entries(ysStockMap)) {
+                        const ysQty = curr.ys_qty ?? 0;
+                        if (db.lastDaekyungSnapshot[id]) {
+                            db.lastDaekyungSnapshot[id].ys_qty = ysQty;
+                            db.lastDaekyungSnapshot[id].stock = ysQty;
+                            db.lastDaekyungSnapshot[id].name = curr.name;
+                        } else {
+                            db.lastDaekyungSnapshot[id] = {
+                                name: curr.name,
+                                stock: ysQty,
+                                ys_qty: ysQty
+                            };
+                        }
+                    }
+
+                    // Overwrite with confirmed/modified diffs for Yangsan (Custom baseline values)
                     daekyungDiffs.forEach(diff => {
                         const prev = db.lastDaekyungSnapshot[diff.id];
                         if (prev) {

@@ -140,9 +140,20 @@ async function updateInventory() {
                 rawData = JSON.parse(localRawContent);
             } else {
                 console.log(`[Inventory Source] Production environment or missing local source. Fetching from S3: ${INVENTORY_URL}...`);
-                const response = await fetch(INVENTORY_URL);
-                if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
-                rawData = await response.json();
+                const fetchController = new AbortController();
+                const fetchTimeout = setTimeout(() => fetchController.abort(), 10000);
+                try {
+                    const response = await fetch(INVENTORY_URL, { signal: fetchController.signal });
+                    clearTimeout(fetchTimeout);
+                    if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+                    rawData = await response.json();
+                } catch (fetchErr) {
+                    clearTimeout(fetchTimeout);
+                    if (fetchErr.name === 'AbortError') {
+                        throw new Error(`Fetch timed out for ${INVENTORY_URL} after 10000ms`);
+                    }
+                    throw fetchErr;
+                }
             }
         }
 

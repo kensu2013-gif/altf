@@ -19,6 +19,27 @@ export const s3Client = new S3Client({
 export const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'altf-web-data-prod';
 const DB_KEY = process.env.S3_DB_KEY || 'database/db.json';
 
+// Helper to send S3 commands with a network timeout (defaults to 10 seconds)
+export async function sendWithTimeout(command, timeoutMs = 10000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+        controller.abort();
+    }, timeoutMs);
+    try {
+        const response = await s3Client.send(command, { abortSignal: controller.signal });
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            const timeoutErr = new Error(`S3 request timed out after ${timeoutMs}ms`);
+            timeoutErr.name = 'TimeoutError';
+            throw timeoutErr;
+        }
+        throw error;
+    }
+}
+
 const streamToString = (stream) =>
     new Promise((resolve, reject) => {
         const chunks = [];
@@ -44,23 +65,18 @@ export async function loadDbFromS3() {
             return null;
         }
     }
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-        console.warn('[S3] loadDbFromS3 request timed out after 10s. Aborting...');
-        controller.abort();
-    }, 10000);
 
     try {
         const command = new GetObjectCommand({
             Bucket: BUCKET_NAME,
             Key: DB_KEY
         });
-        const response = await s3Client.send(command, { abortSignal: controller.signal });
+        const response = await sendWithTimeout(command, 10000);
         const bodyContent = await streamToString(response.Body);
         console.log(`[S3] Loaded data from ${BUCKET_NAME}/${DB_KEY}`);
         return JSON.parse(bodyContent);
     } catch (error) {
-        if (error.name === 'AbortError') {
+        if (error.name === 'AbortError' || error.name === 'TimeoutError') {
             console.error('[S3] loadDbFromS3 command aborted due to timeout.');
         }
         if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
@@ -145,7 +161,7 @@ export async function getInventoryFromS3() {
             Bucket: BUCKET_NAME,
             Key: PROCESSED_KEY
         });
-        const response = await s3Client.send(command);
+        const response = await sendWithTimeout(command, 10000);
         const bodyContent = await streamToString(response.Body);
         console.log(`[S3] Fetched processed inventory (${PROCESSED_KEY}) from S3. Last Modified: ${response.LastModified}`);
         return {
@@ -159,7 +175,7 @@ export async function getInventoryFromS3() {
                 Bucket: BUCKET_NAME,
                 Key: ORIGINAL_KEY
             });
-            const response = await s3Client.send(command);
+            const response = await sendWithTimeout(command, 10000);
             const bodyContent = await streamToString(response.Body);
             console.log(`[S3 Fallback] Fetched original raw inventory (${ORIGINAL_KEY}) from S3. Last Modified: ${response.LastModified}`);
             return {
@@ -194,19 +210,27 @@ export async function getInventoryFromS3() {
             try {
                 console.log('[S3 Fallback] Fetching inventory from public HTTP URL...');
                 const publicUrl = `https://${BUCKET_NAME}.s3.ap-northeast-2.amazonaws.com/${PROCESSED_KEY}`;
-                const response = await fetch(publicUrl);
-                if (response.ok) {
-                    const bodyContent = await response.json();
-                    console.log('[S3 Fallback] Successfully fetched from public HTTP URL.');
-                    return {
-                        items: bodyContent,
-                        lastModified: new Date()
-                    };
-                } else {
-                    console.warn(`[S3 Fallback] HTTP fetch failed with status ${response.status}`);
+                const fetchController = new AbortController();
+                const fetchTimeout = setTimeout(() => fetchController.abort(), 10000);
+                try {
+                    const response = await fetch(publicUrl, { signal: fetchController.signal });
+                    clearTimeout(fetchTimeout);
+                    if (response.ok) {
+                        const bodyContent = await response.json();
+                        console.log('[S3 Fallback] Successfully fetched from public HTTP URL.');
+                        return {
+                            items: bodyContent,
+                            lastModified: new Date()
+                        };
+                    } else {
+                        console.warn(`[S3 Fallback] HTTP fetch failed with status ${response.status}`);
+                    }
+                } catch (fetchError) {
+                    clearTimeout(fetchTimeout);
+                    console.error('[S3 Fallback] Failed to fetch from public HTTP URL:', fetchError);
                 }
-            } catch (fetchError) {
-                console.error('[S3 Fallback] Failed to fetch from public HTTP URL:', fetchError);
+            } catch (outerFetchError) {
+                console.error('[S3 Fallback] Outer error setting up fetch:', outerFetchError);
             }
 
             throw error;
@@ -238,7 +262,7 @@ export async function saveDbToS3(dbObject) {
             Body: JSON.stringify(dbObject, null, 2),
             ContentType: 'application/json'
         });
-        await s3Client.send(command);
+        await sendWithTimeout(command, 10000);
         console.log('[S3] Data saved successfully to S3');
     } catch (error) {
         const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
@@ -273,10 +297,10 @@ export async function getPreviousDbVersion(cutoffDateStr) {
     }
     try {
         const { ListObjectVersionsCommand, GetObjectCommand } = await import('@aws-sdk/client-s3');
-        const versionsRes = await s3Client.send(new ListObjectVersionsCommand({
+        const versionsRes = await sendWithTimeout(new ListObjectVersionsCommand({
             Bucket: BUCKET_NAME,
             Prefix: DB_KEY
-        }));
+        }), 10000);
 
         if (versionsRes.Versions && versionsRes.Versions.length > 1) {
             const cutoff = new Date(cutoffDateStr);
@@ -286,11 +310,11 @@ export async function getPreviousDbVersion(cutoffDateStr) {
                 const targetVersion = pastVersions[0];
                 console.log(`[S3] Found past DB version from ${targetVersion.LastModified} with VersionId: ${targetVersion.VersionId}`);
 
-                const response = await s3Client.send(new GetObjectCommand({
+                const response = await sendWithTimeout(new GetObjectCommand({
                     Bucket: BUCKET_NAME,
                     Key: DB_KEY,
                     VersionId: targetVersion.VersionId
-                }));
+                }), 10000);
                 
                 const chunks = [];
                 for await (const chunk of response.Body) {
@@ -325,7 +349,7 @@ export async function uploadFileToS3(folderPath, fileName, fileBuffer, contentTy
             ContentType: contentType
         });
 
-        await s3Client.send(command);
+        await sendWithTimeout(command, 10000);
 
         // Return Virtual Hosted Style URL
         return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'ap-northeast-2'}.amazonaws.com/${fullKey}`;
@@ -365,7 +389,7 @@ export async function uploadInventoryToS3(jsonData) {
             ContentType: 'application/json'
         });
 
-        await s3Client.send(command);
+        await sendWithTimeout(command, 10000);
         console.log(`[S3] Successfully uploaded processed inventory (${PROCESSED_KEY}) to S3.`);
         return true;
     } catch (error) {
