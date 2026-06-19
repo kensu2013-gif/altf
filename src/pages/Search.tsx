@@ -581,8 +581,12 @@ export default function Search() {
 
         formData.append('callback_url', callbackUrl);
 
+        // Always send user identification fields so Make.com can label the Google Drive file
+        formData.append('user_id', user?.email || user?.id || 'unknown');
+        formData.append('uploaded_at', new Date().toISOString());
         if (user) {
-            formData.append('user_id', user.email || user.id || '');
+            formData.append('user_company', user.companyName || '');
+            formData.append('user_name', user.contactName || '');
         }
 
         try {
