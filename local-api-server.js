@@ -1504,23 +1504,43 @@ const server = http.createServer(async (req, res) => {
                     db.inventoryHistory = db.inventoryHistory || [];
                     db.daekyungHistory = db.daekyungHistory || [];
 
-                    // 1. Save or overwrite today's record in inventoryHistory (Sihwa)
+                    // Helper to merge diffs into existing records instead of overwriting (accumulate changes over multiple syncs)
+                    const mergeDiffs = (existingDiffs, newDiffs) => {
+                        const merged = [...(existingDiffs || [])];
+                        newDiffs.forEach(newD => {
+                            const idx = merged.findIndex(d => d.id === newD.id);
+                            if (idx !== -1) {
+                                const accumChange = merged[idx].change + newD.change;
+                                merged[idx].change = accumChange;
+                                merged[idx].to = newD.to;
+                            } else {
+                                merged.push({ ...newD });
+                            }
+                        });
+                        return merged.filter(d => d.change !== 0);
+                    };
+
+                    // 1. Save or accumulate today's record in inventoryHistory (Sihwa)
                     let todayRecord = db.inventoryHistory.find(h => h.date === date);
                     if (!todayRecord) {
                         todayRecord = { date, diff: [] };
                         db.inventoryHistory.push(todayRecord);
                         if (db.inventoryHistory.length > 61) db.inventoryHistory.shift();
+                        todayRecord.diff = sihwaDiffs;
+                    } else {
+                        todayRecord.diff = mergeDiffs(todayRecord.diff, sihwaDiffs);
                     }
-                    todayRecord.diff = sihwaDiffs;
 
-                    // 2. Save or overwrite today's record in daekyungHistory (Yangsan)
+                    // 2. Save or accumulate today's record in daekyungHistory (Yangsan)
                     let todayDaekyungRecord = db.daekyungHistory.find(h => h.date === date);
                     if (!todayDaekyungRecord) {
                         todayDaekyungRecord = { date, diff: [] };
                         db.daekyungHistory.push(todayDaekyungRecord);
                         if (db.daekyungHistory.length > 185) db.daekyungHistory.shift();
+                        todayDaekyungRecord.diff = daekyungDiffs;
+                    } else {
+                        todayDaekyungRecord.diff = mergeDiffs(todayDaekyungRecord.diff, daekyungDiffs);
                     }
-                    todayDaekyungRecord.diff = daekyungDiffs;
 
                     // 3. Update baselines (lastSnapshot / lastDaekyungSnapshot)
                     db.lastSnapshot = db.lastSnapshot || {};
