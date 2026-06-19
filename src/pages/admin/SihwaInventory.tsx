@@ -214,6 +214,18 @@ interface InventoryHistorySnapshot {
     stock?: Record<string, { name: string; stock: number }>;
 }
 
+interface PendingDiffItem {
+    id: string;
+    name: string;
+    from: number;
+    to: number;
+    change: number;
+    location: string;
+    maker: string;
+    selected: boolean;
+    editedChange: number | '';
+}
+
 export default function SihwaInventory() {
     const { orders, quotes, users, user, addItem } = useStore(useShallow(state => ({
         orders: state.orders,
@@ -288,8 +300,8 @@ export default function SihwaInventory() {
 
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [pendingDate, setPendingDate] = useState('');
-    const [pendingSihwaList, setPendingSihwaList] = useState<any[]>([]);
-    const [pendingDaekyungList, setPendingDaekyungList] = useState<any[]>([]);
+    const [pendingSihwaList, setPendingSihwaList] = useState<PendingDiffItem[]>([]);
+    const [pendingDaekyungList, setPendingDaekyungList] = useState<PendingDiffItem[]>([]);
     const [submittingConfirm, setSubmittingConfirm] = useState(false);
 
     const [sortConfig, setSortConfig] = useState<{
@@ -451,8 +463,8 @@ export default function SihwaInventory() {
                 if ((data.sihwaPending && data.sihwaPending.length > 0) || (data.daekyungPending && data.daekyungPending.length > 0)) {
                     setPendingDate(data.date);
                     // Add selected & editedChange fields
-                    setPendingSihwaList(data.sihwaPending.map((x: any) => ({ ...x, selected: true, editedChange: x.change })));
-                    setPendingDaekyungList(data.daekyungPending.map((x: any) => ({ ...x, selected: true, editedChange: x.change })));
+                    setPendingSihwaList(data.sihwaPending.map((x: { id: string; name: string; from: number; to: number; change: number; location: string; maker: string }) => ({ ...x, selected: true, editedChange: x.change })));
+                    setPendingDaekyungList(data.daekyungPending.map((x: { id: string; name: string; from: number; to: number; change: number; location: string; maker: string }) => ({ ...x, selected: true, editedChange: x.change })));
                     setIsConfirmModalOpen(true);
                 } else {
                     alert('새로운 재고 변동 사항이 감지되지 않았습니다.');
