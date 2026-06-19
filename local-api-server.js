@@ -1526,29 +1526,38 @@ const server = http.createServer(async (req, res) => {
                     db.lastSnapshot = db.lastSnapshot || {};
                     db.lastDaekyungSnapshot = db.lastDaekyungSnapshot || {};
 
-                    // First, reset all existing entries in lastSnapshot to 0 (to handle deleted items)
-                    for (const id of Object.keys(db.lastSnapshot)) {
-                        if (db.lastSnapshot[id]) {
-                            db.lastSnapshot[id].sh_qty = 0;
-                            db.lastSnapshot[id].stock = 0;
-                        }
-                    }
+                    const kstDate = new Date(Date.now() + 9 * 60 * 60 * 1000);
+                    const today = kstDate.toISOString().slice(0, 10);
+                    const isTodayConfirm = (date === today);
 
-                    // Then, sync all items in currentSnapshot to lastSnapshot (Default baseline)
-                    const sihwaStockMap = db.currentSnapshot || {};
-                    for (const [id, curr] of Object.entries(sihwaStockMap)) {
-                        const shQty = curr.sh_qty ?? 0;
-                        if (db.lastSnapshot[id]) {
-                            db.lastSnapshot[id].sh_qty = shQty;
-                            db.lastSnapshot[id].stock = shQty;
-                            db.lastSnapshot[id].name = curr.name;
-                        } else {
-                            db.lastSnapshot[id] = {
-                                name: curr.name,
-                                stock: shQty,
-                                sh_qty: shQty
-                            };
+                    if (isTodayConfirm) {
+                        console.log(`[API] Today confirm detected (${date}). Performing full baseline default sync.`);
+                        // First, reset all existing entries in lastSnapshot to 0 (to handle deleted items)
+                        for (const id of Object.keys(db.lastSnapshot)) {
+                            if (db.lastSnapshot[id]) {
+                                db.lastSnapshot[id].sh_qty = 0;
+                                db.lastSnapshot[id].stock = 0;
+                            }
                         }
+
+                        // Then, sync all items in currentSnapshot to lastSnapshot (Default baseline)
+                        const sihwaStockMap = db.currentSnapshot || {};
+                        for (const [id, curr] of Object.entries(sihwaStockMap)) {
+                            const shQty = curr.sh_qty ?? 0;
+                            if (db.lastSnapshot[id]) {
+                                db.lastSnapshot[id].sh_qty = shQty;
+                                db.lastSnapshot[id].stock = shQty;
+                                db.lastSnapshot[id].name = curr.name;
+                            } else {
+                                db.lastSnapshot[id] = {
+                                    name: curr.name,
+                                    stock: shQty,
+                                    sh_qty: shQty
+                                };
+                            }
+                        }
+                    } else {
+                        console.log(`[API] Past date confirm detected (${date}). Skipping full baseline default sync to prevent overwrite with current stock.`);
                     }
 
                     // Overwrite with confirmed/modified diffs for Sihwa (Custom baseline values)
@@ -1566,28 +1575,30 @@ const server = http.createServer(async (req, res) => {
                         }
                     });
 
-                    // First, reset all existing entries in lastDaekyungSnapshot to 0
-                    for (const id of Object.keys(db.lastDaekyungSnapshot)) {
-                        if (db.lastDaekyungSnapshot[id]) {
-                            db.lastDaekyungSnapshot[id].ys_qty = 0;
-                            db.lastDaekyungSnapshot[id].stock = 0;
+                    if (isTodayConfirm) {
+                        // First, reset all existing entries in lastDaekyungSnapshot to 0
+                        for (const id of Object.keys(db.lastDaekyungSnapshot)) {
+                            if (db.lastDaekyungSnapshot[id]) {
+                                db.lastDaekyungSnapshot[id].ys_qty = 0;
+                                db.lastDaekyungSnapshot[id].stock = 0;
+                            }
                         }
-                    }
 
-                    // Then, sync all items in currentDaekyungSnapshot to lastDaekyungSnapshot (Default baseline)
-                    const ysStockMap = db.currentDaekyungSnapshot || {};
-                    for (const [id, curr] of Object.entries(ysStockMap)) {
-                        const ysQty = curr.ys_qty ?? 0;
-                        if (db.lastDaekyungSnapshot[id]) {
-                            db.lastDaekyungSnapshot[id].ys_qty = ysQty;
-                            db.lastDaekyungSnapshot[id].stock = ysQty;
-                            db.lastDaekyungSnapshot[id].name = curr.name;
-                        } else {
-                            db.lastDaekyungSnapshot[id] = {
-                                name: curr.name,
-                                stock: ysQty,
-                                ys_qty: ysQty
-                            };
+                        // Then, sync all items in currentDaekyungSnapshot to lastDaekyungSnapshot (Default baseline)
+                        const ysStockMap = db.currentDaekyungSnapshot || {};
+                        for (const [id, curr] of Object.entries(ysStockMap)) {
+                            const ysQty = curr.ys_qty ?? 0;
+                            if (db.lastDaekyungSnapshot[id]) {
+                                db.lastDaekyungSnapshot[id].ys_qty = ysQty;
+                                db.lastDaekyungSnapshot[id].stock = ysQty;
+                                db.lastDaekyungSnapshot[id].name = curr.name;
+                            } else {
+                                db.lastDaekyungSnapshot[id] = {
+                                    name: curr.name,
+                                    stock: ysQty,
+                                    ys_qty: ysQty
+                                };
+                            }
                         }
                     }
 
@@ -1846,6 +1857,59 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Internal Server Error' }));
         }
+        return;
+    }
+
+    // POST /api/admin/inventory-history/patch-baseline
+    if (req.method === 'POST' && url.pathname === '/api/admin/inventory-history/patch-baseline') {
+        const session = getAuthenticatedSession(req);
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
+            res.writeHead(403);
+            return res.end(JSON.stringify({ error: 'Forbidden' }));
+        }
+
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { sku, sh_qty, ys_qty } = JSON.parse(body);
+                if (!sku) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    return res.end(JSON.stringify({ error: 'Missing sku' }));
+                }
+
+                await updateDb(async () => {
+                    db.lastSnapshot = db.lastSnapshot || {};
+                    db.lastDaekyungSnapshot = db.lastDaekyungSnapshot || {};
+
+                    if (sh_qty !== undefined) {
+                        if (db.lastSnapshot[sku]) {
+                            db.lastSnapshot[sku].sh_qty = sh_qty;
+                            db.lastSnapshot[sku].stock = sh_qty;
+                        } else {
+                            db.lastSnapshot[sku] = { name: sku.split('-')[0] || sku, stock: sh_qty, sh_qty };
+                        }
+                        console.log(`[PATCH BASELINE] Patched Sihwa SKU ${sku} to sh_qty=${sh_qty}`);
+                    }
+                    if (ys_qty !== undefined) {
+                        if (db.lastDaekyungSnapshot[sku]) {
+                            db.lastDaekyungSnapshot[sku].ys_qty = ys_qty;
+                            db.lastDaekyungSnapshot[sku].stock = ys_qty;
+                        } else {
+                            db.lastDaekyungSnapshot[sku] = { name: sku.split('-')[0] || sku, stock: ys_qty, ys_qty };
+                        }
+                        console.log(`[PATCH BASELINE] Patched Daekyung SKU ${sku} to ys_qty=${ys_qty}`);
+                    }
+                });
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: `Successfully patched baseline for ${sku}` }));
+            } catch (e) {
+                console.error(e);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: e.message }));
+            }
+        });
         return;
     }
 
