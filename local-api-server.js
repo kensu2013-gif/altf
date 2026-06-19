@@ -1395,13 +1395,35 @@ const server = http.createServer(async (req, res) => {
             return !isCompositeOrStubend && validPrefixes.some(p => nameUpper.startsWith(p));
         };
 
-        // Sihwa (시화) Pending Diff Calculation
+        // Retrieve today's existing confirmed history for cumulation in pending list
+        const todaySihwaRecord = db.inventoryHistory ? db.inventoryHistory.find(h => h.date === today) : null;
+        const histSihwaMap = {};
+        if (todaySihwaRecord && Array.isArray(todaySihwaRecord.diff)) {
+            todaySihwaRecord.diff.forEach(d => {
+                histSihwaMap[d.id] = d;
+            });
+        }
+
+        const todayDaekyungRecord = db.daekyungHistory ? db.daekyungHistory.find(h => h.date === today) : null;
+        const histDaekyungMap = {};
+        if (todayDaekyungRecord && Array.isArray(todayDaekyungRecord.diff)) {
+            todayDaekyungRecord.diff.forEach(d => {
+                histDaekyungMap[d.id] = d;
+            });
+        }
+
+        // Sihwa (시화) Pending Diff Calculation (Includes already confirmed changes of today)
         for (const [id, curr] of Object.entries(sihwaStockMap)) {
             if (!isValidItem(curr.name)) continue;
             const prev = lastSnapshot[id];
-            const sh_from = prev ? (prev.sh_qty ?? 0) : 0;
+            const sh_from_base = prev ? (prev.sh_qty ?? 0) : 0;
             const sh_to = curr.sh_qty ?? 0;
-            const sh_change = sh_to - sh_from;
+
+            const hist = histSihwaMap[id];
+            const hist_change = hist ? hist.change : 0;
+            const sh_from = hist ? hist.from : sh_from_base;
+            const sh_change = (sh_to - sh_from_base) + hist_change;
+
             if (sh_change !== 0) {
                 sihwaPending.push({
                     id,
@@ -1417,14 +1439,19 @@ const server = http.createServer(async (req, res) => {
         for (const [id, prev] of Object.entries(lastSnapshot)) {
             if (!isValidItem(prev.name)) continue;
             if (sihwaStockMap[id] === undefined) {
-                const sh_from = prev.sh_qty ?? 0;
-                if (sh_from !== 0) {
+                const sh_from_base = prev.sh_qty ?? 0;
+                const hist = histSihwaMap[id];
+                const hist_change = hist ? hist.change : 0;
+                const sh_from = hist ? hist.from : sh_from_base;
+                const sh_change = (0 - sh_from_base) + hist_change;
+
+                if (sh_change !== 0) {
                     sihwaPending.push({
                         id,
                         name: prev.name,
                         from: sh_from,
                         to: 0,
-                        change: -sh_from,
+                        change: sh_change,
                         location: '시화',
                         maker: '대경'
                     });
@@ -1432,13 +1459,18 @@ const server = http.createServer(async (req, res) => {
             }
         }
 
-        // Daekyung (양산) Pending Diff Calculation
+        // Daekyung (양산) Pending Diff Calculation (Includes already confirmed changes of today)
         for (const [id, curr] of Object.entries(ysStockMap)) {
             if (!isValidItem(curr.name)) continue;
             const prev = lastDaekyungSnapshot[id];
-            const ys_from = prev ? (prev.ys_qty ?? 0) : 0;
+            const ys_from_base = prev ? (prev.ys_qty ?? 0) : 0;
             const ys_to = curr.ys_qty ?? 0;
-            const ys_change = ys_to - ys_from;
+
+            const hist = histDaekyungMap[id];
+            const hist_change = hist ? hist.change : 0;
+            const ys_from = hist ? hist.from : ys_from_base;
+            const ys_change = (ys_to - ys_from_base) + hist_change;
+
             if (ys_change !== 0) {
                 daekyungPending.push({
                     id,
@@ -1454,14 +1486,19 @@ const server = http.createServer(async (req, res) => {
         for (const [id, prev] of Object.entries(lastDaekyungSnapshot)) {
             if (!isValidItem(prev.name)) continue;
             if (ysStockMap[id] === undefined) {
-                const ys_from = prev.ys_qty ?? 0;
-                if (ys_from !== 0) {
+                const ys_from_base = prev.ys_qty ?? 0;
+                const hist = histDaekyungMap[id];
+                const hist_change = hist ? hist.change : 0;
+                const ys_from = hist ? hist.from : ys_from_base;
+                const ys_change = (0 - ys_from_base) + hist_change;
+
+                if (ys_change !== 0) {
                     daekyungPending.push({
                         id,
                         name: prev.name,
                         from: ys_from,
                         to: 0,
-                        change: -ys_from,
+                        change: ys_change,
                         location: '양산',
                         maker: '대경'
                     });
@@ -1504,43 +1541,23 @@ const server = http.createServer(async (req, res) => {
                     db.inventoryHistory = db.inventoryHistory || [];
                     db.daekyungHistory = db.daekyungHistory || [];
 
-                    // Helper to merge diffs into existing records instead of overwriting (accumulate changes over multiple syncs)
-                    const mergeDiffs = (existingDiffs, newDiffs) => {
-                        const merged = [...(existingDiffs || [])];
-                        newDiffs.forEach(newD => {
-                            const idx = merged.findIndex(d => d.id === newD.id);
-                            if (idx !== -1) {
-                                const accumChange = merged[idx].change + newD.change;
-                                merged[idx].change = accumChange;
-                                merged[idx].to = newD.to;
-                            } else {
-                                merged.push({ ...newD });
-                            }
-                        });
-                        return merged.filter(d => d.change !== 0);
-                    };
-
-                    // 1. Save or accumulate today's record in inventoryHistory (Sihwa)
+                    // 1. Save or overwrite today's record in inventoryHistory (Sihwa)
                     let todayRecord = db.inventoryHistory.find(h => h.date === date);
                     if (!todayRecord) {
                         todayRecord = { date, diff: [] };
                         db.inventoryHistory.push(todayRecord);
                         if (db.inventoryHistory.length > 61) db.inventoryHistory.shift();
-                        todayRecord.diff = sihwaDiffs;
-                    } else {
-                        todayRecord.diff = mergeDiffs(todayRecord.diff, sihwaDiffs);
                     }
+                    todayRecord.diff = sihwaDiffs;
 
-                    // 2. Save or accumulate today's record in daekyungHistory (Yangsan)
+                    // 2. Save or overwrite today's record in daekyungHistory (Yangsan)
                     let todayDaekyungRecord = db.daekyungHistory.find(h => h.date === date);
                     if (!todayDaekyungRecord) {
                         todayDaekyungRecord = { date, diff: [] };
                         db.daekyungHistory.push(todayDaekyungRecord);
                         if (db.daekyungHistory.length > 185) db.daekyungHistory.shift();
-                        todayDaekyungRecord.diff = daekyungDiffs;
-                    } else {
-                        todayDaekyungRecord.diff = mergeDiffs(todayDaekyungRecord.diff, daekyungDiffs);
                     }
+                    todayDaekyungRecord.diff = daekyungDiffs;
 
                     // 3. Update baselines (lastSnapshot / lastDaekyungSnapshot)
                     db.lastSnapshot = db.lastSnapshot || {};

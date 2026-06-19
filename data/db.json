@@ -24295,7 +24295,7 @@
       "isDeleted": false
     }
   ],
-  "lastSnapshotDate": "2026-06-16",
+  "lastSnapshotDate": "2026-06-18",
   "lastSnapshot": {
     "T(R)-S80S-10\" X 4\"-WP304-S": {
       "name": "T(R)",
@@ -27544,8 +27544,8 @@
     },
     "90E(L)-S10S-25A-STS304-W": {
       "name": "90E(L)",
-      "stock": 3354,
-      "sh_qty": 3354
+      "stock": 146,
+      "sh_qty": 146
     },
     "90E(L)-S10S-32A-STS304-W": {
       "name": "90E(L)",
