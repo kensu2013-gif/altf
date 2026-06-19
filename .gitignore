@@ -31,3 +31,7 @@ db.json
 # n8n-as-code AI helpers
 n8nac-skills
 n8nac-skills.cmd
+
+# Scratch backups and temp files
+scratch_backup.zip
+._*
