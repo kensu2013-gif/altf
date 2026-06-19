@@ -1360,6 +1360,63 @@ const server = http.createServer(async (req, res) => {
             return !isCompositeOrStubend && validPrefixes.some(p => nameUpper.startsWith(p));
         };
 
+        // Fetch full inventory details to strictly filter by location and maker
+        let inventoryItems = [];
+        try {
+            const inventoryData = await getInventoryFromS3();
+            inventoryItems = Array.isArray(inventoryData) ? inventoryData : (inventoryData.items || []);
+        } catch (err) {
+            console.error('[API] Failed to get inventory for pending calculations:', err);
+        }
+
+        const inventoryMap = {};
+        inventoryItems.forEach(item => {
+            const id = item.sku_key || item.id;
+            if (id) {
+                inventoryMap[id] = item;
+            }
+        });
+
+        const getItemLocations = (item) => {
+            const locationStock = {};
+            if (item.locationStock && Object.keys(item.locationStock).length > 0) {
+                for (const [key, qty] of Object.entries(item.locationStock)) {
+                    const newKey = (key === '서울' || key === '서울재고' || key === '시흥') ? '시화' : key;
+                    locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
+                }
+            } else {
+                const shQtyVal = item.sh_qty !== undefined ? item.sh_qty : item.shQty;
+                const ysQtyVal = item.ready_qty !== undefined ? item.ready_qty : item.ysQty;
+                if (item.location1 && shQtyVal !== undefined) {
+                    const loc1 = (item.location1 === '서울' || item.location1 === '서울재고' || item.location1 === '시흥') ? '시화' : item.location1;
+                    locationStock[loc1] = (locationStock[loc1] || 0) + Number(shQtyVal);
+                }
+                if (item.location && ysQtyVal !== undefined) {
+                    const primaryLoc = (item.location === '서울' || item.location === '서울재고' || item.location === '시흥') ? '시화' : item.location;
+                    locationStock[primaryLoc] = (locationStock[primaryLoc] || 0) + Number(ysQtyVal);
+                }
+            }
+            return locationStock;
+        };
+
+        const isSihwaDaekyung = (id) => {
+            const item = inventoryMap[id];
+            if (!item) return false;
+            const maker = item.maker || item.maker1 || '';
+            if (maker !== '대경') return false;
+            const locs = getItemLocations(item);
+            return locs['시화'] !== undefined;
+        };
+
+        const isYangsanDaekyung = (id) => {
+            const item = inventoryMap[id];
+            if (!item) return false;
+            const maker = item.maker || item.maker1 || '';
+            if (maker !== '대경') return false;
+            const locs = getItemLocations(item);
+            return locs['양산'] !== undefined;
+        };
+
         // Retrieve today's existing confirmed history for cumulation in pending list
         const todaySihwaRecord = db.inventoryHistory ? db.inventoryHistory.find(h => h.date === today) : null;
         const histSihwaMap = {};
@@ -1380,6 +1437,7 @@ const server = http.createServer(async (req, res) => {
         // Sihwa (시화) Pending Diff Calculation (Includes already confirmed changes of today)
         for (const [id, curr] of Object.entries(sihwaStockMap)) {
             if (!isValidItem(curr.name)) continue;
+            if (!isSihwaDaekyung(id)) continue;
             const prev = lastSnapshot[id];
             const sh_from_base = prev ? (prev.sh_qty ?? 0) : 0;
             const sh_to = curr.sh_qty ?? 0;
@@ -1403,6 +1461,7 @@ const server = http.createServer(async (req, res) => {
         }
         for (const [id, prev] of Object.entries(lastSnapshot)) {
             if (!isValidItem(prev.name)) continue;
+            if (!isSihwaDaekyung(id)) continue;
             if (sihwaStockMap[id] === undefined) {
                 const sh_from_base = prev.sh_qty ?? 0;
                 const hist = histSihwaMap[id];
@@ -1427,6 +1486,7 @@ const server = http.createServer(async (req, res) => {
         // Daekyung (양산) Pending Diff Calculation (Includes already confirmed changes of today)
         for (const [id, curr] of Object.entries(ysStockMap)) {
             if (!isValidItem(curr.name)) continue;
+            if (!isYangsanDaekyung(id)) continue;
             const prev = lastDaekyungSnapshot[id];
             const ys_from_base = prev ? (prev.ys_qty ?? 0) : 0;
             const ys_to = curr.ys_qty ?? 0;
@@ -1450,6 +1510,7 @@ const server = http.createServer(async (req, res) => {
         }
         for (const [id, prev] of Object.entries(lastDaekyungSnapshot)) {
             if (!isValidItem(prev.name)) continue;
+            if (!isYangsanDaekyung(id)) continue;
             if (ysStockMap[id] === undefined) {
                 const ys_from_base = prev.ys_qty ?? 0;
                 const hist = histDaekyungMap[id];
