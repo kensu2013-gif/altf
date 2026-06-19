@@ -1798,6 +1798,53 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // DELETE /api/admin/inventory-history
+    if (req.method === 'DELETE' && url.pathname === '/api/admin/inventory-history') {
+        const session = getAuthenticatedSession(req);
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
+            res.writeHead(403);
+            return res.end(JSON.stringify({ error: 'Forbidden' }));
+        }
+
+        const dateToDelete = url.searchParams.get('date');
+        if (!dateToDelete) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ error: 'Missing date parameter' }));
+        }
+
+        try {
+            await updateDb(async () => {
+                db.inventoryHistory = (db.inventoryHistory || []).filter(h => h.date !== dateToDelete);
+                db.daekyungHistory = (db.daekyungHistory || []).filter(h => h.date !== dateToDelete);
+
+                // Reset lastSnapshotDate to the previous available history date if it was deleted
+                if (db.lastSnapshotDate === dateToDelete) {
+                    const allDates = [
+                        ...(db.inventoryHistory || []).map(h => h.date),
+                        ...(db.daekyungHistory || []).map(h => h.date)
+                    ].filter(Boolean);
+                    
+                    if (allDates.length > 0) {
+                        allDates.sort((a, b) => new Date(b) - new Date(a));
+                        db.lastSnapshotDate = allDates[0];
+                    } else {
+                        const prevDay = new Date(new Date(dateToDelete).getTime() - 24 * 60 * 60 * 1000);
+                        db.lastSnapshotDate = prevDay.toISOString().slice(0, 10);
+                    }
+                }
+            });
+
+            console.log(`[API] Deleted inventory history for date: ${dateToDelete}`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, message: `Successfully deleted history for ${dateToDelete}` }));
+        } catch (e) {
+            console.error('[API] Failed to delete inventory history:', e);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Internal Server Error' }));
+        }
+        return;
+    }
+
     // GET /api/users
     if (req.method === 'GET' && url.pathname === '/api/users') {
         // Simple list, maybe filter by role later
