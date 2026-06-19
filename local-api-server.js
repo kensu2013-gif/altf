@@ -254,6 +254,43 @@ async function loadData() {
             } catch (cleanupErr) {
                 console.error('[CLEANUP] Error during self-healing database cleanup:', cleanupErr);
             }
+
+            // Temporary self-healing block to delete June 19, 2026 data and allow recalculation on refresh
+            try {
+                let j19Updated = false;
+                const targetDate = '2026-06-19';
+
+                if (db.inventoryHistory && Array.isArray(db.inventoryHistory)) {
+                    const originalLength = db.inventoryHistory.length;
+                    db.inventoryHistory = db.inventoryHistory.filter(h => h.date !== targetDate);
+                    if (db.inventoryHistory.length !== originalLength) {
+                        j19Updated = true;
+                        console.log(`[CLEANUP-J19] Deleted inventoryHistory on ${targetDate}`);
+                    }
+                }
+
+                if (db.daekyungHistory && Array.isArray(db.daekyungHistory)) {
+                    const originalLength = db.daekyungHistory.length;
+                    db.daekyungHistory = db.daekyungHistory.filter(h => h.date !== targetDate);
+                    if (db.daekyungHistory.length !== originalLength) {
+                        j19Updated = true;
+                        console.log(`[CLEANUP-J19] Deleted daekyungHistory on ${targetDate}`);
+                    }
+                }
+
+                if (db.lastSnapshotDate === targetDate) {
+                    db.lastSnapshotDate = '2026-06-18';
+                    j19Updated = true;
+                    console.log(`[CLEANUP-J19] Reset lastSnapshotDate from ${targetDate} to 2026-06-18`);
+                }
+
+                if (j19Updated) {
+                    console.log('[CLEANUP-J19] Saving database after June 19 cleanup...');
+                    await saveData();
+                }
+            } catch (cleanupErr) {
+                console.error('[CLEANUP-J19] Error during June 19 self-healing database cleanup:', cleanupErr);
+            }
         } else {
             // Seed Initial Admin if file doesn't exist
             db.users = [
