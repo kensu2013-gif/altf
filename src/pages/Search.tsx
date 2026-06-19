@@ -582,10 +582,7 @@ export default function Search() {
         formData.append('callback_url', callbackUrl);
 
         if (user) {
-            formData.append('user_id', user.id || '');
-            formData.append('user_email', user.email || '');
-            formData.append('company_name', user.companyName || '');
-            formData.append('contact_name', user.contactName || '');
+            formData.append('user_id', user.email || user.id || '');
         }
 
         try {
