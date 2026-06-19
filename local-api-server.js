@@ -70,9 +70,9 @@ async function loadData() {
                 }
             }
 
-            // Self-healing recovery for missing daily diffs due to initialization overwrite
-            if (!db.lastSnapshot || Object.keys(db.lastSnapshot).length === 0 || 
-                !db.currentSnapshot || Object.keys(db.currentSnapshot).length === 0) {
+            // Self-healing recovery for missing daily diffs due to initialization overwrite (Disabled)
+            if (false && (!db.lastSnapshot || Object.keys(db.lastSnapshot).length === 0 || 
+                !db.currentSnapshot || Object.keys(db.currentSnapshot).length === 0)) {
                 console.log(`[RECOVERY] Sihwa Snapshot empty or missing. Recovering baseline snapshot...`);
                 let recovered = false;
                 // Try S3 version recovery to get the exact previous state
@@ -1533,38 +1533,30 @@ const server = http.createServer(async (req, res) => {
                     db.lastSnapshot = db.lastSnapshot || {};
                     db.lastDaekyungSnapshot = db.lastDaekyungSnapshot || {};
 
-                    const kstDate = new Date(Date.now() + 9 * 60 * 60 * 1000);
-                    const today = kstDate.toISOString().slice(0, 10);
-                    const isTodayConfirm = (date === today);
-
-                    if (isTodayConfirm) {
-                        console.log(`[API] Today confirm detected (${date}). Performing full baseline default sync.`);
-                        // First, reset all existing entries in lastSnapshot to 0 (to handle deleted items)
-                        for (const id of Object.keys(db.lastSnapshot)) {
-                            if (db.lastSnapshot[id]) {
-                                db.lastSnapshot[id].sh_qty = 0;
-                                db.lastSnapshot[id].stock = 0;
-                            }
+                    console.log(`[API] Confirming inventory for date: ${date}. Performing full baseline default sync.`);
+                    // First, reset all existing entries in lastSnapshot to 0 (to handle deleted items)
+                    for (const id of Object.keys(db.lastSnapshot)) {
+                        if (db.lastSnapshot[id]) {
+                            db.lastSnapshot[id].sh_qty = 0;
+                            db.lastSnapshot[id].stock = 0;
                         }
+                    }
 
-                        // Then, sync all items in currentSnapshot to lastSnapshot (Default baseline)
-                        const sihwaStockMap = db.currentSnapshot || {};
-                        for (const [id, curr] of Object.entries(sihwaStockMap)) {
-                            const shQty = curr.sh_qty ?? 0;
-                            if (db.lastSnapshot[id]) {
-                                db.lastSnapshot[id].sh_qty = shQty;
-                                db.lastSnapshot[id].stock = shQty;
-                                db.lastSnapshot[id].name = curr.name;
-                            } else {
-                                db.lastSnapshot[id] = {
-                                    name: curr.name,
-                                    stock: shQty,
-                                    sh_qty: shQty
-                                };
-                            }
+                    // Then, sync all items in currentSnapshot to lastSnapshot (Default baseline)
+                    const sihwaStockMap = db.currentSnapshot || {};
+                    for (const [id, curr] of Object.entries(sihwaStockMap)) {
+                        const shQty = curr.sh_qty ?? 0;
+                        if (db.lastSnapshot[id]) {
+                            db.lastSnapshot[id].sh_qty = shQty;
+                            db.lastSnapshot[id].stock = shQty;
+                            db.lastSnapshot[id].name = curr.name;
+                        } else {
+                            db.lastSnapshot[id] = {
+                                name: curr.name,
+                                stock: shQty,
+                                sh_qty: shQty
+                            };
                         }
-                    } else {
-                        console.log(`[API] Past date confirm detected (${date}). Skipping full baseline default sync to prevent overwrite with current stock.`);
                     }
 
                     // Overwrite with confirmed/modified diffs for Sihwa (Custom baseline values)
