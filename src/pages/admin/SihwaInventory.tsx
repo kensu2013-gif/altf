@@ -286,6 +286,12 @@ export default function SihwaInventory() {
     const [expandedTrendItems, setExpandedTrendItems] = useState<Record<string, boolean>>({});
     const [expandedDailyGroups, setExpandedDailyGroups] = useState<Record<string, boolean>>({});
 
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [pendingDate, setPendingDate] = useState('');
+    const [pendingSihwaList, setPendingSihwaList] = useState<any[]>([]);
+    const [pendingDaekyungList, setPendingDaekyungList] = useState<any[]>([]);
+    const [submittingConfirm, setSubmittingConfirm] = useState(false);
+
     const [sortConfig, setSortConfig] = useState<{
         key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank' | 'quoteCount' | 'recent60dOrderCount',
         direction: 'asc' | 'desc'
@@ -429,8 +435,103 @@ export default function SihwaInventory() {
     }, [setOrders, setQuotes, fetchUsers, user]);
 
     const handleDataRefresh = async () => {
-        if (refreshInventory) await refreshInventory();
-        await fetchHistory();
+        try {
+            if (refreshInventory) await refreshInventory();
+            
+            // 2. Fetch pending diffs from backend
+            const token = useStore.getState().auth.token;
+            const headers: Record<string, string> = { 'x-requester-role': 'admin' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/admin/inventory-history/pending', {
+                headers
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if ((data.sihwaPending && data.sihwaPending.length > 0) || (data.daekyungPending && data.daekyungPending.length > 0)) {
+                    setPendingDate(data.date);
+                    // Add selected & editedChange fields
+                    setPendingSihwaList(data.sihwaPending.map((x: any) => ({ ...x, selected: true, editedChange: x.change })));
+                    setPendingDaekyungList(data.daekyungPending.map((x: any) => ({ ...x, selected: true, editedChange: x.change })));
+                    setIsConfirmModalOpen(true);
+                } else {
+                    alert('새로운 재고 변동 사항이 감지되지 않았습니다.');
+                    await fetchHistory();
+                }
+            } else {
+                await fetchHistory();
+            }
+        } catch (err) {
+            console.error('Failed during data refresh:', err);
+            await fetchHistory();
+        }
+    };
+
+    const handleSaveConfirmedHistory = async () => {
+        try {
+            setSubmittingConfirm(true);
+            const token = useStore.getState().auth.token;
+            const headers: Record<string, string> = { 
+                'Content-Type': 'application/json',
+                'x-requester-role': 'admin' 
+            };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            // Filter out non-selected items and map editedChange to final values
+            const finalSihwaDiffs = pendingSihwaList
+                .filter(x => x.selected && Number(x.editedChange) !== 0)
+                .map(x => {
+                    const chg = Number(x.editedChange);
+                    return {
+                        id: x.id,
+                        name: x.name,
+                        from: x.from,
+                        to: x.from + chg,
+                        change: chg,
+                        location: x.location,
+                        maker: x.maker
+                    };
+                });
+
+            const finalDaekyungDiffs = pendingDaekyungList
+                .filter(x => x.selected && Number(x.editedChange) !== 0)
+                .map(x => {
+                    const chg = Number(x.editedChange);
+                    return {
+                        id: x.id,
+                        name: x.name,
+                        from: x.from,
+                        to: x.from + chg,
+                        change: chg,
+                        location: x.location,
+                        maker: x.maker
+                    };
+                });
+
+            const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/admin/inventory-history/confirm', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    date: pendingDate,
+                    sihwaDiffs: finalSihwaDiffs,
+                    daekyungDiffs: finalDaekyungDiffs
+                })
+            });
+
+            if (res.ok) {
+                alert('일일 변동 트렌드가 성공적으로 저장되었습니다.');
+                setIsConfirmModalOpen(false);
+                await fetchHistory();
+            } else {
+                const errData = await res.json();
+                alert(`저장 실패: ${errData.error || '알 수 없는 오류'}`);
+            }
+        } catch (err) {
+            console.error('Failed to save confirmed history:', err);
+            alert('오류가 발생하여 저장하지 못했습니다.');
+        } finally {
+            setSubmittingConfirm(false);
+        }
     };
 
     // Filter out irrelevant orders
@@ -5160,6 +5261,180 @@ if (displayList.length === 0) {
                 />
             )}
 
+            {isConfirmModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 text-slate-800">
+                        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <History className="w-5 h-5 text-amber-400" />
+                                <h3 className="font-extrabold text-lg">일일 변동 트렌드 데이터 검토 및 확정 ({pendingDate})</h3>
+                            </div>
+                            <button onClick={() => setIsConfirmModalOpen(false)} className="text-slate-400 hover:text-white transition">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                            <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl text-blue-800 text-xs font-bold leading-relaxed">
+                                💡 자동 계산된 시화/양산 대경재고의 일일 변동 데이터입니다. 
+                                실제 매입/매출에 부합하는 항목들만 체크하여 남기고, 잘못 감지된 노이즈는 체크 해제하거나 변동량을 조작할 수 있습니다. 
+                                저장된 항목들만 오늘 자의 변동 트렌드로 최종 보존되며, 이를 기준으로 baseline 스냅샷이 동기화됩니다.
+                            </div>
+
+                            {/* Sihwa Pending List */}
+                            <div>
+                                <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2 border-b pb-1.5 text-sm">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                                    시화재고 변동 리스트 (대경)
+                                </h4>
+                                {pendingSihwaList.length === 0 ? (
+                                    <p className="text-xs text-slate-400 py-4 text-center font-medium">시화재고의 변동 감지 항목이 없습니다.</p>
+                                ) : (
+                                    <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                                        <table className="w-full text-left text-xs border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                                                    <th className="p-3 text-center w-12">선택</th>
+                                                    <th className="p-3">품목 코드 / 규격</th>
+                                                    <th className="p-3 text-right">이전 재고</th>
+                                                    <th className="p-3 text-center w-24">변동량 조작</th>
+                                                    <th className="p-3 text-right">이후 재고</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {pendingSihwaList.map((item, idx) => {
+                                                    const changeVal = Number(item.editedChange) || 0;
+                                                    const finalQty = item.from + changeVal;
+                                                    return (
+                                                        <tr key={item.id} className={`hover:bg-slate-50/50 ${!item.selected ? 'opacity-50 bg-slate-50/20' : ''}`}>
+                                                            <td className="p-3 text-center">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={item.selected}
+                                                                    onChange={(e) => {
+                                                                        const updated = [...pendingSihwaList];
+                                                                        updated[idx].selected = e.target.checked;
+                                                                        if (!e.target.checked) updated[idx].editedChange = 0;
+                                                                        else updated[idx].editedChange = item.change;
+                                                                        setPendingSihwaList(updated);
+                                                                    }}
+                                                                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                                                />
+                                                            </td>
+                                                            <td className="p-3 font-mono">
+                                                                <div className="font-bold text-slate-700">{item.id}</div>
+                                                                <div className="text-[10px] text-slate-400 font-semibold">{item.name}</div>
+                                                            </td>
+                                                            <td className="p-3 text-right font-medium text-slate-600">{item.from}개</td>
+                                                            <td className="p-3 text-center">
+                                                                <input
+                                                                    type="number"
+                                                                    disabled={!item.selected}
+                                                                    value={item.editedChange}
+                                                                    onChange={(e) => {
+                                                                        const updated = [...pendingSihwaList];
+                                                                        updated[idx].editedChange = e.target.value === '' ? '' : Number(e.target.value);
+                                                                        setPendingSihwaList(updated);
+                                                                    }}
+                                                                    className="w-20 px-2 py-1 text-center border rounded border-slate-300 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
+                                                                />
+                                                            </td>
+                                                            <td className="p-3 text-right font-bold text-slate-800">{finalQty}개</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Daekyung Pending List */}
+                            <div>
+                                <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2 border-b pb-1.5 text-sm">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-violet-500"></span>
+                                    양산재고 변동 리스트 (대경)
+                                </h4>
+                                {pendingDaekyungList.length === 0 ? (
+                                    <p className="text-xs text-slate-400 py-4 text-center font-medium">양산재고의 변동 감지 항목이 없습니다.</p>
+                                ) : (
+                                    <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                                        <table className="w-full text-left text-xs border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                                                    <th className="p-3 text-center w-12">선택</th>
+                                                    <th className="p-3">품목 코드 / 규격</th>
+                                                    <th className="p-3 text-right">이전 재고</th>
+                                                    <th className="p-3 text-center w-24">변동량 조작</th>
+                                                    <th className="p-3 text-right">이후 재고</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {pendingDaekyungList.map((item, idx) => {
+                                                    const changeVal = Number(item.editedChange) || 0;
+                                                    const finalQty = item.from + changeVal;
+                                                    return (
+                                                        <tr key={item.id} className={`hover:bg-slate-50/50 ${!item.selected ? 'opacity-50 bg-slate-50/20' : ''}`}>
+                                                            <td className="p-3 text-center">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={item.selected}
+                                                                    onChange={(e) => {
+                                                                        const updated = [...pendingDaekyungList];
+                                                                        updated[idx].selected = e.target.checked;
+                                                                        if (!e.target.checked) updated[idx].editedChange = 0;
+                                                                        else updated[idx].editedChange = item.change;
+                                                                        setPendingDaekyungList(updated);
+                                                                    }}
+                                                                    className="w-4 h-4 text-violet-600 rounded border-slate-300 focus:ring-violet-500 cursor-pointer"
+                                                                />
+                                                            </td>
+                                                            <td className="p-3 font-mono">
+                                                                <div className="font-bold text-slate-700">{item.id}</div>
+                                                                <div className="text-[10px] text-slate-400 font-semibold">{item.name}</div>
+                                                            </td>
+                                                            <td className="p-3 text-right font-medium text-slate-600">{item.from}개</td>
+                                                            <td className="p-3 text-center">
+                                                                <input
+                                                                    type="number"
+                                                                    disabled={!item.selected}
+                                                                    value={item.editedChange}
+                                                                    onChange={(e) => {
+                                                                        const updated = [...pendingDaekyungList];
+                                                                        updated[idx].editedChange = e.target.value === '' ? '' : Number(e.target.value);
+                                                                        setPendingDaekyungList(updated);
+                                                                    }}
+                                                                    className="w-20 px-2 py-1 text-center border rounded border-slate-300 font-bold focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:bg-slate-100 disabled:text-slate-400"
+                                                                />
+                                                            </td>
+                                                            <td className="p-3 text-right font-bold text-slate-800">{finalQty}개</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3 shrink-0">
+                            <button
+                                onClick={() => setIsConfirmModalOpen(false)}
+                                className="px-4 py-2 border border-slate-300 hover:bg-slate-100 rounded-lg text-slate-700 font-bold text-sm transition"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={handleSaveConfirmedHistory}
+                                disabled={submittingConfirm}
+                                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg font-bold text-sm shadow-md transition"
+                            >
+                                {submittingConfirm ? '저장 중...' : '최종 변동 이력 저장'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -693,13 +693,10 @@ const server = http.createServer(async (req, res) => {
 
             const performInventoryUpdate = async (inventoryData, timestamp) => {
                 // --- Daily Sihwa/Daekyung Inventory Snapshot Logic ---
-                // CRITICAL PRESERVATION RULE: Do not change, bypass, or rewrite this daily snapshot logic.
-                // Daekyung rolling average stock evaluation relies strictly on these daily ledger snapshots (db.daekyungHistory).
+                // We no longer automatically commit changes to database on refresh.
+                // Instead, we only update db.currentSnapshot and initialize baselines if they are empty.
                 try {
                     await updateDb(async () => {
-                        const kstDate = new Date(timestamp + 9 * 60 * 60 * 1000); // KST
-                        const today = kstDate.toISOString().slice(0, 10);
-                        
                         const itemsArr = Array.isArray(inventoryData) ? inventoryData : (inventoryData.items || []);
                         const sihwaStockMap = {};
                         const ysStockMap = {};
@@ -707,9 +704,8 @@ const server = http.createServer(async (req, res) => {
                         itemsArr.forEach(item => {
                             let shStock = 0;
                             let ysStock = 0;
-                            let isSihwa = false;
 
-                            // Only track maker '대경' for Sihwa/Daekyung and Yangsan/Daekyung history
+                            // Only track maker '대경' for Sihwa/Daekyung and Yangsan/Daekyung
                             const maker = item.maker || item.maker1 || '';
                             if (maker !== '대경') {
                                 return;
@@ -736,7 +732,6 @@ const server = http.createServer(async (req, res) => {
 
                             if (locationStock['시화'] !== undefined) {
                                 shStock = locationStock['시화'];
-                                isSihwa = true;
                             }
                             if (locationStock['양산'] !== undefined) {
                                 ysStock = locationStock['양산'];
@@ -749,152 +744,25 @@ const server = http.createServer(async (req, res) => {
                             }
                         });
 
-                        const history = db.inventoryHistory;
-                        const daekyungHistory = db.daekyungHistory || []; 
-                        db.daekyungHistory = daekyungHistory; // Ensure linked
-                        
-                        // Initialize if missing
-                        if (!db.lastSnapshotDate) {
-                            db.lastSnapshotDate = today;
-                            if (!db.lastSnapshot || Object.keys(db.lastSnapshot).length === 0) db.lastSnapshot = sihwaStockMap;
-                            if (!db.currentSnapshot || Object.keys(db.currentSnapshot).length === 0) db.currentSnapshot = sihwaStockMap;
-                            if (!db.lastDaekyungSnapshot || Object.keys(db.lastDaekyungSnapshot).length === 0) db.lastDaekyungSnapshot = ysStockMap;
-                            if (!db.currentDaekyungSnapshot || Object.keys(db.currentDaekyungSnapshot).length === 0) db.currentDaekyungSnapshot = ysStockMap;
-                            
-                            if (history.length === 0) history.push({ date: today, diff: [] });
-                            if (daekyungHistory.length === 0) daekyungHistory.push({ date: today, diff: [] });
-                            
-                            console.log(`[API] Initialized daily baseline snapshot ledger system.`);
-                        } else if (db.lastSnapshotDate !== today) {
-                            if (today === '2026-06-14' && db.june12Snapshot && Object.keys(db.june12Snapshot).length > 0) {
-                                db.lastSnapshot = db.june12Snapshot;
-                                db.lastDaekyungSnapshot = db.june12DaekyungSnapshot || ysStockMap;
-                                console.log(`[API] Day transitioned to ${today}. Baseline forced to June 12th snapshot per user request.`);
-                            } else {
-                                db.lastSnapshot = (db.currentSnapshot && Object.keys(db.currentSnapshot).length > 0) ? db.currentSnapshot : sihwaStockMap;
-                                db.lastDaekyungSnapshot = (db.currentDaekyungSnapshot && Object.keys(db.currentDaekyungSnapshot).length > 0) ? db.currentDaekyungSnapshot : ysStockMap;
-                            }
-                            db.lastSnapshotDate = today;
-                            console.log(`[API] Day transitioned to ${today}. Baseline snapshots updated.`);
-                        }
-
-                        // Compute diff against start-of-day baseline (lastSnapshot / lastDaekyungSnapshot)
-                        const changesObj = {};
-                        const daekyungChangesObj = {};
-                        
-                        const isValidItem = (name) => {
-                            if (!name) return false;
-                            const nameUpper = name.toUpperCase();
-                            const isCompositeOrStubend = nameUpper.startsWith('COMPOSITE') || nameUpper.startsWith('STUBEND');
-                            const validPrefixes = ['90', '45', 'R', 'T', 'CAP'];
-                            return !isCompositeOrStubend && validPrefixes.some(p => nameUpper.startsWith(p));
-                        };
-                        
-                        for (const [id, curr] of Object.entries(sihwaStockMap)) {
-                            if (!isValidItem(curr.name)) continue;
-                            const prev = db.lastSnapshot[id];
-                            const sh_from = prev ? (prev.sh_qty ?? 0) : 0;
-                            const sh_to = curr.sh_qty ?? 0;
-                            const sh_change = sh_to - sh_from;
-                            if (sh_change !== 0) {
-                                changesObj[id] = { 
-                                    name: curr.name, 
-                                    change: sh_change, 
-                                    from: sh_from, 
-                                    to: sh_to,
-                                    location: '시화',
-                                    maker: '대경'
-                                };
-                            }
-                        }
-                        for (const [id, prev] of Object.entries(db.lastSnapshot)) {
-                            if (!isValidItem(prev.name)) continue;
-                            if (sihwaStockMap[id] === undefined) {
-                                const sh_from = prev.sh_qty ?? 0;
-                                if (sh_from !== 0) {
-                                    changesObj[id] = { 
-                                        name: prev.name, 
-                                        change: -sh_from, 
-                                        from: sh_from, 
-                                        to: 0,
-                                        location: '시화',
-                                        maker: '대경'
-                                    };
-                                }
-                            }
-                        }
-                        
-                        // Daekyung
-                        for (const [id, curr] of Object.entries(ysStockMap)) {
-                            if (!isValidItem(curr.name)) continue;
-                            const prev = db.lastDaekyungSnapshot[id];
-                            const ys_from = prev ? (prev.ys_qty ?? 0) : 0;
-                            const ys_to = curr.ys_qty ?? 0;
-                            const ys_change = ys_to - ys_from;
-                            if (ys_change !== 0) {
-                                daekyungChangesObj[id] = { 
-                                    name: curr.name, 
-                                    change: ys_change, 
-                                    from: ys_from, 
-                                    to: ys_to,
-                                    location: '양산',
-                                    maker: '대경'
-                                };
-                            }
-                        }
-                        for (const [id, prev] of Object.entries(db.lastDaekyungSnapshot)) {
-                            if (!isValidItem(prev.name)) continue;
-                            if (ysStockMap[id] === undefined) {
-                                const ys_from = prev.ys_qty ?? 0;
-                                if (ys_from !== 0) {
-                                    daekyungChangesObj[id] = { 
-                                        name: prev.name, 
-                                        change: -ys_from, 
-                                        from: ys_from, 
-                                        to: 0,
-                                        location: '양산',
-                                        maker: '대경'
-                                    };
-                                }
-                            }
-                        }
-
                         // Update current snapshots to reflect the latest values
                         db.currentSnapshot = sihwaStockMap;
                         db.currentDaekyungSnapshot = ysStockMap;
-                        
-                        if (today === '2026-06-12') {
-                            db.june12Snapshot = sihwaStockMap;
-                            db.june12DaekyungSnapshot = ysStockMap;
-                        }
                         
                         // Retain legacy keys for backward compatibility
                         db.inventorySnapshot = sihwaStockMap;
                         db.daekyungSnapshot = ysStockMap;
 
-                        // Update history record by overwriting its daily diff with the complete change from start-of-day
-                        let todayRecord = history.find(h => h.date === today);
-                        if (!todayRecord) {
-                            todayRecord = { date: today, diff: [] };
-                            history.push(todayRecord);
-                            if (history.length > 61) history.shift();
+                        // Initialize baseline snapshots if completely missing
+                        if (!db.lastSnapshot || Object.keys(db.lastSnapshot).length === 0) {
+                            db.lastSnapshot = sihwaStockMap;
+                            db.lastSnapshotDate = new Date(timestamp + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
                         }
-                        todayRecord.diff = Object.entries(changesObj)
-                            .map(([id, changeData]) => ({ id, ...changeData }))
-                            .filter(d => d.change !== 0);
-
-                        let todayDaekyungRecord = daekyungHistory.find(h => h.date === today);
-                        if (!todayDaekyungRecord) {
-                            todayDaekyungRecord = { date: today, diff: [] };
-                            daekyungHistory.push(todayDaekyungRecord);
-                            if (daekyungHistory.length > 185) daekyungHistory.shift();
+                        if (!db.lastDaekyungSnapshot || Object.keys(db.lastDaekyungSnapshot).length === 0) {
+                            db.lastDaekyungSnapshot = ysStockMap;
                         }
-                        todayDaekyungRecord.diff = Object.entries(daekyungChangesObj)
-                            .map(([id, changeData]) => ({ id, ...changeData }))
-                            .filter(d => d.change !== 0);
                     });
                 } catch (snapErr) {
-                    console.error('[API] Error creating daily inventory snapshot:', snapErr);
+                    console.error('[API] Error updating live inventory snapshots:', snapErr);
                 }
 
                 const rawJson = JSON.stringify(inventoryData);
@@ -1497,6 +1365,205 @@ const server = http.createServer(async (req, res) => {
         const logs = [...db.loginLogs].sort((a, b) => b.timestamp - a.timestamp).slice(0, 200);
 
         sendJsonResponse(req, res, 200, logs);
+        return;
+    }
+
+    // GET /api/admin/inventory-history/pending
+    if (req.method === 'GET' && url.pathname === '/api/admin/inventory-history/pending') {
+        const session = getAuthenticatedSession(req);
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
+            res.writeHead(403);
+            return res.end(JSON.stringify({ error: 'Forbidden' }));
+        }
+
+        const kstDate = new Date(Date.now() + 9 * 60 * 60 * 1000);
+        const today = kstDate.toISOString().slice(0, 10);
+
+        const sihwaStockMap = db.currentSnapshot || {};
+        const ysStockMap = db.currentDaekyungSnapshot || {};
+        const lastSnapshot = db.lastSnapshot || {};
+        const lastDaekyungSnapshot = db.lastDaekyungSnapshot || {};
+
+        const sihwaPending = [];
+        const daekyungPending = [];
+
+        const isValidItem = (name) => {
+            if (!name) return false;
+            const nameUpper = name.toUpperCase();
+            const isCompositeOrStubend = nameUpper.startsWith('COMPOSITE') || nameUpper.startsWith('STUBEND');
+            const validPrefixes = ['90', '45', 'R', 'T', 'CAP'];
+            return !isCompositeOrStubend && validPrefixes.some(p => nameUpper.startsWith(p));
+        };
+
+        // Sihwa (시화) Pending Diff Calculation
+        for (const [id, curr] of Object.entries(sihwaStockMap)) {
+            if (!isValidItem(curr.name)) continue;
+            const prev = lastSnapshot[id];
+            const sh_from = prev ? (prev.sh_qty ?? 0) : 0;
+            const sh_to = curr.sh_qty ?? 0;
+            const sh_change = sh_to - sh_from;
+            if (sh_change !== 0) {
+                sihwaPending.push({
+                    id,
+                    name: curr.name,
+                    from: sh_from,
+                    to: sh_to,
+                    change: sh_change,
+                    location: '시화',
+                    maker: '대경'
+                });
+            }
+        }
+        for (const [id, prev] of Object.entries(lastSnapshot)) {
+            if (!isValidItem(prev.name)) continue;
+            if (sihwaStockMap[id] === undefined) {
+                const sh_from = prev.sh_qty ?? 0;
+                if (sh_from !== 0) {
+                    sihwaPending.push({
+                        id,
+                        name: prev.name,
+                        from: sh_from,
+                        to: 0,
+                        change: -sh_from,
+                        location: '시화',
+                        maker: '대경'
+                    });
+                }
+            }
+        }
+
+        // Daekyung (양산) Pending Diff Calculation
+        for (const [id, curr] of Object.entries(ysStockMap)) {
+            if (!isValidItem(curr.name)) continue;
+            const prev = lastDaekyungSnapshot[id];
+            const ys_from = prev ? (prev.ys_qty ?? 0) : 0;
+            const ys_to = curr.ys_qty ?? 0;
+            const ys_change = ys_to - ys_from;
+            if (ys_change !== 0) {
+                daekyungPending.push({
+                    id,
+                    name: curr.name,
+                    from: ys_from,
+                    to: ys_to,
+                    change: ys_change,
+                    location: '양산',
+                    maker: '대경'
+                });
+            }
+        }
+        for (const [id, prev] of Object.entries(lastDaekyungSnapshot)) {
+            if (!isValidItem(prev.name)) continue;
+            if (ysStockMap[id] === undefined) {
+                const ys_from = prev.ys_qty ?? 0;
+                if (ys_from !== 0) {
+                    daekyungPending.push({
+                        id,
+                        name: prev.name,
+                        from: ys_from,
+                        to: 0,
+                        change: -ys_from,
+                        location: '양산',
+                        maker: '대경'
+                    });
+                }
+            }
+        }
+
+        sendJsonResponse(req, res, 200, {
+            date: today,
+            lastSnapshotDate: db.lastSnapshotDate,
+            sihwaPending,
+            daekyungPending
+        });
+        return;
+    }
+
+    // POST /api/admin/inventory-history/confirm
+    if (req.method === 'POST' && url.pathname === '/api/admin/inventory-history/confirm') {
+        const session = getAuthenticatedSession(req);
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
+            res.writeHead(403);
+            return res.end(JSON.stringify({ error: 'Forbidden' }));
+        }
+
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { date, sihwaDiffs, daekyungDiffs } = JSON.parse(body);
+                if (!date || !Array.isArray(sihwaDiffs) || !Array.isArray(daekyungDiffs)) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    return res.end(JSON.stringify({ error: 'Invalid parameters' }));
+                }
+
+                await updateDb(async () => {
+                    db.inventoryHistory = db.inventoryHistory || [];
+                    db.daekyungHistory = db.daekyungHistory || [];
+
+                    // 1. Save or overwrite today's record in inventoryHistory (Sihwa)
+                    let todayRecord = db.inventoryHistory.find(h => h.date === date);
+                    if (!todayRecord) {
+                        todayRecord = { date, diff: [] };
+                        db.inventoryHistory.push(todayRecord);
+                        if (db.inventoryHistory.length > 61) db.inventoryHistory.shift();
+                    }
+                    todayRecord.diff = sihwaDiffs;
+
+                    // 2. Save or overwrite today's record in daekyungHistory (Yangsan)
+                    let todayDaekyungRecord = db.daekyungHistory.find(h => h.date === date);
+                    if (!todayDaekyungRecord) {
+                        todayDaekyungRecord = { date, diff: [] };
+                        db.daekyungHistory.push(todayDaekyungRecord);
+                        if (db.daekyungHistory.length > 185) db.daekyungHistory.shift();
+                    }
+                    todayDaekyungRecord.diff = daekyungDiffs;
+
+                    // 3. Update baselines (lastSnapshot / lastDaekyungSnapshot) ONLY for confirmed diffs
+                    db.lastSnapshot = db.lastSnapshot || {};
+                    db.lastDaekyungSnapshot = db.lastDaekyungSnapshot || {};
+
+                    // Update lastSnapshot for Sihwa based on confirmed diffs
+                    sihwaDiffs.forEach(diff => {
+                        const prev = db.lastSnapshot[diff.id];
+                        if (prev) {
+                            prev.sh_qty = diff.to;
+                            prev.stock = diff.to;
+                        } else {
+                            db.lastSnapshot[diff.id] = {
+                                name: diff.name,
+                                stock: diff.to,
+                                sh_qty: diff.to
+                            };
+                        }
+                    });
+
+                    // Update lastDaekyungSnapshot for Yangsan based on confirmed diffs
+                    daekyungDiffs.forEach(diff => {
+                        const prev = db.lastDaekyungSnapshot[diff.id];
+                        if (prev) {
+                            prev.ys_qty = diff.to;
+                            prev.stock = diff.to;
+                        } else {
+                            db.lastDaekyungSnapshot[diff.id] = {
+                                name: diff.name,
+                                stock: diff.to,
+                                ys_qty: diff.to
+                            };
+                        }
+                    });
+
+                    db.lastSnapshotDate = date;
+                });
+
+                console.log(`[API] Manually confirmed and saved inventory history for date: ${date}. Sihwa diffs: ${sihwaDiffs.length}, Daekyung diffs: ${daekyungDiffs.length}`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: 'History confirmed and saved successfully.' }));
+            } catch (e) {
+                console.error('[API] Failed to confirm inventory history:', e);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Internal Server Error' }));
+            }
+        });
         return;
     }
 
