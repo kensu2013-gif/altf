@@ -5322,6 +5322,7 @@ if (displayList.length === 0) {
                                                                 <input
                                                                     type="checkbox"
                                                                     checked={item.selected}
+                                                                    aria-label="변동 항목 선택"
                                                                     onChange={(e) => {
                                                                         const updated = [...pendingSihwaList];
                                                                         updated[idx].selected = e.target.checked;
@@ -5342,6 +5343,8 @@ if (displayList.length === 0) {
                                                                     type="number"
                                                                     disabled={!item.selected}
                                                                     value={item.editedChange}
+                                                                    aria-label="변동 수량 조작"
+                                                                    placeholder="0"
                                                                     onChange={(e) => {
                                                                         const updated = [...pendingSihwaList];
                                                                         updated[idx].editedChange = e.target.value === '' ? '' : Number(e.target.value);
@@ -5390,6 +5393,7 @@ if (displayList.length === 0) {
                                                                 <input
                                                                     type="checkbox"
                                                                     checked={item.selected}
+                                                                    aria-label="변동 항목 선택"
                                                                     onChange={(e) => {
                                                                         const updated = [...pendingDaekyungList];
                                                                         updated[idx].selected = e.target.checked;
@@ -5410,6 +5414,8 @@ if (displayList.length === 0) {
                                                                     type="number"
                                                                     disabled={!item.selected}
                                                                     value={item.editedChange}
+                                                                    aria-label="변동 수량 조작"
+                                                                    placeholder="0"
                                                                     onChange={(e) => {
                                                                         const updated = [...pendingDaekyungList];
                                                                         updated[idx].editedChange = e.target.value === '' ? '' : Number(e.target.value);
