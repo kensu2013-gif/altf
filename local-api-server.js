@@ -72,10 +72,8 @@ async function loadData() {
 
             // Self-healing recovery for missing daily diffs due to initialization overwrite
             if (!db.lastSnapshot || Object.keys(db.lastSnapshot).length === 0 || 
-                !db.currentSnapshot || Object.keys(db.currentSnapshot).length === 0 ||
-                !db.lastDaekyungSnapshot || Object.keys(db.lastDaekyungSnapshot).length === 0 ||
-                !db.currentDaekyungSnapshot || Object.keys(db.currentDaekyungSnapshot).length === 0) {
-                console.log(`[RECOVERY] Snapshot empty or missing. Recovering baseline snapshot...`);
+                !db.currentSnapshot || Object.keys(db.currentSnapshot).length === 0) {
+                console.log(`[RECOVERY] Sihwa Snapshot empty or missing. Recovering baseline snapshot...`);
                 let recovered = false;
                 // Try S3 version recovery to get the exact previous state
                 try {
@@ -83,17 +81,10 @@ async function loadData() {
                     const oldDb = await getPreviousDbVersion(new Date(Date.now() - 60 * 1000).toISOString());
                     if (oldDb) {
                         const recoveredSihwa = oldDb.currentSnapshot || oldDb.inventorySnapshot || oldDb.lastSnapshot;
-                        const recoveredDaekyung = oldDb.currentDaekyungSnapshot || oldDb.daekyungSnapshot || oldDb.lastDaekyungSnapshot;
                         if (recoveredSihwa && Object.keys(recoveredSihwa).length > 0) {
                             db.lastSnapshot = recoveredSihwa;
                             db.currentSnapshot = recoveredSihwa;
                             console.log('[RECOVERY] Restored Sihwa lastSnapshot from S3 version history.');
-                            recovered = true;
-                        }
-                        if (recoveredDaekyung && Object.keys(recoveredDaekyung).length > 0) {
-                            db.lastDaekyungSnapshot = recoveredDaekyung;
-                            db.currentDaekyungSnapshot = recoveredDaekyung;
-                            console.log('[RECOVERY] Restored Daekyung lastDaekyungSnapshot from S3 version history.');
                             recovered = true;
                         }
                     }
