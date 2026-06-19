@@ -5281,7 +5281,7 @@ if (displayList.length === 0) {
                                 <History className="w-5 h-5 text-amber-400" />
                                 <h3 className="font-extrabold text-lg">일일 변동 트렌드 데이터 검토 및 확정 ({pendingDate})</h3>
                             </div>
-                            <button onClick={() => setIsConfirmModalOpen(false)} className="text-slate-400 hover:text-white transition">
+                            <button onClick={() => setIsConfirmModalOpen(false)} aria-label="닫기" className="text-slate-400 hover:text-white transition">
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
