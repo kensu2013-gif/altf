@@ -1473,7 +1473,11 @@ const server = http.createServer(async (req, res) => {
             date: today,
             lastSnapshotDate: db.lastSnapshotDate,
             sihwaPending,
-            daekyungPending
+            daekyungPending,
+            debugItem: {
+                last: lastSnapshot['90E(L)-S10S-25A-STS304-W'] || lastSnapshot['90E(L)-S10S-25A-STS304'] || null,
+                current: sihwaStockMap['90E(L)-S10S-25A-STS304-W'] || sihwaStockMap['90E(L)-S10S-25A-STS304'] || null
+            }
         });
         return;
     }
