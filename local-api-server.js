@@ -1904,41 +1904,81 @@ const server = http.createServer(async (req, res) => {
             return res.end(JSON.stringify({ error: 'Forbidden' }));
         }
 
-        try {
-            const { getPreviousDbVersion } = await import('./s3-db.js');
-            const cutoffDate = '2026-06-19T00:00:00+09:00'; 
-            console.log(`[API] Restoring baseline from S3 DB version older than ${cutoffDate}...`);
-            const prevDb = await getPreviousDbVersion(cutoffDate);
-            if (!prevDb) {
-                res.writeHead(404, { 'Content-Type': 'application/json' });
-                return res.end(JSON.stringify({ error: 'No previous S3 DB version found before 6/19' }));
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', async () => {
+            try {
+                let lastSnapshot = null;
+                let lastDaekyungSnapshot = null;
+
+                if (body) {
+                    try {
+                        const parsed = JSON.parse(body);
+                        lastSnapshot = parsed.lastSnapshot;
+                        lastDaekyungSnapshot = parsed.lastDaekyungSnapshot;
+                    } catch (parseErr) {
+                        console.warn('[API] Failed to parse restore payload body:', parseErr.message);
+                    }
+                }
+
+                // If payloads are provided, overwrite directly (Bulk restore via client backup)
+                if (lastSnapshot || lastDaekyungSnapshot) {
+                    await updateDb(async () => {
+                        if (lastSnapshot) {
+                            db.lastSnapshot = lastSnapshot;
+                        }
+                        if (lastDaekyungSnapshot) {
+                            db.lastDaekyungSnapshot = lastDaekyungSnapshot;
+                        }
+                        db.lastSnapshotDate = '2026-06-18';
+                        
+                        // Hotpatch target item to ensure 146 EA baseline
+                        const targetSku = '90E(L)-S10S-25A-STS304-W';
+                        if (db.lastSnapshot[targetSku]) {
+                            db.lastSnapshot[targetSku].sh_qty = 146;
+                            db.lastSnapshot[targetSku].stock = 146;
+                        }
+                    });
+                    console.log(`[API] Successfully restored baseline snapshots via client upload.`);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    return res.end(JSON.stringify({ success: true, message: 'Successfully restored baseline snapshots via uploaded payload.' }));
+                }
+
+                // Otherwise, fallback to S3 versioning restore (S3 backup lookup)
+                const { getPreviousDbVersion } = await import('./s3-db.js');
+                const cutoffDate = '2026-06-19T00:00:00+09:00'; 
+                console.log(`[API] Restoring baseline from S3 DB version older than ${cutoffDate}...`);
+                const prevDb = await getPreviousDbVersion(cutoffDate);
+                if (!prevDb) {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    return res.end(JSON.stringify({ error: 'No previous S3 DB version found before 6/19 and no upload payload provided.' }));
+                }
+
+                await updateDb(async () => {
+                    if (prevDb.lastSnapshot) {
+                        db.lastSnapshot = prevDb.lastSnapshot;
+                    }
+                    if (prevDb.lastDaekyungSnapshot) {
+                        db.lastDaekyungSnapshot = prevDb.lastDaekyungSnapshot;
+                    }
+                    db.lastSnapshotDate = '2026-06-18';
+                    
+                    const targetSku = '90E(L)-S10S-25A-STS304-W';
+                    if (db.lastSnapshot[targetSku]) {
+                        db.lastSnapshot[targetSku].sh_qty = 146;
+                        db.lastSnapshot[targetSku].stock = 146;
+                    }
+                });
+
+                console.log(`[API] Successfully restored baseline snapshots to 6/18 state via S3 version history.`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: 'Successfully restored baseline snapshots to 6/18 state via S3 version history.' }));
+            } catch (e) {
+                console.error('[API] Failed to restore baseline:', e);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Internal Server Error' }));
             }
-
-            await updateDb(async () => {
-                if (prevDb.lastSnapshot) {
-                    db.lastSnapshot = prevDb.lastSnapshot;
-                }
-                if (prevDb.lastDaekyungSnapshot) {
-                    db.lastDaekyungSnapshot = prevDb.lastDaekyungSnapshot;
-                }
-                db.lastSnapshotDate = '2026-06-18';
-                
-                // Hotpatch target item to ensure 146 EA baseline
-                const targetSku = '90E(L)-S10S-25A-STS304-W';
-                if (db.lastSnapshot[targetSku]) {
-                    db.lastSnapshot[targetSku].sh_qty = 146;
-                    db.lastSnapshot[targetSku].stock = 146;
-                }
-            });
-
-            console.log(`[API] Successfully restored baseline snapshots to 6/18 state.`);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, message: 'Successfully restored baseline snapshots to 6/18 state.' }));
-        } catch (e) {
-            console.error('[API] Failed to restore baseline:', e);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Internal Server Error' }));
-        }
+        });
         return;
     }
 
