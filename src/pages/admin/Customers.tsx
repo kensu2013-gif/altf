@@ -833,7 +833,7 @@ export default function Customers() {
         });
 
         return analysisResults;
-    }, [orders, customersList, inventoryMap]);
+    }, [orders, customersList, inventoryMap, now]);
 
     // Strategic BI Analytics Engine
     const biAnalytics = useMemo(() => {
@@ -1026,7 +1026,7 @@ export default function Customers() {
             if (idxB !== -1) return 1;
             return b.totalAmount - a.totalAmount;
         });
-    }, [orders, customersList, inventoryMap, analyticsSortBy, now]);
+    }, [orders, customersList, inventoryMap, analyticsSortBy]);
 
     // 2. Strategy Analytics Engine (심화 BI 업체별 전략 분석)
     const strategyAnalytics = useMemo(() => {
@@ -2133,7 +2133,7 @@ const actionIntel = useMemo(() => {
                                                     </span>
                                                 </div>
                                                 <div className="bg-white p-2 rounded border border-slate-100 flex flex-col justify-between">
-                                                    <span className="text-slate-400 font-bold font-medium">전년 동월 ({trendAnalysis[reg.region].yoyMonth.label})</span>
+                                                    <span className="text-slate-400 font-bold">전년 동월 ({trendAnalysis[reg.region].yoyMonth.label})</span>
                                                     <span className="text-xs font-black text-slate-700 flex items-center justify-between mt-1">
                                                         <span>{trendAnalysis[reg.region].yoyMonth.currentQty.toLocaleString()}개</span>
                                                         <span className={trendAnalysis[reg.region].yoyMonth.rate >= 0 ? 'text-emerald-600 font-extrabold' : 'text-rose-600 font-extrabold'}>
@@ -2142,7 +2142,7 @@ const actionIntel = useMemo(() => {
                                                     </span>
                                                 </div>
                                                 <div className="bg-white p-2 rounded border border-slate-100 flex flex-col justify-between">
-                                                    <span className="text-slate-400 font-bold font-medium">전년 동반기 ({trendAnalysis[reg.region].yoyHalf.label})</span>
+                                                    <span className="text-slate-400 font-bold">전년 동반기 ({trendAnalysis[reg.region].yoyHalf.label})</span>
                                                     <span className="text-xs font-black text-slate-700 flex items-center justify-between mt-1">
                                                         <span>{trendAnalysis[reg.region].yoyHalf.currentQty.toLocaleString()}개</span>
                                                         <span className={trendAnalysis[reg.region].yoyHalf.rate >= 0 ? 'text-emerald-600 font-extrabold' : 'text-rose-600 font-extrabold'}>
