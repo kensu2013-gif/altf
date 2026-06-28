@@ -214,7 +214,7 @@ interface InventoryHistorySnapshot {
     stock?: Record<string, { name: string; stock: number }>;
 }
 
-interface PendingDiffItem {
+interface InventoryDiffSubmitItem {
     id: string;
     name: string;
     from: number;
@@ -222,6 +222,9 @@ interface PendingDiffItem {
     change: number;
     location: string;
     maker: string;
+}
+
+interface PendingDiffItem extends InventoryDiffSubmitItem {
     selected: boolean;
     editedChange: number | '';
 }
@@ -503,7 +506,7 @@ export default function SihwaInventory() {
                     };
                 });
 
-            const finalDaekyungDiffs: any[] = [];
+            const finalDaekyungDiffs: InventoryDiffSubmitItem[] = [];
 
             const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/admin/inventory-history/confirm', {
                 method: 'POST',
@@ -770,6 +773,8 @@ export default function SihwaInventory() {
         recent7dSales: number;
         recent30dSales: number;
         recent60dSales: number;
+        recent90dSales: number;
+        recent180dSales: number;
         quoteCount: number;
         recent60dOrderCount: number;
         daekyungDirectRatio: number;
@@ -841,21 +846,31 @@ export default function SihwaInventory() {
         const thirtyDaysAgo = nowTime - (30 * 24 * 60 * 60 * 1000);
         const sixtyDaysAgo = nowTime - (60 * 24 * 60 * 60 * 1000);
         const sevenDaysAgo = nowTime - (7 * 24 * 60 * 60 * 1000);
+        const ninetyDaysAgo = nowTime - (90 * 24 * 60 * 60 * 1000);
+        const oneEightyDaysAgo = nowTime - (180 * 24 * 60 * 60 * 1000);
 
-        const recentSalesMap: Record<string, { recent7d: number, recent30d: number, recent60d: number }> = {};
+        const recentSalesMap: Record<string, { recent7d: number, recent30d: number, recent60d: number, recent90d: number, recent180d: number }> = {};
         historyData.inventoryHistory.forEach((snap: InventoryHistorySnapshot) => {
             const snapDate = new Date(snap.date).getTime();
             if (isNaN(snapDate)) return;
             const isWithin7d = snapDate >= sevenDaysAgo;
             const isWithin30d = snapDate >= thirtyDaysAgo;
             const isWithin60d = snapDate >= sixtyDaysAgo;
+            const isWithin90d = snapDate >= ninetyDaysAgo;
+            const isWithin180d = snapDate >= oneEightyDaysAgo;
 
-            if (isWithin60d && snap.diff) {
+            if (isWithin180d && snap.diff) {
                 snap.diff.forEach((d: InventoryDiffItem) => {
                     if (d.change < 0) {
                         const absChg = Math.abs(d.change);
-                        if (!recentSalesMap[d.id]) recentSalesMap[d.id] = { recent7d: 0, recent30d: 0, recent60d: 0 };
-                        recentSalesMap[d.id].recent60d += absChg;
+                        if (!recentSalesMap[d.id]) recentSalesMap[d.id] = { recent7d: 0, recent30d: 0, recent60d: 0, recent90d: 0, recent180d: 0 };
+                        recentSalesMap[d.id].recent180d += absChg;
+                        if (isWithin90d) {
+                            recentSalesMap[d.id].recent90d += absChg;
+                        }
+                        if (isWithin60d) {
+                            recentSalesMap[d.id].recent60d += absChg;
+                        }
                         if (isWithin30d) {
                             recentSalesMap[d.id].recent30d += absChg;
                         }
@@ -933,7 +948,7 @@ export default function SihwaInventory() {
 
             const basePrice = item.base_price ?? item.unitPrice ?? 0;
             const recentInfo = recentSeoulPurchaseInfoMap[item.id];
-            const recentSales = recentSalesMap[item.id] || { recent7d: 0, recent30d: 0, recent60d: 0 };
+            const recentSales = recentSalesMap[item.id] || { recent7d: 0, recent30d: 0, recent60d: 0, recent90d: 0, recent180d: 0 };
 
             // Calculate Profit Margin
             const sellingPrice = calculateSellingPrice(item.id, basePrice);
@@ -962,6 +977,8 @@ export default function SihwaInventory() {
                     recent7dSales: recentSales.recent7d,
                     recent30dSales: recentSales.recent30d,
                     recent60dSales: recentSales.recent60d,
+                    recent90dSales: recentSales.recent90d,
+                    recent180dSales: recentSales.recent180d,
                     quoteCount: quoteCountMap[item.id] || 0,
                     recent60dOrderCount: recent60dOrderCountMap[item.id] || 0,
                     daekyungDirectRatio,
@@ -1021,7 +1038,7 @@ export default function SihwaInventory() {
                     const marketTotal = salesData.salesVolume + compData.compSales;
                     const marketShare = marketTotal > 0 ? parseFloat(((salesData.salesVolume / marketTotal) * 100).toFixed(1)) : 0;
 
-                    const recentSales = recentSalesMap[id] || { recent7d: 0, recent30d: 0, recent60d: 0 };
+                    const recentSales = recentSalesMap[id] || { recent7d: 0, recent30d: 0, recent60d: 0, recent90d: 0, recent180d: 0 };
                     const purchasePrice = recentInfo ? recentInfo.price : calculateFallbackPurchasePrice(id, rawBasePrice);
                     const profitMarginRate = finalSellingPrice > 0 ? parseFloat((((finalSellingPrice - purchasePrice) / finalSellingPrice) * 100).toFixed(1)) : 0;
 
@@ -1044,6 +1061,8 @@ export default function SihwaInventory() {
                         recent7dSales: recentSales.recent7d,
                         recent30dSales: recentSales.recent30d,
                         recent60dSales: recentSales.recent60d,
+                        recent90dSales: recentSales.recent90d,
+                        recent180dSales: recentSales.recent180d,
                         quoteCount: quoteCountMap[id] || 0,
                         recent60dOrderCount: recent60dOrderCountMap[id] || 0,
                         daekyungDirectRatio,

@@ -261,6 +261,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         return isStockOrder(initialCustomer, order.customerName || '');
     });
 
+    const [bulkSupplierRateInput, setBulkSupplierRateInput] = useState<string>('');
+    const [bulkDiscountRateInput, setBulkDiscountRateInput] = useState<string>('');
+
     const checkDuplicates = useCallback((currentPoItems: LineItem[]) => {
         const allOrders = useStore.getState().orders || [];
         const duplicates: {
@@ -2550,6 +2553,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     type="number"
                                                                     inputMode="numeric"
                                                                     placeholder="일괄"
+                                                                    value={bulkSupplierRateInput}
+                                                                    onChange={(e) => setBulkSupplierRateInput(e.target.value)}
                                                                     className="w-full px-1 py-0.5 text-center text-xs border border-indigo-200 rounded focus:border-indigo-500 outline-none text-indigo-700 bg-indigo-50/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-indigo-300"
                                                                     onKeyDown={(e) => {
                                                                         if (e.key === 'Enter') {
@@ -2562,15 +2567,20 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                                 setDisplayedItems(newItems);
                                                                             }
                                                                         }
-                                                                    }
-                                                                    }
+                                                                    }}
                                                                 />
                                                                 <button
                                                                     onClick={() => {
+                                                                        const val = Number(bulkSupplierRateInput);
+                                                                        const hasInput = bulkSupplierRateInput.trim() !== '';
                                                                         const newItems = displayedItems.map(item => {
-                                                                            const product = findProduct({ productId: item.productId });
-                                                                            const productRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
-                                                                            return { ...item, supplierRate: productRate };
+                                                                            if (hasInput && !isNaN(val)) {
+                                                                                return { ...item, supplierRate: val };
+                                                                            } else {
+                                                                                const product = findProduct({ productId: item.productId });
+                                                                                const productRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
+                                                                                return { ...item, supplierRate: productRate };
+                                                                            }
                                                                         });
                                                                         setDisplayedItems(newItems);
                                                                     }}
@@ -2609,6 +2619,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     type="number"
                                                                     inputMode="numeric"
                                                                     placeholder="일괄"
+                                                                    value={bulkDiscountRateInput}
+                                                                    onChange={(e) => setBulkDiscountRateInput(e.target.value)}
                                                                     className="w-full px-1 py-0.5 text-center text-xs border border-slate-300 rounded focus:border-teal-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                     onKeyDown={(e) => {
                                                                         if (e.key === 'Enter') {
@@ -2639,15 +2651,36 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 />
                                                                 <button
                                                                     onClick={() => {
+                                                                        const val = Number(bulkDiscountRateInput);
+                                                                        const hasInput = bulkDiscountRateInput.trim() !== '';
                                                                         const newItems = displayedItems.map(item => {
-                                                                            const product = findProduct({ productId: item.productId });
-                                                                            const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
-                                                                            return {
-                                                                                ...item,
-                                                                                discountRate: 0,
-                                                                                unitPrice: basePrice,
-                                                                                amount: basePrice * item.quantity
-                                                                            };
+                                                                            if (hasInput && !isNaN(val)) {
+                                                                                const product = findProduct({ productId: item.productId });
+                                                                                const productRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
+                                                                                if (productRate === 0) {
+                                                                                    return item;
+                                                                                }
+                                                                                const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
+                                                                                if (basePrice > 0) {
+                                                                                    const newPrice = Math.round(Math.round(basePrice * (1 - val / 100)) / 10) * 10;
+                                                                                    return {
+                                                                                        ...item,
+                                                                                        discountRate: val,
+                                                                                        unitPrice: newPrice,
+                                                                                        amount: newPrice * item.quantity
+                                                                                    };
+                                                                                }
+                                                                                return { ...item, discountRate: val };
+                                                                            } else {
+                                                                                const product = findProduct({ productId: item.productId });
+                                                                                const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
+                                                                                return {
+                                                                                    ...item,
+                                                                                    discountRate: 0,
+                                                                                    unitPrice: basePrice,
+                                                                                    amount: basePrice * item.quantity
+                                                                                };
+                                                                            }
                                                                         });
                                                                         setDisplayedItems(newItems);
                                                                     }}

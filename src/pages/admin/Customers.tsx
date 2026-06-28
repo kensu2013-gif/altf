@@ -22,6 +22,8 @@ interface Customer {
     isDeleted?: boolean;
 }
 
+type AnalyticsPeriod = '3m' | '6m' | '12m' | 'ALL';
+
 // ── 업체별 인텔리전스 카드 타입 ──────────────────────────────
 interface CompanyIntelCard {
   companyName: string;
@@ -240,6 +242,7 @@ const resolveOrderDate = (o: any): Date => {
 };
 
 export default function Customers() {
+    const [now] = useState(() => new Date());
     const user = useStore(state => state.auth.user);
     const token = useStore(state => state.auth.token);
     const orders = useStore(state => state.orders);
@@ -266,6 +269,8 @@ export default function Customers() {
     };
 
     const [analyticsSortBy, setAnalyticsSortBy] = useState<'qty' | 'amount' | 'margin'>('qty');
+    const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsPeriod>('ALL');
+    const [openedTrendRegion, setOpenedTrendRegion] = useState<string | null>(null);
     const [expandedStrategyGroups, setExpandedStrategyGroups] = useState<Record<string, boolean>>({
         CHURN_RISK: true, GROWTH: true, STABLE: false, NEW: true, DORMANT: false
     });
@@ -573,9 +578,20 @@ export default function Customers() {
     const analytics = useMemo(() => {
         const regionMap: Record<string, { totalAmount: number; totalCost: number; totalQty: number; items: Record<string, {qty: number; amount: number; cost: number; material: string}>; missingCustomers: Map<string, string> }> = {};
         
+        const nowTime = now.getTime();
+        let cutOffTime = 0;
+        if (analyticsPeriod === '3m') cutOffTime = nowTime - (90 * 24 * 60 * 60 * 1000);
+        else if (analyticsPeriod === '6m') cutOffTime = nowTime - (180 * 24 * 60 * 60 * 1000);
+        else if (analyticsPeriod === '12m') cutOffTime = nowTime - (365 * 24 * 60 * 60 * 1000);
+
         orders.forEach(o => {
             const oExt = o as typeof o & { isDeleted?: boolean; poEndCustomer?: string; payload?: { customer?: { company_name?: string } } };
             if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN' || oExt.isDeleted) return;
+
+            if (cutOffTime > 0) {
+                const orderTime = new Date(o.createdAt).getTime();
+                if (isNaN(orderTime) || orderTime < cutOffTime) return;
+            }
 
             // Exclude ALL internal stock orders (e.g. 서울재고)
             const fullCustomerName = (oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || '').toLowerCase();
@@ -662,7 +678,162 @@ export default function Customers() {
             });
 
         return results;
-    }, [orders, customersList, inventoryMap, analyticsSortBy]);
+    }, [orders, customersList, inventoryMap, analyticsSortBy, analyticsPeriod, now]);
+
+    const trendAnalysis = useMemo(() => {
+        const today = now;
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth() + 1; // 1-12
+        const currentQuarter = Math.floor((currentMonth - 1) / 3) + 1; // 1-4
+        const currentHalf = currentMonth <= 6 ? 1 : 2; // 1-2
+
+        const dataMap: Record<string, Record<string, Record<string, { qty: number, amount: number }>>> = {};
+
+        orders.forEach(o => {
+            const oExt = o as typeof o & { isDeleted?: boolean; poEndCustomer?: string; payload?: { customer?: { company_name?: string } } };
+            if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN' || oExt.isDeleted) return;
+
+            const fullCustomerName = (oExt.poEndCustomer || oExt.payload?.customer?.company_name || o.customerName || '').toLowerCase();
+            if (fullCustomerName.includes('서울재고') || fullCustomerName.includes('시화재고') || fullCustomerName.includes('알트에프') || fullCustomerName.includes('altf') || fullCustomerName.includes('재고입고') || fullCustomerName.includes('stock')) return;
+
+            const customer = matchCustomerToCrm(oExt, customersList);
+            const region = customer?.region || 'CRM 미등록/예외';
+            if (region === 'CRM 미등록/예외') return;
+
+            const orderDate = new Date(o.createdAt);
+            const y = orderDate.getFullYear();
+            const m = orderDate.getMonth() + 1;
+            const q = Math.floor((m - 1) / 3) + 1;
+            const h = m <= 6 ? 1 : 2;
+
+            if (!dataMap[region]) dataMap[region] = {};
+
+            const keys = [`${y}-${m}`, `${y}-Q${q}`, `${y}-H${h}`];
+
+            keys.forEach(k => {
+                if (!dataMap[region][k]) dataMap[region][k] = {};
+            });
+
+            o.items?.forEach(item => {
+                const itemExt = item as typeof item & { item_id?: string, isDeleted?: boolean, material?: string };
+                if (itemExt.isDeleted) return;
+
+                const quantity = item.quantity || 0;
+                if (quantity <= 0) return;
+                const unitPrice = item.unitPrice || 0;
+
+                const id = itemExt.productId || itemExt.item_id || '';
+                const product = inventoryMap.get(id);
+                const materialInfo = product?.material || itemExt.material || '';
+                const matString = materialInfo ? `-${materialInfo}` : '';
+                const itemKey = `${item.name}-${item.thickness}-${item.size}${matString}`;
+
+                keys.forEach(k => {
+                    if (!dataMap[region][k][itemKey]) {
+                        dataMap[region][k][itemKey] = { qty: 0, amount: 0 };
+                    }
+                    dataMap[region][k][itemKey].qty += quantity;
+                    dataMap[region][k][itemKey].amount += quantity * unitPrice;
+                });
+            });
+        });
+
+        const analysisResults: Record<string, {
+            qoq: { currentQty: number, prevQty: number, rate: number, topGrowing: string[] },
+            yoyMonth: { currentQty: number, prevQty: number, rate: number, label: string },
+            yoyQuarter: { currentQty: number, prevQty: number, rate: number, label: string },
+            yoyHalf: { currentQty: number, prevQty: number, rate: number, label: string },
+            forecast: { item: string, expectedQty: number, reason: string }[]
+        }> = {};
+
+        const regions = Array.from(new Set(customersList.map(c => c.region).filter(Boolean)));
+
+        regions.forEach(region => {
+            const regData = dataMap[region] || {};
+
+            const currentQKey = `${currentYear}-Q${currentQuarter}`;
+            let prevQYear = currentYear;
+            let prevQ = currentQuarter - 1;
+            if (prevQ === 0) {
+                prevQYear = currentYear - 1;
+                prevQ = 4;
+            }
+            const prevQKey = `${prevQYear}-Q${prevQ}`;
+
+            const curQItems = regData[currentQKey] || {};
+            const prevQItems = regData[prevQKey] || {};
+
+            let curQQty = 0;
+            Object.values(curQItems).forEach(v => curQQty += v.qty);
+            let prevQQty = 0;
+            Object.values(prevQItems).forEach(v => prevQQty += v.qty);
+
+            const qoqRate = prevQQty > 0 ? parseFloat((((curQQty - prevQQty) / prevQQty) * 100).toFixed(1)) : 0;
+
+            const growingItems = Object.keys(curQItems).map(itemKey => {
+                const curQVal = curQItems[itemKey]?.qty || 0;
+                const prevQVal = prevQItems[itemKey]?.qty || 0;
+                const diff = curQVal - prevQVal;
+                return { itemKey, diff, curQVal, prevQVal };
+            })
+            .filter(x => x.diff > 0)
+            .sort((a, b) => b.diff - a.diff)
+            .slice(0, 3)
+            .map(x => `${x.itemKey} (+${x.diff}개)`);
+
+            const currentMKey = `${currentYear}-${currentMonth}`;
+            const prevMKey = `${currentYear - 1}-${currentMonth}`;
+            let curMQty = 0;
+            Object.values(regData[currentMKey] || {}).forEach(v => curMQty += v.qty);
+            let prevMQty = 0;
+            Object.values(regData[prevMKey] || {}).forEach(v => prevMQty += v.qty);
+            const yoyMRate = prevMQty > 0 ? parseFloat((((curMQty - prevMQty) / prevMQty) * 100).toFixed(1)) : 0;
+
+            const prevYQKey = `${currentYear - 1}-Q${currentQuarter}`;
+            let prevYQQty = 0;
+            Object.values(regData[prevYQKey] || {}).forEach(v => prevYQQty += v.qty);
+            const yoyQRate = prevYQQty > 0 ? parseFloat((((curQQty - prevYQQty) / prevYQQty) * 100).toFixed(1)) : 0;
+
+            const currentHKey = `${currentYear}-H${currentHalf}`;
+            const prevYHKey = `${currentYear - 1}-H${currentHalf}`;
+            let curHQty = 0;
+            Object.values(regData[currentHKey] || {}).forEach(v => curHQty += v.qty);
+            let prevYHQty = 0;
+            Object.values(regData[prevYHKey] || {}).forEach(v => prevYHQty += v.qty);
+            const yoyHRate = prevYHQty > 0 ? parseFloat((((curHQty - prevYHQty) / prevYHQty) * 100).toFixed(1)) : 0;
+
+            let nextQYear = currentYear;
+            let nextQ = currentQuarter + 1;
+            if (nextQ === 5) {
+                nextQYear = currentYear + 1;
+                nextQ = 1;
+            }
+            const lastYearNextQKey = `${nextQYear - 1}-Q${nextQ}`;
+            const lastYearNextQItems = regData[lastYearNextQKey] || {};
+            const forecastItems = Object.entries(lastYearNextQItems)
+                .sort((a, b) => b[1].qty - a[1].qty)
+                .slice(0, 3)
+                .map(([itemKey, val]) => {
+                    return {
+                        item: itemKey,
+                        expectedQty: Math.round(val.qty * (1 + (yoyQRate / 100))),
+                        reason: `작년 Q${nextQ} 판매량(${val.qty}개) 및 성장률(${yoyQRate}%) 반영`
+                    };
+                });
+
+            analysisResults[region] = {
+                qoq: { currentQty: curQQty, prevQty: prevQQty, rate: qoqRate, topGrowing: growingItems },
+                yoyMonth: { currentQty: curMQty, prevQty: prevMQty, rate: yoyMRate, label: `${currentMonth}월` },
+                yoyQuarter: { currentQty: curQQty, prevQty: prevYQQty, rate: yoyQRate, label: `Q${currentQuarter}` },
+                yoyHalf: { currentQty: curHQty, prevQty: prevYHQty, rate: yoyHRate, label: `${currentHalf === 1 ? '상반기' : '하반기'}` },
+                forecast: forecastItems.length > 0 ? forecastItems : [
+                    { item: '데이터 없음', expectedQty: 0, reason: '예측을 위한 과거 데이터 부족' }
+                ]
+            };
+        });
+
+        return analysisResults;
+    }, [orders, customersList, inventoryMap]);
 
     // Strategic BI Analytics Engine
     const biAnalytics = useMemo(() => {
@@ -855,13 +1026,13 @@ export default function Customers() {
             if (idxB !== -1) return 1;
             return b.totalAmount - a.totalAmount;
         });
-    }, [orders, customersList, inventoryMap, analyticsSortBy]);
+    }, [orders, customersList, inventoryMap, analyticsSortBy, now]);
 
     // 2. Strategy Analytics Engine (심화 BI 업체별 전략 분석)
     const strategyAnalytics = useMemo(() => {
-        const now = new Date();
-        const recentDaysAgo = new Date(now.getTime() - (strategyPeriod * 24 * 60 * 60 * 1000));
-        const previousDaysAgo = new Date(now.getTime() - (strategyPeriod * 2 * 24 * 60 * 60 * 1000));
+        const nowVal = now;
+        const recentDaysAgo = new Date(nowVal.getTime() - (strategyPeriod * 24 * 60 * 60 * 1000));
+        const previousDaysAgo = new Date(nowVal.getTime() - (strategyPeriod * 2 * 24 * 60 * 60 * 1000));
 
         const compMap: Record<string, {
             companyName: string;
@@ -894,7 +1065,7 @@ export default function Customers() {
                 };
             }
 
-            const orderDate = new Date(o.createdAt || new Date());
+            const orderDate = new Date(o.createdAt || nowVal);
             const comp = compMap[companyName];
 
             if (!comp.lastOrderDate || orderDate > comp.lastOrderDate) comp.lastOrderDate = orderDate;
@@ -958,10 +1129,10 @@ export default function Customers() {
                 return b.totalAmount - a.totalAmount;
             });
 
-    }, [orders, customersList, strategyPeriod]);
+    }, [orders, customersList, strategyPeriod, now]);
 
     const companyIntelCards = useMemo((): CompanyIntelCard[] => {
-      const now = new Date();
+      const nowVal = now;
       // ── Step 1: 업체별 전체 집계 ─────────────────────────────
       const cardMap: Record<string, {
         companyName: string;
@@ -1028,15 +1199,15 @@ export default function Customers() {
         if (o.status === 'CANCELLED' || o.status === 'WITHDRAWN' || oExt.isDeleted) return;
 
         // 날짜 필터 적용
-        const orderDate = new Date(o.createdAt || new Date());
+        const orderDate = new Date(o.createdAt || nowVal);
         const year = orderDate.getFullYear();
         const month = orderDate.getMonth() + 1;
-        const currentYear = new Date().getFullYear();
+        const currentYear = nowVal.getFullYear();
 
         if (companyCardPeriod !== 'ALL') {
           if (companyCardPeriod.startsWith('LAST_')) {
             const days = parseInt(companyCardPeriod.replace('LAST_', '').replace('_DAYS', ''));
-            const cutoffDate = new Date(now.getTime() - days * 86400000);
+            const cutoffDate = new Date(nowVal.getTime() - days * 86400000);
             if (orderDate < cutoffDate) return;
           } else if (companyCardPeriod === 'THIS_YEAR' && year !== currentYear) return;
           else if (companyCardPeriod === 'H1' && (year !== currentYear || month > 6)) return;
@@ -1159,7 +1330,7 @@ export default function Customers() {
       // 최근 12개월 라벨 생성
       const last12Months: string[] = [];
       for (let i = 11; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const d = new Date(nowVal.getFullYear(), nowVal.getMonth() - i, 1);
         last12Months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
       }
 
@@ -1170,7 +1341,7 @@ export default function Customers() {
           const firstOrderDate = sortedDates[0]?.toISOString().split('T')[0] || null;
           const lastOrderDate = sortedDates[sortedDates.length - 1]?.toISOString().split('T')[0] || null;
           const daysSinceLastOrder = lastOrderDate
-            ? Math.floor((now.getTime() - new Date(lastOrderDate).getTime()) / 86400000)
+            ? Math.floor((nowVal.getTime() - new Date(lastOrderDate).getTime()) / 86400000)
             : 9999;
 
           // 평균 발주 주기 계산
@@ -1242,7 +1413,7 @@ export default function Customers() {
           } else if (daysSinceLastOrder > CHURN_RISK_DAYS) {
             status = 'CHURN_RISK';
             marketingAction = `이탈 위험 ${daysSinceLastOrder}일 무발주 — 긴급 컨택 요망 🚨`;
-          } else if (firstOrderDate && new Date(firstOrderDate) >= new Date(now.getTime() - 30 * 86400000)) {
+          } else if (firstOrderDate && new Date(firstOrderDate) >= new Date(nowVal.getTime() - 30 * 86400000)) {
             status = 'NEW';
             marketingAction = '신규 업체 — 정기 발주 유도 및 추천 품목 제안';
           } else {
@@ -1270,7 +1441,7 @@ export default function Customers() {
         })
         .sort((a, b) => b.totalAmount - a.totalAmount);
 
-    }, [orders, quotations, customersList, inventoryMap, companyCardPeriod]);
+    }, [orders, quotations, customersList, inventoryMap, companyCardPeriod, now]);
 
     const totalBiRevenue = useMemo(() => {
         return biAnalytics.reduce((acc, c) => acc + c.totalAmount, 0);
@@ -1288,7 +1459,7 @@ export default function Customers() {
 
   // ── ACTION INTELLIGENCE ENGINE ───────────────────────────────
 const actionIntel = useMemo(() => {
-  const now = new Date();
+  const nowVal = now;
   const CHURN_RISK_DAYS = 45;
   const DORMANT_DAYS    = 90;
 
@@ -1404,7 +1575,7 @@ const actionIntel = useMemo(() => {
   // ── 최근 12개월 키 ───────────────────────────────────────
   const last12: string[] = [];
   for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const d = new Date(nowVal.getFullYear(), nowVal.getMonth() - i, 1);
     last12.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
 
@@ -1416,7 +1587,7 @@ const actionIntel = useMemo(() => {
       const lastOrder  = c.lastOrderDate;
       const firstOrder = c.firstOrderDate;
       const daysSince  = lastOrder
-        ? Math.floor((now.getTime() - lastOrder.getTime()) / 86400000) : 9999;
+        ? Math.floor((nowVal.getTime() - lastOrder.getTime()) / 86400000) : 9999;
 
       // 평균 주기
       let avgInterval = 0;
@@ -1463,7 +1634,7 @@ const actionIntel = useMemo(() => {
         status = 'DORMANT';
       } else if (daysSince > CHURN_RISK_DAYS) {
         status = 'CHURN_RISK';
-      } else if (firstOrder && now.getTime() - firstOrder.getTime() < 30 * 86400000) {
+      } else if (firstOrder && nowVal.getTime() - firstOrder.getTime() < 30 * 86400000) {
         status = 'NEW';
       } else if (recentMonthAmt >= prevMonthAmt * 1.3 && prevMonthAmt > 500000) {
         status = 'GROWTH';
@@ -1556,7 +1727,7 @@ const actionIntel = useMemo(() => {
     cards, urgentCards, growthCards, newCards, stableCards,
     urgentCount, sidebarActions, last12,
   };
-}, [orders, customersList, inventoryMap]);
+}, [orders, customersList, inventoryMap, now]);
 
     if (user?.role !== 'MASTER' && user?.role?.toLowerCase() !== 'admin' && !user?.permissions?.viewCrm) {
         return (
@@ -1815,7 +1986,7 @@ const actionIntel = useMemo(() => {
 
             {activeTab === 'ANALYTICS' && (
                 <div className="space-y-6">
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                    <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4">
                         <div>
                             <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
                                 <BarChart2 className="w-7 h-7 text-indigo-600" />
@@ -1825,19 +1996,38 @@ const actionIntel = useMemo(() => {
                                 접수된 주문건의 상호명을 CRM 고객 명부와 크로스체크하여 "어느 지역으로 어떤 자재가 집중되고 있는지"를 분석합니다.
                             </p>
                         </div>
-                        <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-inner">
-                            <button 
-                                onClick={() => setAnalyticsSortBy('qty')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${analyticsSortBy === 'qty' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            >수량 많은순</button>
-                            <button 
-                                onClick={() => setAnalyticsSortBy('amount')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${analyticsSortBy === 'amount' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            >매출액 많은순</button>
-                            <button 
-                                onClick={() => setAnalyticsSortBy('margin')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${analyticsSortBy === 'margin' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            >순이익 높은순</button>
+                        <div className="flex flex-wrap items-center gap-3 shrink-0">
+                            {/* 기간 필터 */}
+                            <div className="flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm text-sm font-bold text-slate-700">
+                                <span className="text-slate-400">집계 기간:</span>
+                                <select 
+                                    title="집계 기간 선택"
+                                    value={analyticsPeriod}
+                                    onChange={(e) => setAnalyticsPeriod(e.target.value as AnalyticsPeriod)}
+                                    className="bg-transparent border-none focus:outline-none text-indigo-600 font-extrabold cursor-pointer"
+                                >
+                                    <option value="3m">최근 3개월</option>
+                                    <option value="6m">최근 6개월</option>
+                                    <option value="12m">최근 12개월</option>
+                                    <option value="ALL">전체 기간</option>
+                                </select>
+                            </div>
+
+                            {/* 정렬 버튼 */}
+                            <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-inner">
+                                <button 
+                                    onClick={() => setAnalyticsSortBy('qty')}
+                                    className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${analyticsSortBy === 'qty' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >수량 많은순</button>
+                                <button 
+                                    onClick={() => setAnalyticsSortBy('amount')}
+                                    className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${analyticsSortBy === 'amount' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >매출액 많은순</button>
+                                <button 
+                                    onClick={() => setAnalyticsSortBy('margin')}
+                                    className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${analyticsSortBy === 'margin' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >순이익 높은순</button>
+                            </div>
                         </div>
                     </div>
 
@@ -1904,6 +2094,97 @@ const actionIntel = useMemo(() => {
                                             <BarChart2 className="w-3.5 h-3.5" />
                                             자세히 보기 (총 {reg.allItems.length}개 품목)
                                         </button>
+                                    )}
+
+                                    {/* Trend Intelligence Accordion */}
+                                    <button 
+                                        onClick={() => setOpenedTrendRegion(openedTrendRegion === reg.region ? null : reg.region)}
+                                        className="w-full mt-2 py-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-100 transition-colors flex items-center justify-center gap-1"
+                                    >
+                                        <TrendingUp className="w-3.5 h-3.5" />
+                                        {openedTrendRegion === reg.region ? '트렌드 분석 닫기' : 'Trend Intelligence 분석'}
+                                    </button>
+
+                                    {openedTrendRegion === reg.region && trendAnalysis[reg.region] && (
+                                        <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-3 text-[11px] animate-fadeIn">
+                                            <div className="flex items-center gap-1.5 font-bold text-slate-800 border-b border-slate-200 pb-1.5">
+                                                <TrendingUp className="w-4 h-4 text-emerald-500" />
+                                                <span>{reg.region} 트렌드 분석 & 예측 리포트</span>
+                                            </div>
+                                            
+                                            {/* 지표 비교 */}
+                                            <div className="grid grid-cols-2 gap-2 text-[10px]">
+                                                <div className="bg-white p-2 rounded border border-slate-100 flex flex-col justify-between">
+                                                    <span className="text-slate-400 font-bold">직전분기 대비 (QoQ)</span>
+                                                    <span className="text-xs font-black text-slate-700 flex items-center justify-between mt-1">
+                                                        <span>{trendAnalysis[reg.region].qoq.currentQty.toLocaleString()}개</span>
+                                                        <span className={trendAnalysis[reg.region].qoq.rate >= 0 ? 'text-emerald-600 font-extrabold' : 'text-rose-600 font-extrabold'}>
+                                                            {trendAnalysis[reg.region].qoq.rate >= 0 ? '↑' : '↓'} {Math.abs(trendAnalysis[reg.region].qoq.rate)}%
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                                <div className="bg-white p-2 rounded border border-slate-100 flex flex-col justify-between">
+                                                    <span className="text-slate-400 font-bold">전년 동분기 대비 (YoY)</span>
+                                                    <span className="text-xs font-black text-slate-700 flex items-center justify-between mt-1">
+                                                        <span>{trendAnalysis[reg.region].yoyQuarter.currentQty.toLocaleString()}개</span>
+                                                        <span className={trendAnalysis[reg.region].yoyQuarter.rate >= 0 ? 'text-emerald-600 font-extrabold' : 'text-rose-600 font-extrabold'}>
+                                                            {trendAnalysis[reg.region].yoyQuarter.rate >= 0 ? '↑' : '↓'} {Math.abs(trendAnalysis[reg.region].yoyQuarter.rate)}%
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                                <div className="bg-white p-2 rounded border border-slate-100 flex flex-col justify-between">
+                                                    <span className="text-slate-400 font-bold font-medium">전년 동월 ({trendAnalysis[reg.region].yoyMonth.label})</span>
+                                                    <span className="text-xs font-black text-slate-700 flex items-center justify-between mt-1">
+                                                        <span>{trendAnalysis[reg.region].yoyMonth.currentQty.toLocaleString()}개</span>
+                                                        <span className={trendAnalysis[reg.region].yoyMonth.rate >= 0 ? 'text-emerald-600 font-extrabold' : 'text-rose-600 font-extrabold'}>
+                                                            {trendAnalysis[reg.region].yoyMonth.rate >= 0 ? '↑' : '↓'} {Math.abs(trendAnalysis[reg.region].yoyMonth.rate)}%
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                                <div className="bg-white p-2 rounded border border-slate-100 flex flex-col justify-between">
+                                                    <span className="text-slate-400 font-bold font-medium">전년 동반기 ({trendAnalysis[reg.region].yoyHalf.label})</span>
+                                                    <span className="text-xs font-black text-slate-700 flex items-center justify-between mt-1">
+                                                        <span>{trendAnalysis[reg.region].yoyHalf.currentQty.toLocaleString()}개</span>
+                                                        <span className={trendAnalysis[reg.region].yoyHalf.rate >= 0 ? 'text-emerald-600 font-extrabold' : 'text-rose-600 font-extrabold'}>
+                                                            {trendAnalysis[reg.region].yoyHalf.rate >= 0 ? '↑' : '↓'} {Math.abs(trendAnalysis[reg.region].yoyHalf.rate)}%
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* QoQ 급성장 품목 */}
+                                            {trendAnalysis[reg.region].qoq.topGrowing && trendAnalysis[reg.region].qoq.topGrowing.length > 0 && (
+                                                <div className="bg-white p-2 rounded border border-slate-100">
+                                                    <div className="text-[10px] font-bold text-slate-400 mb-1">QoQ 급성장 품목</div>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {trendAnalysis[reg.region].qoq.topGrowing.map((item, idx) => (
+                                                            <span key={idx} className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-[9px] font-bold border border-indigo-100">
+                                                                {item}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* 차기 분기 수요 예측 */}
+                                            <div className="bg-white p-2 rounded border border-slate-100">
+                                                <div className="text-[10px] font-bold text-slate-400 mb-1 flex justify-between">
+                                                    <span>차기 분기 수요 예측 품목</span>
+                                                    <span className="text-[8px] font-normal text-slate-400">성장률 가중 반영</span>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    {trendAnalysis[reg.region].forecast.map((fc, idx) => (
+                                                        <div key={idx} className="flex justify-between items-center text-[10px] py-0.5 border-b border-dashed border-slate-100 last:border-0">
+                                                            <span className="font-bold text-slate-600 truncate max-w-[130px]" title={fc.item}>{fc.item}</span>
+                                                            <div className="text-right shrink-0">
+                                                                <span className="font-extrabold text-emerald-600">{fc.expectedQty > 0 ? `${fc.expectedQty.toLocaleString()}개 예상` : '데이터 부족'}</span>
+                                                                <span className="text-[8px] text-slate-400 block scale-90 origin-right leading-none">{fc.reason}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -3177,7 +3458,7 @@ const actionIntel = useMemo(() => {
                                   <div className="flex justify-between"><span className="text-slate-400">첫 거래</span><span className="font-bold">{card.firstOrderDate || '없음'}</span></div>
                                   <div className="flex justify-between"><span className="text-slate-400">마지막 발주</span><span className={`font-bold ${card.daysSince > 45 ? 'text-rose-500' : 'text-slate-700'}`}>{card.daysSince}일 전</span></div>
                                   <div className="flex justify-between"><span className="text-slate-400">평균 주기</span><span className="font-bold">{card.avgInterval > 0 ? `${card.avgInterval}일` : '측정불가'}</span></div>
-                                  {card.predictedNext && <div className="flex justify-between"><span className="text-slate-400">예상 다음 발주</span><span className={`font-bold ${card.predictedNext < new Date().toISOString().split('T')[0] ? 'text-rose-500' : 'text-indigo-600'}`}>{card.predictedNext}</span></div>}
+                                  {card.predictedNext && <div className="flex justify-between"><span className="text-slate-400">예상 다음 발주</span><span className={`font-bold ${card.predictedNext < now.toISOString().split('T')[0] ? 'text-rose-500' : 'text-indigo-600'}`}>{card.predictedNext}</span></div>}
                                 </div>
                               </div>
                             </div>
