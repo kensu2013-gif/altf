@@ -2628,10 +2628,6 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                             if (!isNaN(val)) {
                                                                                 const newItems = displayedItems.map(item => {
                                                                                     const product = findProduct({ productId: item.productId });
-                                                                                    const productRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
-                                                                                    if (productRate === 0) {
-                                                                                        return item;
-                                                                                    }
                                                                                     const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
                                                                                     if (basePrice > 0) {
                                                                                         const newPrice = Math.round(Math.round(basePrice * (1 - val / 100)) / 10) * 10;
@@ -2656,10 +2652,6 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                         const newItems = displayedItems.map(item => {
                                                                             if (hasInput && !isNaN(val)) {
                                                                                 const product = findProduct({ productId: item.productId });
-                                                                                const productRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
-                                                                                if (productRate === 0) {
-                                                                                    return item;
-                                                                                }
                                                                                 const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
                                                                                 if (basePrice > 0) {
                                                                                     const newPrice = Math.round(Math.round(basePrice * (1 - val / 100)) / 10) * 10;

@@ -255,6 +255,7 @@ export default function SihwaInventory() {
     const [sihwaFilterSize, setSihwaFilterSize] = useState<string[]>([]);
     const [sihwaFilterThickness, setSihwaFilterThickness] = useState<string[]>([]);
     const [pinnedItemIds, setPinnedItemIds] = useState<Set<string>>(new Set());
+    const [topPeriod, setTopPeriod] = useState<'7D' | '30D' | '60D' | '90D' | '180D'>('30D');
 
     const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE' | 'HEALTH_DIAGNOSIS' | 'DAEKYUNG_STOCK'>('AI_SUMMARY');
     const [dkSortConfig, setDkSortConfig] = useState<{
@@ -3305,25 +3306,43 @@ export default function SihwaInventory() {
                                                 ) : (
                                                     <div className="p-0">
                                                         {groupedDailyTrend.map((group, idx) => {
-                                                            let dailyRevenue = 0;
-                                                            let dailyCost = 0;
+                                                             let dailyRevenue = 0;
+                                                             let dailyCost = 0;
+                                                             let outgoingCount = 0;
+                                                             let incomingCount = 0;
+                                                             let outgoingQty = 0;
+                                                             let incomingQty = 0;
 
-                                                            const itemsList = Object.values(group.items);
-                                                            itemsList.forEach(({ product, incoming, outgoing }) => {
-                                                                const analysis = analyzedInventory.find(ai => ai.product.id === product.id);
-                                                                if (outgoing > 0) dailyRevenue += outgoing * (analysis ? analysis.sellingPrice : 0);
-                                                                if (incoming > 0) dailyCost += incoming * (analysis ? analysis.recentPurchasePrice : 0);
-                                                            });
+                                                             const itemsList = Object.values(group.items);
+                                                             itemsList.forEach(({ product, incoming, outgoing }) => {
+                                                                 const analysis = analyzedInventory.find(ai => ai.product.id === product.id);
+                                                                 if (outgoing > 0) {
+                                                                     dailyRevenue += outgoing * (analysis ? analysis.sellingPrice : 0);
+                                                                     outgoingCount++;
+                                                                     outgoingQty += outgoing;
+                                                                 }
+                                                                 if (incoming > 0) {
+                                                                     dailyCost += incoming * (analysis ? analysis.recentPurchasePrice : 0);
+                                                                     incomingCount++;
+                                                                     incomingQty += incoming;
+                                                                 }
+                                                             });
 
-                                                            const isGroupExpanded = expandedDailyGroups[group.date] ?? (idx === 0);
+                                                             const isGroupExpanded = expandedDailyGroups[group.date] ?? (idx === 0);
 
-                                                            return (
-                                                                <div key={group.date} className="border-b border-slate-100 last:border-0 p-4">
-                                                                    <div className="flex flex-col gap-2 mb-3">
-                                                                        <div className="flex items-center justify-between">
-                                                                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono font-bold hover:bg-slate-300 cursor-pointer transition-colors" onClick={() => toggleDailyGroup(group.date)}>{group.date}</span>
-                                                                            <span className="text-slate-500 font-medium text-xs">총 변동 {itemsList.length}건</span>
-                                                                        </div>
+                                                             return (
+                                                                 <div key={group.date} className="border-b border-slate-100 last:border-0 p-4">
+                                                                     <div className="flex flex-col gap-2 mb-3">
+                                                                         <div className="flex items-center justify-between">
+                                                                             <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono font-bold hover:bg-slate-300 cursor-pointer transition-colors" onClick={() => toggleDailyGroup(group.date)}>{group.date}</span>
+                                                                             <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                                                                                 <span>총 {itemsList.length}건</span>
+                                                                                 <span className="text-slate-300">|</span>
+                                                                                 <span className="text-blue-600 font-bold">출고 {outgoingCount}건 ({outgoingQty.toLocaleString()}개)</span>
+                                                                                 <span className="text-slate-300">|</span>
+                                                                                 <span className="text-emerald-600 font-bold">입고 {incomingCount}건 ({incomingQty.toLocaleString()}개)</span>
+                                                                             </div>
+                                                                         </div>
 
                                                                         {(dailyRevenue > 0 || dailyCost > 0) && (
                                                                             <div
@@ -3445,16 +3464,36 @@ export default function SihwaInventory() {
                                             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-2 bg-slate-50 shrink-0">
                                                 <div className="flex items-center gap-2">
                                                     <TrendingUp className="w-5 h-5 text-emerald-500" />
-                                                    <h2 className="font-bold text-slate-800">최근 30일 판매 TOP 품목</h2>
+                                                    <h2 className="font-bold text-slate-800">
+                                                        최근 {topPeriod === '7D' ? '7일' : topPeriod === '30D' ? '30일' : topPeriod === '60D' ? '60일' : topPeriod === '90D' ? '90일' : '180일'} 판매 TOP 품목
+                                                    </h2>
                                                 </div>
-                                                <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded font-bold border border-slate-200">자동분석</span>
+                                                <select
+                                                    title="조회 기간"
+                                                    aria-label="조회 기간"
+                                                    value={topPeriod}
+                                                    onChange={(e) => setTopPeriod(e.target.value as '7D' | '30D' | '60D' | '90D' | '180D')}
+                                                    className="bg-white border border-slate-300 rounded text-xs py-1 px-2 text-slate-700 focus:ring-1 focus:ring-indigo-500 focus:outline-hidden font-bold cursor-pointer"
+                                                >
+                                                    <option value="7D">최근 7일</option>
+                                                    <option value="30D">최근 30일</option>
+                                                    <option value="60D">최근 60일</option>
+                                                    <option value="90D">최근 90일</option>
+                                                    <option value="180D">최근 180일</option>
+                                                </select>
                                             </div>
                                             <div className="p-0 flex-1 h-[320px] overflow-y-auto bg-slate-50/30">
                                                 <div className="grid grid-cols-1 divide-y divide-slate-100">
                                                     {(() => {
+                                                        const field = topPeriod === '7D' ? 'recent7dSales' :
+                                                                      topPeriod === '60D' ? 'recent60dSales' :
+                                                                      topPeriod === '90D' ? 'recent90dSales' :
+                                                                      topPeriod === '180D' ? 'recent180dSales' :
+                                                                      'recent30dSales';
+
                                                         const topItems = [...analyzedInventory]
-                                                            .filter(item => item.recent30dSales > 0 && !item.product.id.startsWith('STUBEND') && item.sellingPrice > 0)
-                                                            .sort((a, b) => b.recent30dSales - a.recent30dSales)
+                                                            .filter(item => (item[field] as number) > 0 && !item.product.id.startsWith('STUBEND') && item.sellingPrice > 0)
+                                                            .sort((a, b) => (b[field] as number) - (a[field] as number))
                                                             .slice(0, 50); // Get top 50
 
                                                         if (topItems.length === 0) {
@@ -3475,10 +3514,10 @@ export default function SihwaInventory() {
                                                                 <div className="flex flex-col items-end shrink-0 pl-1">
                                                                     <div className="flex items-center gap-1 justify-end">
                                                                         <span className="text-[9px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-bold">{item.salesFreq.toLocaleString()}회발생</span>
-                                                                        <span className="font-black text-slate-700 text-sm drop-shadow-sm">{item.recent30dSales.toLocaleString()} <span className="font-normal text-[10px] text-slate-400">개</span></span>
+                                                                        <span className="font-black text-slate-700 text-sm drop-shadow-sm">{(item[field] as number).toLocaleString()} <span className="font-normal text-[10px] text-slate-400">개</span></span>
                                                                     </div>
-                                                                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-[80px]" title={`기간누적매출 ${formatCur(item.recent30dSales * item.sellingPrice)}원`}>
-                                                                        ₩{formatCur(item.recent30dSales * item.sellingPrice)}
+                                                                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-[80px]" title={`기간누적매출 ${formatCur((item[field] as number) * item.sellingPrice)}원`}>
+                                                                        ₩{formatCur((item[field] as number) * item.sellingPrice)}
                                                                     </span>
                                                                 </div>
                                                             </div>
