@@ -90,10 +90,20 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
         daekyungHistory: InventoryHistorySnapshot[];
     }>({ inventoryHistory: [], daekyungHistory: [] });
     
+    const [chartMetric, setChartMetric] = useState<'amount' | 'ordersCount' | 'quantity'>('amount');
     const [eventsLoading, setEventsLoading] = useState(true);
     const [historyLoading, setHistoryLoading] = useState(true);
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
-    const [hoveredData, setHoveredData] = useState<{ label: string; amount: number; lastYearAmount: number; events: CrmEvent[] } | null>(null);
+    const [hoveredData, setHoveredData] = useState<{ 
+        label: string; 
+        amount: number; 
+        lastYearAmount: number; 
+        ordersCount: number;
+        lastYearOrdersCount: number;
+        quantity: number;
+        lastYearQuantity: number;
+        events: CrmEvent[] 
+    } | null>(null);
     const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number } | null>(null);
 
     const tooltipRef = useRef<HTMLDivElement>(null);
@@ -222,14 +232,32 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
         halfSales, 
         totalSales, 
         momTrend, 
-        maxMonthlyAmount 
+        maxMonthlyAmount,
+        maxMonthlyOrdersCount,
+        maxMonthlyQuantity
     } = useMemo(() => {
         const months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
         
         // 월별 기본 구조 세팅
-        const monthly: Record<string, { month: string; amount: number; lastYearAmount: number; ordersCount: number }> = {};
+        const monthly: Record<string, { 
+            month: string; 
+            amount: number; 
+            lastYearAmount: number; 
+            ordersCount: number;
+            lastYearOrdersCount: number;
+            quantity: number;
+            lastYearQuantity: number;
+        }> = {};
         months.forEach(m => {
-            monthly[`${currentYear}-${m}`] = { month: `${m}월`, amount: 0, lastYearAmount: 0, ordersCount: 0 };
+            monthly[`${currentYear}-${m}`] = { 
+                month: `${m}월`, 
+                amount: 0, 
+                lastYearAmount: 0, 
+                ordersCount: 0,
+                lastYearOrdersCount: 0,
+                quantity: 0,
+                lastYearQuantity: 0
+            };
         });
 
         // 분기별
@@ -263,11 +291,13 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
 
-            // 품목 합계 계산
+            // 품목 합계 및 수량 계산
             let orderTotal = 0;
+            let orderQty = 0;
             o.items?.forEach(item => {
                 if (item.isDeleted) return;
                 orderTotal += (item.quantity || 0) * (item.unitPrice || 0);
+                orderQty += (item.quantity || 0);
             });
 
             if (year === currentYear) {
@@ -275,6 +305,7 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
                 if (monthly[`${currentYear}-${month}`]) {
                     monthly[`${currentYear}-${month}`].amount += orderTotal;
                     monthly[`${currentYear}-${month}`].ordersCount += 1;
+                    monthly[`${currentYear}-${month}`].quantity += orderQty;
                 }
 
                 // 분기 집계
@@ -293,6 +324,8 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
                 const curEquivalentKey = `${currentYear}-${month}`;
                 if (monthly[curEquivalentKey]) {
                     monthly[curEquivalentKey].lastYearAmount += orderTotal;
+                    monthly[curEquivalentKey].lastYearOrdersCount += 1;
+                    monthly[curEquivalentKey].lastYearQuantity += orderQty;
                 }
 
                 // 분기 집계 (전년)
@@ -321,6 +354,8 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
         }
 
         const maxAmt = Math.max(...Object.values(monthly).map(m => Math.max(m.amount, m.lastYearAmount)), 1);
+        const maxOrders = Math.max(...Object.values(monthly).map(m => Math.max(m.ordersCount, m.lastYearOrdersCount)), 1);
+        const maxQty = Math.max(...Object.values(monthly).map(m => Math.max(m.quantity, m.lastYearQuantity)), 1);
 
         return {
             monthlySales: Object.values(monthly),
@@ -334,7 +369,9 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
                 prevVal: prevMonthVal,
                 percent: parseFloat(pct.toFixed(1))
             },
-            maxMonthlyAmount: maxAmt
+            maxMonthlyAmount: maxAmt,
+            maxMonthlyOrdersCount: maxOrders,
+            maxMonthlyQuantity: maxQty
         };
     }, [orders, currentYear, lastYear, now]);
 
@@ -595,6 +632,63 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
         return mapping;
     }, [events]);
 
+    const currentMaxVal = useMemo(() => {
+        if (chartMetric === 'ordersCount') return maxMonthlyOrdersCount;
+        if (chartMetric === 'quantity') return maxMonthlyQuantity;
+        return maxMonthlyAmount;
+    }, [chartMetric, maxMonthlyAmount, maxMonthlyOrdersCount, maxMonthlyQuantity]);
+
+    const getMetricValues = (m: typeof monthlySales[0]) => {
+        if (chartMetric === 'ordersCount') {
+            return { current: m.ordersCount, last: m.lastYearOrdersCount };
+        }
+        if (chartMetric === 'quantity') {
+            return { current: m.quantity, last: m.lastYearQuantity };
+        }
+        return { current: m.amount, last: m.lastYearAmount };
+    };
+
+    const growthMetrics = useMemo(() => {
+        let totalAmtThisYear = 0;
+        let totalAmtLastYear = 0;
+        let totalOrdersThisYear = 0;
+        let totalOrdersLastYear = 0;
+        let totalQtyThisYear = 0;
+        let totalQtyLastYear = 0;
+
+        monthlySales.forEach(m => {
+            totalAmtThisYear += m.amount;
+            totalAmtLastYear += m.lastYearAmount;
+            totalOrdersThisYear += m.ordersCount;
+            totalOrdersLastYear += m.lastYearOrdersCount;
+            totalQtyThisYear += m.quantity;
+            totalQtyLastYear += m.lastYearQuantity;
+        });
+
+        const amtGrowthPct = totalAmtLastYear > 0 ? ((totalAmtThisYear - totalAmtLastYear) / totalAmtLastYear) * 100 : 0;
+        const ordersGrowthPct = totalOrdersLastYear > 0 ? ((totalOrdersThisYear - totalOrdersLastYear) / totalOrdersLastYear) * 100 : 0;
+        const qtyGrowthPct = totalQtyLastYear > 0 ? ((totalQtyThisYear - totalQtyLastYear) / totalQtyLastYear) * 100 : 0;
+
+        const avgPriceThisYear = totalQtyThisYear > 0 ? totalAmtThisYear / totalQtyThisYear : 0;
+        const avgPriceLastYear = totalQtyLastYear > 0 ? totalAmtLastYear / totalQtyLastYear : 0;
+        const priceGrowthPct = avgPriceLastYear > 0 ? ((avgPriceThisYear - avgPriceLastYear) / avgPriceLastYear) * 100 : 0;
+
+        return {
+            amtGrowthPct: parseFloat(amtGrowthPct.toFixed(1)),
+            ordersGrowthPct: parseFloat(ordersGrowthPct.toFixed(1)),
+            qtyGrowthPct: parseFloat(qtyGrowthPct.toFixed(1)),
+            priceGrowthPct: parseFloat(priceGrowthPct.toFixed(1)),
+            avgPriceThisYear,
+            avgPriceLastYear,
+            totalAmtThisYear,
+            totalAmtLastYear,
+            totalOrdersThisYear,
+            totalOrdersLastYear,
+            totalQtyThisYear,
+            totalQtyLastYear
+        };
+    }, [monthlySales]);
+
     if (eventsLoading || historyLoading) {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-slate-500">
@@ -709,14 +803,35 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
                 
                 {/* 왼쪽 2칸: 매출 추세 & 비즈니스 이벤트 오버레이 차트 */}
                 <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-xs p-6 space-y-6 flex flex-col justify-between">
-                    <div>
-                        <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                            <Activity className="w-5 h-5 text-indigo-600" />
-                            전사 매출 추세 분석 및 중요 비즈니스 이벤트 매핑
-                        </h2>
-                        <p className="text-xs text-slate-400 mt-1">
-                            올해 월별 실적과 전년 동기 대비 추이를 비교합니다. 그래프 위의 점에 마우스를 올리면 이벤트 정보가 표시됩니다.
-                        </p>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                                <Activity className="w-5 h-5 text-indigo-600" />
+                                전사 매출 추세 분석 및 중요 비즈니스 이벤트 매핑
+                            </h2>
+                            <p className="text-xs text-slate-400 mt-1">
+                                올해 월별 실적과 전년 동기 대비 추이를 비교합니다. 그래프 위의 점에 마우스를 올리면 이벤트 정보가 표시됩니다.
+                            </p>
+                        </div>
+                        {/* 메트릭 선택 탭 */}
+                        <div className="flex bg-slate-100 p-1 rounded-xl shrink-0 text-xs">
+                            {(['amount', 'ordersCount', 'quantity'] as const).map((metric) => (
+                                <button
+                                    key={metric}
+                                    type="button"
+                                    onClick={() => setChartMetric(metric)}
+                                    className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                                        chartMetric === metric
+                                            ? 'bg-white text-indigo-600 shadow-xs'
+                                            : 'text-slate-500 hover:text-slate-800'
+                                    }`}
+                                >
+                                    {metric === 'amount' && '매출액'}
+                                    {metric === 'ordersCount' && '출고 건수'}
+                                    {metric === 'quantity' && '출고 수량'}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     {/* 커스텀 SVG 매출 추세 및 이벤트 매핑 차트 */}
@@ -742,16 +857,15 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
                             {/* X축 */}
                             <line x1="40" y1="220" x2="680" y2="220" stroke="#cbd5e1" strokeWidth="1.5" />
 
-                            {/* 막대 차트 (올해 매출) 및 꺾은선 차트 (전년 매출) */}
+                            {/* 막대 차트 및 꺾은선 차트 */}
                             {monthlySales.map((m, idx) => {
                                 const xPos = 65 + idx * 52;
                                 
-                                // 올해 매출 막대 계산
-                                const thisYearHeight = maxMonthlyAmount > 0 ? (m.amount / maxMonthlyAmount) * 200 : 0;
+                                const vals = getMetricValues(m);
+                                const thisYearHeight = currentMaxVal > 0 ? (vals.current / currentMaxVal) * 200 : 0;
                                 const thisYearY = 220 - thisYearHeight;
 
-                                // 전년 매출 꺾은선 점 계산
-                                const lastYearHeight = maxMonthlyAmount > 0 ? (m.lastYearAmount / maxMonthlyAmount) * 200 : 0;
+                                const lastYearHeight = currentMaxVal > 0 ? (vals.last / currentMaxVal) * 200 : 0;
                                 const lastYearY = 220 - lastYearHeight;
 
                                 // 현재 월에 등록된 이벤트가 있는지 검사
@@ -773,6 +887,10 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
                                                     label: `${currentYear}년 ${m.month}`,
                                                     amount: m.amount,
                                                     lastYearAmount: m.lastYearAmount,
+                                                    ordersCount: m.ordersCount,
+                                                    lastYearOrdersCount: m.lastYearOrdersCount,
+                                                    quantity: m.quantity,
+                                                    lastYearQuantity: m.lastYearQuantity,
                                                     events: monthEvs
                                                 });
                                                 setHoveredPoint({ x: e.clientX, y: e.clientY });
@@ -780,8 +898,8 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
                                             onMouseLeave={() => setHoveredData(null)}
                                         />
 
-                                        {/* 올해 매출 막대 (그라데이션 효과) */}
-                                        {m.amount > 0 && (
+                                        {/* 올해 막대 (그라데이션 효과) */}
+                                        {vals.current > 0 && (
                                             <rect
                                                 x={xPos - 12}
                                                 y={thisYearY}
@@ -793,8 +911,8 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
                                             />
                                         )}
 
-                                        {/* 전년도 매출 점 (동그라미) */}
-                                        {m.lastYearAmount > 0 && (
+                                        {/* 전년도 점 (동그라미) */}
+                                        {vals.last > 0 && (
                                             <circle 
                                                 cx={xPos} 
                                                 cy={lastYearY} 
@@ -861,9 +979,11 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
 
                             {/* 전년도 매출 점들을 잇는 꺾은선 렌더링 */}
                             <path
+                                id="lastYearLine"
                                 d={monthlySales.reduce((acc, m, idx) => {
                                     const xPos = 65 + idx * 52;
-                                    const lastYearHeight = maxMonthlyAmount > 0 ? (m.lastYearAmount / maxMonthlyAmount) * 200 : 0;
+                                    const vals = getMetricValues(m);
+                                    const lastYearHeight = currentMaxVal > 0 ? (vals.last / currentMaxVal) * 200 : 0;
                                     const lastYearY = 220 - lastYearHeight;
                                     return acc + `${idx === 0 ? 'M' : 'L'} ${xPos} ${lastYearY}`;
                                 }, '')}
@@ -888,13 +1008,17 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
                         <div className="flex items-center justify-end gap-5 text-xs text-slate-500 pr-5">
                             <div className="flex items-center gap-1.5">
                                 <span className="w-3.5 h-3.5 bg-indigo-600 rounded"></span>
-                                <span className="font-bold">올해 매출 ({currentYear}년)</span>
+                                <span className="font-bold">
+                                    올해 {chartMetric === 'amount' ? '매출액' : chartMetric === 'ordersCount' ? '출고 건수' : '출고 수량'} ({currentYear}년)
+                                </span>
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <span className="w-3.5 h-0.5 bg-rose-400 inline-block relative top-[-1px]">
                                     <span className="w-1.5 h-1.5 bg-rose-400 rounded-full absolute left-1 -top-0.5"></span>
                                 </span>
-                                <span className="font-bold">작년 매출 ({lastYear}년)</span>
+                                <span className="font-bold">
+                                    작년 {chartMetric === 'amount' ? '매출액' : chartMetric === 'ordersCount' ? '출고 건수' : '출고 수량'} ({lastYear}년)
+                                </span>
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <span className="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
@@ -906,25 +1030,53 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
                         {hoveredData && hoveredPoint && (
                             <div 
                                 ref={tooltipRef}
-                                className="absolute bg-slate-900/95 text-white text-xs rounded-xl p-3 shadow-xl border border-slate-700/50 z-30 pointer-events-none w-56 space-y-2 animate-in fade-in zoom-in-95 duration-100"
+                                className="absolute bg-slate-900/95 text-white text-xs rounded-xl p-3.5 shadow-xl border border-slate-700/50 z-30 pointer-events-none w-64 space-y-3 animate-in fade-in zoom-in-95 duration-100"
                             >
                                 <div className="font-black border-b border-slate-800 pb-1.5 flex justify-between">
                                     <span>{hoveredData.label}</span>
                                 </div>
-                                <div className="space-y-1">
-                                    <div className="flex justify-between">
-                                        <span className="text-slate-400">올해 매출:</span>
-                                        <span className="font-bold text-indigo-300">{Math.round(hoveredData.amount / 10000).toLocaleString()}만원</span>
+                                <div className="space-y-2">
+                                    {/* 1. 매출액 */}
+                                    <div className="border-b border-slate-800/50 pb-1.5">
+                                        <div className="flex justify-between font-black text-[9px] text-slate-400 uppercase tracking-wider">매출액</div>
+                                        <div className="flex justify-between mt-0.5">
+                                            <span className="text-slate-300">올해:</span>
+                                            <span className="font-bold text-indigo-300">{Math.round(hoveredData.amount / 10000).toLocaleString()}만원</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-400">작년:</span>
+                                            <span className="font-bold text-rose-300">{Math.round(hoveredData.lastYearAmount / 10000).toLocaleString()}만원</span>
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-slate-400">작년 매출:</span>
-                                        <span className="font-bold text-rose-300">{Math.round(hoveredData.lastYearAmount / 10000).toLocaleString()}만원</span>
+                                    {/* 2. 출고 건수 */}
+                                    <div className="border-b border-slate-800/50 pb-1.5">
+                                        <div className="flex justify-between font-black text-[9px] text-slate-400 uppercase tracking-wider">출고 건수</div>
+                                        <div className="flex justify-between mt-0.5">
+                                            <span className="text-slate-300">올해:</span>
+                                            <span className="font-bold text-indigo-300">{hoveredData.ordersCount}건</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-400">작년:</span>
+                                            <span className="font-bold text-rose-300">{hoveredData.lastYearOrdersCount}건</span>
+                                        </div>
+                                    </div>
+                                    {/* 3. 출고 수량 */}
+                                    <div>
+                                        <div className="flex justify-between font-black text-[9px] text-slate-400 uppercase tracking-wider">출고 수량</div>
+                                        <div className="flex justify-between mt-0.5">
+                                            <span className="text-slate-300">올해:</span>
+                                            <span className="font-bold text-indigo-300">{hoveredData.quantity.toLocaleString()}개</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-400">작년:</span>
+                                            <span className="font-bold text-rose-300">{hoveredData.lastYearQuantity.toLocaleString()}개</span>
+                                        </div>
                                     </div>
                                 </div>
                                 
                                 {hoveredData.events.length > 0 && (
                                     <div className="pt-2 border-t border-slate-800">
-                                        <div className="text-[10px] font-black text-amber-400 uppercase tracking-wider mb-1">매핑된 비즈니스 이벤트</div>
+                                        <div className="text-[9px] font-black text-amber-400 uppercase tracking-wider mb-1">매핑된 비즈니스 이벤트</div>
                                         {hoveredData.events.map(ev => (
                                             <div key={ev.id} className="bg-slate-800 rounded p-1.5 mt-1 border border-slate-700/50 text-[10px]">
                                                 <div className="font-bold text-slate-200">{ev.title}</div>
@@ -935,6 +1087,65 @@ export default function FlowChartDashboard({ orders, customersList, inventoryMap
                                 )}
                             </div>
                         )}
+                    </div>
+
+                    {/* 지능형 매출 원인 진단 패널 */}
+                    <div className="mt-6 border-t border-slate-100 pt-6">
+                        <div className="rounded-2xl bg-slate-50 border border-slate-200/80 p-5 space-y-4">
+                            <div className="flex items-center gap-2">
+                                <span className="flex h-2.5 w-2.5 rounded-full bg-indigo-600 animate-pulse"></span>
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">지능형 매출 성장 엔진 진단 (YoY 비교)</h3>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="bg-white rounded-xl p-3 border border-slate-100 text-center">
+                                    <div className="text-[10px] font-black text-slate-400">누적 매출액</div>
+                                    <div className="text-sm font-black text-indigo-600 mt-1">
+                                        {growthMetrics.amtGrowthPct > 0 ? `+${growthMetrics.amtGrowthPct}%` : `${growthMetrics.amtGrowthPct}%`}
+                                    </div>
+                                </div>
+                                <div className="bg-white rounded-xl p-3 border border-slate-100 text-center">
+                                    <div className="text-[10px] font-black text-slate-400">누적 출고량</div>
+                                    <div className="text-sm font-black text-indigo-600 mt-1">
+                                        {growthMetrics.qtyGrowthPct > 0 ? `+${growthMetrics.qtyGrowthPct}%` : `${growthMetrics.qtyGrowthPct}%`}
+                                    </div>
+                                </div>
+                                <div className="bg-white rounded-xl p-3 border border-slate-100 text-center">
+                                    <div className="text-[10px] font-black text-slate-400">누적 출고 건수</div>
+                                    <div className="text-sm font-black text-indigo-600 mt-1">
+                                        {growthMetrics.ordersGrowthPct > 0 ? `+${growthMetrics.ordersGrowthPct}%` : `${growthMetrics.ordersGrowthPct}%`}
+                                    </div>
+                                </div>
+                                <div className="bg-white rounded-xl p-3 border border-slate-100 text-center">
+                                    <div className="text-[10px] font-black text-slate-400">평균 출고 단가</div>
+                                    <div className="text-sm font-black text-indigo-600 mt-1">
+                                        {growthMetrics.priceGrowthPct > 0 ? `+${growthMetrics.priceGrowthPct}%` : `${growthMetrics.priceGrowthPct}%`}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-xl p-4 border border-slate-100 space-y-2 text-xs">
+                                <div className="font-bold text-slate-700 flex items-center gap-1.5">
+                                    💡 <span className="font-black text-indigo-600">진단 요약 및 권장 영업 방향</span>
+                                </div>
+                                <p className="text-slate-600 leading-relaxed font-medium">
+                                    {(() => {
+                                        const { amtGrowthPct, qtyGrowthPct, priceGrowthPct, ordersGrowthPct } = growthMetrics;
+                                        
+                                        if (priceGrowthPct > 5 && qtyGrowthPct <= 0 && amtGrowthPct > 0) {
+                                            return `현재 매출액은 전년 동기 대비 ${amtGrowthPct}% 증가하며 상승세를 보이고 있으나, 실제 출고량(수량)은 ${qtyGrowthPct}% 감소하고 평균 출고 단가가 ${priceGrowthPct}% 상승하여 매출 성장이 견인되었습니다. 이는 단가 인상에 의존한 일시적 성장 구조일 확률이 높습니다. 원가 변동이나 시장 하락세 진입 시 타격이 클 수 있으므로, 출고 빈도와 거래 물량을 확보하기 위한 신규 판로 개척과 단가 외의 차별화 영업 전략 수립이 요구됩니다.`;
+                                        }
+                                        if (qtyGrowthPct > 3 && amtGrowthPct > 0) {
+                                            return `매출액(${amtGrowthPct}% 증가)과 더불어 실제 출고량(${qtyGrowthPct}% 증가) 및 출고 건수(${ordersGrowthPct}% 증가)가 모두 상승하는 바람직한 '물량 주도형 건강한 성장' 국면입니다. 단가 인상 외에 실질적인 거래 빈도와 점유율이 늘고 있음을 의미하므로, 이 추세를 유지하기 위해 기존 우량 고객사의 이탈을 방지하고 시화/대경 재고 매칭률을 극대화하여 수요를 선제적으로 흡수해야 합니다.`;
+                                        }
+                                        if (amtGrowthPct < 0 && qtyGrowthPct < 0) {
+                                            return `현재 전사 매출액(${amtGrowthPct}% 감소)과 출고량(${qtyGrowthPct}% 감소)이 모두 줄어들고 있는 침체 신호가 나타나고 있습니다. 단가 방어에도 불구하고 주문 빈도와 벌크 수요가 하락하고 있으므로, 단가 마진율 조정이나 지역별 집중 프로모션을 통한 신속한 수요 회복 조치를 취해야 합니다.`;
+                                        }
+                                        return `현재 매출액은 ${amtGrowthPct}%, 출고량은 ${qtyGrowthPct}%, 출고 건수는 ${ordersGrowthPct}%의 변동을 나타내고 있습니다. 출고 단가는 전년 대비 ${priceGrowthPct}% 수준으로 균형을 유지하고 있으며, 안정적인 고정 매출 확보와 동시에 고수익성 틈새 주문 유치의 듀얼 트랙 전략이 유효합니다.`;
+                                    })()}
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
