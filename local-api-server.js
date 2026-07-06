@@ -25,6 +25,7 @@ let db = {
     loginLogs: [],
     inventoryHistory: [],
     customers: [],
+    crmEvents: [],
     lastSnapshotDate: null,
     lastSnapshot: null,
     currentSnapshot: null,
@@ -55,7 +56,8 @@ async function loadData() {
             db.june12DaekyungSnapshot = json.june12DaekyungSnapshot || null;
             db.daekyungHistory = json.daekyungHistory || [];
             db.customers = json.customers || [];
-            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.loginLogs.length} logs, ${db.inventoryHistory.length} history, Snapshot Date: ${db.lastSnapshotDate}`);
+            db.crmEvents = json.crmEvents || [];
+            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.loginLogs.length} logs, ${db.inventoryHistory.length} history, ${db.crmEvents.length} crm events, Snapshot Date: ${db.lastSnapshotDate}`);
             
             // Seed Customers if empty
             if (db.customers.length === 0) {
@@ -2274,6 +2276,82 @@ const server = http.createServer(async (req, res) => {
                 res.end(JSON.stringify({ error: 'Server Error' }));
             }
         });
+        return;
+    }
+
+    // --- CRM EVENTS APIs ---
+    // GET /api/crm/events
+    if (req.method === 'GET' && url.pathname === '/api/crm/events') {
+        const requesterRole = req.headers['x-requester-role'];
+        if (requesterRole !== 'MASTER' && requesterRole !== 'admin' && requesterRole !== 'manager' && requesterRole !== 'MANAGER') {
+            res.writeHead(403);
+            return res.end(JSON.stringify({ error: 'Forbidden' }));
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(db.crmEvents || []));
+    }
+
+    // POST /api/crm/events
+    if (req.method === 'POST' && url.pathname === '/api/crm/events') {
+        const requesterRole = req.headers['x-requester-role'];
+        if (requesterRole !== 'MASTER' && requesterRole !== 'admin' && requesterRole !== 'manager' && requesterRole !== 'MANAGER') {
+            res.writeHead(403);
+            return res.end(JSON.stringify({ error: 'Forbidden' }));
+        }
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const eventData = JSON.parse(body);
+                if (!eventData.date || !eventData.title || !eventData.type) {
+                    res.writeHead(400);
+                    return res.end(JSON.stringify({ error: 'Missing required fields' }));
+                }
+
+                const newEvent = {
+                    id: 'evt-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+                    date: eventData.date, // YYYY-MM-DD
+                    title: eventData.title,
+                    description: eventData.description || '',
+                    type: eventData.type, // 'price_change' | 'large_order' | 'competitor_issue' | 'other'
+                    createdAt: new Date().toISOString()
+                };
+
+                await updateDb(() => {
+                    db.crmEvents = db.crmEvents || [];
+                    db.crmEvents.push(newEvent);
+                });
+
+                res.writeHead(201, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(newEvent));
+            } catch (e) {
+                console.error('[API] Error saving CRM event:', e);
+                res.writeHead(500);
+                res.end(JSON.stringify({ error: 'Server Error' }));
+            }
+        });
+        return;
+    }
+
+    // DELETE /api/crm/events/:id
+    if (req.method === 'DELETE' && url.pathname.startsWith('/api/crm/events/')) {
+        const requesterRole = req.headers['x-requester-role'];
+        if (requesterRole !== 'MASTER' && requesterRole !== 'admin' && requesterRole !== 'manager' && requesterRole !== 'MANAGER') {
+            res.writeHead(403);
+            return res.end(JSON.stringify({ error: 'Forbidden' }));
+        }
+        const id = url.pathname.split('/').pop();
+        try {
+            await updateDb(() => {
+                db.crmEvents = (db.crmEvents || []).filter(e => e.id !== id);
+            });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true }));
+        } catch (e) {
+            console.error('[API] Error deleting CRM event:', e);
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'Server Error' }));
+        }
         return;
     }
 

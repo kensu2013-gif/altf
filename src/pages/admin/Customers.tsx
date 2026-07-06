@@ -4,6 +4,7 @@ import { useStore } from '../../store/useStore';
 import { useInventory } from '../../hooks/useInventory';
 import type { Product, Quotation } from '../../types';
 import { calculateCustomerGrade } from '../../lib/customerUtils';
+import FlowChartDashboard from '../../components/admin/FlowChartDashboard';
 
 interface Customer {
     id: string;
@@ -251,7 +252,7 @@ export default function Customers() {
     const [customersList, setCustomersList] = useState<Customer[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
-    const [activeTab, setActiveTab] = useState<'MASTER' | 'ANALYTICS' | 'COMPANY_ANALYTICS' | 'BI_ANALYTICS' | 'STRATEGY_ANALYTICS' | 'COMPANY_CARD' | 'ACTION_INTEL'>('MASTER');
+    const [activeTab, setActiveTab] = useState<'MASTER' | 'ANALYTICS' | 'COMPANY_ANALYTICS' | 'BI_ANALYTICS' | 'STRATEGY_ANALYTICS' | 'COMPANY_CARD' | 'ACTION_INTEL' | 'FLOW_CHART'>('MASTER');
 
     // ── ACTION INTEL 탭 전용 State ──────────────────────────────
     const [intelSubView, setIntelSubView] = useState<'urgent' | 'prep' | 'strategy' | 'growth' | 'inventory'>('urgent');
@@ -1808,6 +1809,17 @@ const actionIntel = useMemo(() => {
     </span>
   )}
 </button>
+                <button
+                    onClick={() => setActiveTab('FLOW_CHART')}
+                    className={`px-5 py-2.5 rounded-t-lg font-bold transition-all flex items-center gap-1.5
+                        ${activeTab === 'FLOW_CHART'
+                            ? 'bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-md'
+                            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                        }`}
+                >
+                    <Activity className="w-4 h-4" />
+                    flow chart
+                </button>
             </div>
 
             {activeTab === 'MASTER' && (
@@ -3595,7 +3607,15 @@ const actionIntel = useMemo(() => {
       </div>
     </div>
   </div>
-)}
+            )}
+            {activeTab === 'FLOW_CHART' && (
+                <FlowChartDashboard
+                    orders={orders}
+                    customersList={customersList}
+                    inventoryMap={inventoryMap}
+                    token={token || ''}
+                />
+            )}
         </div>
     );
 }
