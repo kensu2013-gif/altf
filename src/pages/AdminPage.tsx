@@ -2,6 +2,7 @@ import { useState, useEffect, useDeferredValue } from 'react';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { calculateCustomerGrade } from '../lib/customerUtils';
+import type { CrmCustomer } from '../lib/customerUtils';
 import { CalmPageShell } from '../components/ui/CalmPageShell';
 import { PageTransition } from '../components/ui/PageTransition';
 import {
@@ -27,7 +28,7 @@ export default function AdminPage() {
     })));
     const user = useStore((state) => state.auth.user);
     const { findProduct } = useInventoryIndex(inventory);
-    const [crmCustomers, setCrmCustomers] = useState<any[]>([]);
+    const [crmCustomers, setCrmCustomers] = useState<CrmCustomer[]>([]);
 
 
     // Sync Orders on Mount
