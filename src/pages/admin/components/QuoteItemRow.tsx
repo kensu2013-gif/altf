@@ -101,7 +101,7 @@ export const QuoteItemRow = React.memo(({
     // Anti-Gravity: Calculate bsStock dynamically by matching compatible logical specifications in inventory.
     // Works even if the product is unlinked (null) or a custom item by falling back to item details.
     const bsStock = (() => {
-        const nameStr = (product?.name || item.name || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const nameStr = (product?.name || item.name || '').toUpperCase().trim();
         const thickStr = (product?.thickness || item.thickness || '').toUpperCase().trim();
         const sizeA = getPrimaryASize(product?.size || item.size);
         const matNorm = normalizeMaterial(product?.material || item.material);
@@ -113,7 +113,7 @@ export const QuoteItemRow = React.memo(({
         inventory.forEach(p => {
             if (product && p.id === product.id) return;
             
-            const pName = (p.name || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+            const pName = (p.name || '').toUpperCase().trim();
             const pThick = (p.thickness || '').toUpperCase().trim();
             if (pName !== nameStr || pThick !== thickStr) return;
             
