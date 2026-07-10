@@ -2,7 +2,7 @@
 import React from 'react';
 import type { LineItem, Product } from '../../../types';
 import type { CustomPriceRecord } from '../../../store/useStore';
-import { findMatchingProduct } from '../../../lib/productUtils';
+import { findMatchingProduct, formatThickness } from '../../../lib/productUtils';
 import { formatCurrency } from '../../../lib/utils'; // Adjust path if needed
 
 interface QuoteItem extends LineItem {
@@ -102,16 +102,16 @@ export const QuoteItemRow = React.memo(({
     // Works even if the product is unlinked (null) or a custom item by falling back to item details.
     const bsStock = (() => {
         const nameStr = (product?.name || item.name || '').toUpperCase().trim();
-        const thickStr = (product?.thickness || item.thickness || '').toUpperCase().trim();
+        const thickStr = formatThickness((product?.thickness || item.thickness || '').toUpperCase().trim());
         const sizeA = getPrimaryASize(product?.size || item.size);
         const matNorm = normalizeMaterial(product?.material || item.material);
         
         if (!nameStr) return 0;
         
         const hasLocStock = product?.locationStock && Object.keys(product.locationStock).length > 0;
-        const isBusan = product?.location1 === '부산' || (product?.location1 && String(product?.location1).includes('부산')) || (product?.locationStock && product?.locationStock['부산'] !== undefined);
-        
-        let sum = hasLocStock 
+        const isBusan = product?.location1 === '부산' || (product?.location1 && String(product?.location1).includes('부산')) || product?.location === '부산' || (product?.locationStock && product?.locationStock['부산'] !== undefined);
+
+        let sum = hasLocStock
             ? (product?.locationStock?.['부산'] || 0) 
             : (isBusan ? (product?.shQty ?? product?.sh_qty ?? 0) : 0);
         
@@ -119,14 +119,14 @@ export const QuoteItemRow = React.memo(({
             if (product && p.id === product.id) return;
             
             const pName = (p.name || '').toUpperCase().trim();
-            const pThick = (p.thickness || '').toUpperCase().trim();
+            const pThick = formatThickness((p.thickness || '').toUpperCase().trim());
             if (pName !== nameStr || pThick !== thickStr) return;
             
             const pSizeA = getPrimaryASize(p.size);
             const pMatNorm = normalizeMaterial(p.material);
             
             const pHasLocStock = p.locationStock && Object.keys(p.locationStock).length > 0;
-            const pIsBusan = p.location1 === '부산' || (p.location1 && String(p.location1).includes('부산')) || (p.locationStock && p.locationStock['부산'] !== undefined);
+            const pIsBusan = p.location1 === '부산' || (p.location1 && String(p.location1).includes('부산')) || p.location === '부산' || (p.locationStock && p.locationStock['부산'] !== undefined);
             
             if (pSizeA === sizeA && pMatNorm === matNorm) {
                 sum += pHasLocStock 
