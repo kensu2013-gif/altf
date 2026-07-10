@@ -126,31 +126,26 @@ export async function getInventoryFromS3() {
         }
         throw new Error('Local inventory file missing and AWS credentials not configured.');
     }
-    const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+    // Prioritize local file if it exists (useful for local overrides, builds or instant production deployments)
+    try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const { fileURLToPath } = await import('url');
 
-    // Prioritize local file if it exists (useful for local overrides or builds)
-    // In production, skip local check and always read from S3 to ensure multi-instance consistency.
-    if (!isProd) {
-        try {
-            const fs = await import('fs');
-            const path = await import('path');
-            const { fileURLToPath } = await import('url');
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = path.dirname(__filename);
+        const localPath = path.join(__dirname, 'public/api/inventory/inventory.json');
 
-            const __filename = fileURLToPath(import.meta.url);
-            const __dirname = path.dirname(__filename);
-            const localPath = path.join(__dirname, 'public/api/inventory/inventory.json');
-
-            if (fs.existsSync(localPath)) {
-                console.log(`[Inventory Source] Prioritizing local file: ${localPath}`);
-                const localData = fs.readFileSync(localPath, 'utf8');
-                return {
-                    items: JSON.parse(localData),
-                    lastModified: fs.statSync(localPath).mtime
-                };
-            }
-        } catch (localErr) {
-            console.warn('[Inventory Source] Failed to read local inventory file first:', localErr.message);
+        if (fs.existsSync(localPath)) {
+            console.log(`[Inventory Source] Prioritizing local file: ${localPath}`);
+            const localData = fs.readFileSync(localPath, 'utf8');
+            return {
+                items: JSON.parse(localData),
+                lastModified: fs.statSync(localPath).mtime
+            };
         }
+    } catch (localErr) {
+        console.warn('[Inventory Source] Failed to read local inventory file first:', localErr.message);
     }
 
     const PROCESSED_KEY = 'public/inventory/processed_inventory.json';
