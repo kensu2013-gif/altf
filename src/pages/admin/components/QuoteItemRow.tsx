@@ -98,6 +98,35 @@ export const QuoteItemRow = React.memo(({
     const profit = (item.unitPrice - costPrice) * item.quantity;
     const isPriceModified = product ? item.unitPrice !== product.unitPrice : false;
 
+    // Anti-Gravity: Calculate bsStock dynamically by matching compatible logical specifications in inventory.
+    // Works even if the product is unlinked (null) or a custom item by falling back to item details.
+    const bsStock = (() => {
+        const nameStr = (product?.name || item.name || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const thickStr = (product?.thickness || item.thickness || '').toUpperCase().trim();
+        const sizeA = getPrimaryASize(product?.size || item.size);
+        const matNorm = normalizeMaterial(product?.material || item.material);
+        
+        if (!nameStr) return 0;
+        
+        let sum = product?.locationStock?.['부산'] || 0;
+        
+        inventory.forEach(p => {
+            if (product && p.id === product.id) return;
+            
+            const pName = (p.name || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+            const pThick = (p.thickness || '').toUpperCase().trim();
+            if (pName !== nameStr || pThick !== thickStr) return;
+            
+            const pSizeA = getPrimaryASize(p.size);
+            const pMatNorm = normalizeMaterial(p.material);
+            
+            if (pSizeA === sizeA && pMatNorm === matNorm) {
+                sum += p.locationStock?.['부산'] || 0;
+            }
+        });
+        return sum;
+    })();
+
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
             e.preventDefault();
@@ -185,6 +214,9 @@ export const QuoteItemRow = React.memo(({
                 {isUnlinked ? (
                     <div className="flex flex-col items-center gap-1">
                         <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">미연동</span>
+                        {bsStock > 0 && (
+                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded mt-1">부산: {bsStock}</span>
+                        )}
                         {customPriceRecord && (
                             <div className="flex flex-col items-center mt-1 border border-slate-200 bg-slate-50 rounded p-1.5 text-[10px] w-full max-w-[100px] shadow-sm">
                         <span className="text-slate-700 font-bold mb-1 whitespace-nowrap border-b border-slate-200 w-full text-center pb-0.5">📋 과거 실적확인</span>
@@ -207,35 +239,6 @@ export const QuoteItemRow = React.memo(({
                         const ysStock = (product?.locationStock?.['양산'] as number) ?? (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (product.shQty ?? 0)) : 0);
                         const shStock = (product?.locationStock?.['시화'] as number) ?? product?.shQty ?? 0;
                         
-                        // Anti-Gravity: Calculate bsStock dynamically by matching compatible logical specifications in inventory
-                        const bsStock = (() => {
-                            if (!product) return 0;
-                            let sum = product.locationStock?.['부산'] || 0;
-                            
-                            const sizeA = getPrimaryASize(product.size);
-                            const matNorm = normalizeMaterial(product.material);
-                            const targetName = (product.name || '').toUpperCase().trim();
-                            const targetThick = (product.thickness || '').toUpperCase().trim();
-                            
-                            if (!targetName) return sum;
-                            
-                            inventory.forEach(p => {
-                                if (p.id === product.id) return;
-                                
-                                const pName = (p.name || '').toUpperCase().trim();
-                                const pThick = (p.thickness || '').toUpperCase().trim();
-                                if (pName !== targetName || pThick !== targetThick) return;
-                                
-                                const pSizeA = getPrimaryASize(p.size);
-                                const pMatNorm = normalizeMaterial(p.material);
-                                
-                                if (pSizeA === sizeA && pMatNorm === matNorm) {
-                                    sum += p.locationStock?.['부산'] || 0;
-                                }
-                            });
-                            return sum;
-                        })();
-
                         const waitStock = product?.marking_wait_qty ?? item.marking_wait_qty ?? 0;
 
                         return (
