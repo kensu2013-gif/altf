@@ -9,6 +9,36 @@ interface QuoteItem extends LineItem {
     userUnitPrice?: number;
 }
 
+function getPrimaryASize(sizeStr: string | undefined): number {
+    const clean = String(sizeStr || '').toUpperCase().trim();
+    if (!clean) return 0;
+    const parts = clean.split(/X/i);
+    const primaryPart = parts[0].trim();
+    if (primaryPart.includes('A')) {
+        const match = primaryPart.match(/(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+    }
+    const inchToAMap: Record<string, number> = {
+        '1/2': 15, '3/4': 20, '1': 25, '1-1/4': 32, '1.1/4': 32, '1 1/4': 32,
+        '1-1/2': 40, '1.1/2': 40, '1 1/2': 40, '2': 50, '2-1/2': 65, '2.1/2': 65, '2 1/2': 65,
+        '3': 80, '4': 100, '5': 125, '6': 150, '8': 200, '10': 250, '12': 300,
+        '14': 350, '16': 400, '18': 450, '20': 500, '22': 550, '24': 600,
+        '26': 650, '28': 700, '30': 750, '32': 800, '36': 900, '40': 1000
+    };
+    const stripped = primaryPart.replace(/"/g, '').trim();
+    if (inchToAMap[stripped] !== undefined) return inchToAMap[stripped];
+    const decimalVal = parseFloat(stripped) || 0;
+    if (decimalVal >= 15) return decimalVal;
+    return 0;
+}
+
+function normalizeMaterial(matStr: string | undefined): string {
+    const clean = String(matStr || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (clean.includes('316L') || clean.includes('316')) return '316L';
+    if (clean.includes('304L') || clean.includes('304')) return '304';
+    return clean;
+}
+
 interface QuoteItemRowProps {
     item: QuoteItem;
     index: number;
@@ -176,7 +206,36 @@ export const QuoteItemRow = React.memo(({
                     (() => {
                         const ysStock = (product?.locationStock?.['양산'] as number) ?? (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (product.shQty ?? 0)) : 0);
                         const shStock = (product?.locationStock?.['시화'] as number) ?? product?.shQty ?? 0;
-                        const bsStock = (product?.locationStock?.['부산'] as number) ?? 0;
+                        
+                        // Anti-Gravity: Calculate bsStock dynamically by matching compatible logical specifications in inventory
+                        const bsStock = (() => {
+                            if (!product) return 0;
+                            let sum = product.locationStock?.['부산'] || 0;
+                            
+                            const sizeA = getPrimaryASize(product.size);
+                            const matNorm = normalizeMaterial(product.material);
+                            const targetName = (product.name || '').toUpperCase().trim();
+                            const targetThick = (product.thickness || '').toUpperCase().trim();
+                            
+                            if (!targetName) return sum;
+                            
+                            inventory.forEach(p => {
+                                if (p.id === product.id) return;
+                                
+                                const pName = (p.name || '').toUpperCase().trim();
+                                const pThick = (p.thickness || '').toUpperCase().trim();
+                                if (pName !== targetName || pThick !== targetThick) return;
+                                
+                                const pSizeA = getPrimaryASize(p.size);
+                                const pMatNorm = normalizeMaterial(p.material);
+                                
+                                if (pSizeA === sizeA && pMatNorm === matNorm) {
+                                    sum += p.locationStock?.['부산'] || 0;
+                                }
+                            });
+                            return sum;
+                        })();
+
                         const waitStock = product?.marking_wait_qty ?? item.marking_wait_qty ?? 0;
 
                         return (
