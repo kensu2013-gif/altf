@@ -3011,7 +3011,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     ) : (
                                                                         (() => {
                                                                             const hasLocStock = product?.locationStock && Object.keys(product.locationStock).length > 0;
-                                                                            const isBusan = product?.location1 === '부산' || (product?.location1 && String(product?.location1).includes('부산')) || (product?.locationStock && product?.locationStock['부산'] !== undefined);
+                                                                            const isBusan = product?.location1 === '부산' || (product?.location1 && String(product?.location1).includes('부산')) || product?.location === '부산' || (product?.locationStock && product?.locationStock['부산'] !== undefined);
                                                                             const ysStock = hasLocStock 
                                                                                 ? (product?.locationStock?.['양산'] || 0) 
                                                                                 : (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (isBusan ? 0 : (product.shQty ?? 0))) : (item.currentStock || 0));
