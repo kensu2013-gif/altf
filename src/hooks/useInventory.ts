@@ -73,6 +73,7 @@ export function useInventory() {
             const arr = Array.isArray(updated) ? updated : (Array.isArray(updated?.items) ? updated.items : []);
             const processed = arr.map((item: RawInventoryItem) => {
                 const locationStock: Record<string, number> = {};
+                const isBusan = item.location1 === '부산' || (item.location1 && String(item.location1).includes('부산')) || (item.locationStock && item.locationStock['부산'] !== undefined);
                 if (item.locationStock && Object.keys(item.locationStock).length > 0) {
                     for (const [key, qty] of Object.entries(item.locationStock)) {
                         const newKey = (key === '서울' || key === '서울재고') ? '시화' : key;
@@ -80,7 +81,6 @@ export function useInventory() {
                     }
                 } else {
                     if (item.location1 && item.sh_qty !== undefined && item.sh_qty !== null && item.sh_qty !== '') {
-                        const isBusan = item.location1 === '부산' || item.location1.includes('부산');
                         const loc1 = isBusan ? '부산' : ((item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1);
                         locationStock[loc1] = Number(item.sh_qty);
                     }
@@ -99,6 +99,8 @@ export function useInventory() {
                 const parsed = parseSku(id);
                 const finalSize = parsed.size.replace(/^[A-Z]+-?/, '').trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
 
+                const rawShQty = item.sh_qty !== undefined ? Number(item.sh_qty) : (item.shQty !== undefined ? Number(item.shQty) : 0);
+
                 return {
                     ...item,
                     id,
@@ -113,6 +115,7 @@ export function useInventory() {
                     odEqKey: item.od_eq_key || item.odEqKey,
                     locationStock,
                     maker1: item.maker1,
+                    shQty: isBusan ? 0 : rawShQty,
                     marking_wait_qty: Number(item.marking_wait_qty) || 0
                 } as Product;
             });
@@ -145,6 +148,7 @@ export function useInventory() {
                 // 1. Calculate Location Stock Map
                 // Anti-Gravity: Prefer server-provided locationStock if available, mapped '서울' -> '시화'
                 const locationStock: Record<string, number> = {};
+                const isBusan = item.location1 === '부산' || (item.location1 && String(item.location1).includes('부산')) || (item.locationStock && item.locationStock['부산'] !== undefined);
 
                 if (item.locationStock && Object.keys(item.locationStock).length > 0) {
                     for (const [key, qty] of Object.entries(item.locationStock)) {
@@ -154,7 +158,6 @@ export function useInventory() {
                 } else {
                     // 1. Process Secondary Location (Sihwa or Busan)
                     if (item.location1 && item.sh_qty !== undefined && item.sh_qty !== null && item.sh_qty !== '') {
-                        const isBusan = item.location1 === '부산' || item.location1.includes('부산');
                         const loc1 = isBusan ? '부산' : ((item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1);
                         locationStock[loc1] = Number(item.sh_qty);
                     }
@@ -184,6 +187,8 @@ export function useInventory() {
                 const parsed = parseSku(id);
                 const finalSize = parsed.size.replace(/^[A-Z]+-?/, '').trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
 
+                const rawShQty = item.sh_qty !== undefined ? Number(item.sh_qty) : (item.shQty !== undefined ? Number(item.shQty) : 0);
+
                 return {
                     ...item, // Keep original props
                     id: id,
@@ -201,6 +206,7 @@ export function useInventory() {
 
                     // User Request: Capture maker1 for conditional display
                     maker1: item.maker1,
+                    shQty: isBusan ? 0 : rawShQty,
                     marking_wait_qty: Number(item.marking_wait_qty) || 0
                 } as Product;
             });

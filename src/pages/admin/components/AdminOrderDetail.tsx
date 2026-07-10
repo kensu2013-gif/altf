@@ -3009,16 +3009,31 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     {isUnlinked ? (
                                                                         <span className="font-bold text-slate-400">-</span>
                                                                     ) : (
-                                                                        <div className="flex flex-col items-center text-xs w-auto min-w-[75px] mx-auto px-1 space-y-0.5">
-                                                                            <div className="flex justify-between w-full gap-2 whitespace-nowrap">
-                                                                                <span className="text-slate-500 font-normal">양산:</span>
-                                                                                <span className="font-bold text-slate-800">{((product?.locationStock?.['양산'] as number) ?? (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (product.shQty ?? 0)) : (item.currentStock || 0))).toLocaleString()}</span>
-                                                                            </div>
-                                                                            <div className="flex justify-between w-full gap-2 whitespace-nowrap">
-                                                                                <span className="text-slate-500 font-normal">시화:</span>
-                                                                                <span className="font-bold text-blue-600">{((product?.locationStock?.['시화'] as number) ?? product?.shQty ?? 0).toLocaleString()}</span>
-                                                                            </div>
-                                                                        </div>
+                                                                        (() => {
+                                                                            const isBusan = product?.location1 === '부산' || (product?.location1 && String(product?.location1).includes('부산')) || (product?.locationStock && product?.locationStock['부산'] !== undefined);
+                                                                            const ysStock = (product?.locationStock?.['양산'] as number) ?? (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (isBusan ? 0 : (product.shQty ?? 0))) : (item.currentStock || 0));
+                                                                            const shStock = (product?.locationStock?.['시화'] as number) ?? (isBusan ? 0 : (product?.shQty ?? 0));
+                                                                            const bsStock = (product?.locationStock?.['부산'] as number) ?? (isBusan ? (product?.shQty ?? product?.sh_qty ?? 0) : 0);
+
+                                                                            return (
+                                                                                <div className="flex flex-col items-center text-xs w-auto min-w-[75px] mx-auto px-1 space-y-0.5">
+                                                                                    <div className="flex justify-between w-full gap-2 whitespace-nowrap">
+                                                                                        <span className="text-slate-500 font-normal">양산:</span>
+                                                                                        <span className="font-bold text-slate-800">{ysStock.toLocaleString()}</span>
+                                                                                    </div>
+                                                                                    <div className="flex justify-between w-full gap-2 whitespace-nowrap">
+                                                                                        <span className="text-slate-500 font-normal">시화:</span>
+                                                                                        <span className="font-bold text-blue-600">{shStock.toLocaleString()}</span>
+                                                                                    </div>
+                                                                                    {bsStock > 0 && (
+                                                                                        <div className="flex justify-between w-full gap-2 whitespace-nowrap">
+                                                                                            <span className="text-slate-500 font-normal">부산:</span>
+                                                                                            <span className="font-bold text-emerald-600">{bsStock.toLocaleString()}</span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })()
                                                                     )}
                                                                 </td>
                                                                 <td className="px-4 py-3 text-center align-middle">

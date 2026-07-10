@@ -108,7 +108,8 @@ export const QuoteItemRow = React.memo(({
         
         if (!nameStr) return 0;
         
-        let sum = product?.locationStock?.['부산'] || 0;
+        const isBusan = product?.location1 === '부산' || (product?.location1 && String(product?.location1).includes('부산')) || (product?.locationStock && product?.locationStock['부산'] !== undefined);
+        let sum = product?.locationStock?.['부산'] || (isBusan ? (product?.shQty ?? product?.sh_qty ?? 0) : 0);
         
         inventory.forEach(p => {
             if (product && p.id === product.id) return;
@@ -236,8 +237,9 @@ export const QuoteItemRow = React.memo(({
                     </div>
                 ) : (
                     (() => {
-                        const ysStock = (product?.locationStock?.['양산'] as number) ?? (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (product.shQty ?? 0)) : 0);
-                        const shStock = (product?.locationStock?.['시화'] as number) ?? product?.shQty ?? 0;
+                        const isBusan = product?.location1 === '부산' || (product?.location1 && String(product?.location1).includes('부산')) || (product?.locationStock && product?.locationStock['부산'] !== undefined);
+                        const ysStock = (product?.locationStock?.['양산'] as number) ?? (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (isBusan ? 0 : (product.shQty ?? 0))) : 0);
+                        const shStock = (product?.locationStock?.['시화'] as number) ?? (isBusan ? 0 : (product?.shQty ?? 0));
                         
                         const waitStock = product?.marking_wait_qty ?? item.marking_wait_qty ?? 0;
 
