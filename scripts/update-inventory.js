@@ -359,43 +359,55 @@ async function updateInventory() {
             }
         });
 
-        // Anti-Gravity: Merge locationStock for compatible odEqKey / id items (e.g. A-size and Inch-size matches)
-        // 1. Group items by normalized key
-        const cleanKey = (key) => String(key || '').toUpperCase().replace(/\s+/g, '').replace(/\/L/g, '');
+        // Anti-Gravity: Merge locationStock for compatible size (A-size and Inch-size) and material items
+        // 1. Group items by logical specification key
+        const getPrimaryASize = (sizeStr) => {
+            const clean = String(sizeStr || '').toUpperCase().trim();
+            if (!clean) return 0;
+            const parts = clean.split(/X/i);
+            const primaryPart = parts[0].trim();
+            if (primaryPart.includes('A')) {
+                const match = primaryPart.match(/(\d+)/);
+                return match ? parseInt(match[1], 10) : 0;
+            }
+            const inchToAMap = {
+                '1/2': 15, '3/4': 20, '1': 25, '1-1/4': 32, '1.1/4': 32, '1 1/4': 32,
+                '1-1/2': 40, '1.1/2': 40, '1 1/2': 40, '2': 50, '2-1/2': 65, '2.1/2': 65, '2 1/2': 65,
+                '3': 80, '4': 100, '5': 125, '6': 150, '8': 200, '10': 250, '12': 300,
+                '14': 350, '16': 400, '18': 450, '20': 500, '22': 550, '24': 600,
+                '26': 650, '28': 700, '30': 750, '32': 800, '36': 900, '40': 1000
+            };
+            const stripped = primaryPart.replace(/"/g, '').trim();
+            if (inchToAMap[stripped] !== undefined) return inchToAMap[stripped];
+            let decimalVal = parseFloat(stripped) || 0;
+            if (decimalVal >= 15) return decimalVal;
+            return 0;
+        };
+
+        const normalizeMaterial = (matStr) => {
+            const clean = String(matStr || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (clean.includes('316L') || clean.includes('316')) return '316L';
+            if (clean.includes('304L') || clean.includes('304')) return '304';
+            return clean;
+        };
+
         const groupMap = new Map();
 
         processed.forEach(p => {
-            const keys = [p.id, p.odEqKey].filter(Boolean).map(cleanKey);
-            const groupKey = keys[0];
-            if (!groupKey) return;
-
-            let mappedGroupKey = null;
-            for (const k of keys) {
-                if (groupMap.has(k)) {
-                    mappedGroupKey = k;
-                    break;
-                }
+            const sizeA = getPrimaryASize(p.size);
+            const matNorm = normalizeMaterial(p.material);
+            
+            // Generate a unique key for the logical spec: "{Name}-{Thickness}-{NormalizedSize}-{NormalizedMaterial}"
+            const specKey = `${p.name.toUpperCase().trim()}-${p.thickness.toUpperCase().trim()}-${sizeA}-${matNorm}`;
+            
+            if (!groupMap.has(specKey)) {
+                groupMap.set(specKey, []);
             }
-
-            if (!mappedGroupKey) {
-                mappedGroupKey = groupKey;
-                groupMap.set(mappedGroupKey, []);
-            }
-
-            groupMap.get(mappedGroupKey).push(p);
-            keys.forEach(k => {
-                if (!groupMap.has(k)) {
-                    groupMap.set(k, groupMap.get(mappedGroupKey));
-                }
-            });
+            groupMap.get(specKey).push(p);
         });
 
         // 2. Sum locationStock for each group and apply back
-        const visitedGroups = new Set();
-        groupMap.forEach((list, key) => {
-            if (visitedGroups.has(list)) return;
-            visitedGroups.add(list);
-
+        groupMap.forEach((list, specKey) => {
             const mergedStock = {};
             list.forEach(p => {
                 if (p.locationStock) {
