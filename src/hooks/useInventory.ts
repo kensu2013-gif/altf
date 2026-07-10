@@ -114,8 +114,6 @@ export function useInventory() {
                 const parsed = parseSku(id);
                 const finalSize = parsed.size.replace(/^[A-Z]+-?/, '').trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
 
-                const rawShQty = item.sh_qty !== undefined ? Number(item.sh_qty) : (item.shQty !== undefined ? Number(item.shQty) : 0);
-
                 return {
                     ...item,
                     id,
@@ -205,8 +203,6 @@ export function useInventory() {
                 const id = (item.sku_key || item.id || '') as string;
                 const parsed = parseSku(id);
                 const finalSize = parsed.size.replace(/^[A-Z]+-?/, '').trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
-
-                const rawShQty = item.sh_qty !== undefined ? Number(item.sh_qty) : (item.shQty !== undefined ? Number(item.shQty) : 0);
 
                 return {
                     ...item, // Keep original props
