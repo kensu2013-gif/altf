@@ -108,8 +108,12 @@ export const QuoteItemRow = React.memo(({
         
         if (!nameStr) return 0;
         
+        const hasLocStock = product?.locationStock && Object.keys(product.locationStock).length > 0;
         const isBusan = product?.location1 === '부산' || (product?.location1 && String(product?.location1).includes('부산')) || (product?.locationStock && product?.locationStock['부산'] !== undefined);
-        let sum = product?.locationStock?.['부산'] || (isBusan ? (product?.shQty ?? product?.sh_qty ?? 0) : 0);
+        
+        let sum = hasLocStock 
+            ? (product?.locationStock?.['부산'] || 0) 
+            : (isBusan ? (product?.shQty ?? product?.sh_qty ?? 0) : 0);
         
         inventory.forEach(p => {
             if (product && p.id === product.id) return;
@@ -121,8 +125,13 @@ export const QuoteItemRow = React.memo(({
             const pSizeA = getPrimaryASize(p.size);
             const pMatNorm = normalizeMaterial(p.material);
             
+            const pHasLocStock = p.locationStock && Object.keys(p.locationStock).length > 0;
+            const pIsBusan = p.location1 === '부산' || (p.location1 && String(p.location1).includes('부산')) || (p.locationStock && p.locationStock['부산'] !== undefined);
+            
             if (pSizeA === sizeA && pMatNorm === matNorm) {
-                sum += p.locationStock?.['부산'] || 0;
+                sum += pHasLocStock 
+                    ? (p.locationStock?.['부산'] || 0) 
+                    : (pIsBusan ? (p.shQty ?? p.sh_qty ?? 0) : 0);
             }
         });
         return sum;
@@ -237,9 +246,14 @@ export const QuoteItemRow = React.memo(({
                     </div>
                 ) : (
                     (() => {
+                        const hasLocStock = product?.locationStock && Object.keys(product.locationStock).length > 0;
                         const isBusan = product?.location1 === '부산' || (product?.location1 && String(product?.location1).includes('부산')) || (product?.locationStock && product?.locationStock['부산'] !== undefined);
-                        const ysStock = (product?.locationStock?.['양산'] as number) ?? (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (isBusan ? 0 : (product.shQty ?? 0))) : 0);
-                        const shStock = (product?.locationStock?.['시화'] as number) ?? (isBusan ? 0 : (product?.shQty ?? 0));
+                        const ysStock = hasLocStock 
+                            ? (product?.locationStock?.['양산'] || 0) 
+                            : (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (isBusan ? 0 : (product.shQty ?? 0))) : 0);
+                        const shStock = hasLocStock 
+                            ? (product?.locationStock?.['시화'] || 0) 
+                            : (isBusan ? 0 : (product?.shQty ?? 0));
                         
                         const waitStock = product?.marking_wait_qty ?? item.marking_wait_qty ?? 0;
 

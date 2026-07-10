@@ -3010,10 +3010,17 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                         <span className="font-bold text-slate-400">-</span>
                                                                     ) : (
                                                                         (() => {
+                                                                            const hasLocStock = product?.locationStock && Object.keys(product.locationStock).length > 0;
                                                                             const isBusan = product?.location1 === '부산' || (product?.location1 && String(product?.location1).includes('부산')) || (product?.locationStock && product?.locationStock['부산'] !== undefined);
-                                                                            const ysStock = (product?.locationStock?.['양산'] as number) ?? (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (isBusan ? 0 : (product.shQty ?? 0))) : (item.currentStock || 0));
-                                                                            const shStock = (product?.locationStock?.['시화'] as number) ?? (isBusan ? 0 : (product?.shQty ?? 0));
-                                                                            const bsStock = (product?.locationStock?.['부산'] as number) ?? (isBusan ? (product?.shQty ?? product?.sh_qty ?? 0) : 0);
+                                                                            const ysStock = hasLocStock 
+                                                                                ? (product?.locationStock?.['양산'] || 0) 
+                                                                                : (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (isBusan ? 0 : (product.shQty ?? 0))) : (item.currentStock || 0));
+                                                                            const shStock = hasLocStock 
+                                                                                ? (product?.locationStock?.['시화'] || 0) 
+                                                                                : (isBusan ? 0 : (product?.shQty ?? 0));
+                                                                            const bsStock = hasLocStock 
+                                                                                ? (product?.locationStock?.['부산'] || 0) 
+                                                                                : (isBusan ? (product?.shQty ?? product?.sh_qty ?? 0) : 0);
 
                                                                             return (
                                                                                 <div className="flex flex-col items-center text-xs w-auto min-w-[75px] mx-auto px-1 space-y-0.5">
