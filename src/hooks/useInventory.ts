@@ -80,7 +80,8 @@ export function useInventory() {
                     }
                 } else {
                     if (item.location1 && item.sh_qty !== undefined && item.sh_qty !== null && item.sh_qty !== '') {
-                        const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
+                        const isBusan = item.location1 === '부산' || item.location1.includes('부산');
+                        const loc1 = isBusan ? '부산' : ((item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1);
                         locationStock[loc1] = Number(item.sh_qty);
                     }
                     if (item.location && item.ready_qty !== undefined && item.ready_qty !== null && item.ready_qty !== '') {
@@ -151,9 +152,10 @@ export function useInventory() {
                         locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
                     }
                 } else {
-                    // 1. Process Secondary Location (Sihwa)
+                    // 1. Process Secondary Location (Sihwa or Busan)
                     if (item.location1 && item.sh_qty !== undefined && item.sh_qty !== null && item.sh_qty !== '') {
-                        const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
+                        const isBusan = item.location1 === '부산' || item.location1.includes('부산');
+                        const loc1 = isBusan ? '부산' : ((item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1);
                         locationStock[loc1] = Number(item.sh_qty);
                     }
 

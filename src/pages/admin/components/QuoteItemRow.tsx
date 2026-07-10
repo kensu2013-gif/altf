@@ -176,6 +176,7 @@ export const QuoteItemRow = React.memo(({
                     (() => {
                         const ysStock = (product?.locationStock?.['양산'] as number) ?? (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (product.shQty ?? 0)) : 0);
                         const shStock = (product?.locationStock?.['시화'] as number) ?? product?.shQty ?? 0;
+                        const bsStock = (product?.locationStock?.['부산'] as number) ?? 0;
                         const waitStock = product?.marking_wait_qty ?? item.marking_wait_qty ?? 0;
 
                         return (
@@ -188,6 +189,12 @@ export const QuoteItemRow = React.memo(({
                                     <span className="text-slate-500">시화:</span>
                                     <span className="font-bold text-blue-600">{shStock.toLocaleString()}</span>
                                 </div>
+                                {bsStock > 0 && (
+                                    <div className="flex justify-between w-full gap-2 whitespace-nowrap">
+                                        <span className="text-slate-500">부산:</span>
+                                        <span className="font-bold text-emerald-600">{bsStock.toLocaleString()}</span>
+                                    </div>
+                                )}
                                 {waitStock > 0 && (
                                     <div className="flex justify-between w-full gap-2 whitespace-nowrap">
                                         <span className="text-slate-500">대기:</span>

@@ -260,9 +260,15 @@ async function updateInventory() {
                 stockStatus = currentStock > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK';
             }
 
+            const isBusan = row.location1 === '부산' || (row.location1 && String(row.location1).includes('부산'));
+
             let locationStock = {};
             // Force explicit keys for the UI
-            if (shQty > 0) locationStock['시화'] = shQty;
+            if (isBusan) {
+                if (shQty > 0) locationStock['부산'] = shQty;
+            } else {
+                if (shQty > 0) locationStock['시화'] = shQty;
+            }
             if (ysQty > 0) locationStock['양산'] = ysQty;
 
             // Fallback: If total > 0 but locationStock empty (e.g. data missing but Stock present?), assign all to 'Main'?
@@ -284,8 +290,9 @@ async function updateInventory() {
                 locationStock,
                 location1: row.location1,
                 maker1: row.maker1,
-                shQty: shQty,
+                shQty: isBusan ? 0 : shQty,
                 marking_wait_qty: Number(row.marking_wait_qty) || 0,
+                odEqKey: row.od_eq_key || row.odEqKey,
 
                 // Supplier fields
                 base_price: base_price_raw,
@@ -293,6 +300,63 @@ async function updateInventory() {
                 rate_act,
                 rate_act2
             };
+        });
+
+        // Anti-Gravity: Interpolate missing prices for Busan-Taeil items using Daekyung bend prices via odEqKey
+        const priceMap = new Map();
+        processed.forEach(p => {
+            if (p.base_price > 0 || p.unitPrice > 0) {
+                priceMap.set(p.id, {
+                    base_price: p.base_price,
+                    unitPrice: p.unitPrice,
+                    rate_pct: p.rate_pct,
+                    rate_act: p.rate_act,
+                    rate_act2: p.rate_act2
+                });
+            }
+        });
+
+        processed.forEach(p => {
+            if (p.base_price === 0 && p.unitPrice === 0) {
+                const eqKey = p.odEqKey;
+                if (!eqKey) return;
+
+                if (priceMap.has(eqKey)) {
+                    const eqPrice = priceMap.get(eqKey);
+                    p.base_price = eqPrice.base_price;
+                    p.unitPrice = eqPrice.unitPrice;
+                    p.rate_pct = eqPrice.rate_pct;
+                    p.rate_act = eqPrice.rate_act;
+                    p.rate_act2 = eqPrice.rate_act2;
+                } else {
+                    // Normalize slash in material (e.g., STS304/L-S -> STS304-S, STS316/L-W -> STS316-W)
+                    const normalizedKeys = [];
+                    if (eqKey.includes('/L')) {
+                        normalizedKeys.push(eqKey.replace('/L', '')); // e.g. STS304-S
+                        normalizedKeys.push(eqKey.replace('/L', 'L')); // e.g. STS304L-S
+                    }
+                    if (eqKey.includes('304/L')) {
+                        normalizedKeys.push(eqKey.replace('304/L', '304'));
+                        normalizedKeys.push(eqKey.replace('304/L', '304L'));
+                    }
+                    if (eqKey.includes('316/L')) {
+                        normalizedKeys.push(eqKey.replace('316/L', '316'));
+                        normalizedKeys.push(eqKey.replace('316/L', '316L'));
+                    }
+
+                    for (const altKey of normalizedKeys) {
+                        if (priceMap.has(altKey)) {
+                            const eqPrice = priceMap.get(altKey);
+                            p.base_price = eqPrice.base_price;
+                            p.unitPrice = eqPrice.unitPrice;
+                            p.rate_pct = eqPrice.rate_pct;
+                            p.rate_act = eqPrice.rate_act;
+                            p.rate_act2 = eqPrice.rate_act2;
+                            break;
+                        }
+                    }
+                }
+            }
         });
 
         if (processed.length > 0) {

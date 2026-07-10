@@ -87,6 +87,7 @@ export default function AdminLayout() {
         { label: '미결 관리', path: '/admin/pending', emoji: '⏳', badge: delayedPendingCount },
         { label: '견적 관리', path: '/admin/quotes', emoji: '📝', badge: quotes.filter(q => q.status === 'SUBMITTED' && !q.isDeleted).length },
         { label: '시화재고 관리', path: '/admin/sihwainventory', emoji: '🏭' },
+        { label: '부산재고 관리', path: '/admin/busaninventory', emoji: '⚓' },
         { label: '재고 관리', path: '/admin/inventory', emoji: '📦' },
         { label: '설정', path: '/admin/settings', emoji: '⚙️' },
     ];
@@ -129,7 +130,7 @@ export default function AdminLayout() {
                         if (user?.role === 'MANAGER') {
                             const baseAllowed = ['/admin/orders', '/admin/pending', '/admin/quotes'];
                             if (user.permissions?.viewCrm && item.path === '/admin/customers') return true;
-                            if (user.permissions?.viewSihwa && item.path === '/admin/sihwainventory') return true;
+                            if (user.permissions?.viewSihwa && (item.path === '/admin/sihwainventory' || item.path === '/admin/busaninventory')) return true;
                             return baseAllowed.includes(item.path);
                         }
                         // MASTER or admin sees everything

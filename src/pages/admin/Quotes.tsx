@@ -277,7 +277,7 @@ export default function AdminQuotes() {
                             const displayContact = quote.customerInfo?.contactName || quoteUser?.contactName || '';
 
                             const checkQuoteStockInsufficiency = (q: typeof quote) => {
-                                if (q.status === 'COMPLETED' || q.isDeleted) return false;
+                                if (q.isDeleted) return false;
                                 for (const item of q.items) {
                                     const id = item.productId || (item as { item_id?: string }).item_id;
                                     if (!id) continue;
