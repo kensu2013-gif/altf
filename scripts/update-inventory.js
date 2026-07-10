@@ -359,6 +359,62 @@ async function updateInventory() {
             }
         });
 
+        // Anti-Gravity: Merge locationStock for compatible odEqKey / id items (e.g. A-size and Inch-size matches)
+        // 1. Group items by normalized key
+        const cleanKey = (key) => String(key || '').toUpperCase().replace(/\s+/g, '').replace(/\/L/g, '');
+        const groupMap = new Map();
+
+        processed.forEach(p => {
+            const keys = [p.id, p.odEqKey].filter(Boolean).map(cleanKey);
+            const groupKey = keys[0];
+            if (!groupKey) return;
+
+            let mappedGroupKey = null;
+            for (const k of keys) {
+                if (groupMap.has(k)) {
+                    mappedGroupKey = k;
+                    break;
+                }
+            }
+
+            if (!mappedGroupKey) {
+                mappedGroupKey = groupKey;
+                groupMap.set(mappedGroupKey, []);
+            }
+
+            groupMap.get(mappedGroupKey).push(p);
+            keys.forEach(k => {
+                if (!groupMap.has(k)) {
+                    groupMap.set(k, groupMap.get(mappedGroupKey));
+                }
+            });
+        });
+
+        // 2. Sum locationStock for each group and apply back
+        const visitedGroups = new Set();
+        groupMap.forEach((list, key) => {
+            if (visitedGroups.has(list)) return;
+            visitedGroups.add(list);
+
+            const mergedStock = {};
+            list.forEach(p => {
+                if (p.locationStock) {
+                    for (const [loc, qty] of Object.entries(p.locationStock)) {
+                        mergedStock[loc] = (mergedStock[loc] || 0) + Number(qty);
+                    }
+                }
+            });
+
+            list.forEach(p => {
+                p.locationStock = { ...mergedStock };
+                const sh = Number(mergedStock['시화']) || 0;
+                const ys = Number(mergedStock['양산']) || 0;
+                const bs = Number(mergedStock['부산']) || 0;
+                p.currentStock = sh + ys + bs;
+                p.shQty = sh;
+            });
+        });
+
         if (processed.length > 0) {
             fs.writeFileSync(path.join(__dirname, 'debug_values.txt'), JSON.stringify(processed[0], null, 2));
         }
