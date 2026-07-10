@@ -73,23 +73,38 @@ export function useInventory() {
             const arr = Array.isArray(updated) ? updated : (Array.isArray(updated?.items) ? updated.items : []);
             const processed = arr.map((item: RawInventoryItem) => {
                 const locationStock: Record<string, number> = {};
-                const isBusan = item.location1 === '부산' || (item.location1 && String(item.location1).includes('부산')) || (item.locationStock && item.locationStock['부산'] !== undefined);
+                const rawShQty = item.sh_qty !== undefined ? Number(item.sh_qty) : (item.shQty !== undefined ? Number(item.shQty) : 0);
+                const rawYsQty = item.ready_qty !== undefined ? Number(item.ready_qty) : 0;
+                
                 if (item.locationStock && Object.keys(item.locationStock).length > 0) {
                     for (const [key, qty] of Object.entries(item.locationStock)) {
                         const newKey = (key === '서울' || key === '서울재고') ? '시화' : key;
                         locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
                     }
-                } else {
-                    if (item.location1 && item.sh_qty !== undefined && item.sh_qty !== null && item.sh_qty !== '') {
-                        const loc1 = isBusan ? '부산' : ((item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1);
-                        locationStock[loc1] = Number(item.sh_qty);
-                    }
-                    if (item.location && item.ready_qty !== undefined && item.ready_qty !== null && item.ready_qty !== '') {
-                        const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
-                        locationStock[primaryLoc] = Number(item.ready_qty);
+                }
+                
+                const isBusan = item.location1 === '부산' || 
+                                (item.location1 && String(item.location1).includes('부산')) || 
+                                item.location === '부산' || 
+                                (item.locationStock && item.locationStock['부산'] !== undefined);
+
+                if (isBusan) {
+                    if (locationStock['시화'] > 0 && !locationStock['부산']) {
+                        locationStock['부산'] = locationStock['시화'];
+                        locationStock['시화'] = 0;
                     }
                 }
-                const currentStock = item.ready_qty !== undefined ? Number(item.ready_qty) : (Number(item.currentStock) || 0);
+
+                if (Object.keys(locationStock).length === 0) {
+                    if (isBusan) {
+                        if (rawShQty > 0) locationStock['부산'] = rawShQty;
+                    } else {
+                        if (rawShQty > 0) locationStock['시화'] = rawShQty;
+                    }
+                    if (rawYsQty > 0) locationStock['양산'] = rawYsQty;
+                }
+
+                const currentStock = (locationStock['부산'] || 0) + (locationStock['양산'] || 0) + (locationStock['시화'] || 0);
                 let stockStatus = item.stockStatus;
                 if (!stockStatus) {
                     stockStatus = currentStock > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK';
@@ -144,35 +159,39 @@ export function useInventory() {
             // The live S3 data uses 'item' for name, 'ready_qty' for stock, 'final_price' for price.
             // We map it here to ensure the Product interface is satisfied.
             const processed = arr.map((item: RawInventoryItem) => {
-                // 1. Calculate Location Stock Map
-                // 1. Calculate Location Stock Map
-                // Anti-Gravity: Prefer server-provided locationStock if available, mapped '서울' -> '시화'
                 const locationStock: Record<string, number> = {};
-                const isBusan = item.location1 === '부산' || (item.location1 && String(item.location1).includes('부산')) || (item.locationStock && item.locationStock['부산'] !== undefined);
-
+                const rawShQty = item.sh_qty !== undefined ? Number(item.sh_qty) : (item.shQty !== undefined ? Number(item.shQty) : 0);
+                const rawYsQty = item.ready_qty !== undefined ? Number(item.ready_qty) : 0;
+                
                 if (item.locationStock && Object.keys(item.locationStock).length > 0) {
                     for (const [key, qty] of Object.entries(item.locationStock)) {
                         const newKey = (key === '서울' || key === '서울재고') ? '시화' : key;
                         locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
                     }
-                } else {
-                    // 1. Process Secondary Location (Sihwa or Busan)
-                    if (item.location1 && item.sh_qty !== undefined && item.sh_qty !== null && item.sh_qty !== '') {
-                        const loc1 = isBusan ? '부산' : ((item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1);
-                        locationStock[loc1] = Number(item.sh_qty);
-                    }
+                }
+                
+                const isBusan = item.location1 === '부산' || 
+                                (item.location1 && String(item.location1).includes('부산')) || 
+                                item.location === '부산' || 
+                                (item.locationStock && item.locationStock['부산'] !== undefined);
 
-                    // 2. Process Primary Location (Daekyung/Yangsan)
-                    if (item.location && item.ready_qty !== undefined && item.ready_qty !== null && item.ready_qty !== '') {
-                        const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
-                        locationStock[primaryLoc] = Number(item.ready_qty);
+                if (isBusan) {
+                    if (locationStock['시화'] > 0 && !locationStock['부산']) {
+                        locationStock['부산'] = locationStock['시화'];
+                        locationStock['시화'] = 0;
                     }
                 }
 
-                // The user explicitly stated: "Do not do other operations on inventory.json"
-                // "90e(l)-s10s-100a-sts304-w MUST be 8165. Other numbers should not appear (5536 is wrong)."
-                // Therefore, currentStock is exactly ready_qty.
-                const currentStock = item.ready_qty !== undefined ? Number(item.ready_qty) : (Number(item.currentStock) || 0);
+                if (Object.keys(locationStock).length === 0) {
+                    if (isBusan) {
+                        if (rawShQty > 0) locationStock['부산'] = rawShQty;
+                    } else {
+                        if (rawShQty > 0) locationStock['시화'] = rawShQty;
+                    }
+                    if (rawYsQty > 0) locationStock['양산'] = rawYsQty;
+                }
+
+                const currentStock = (locationStock['부산'] || 0) + (locationStock['양산'] || 0) + (locationStock['시화'] || 0);
 
                 // Derive status if missing (S3 data lacks stockStatus)
                 let stockStatus = item.stockStatus;
