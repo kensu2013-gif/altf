@@ -3009,18 +3009,35 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                     {isUnlinked ? (
                                                                         <span className="font-bold text-slate-400">-</span>
                                                                     ) : (
-                                                                        (() => {
-                                                                            const hasLocStock = product?.locationStock && Object.keys(product.locationStock).length > 0;
-                                                                            const isBusan = product?.location1 === '부산' || (product?.location1 && String(product?.location1).includes('부산')) || product?.location === '부산' || (product?.locationStock && product?.locationStock['부산'] !== undefined);
-                                                                            const ysStock = hasLocStock 
-                                                                                ? (product?.locationStock?.['양산'] || 0) 
-                                                                                : (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (isBusan ? 0 : (product.shQty ?? 0))) : (item.currentStock || 0));
-                                                                            const shStock = hasLocStock 
-                                                                                ? (product?.locationStock?.['시화'] || 0) 
-                                                                                : (isBusan ? 0 : (product?.shQty ?? 0));
-                                                                            const bsStock = hasLocStock 
-                                                                                ? (product?.locationStock?.['부산'] || 0) 
-                                                                                : (isBusan ? (product?.shQty ?? product?.sh_qty ?? 0) : 0);
+                                                                            (() => {
+                                                                                // Aggregate stock across duplicate IDs in inventory to support items split across locations
+                                                                                const aggStock = { 양산: 0, 시화: 0, 부산: 0 };
+                                                                                if (product) {
+                                                                                    inventory.forEach(p => {
+                                                                                        if (p.id === product.id) {
+                                                                                            if (p.locationStock && Object.keys(p.locationStock).length > 0) {
+                                                                                                if (p.locationStock['양산'] !== undefined) aggStock['양산'] += Number(p.locationStock['양산']);
+                                                                                                if (p.locationStock['시화'] !== undefined) aggStock['시화'] += Number(p.locationStock['시화']);
+                                                                                                if (p.locationStock['서울'] !== undefined) aggStock['시화'] += Number(p.locationStock['서울']);
+                                                                                                if (p.locationStock['대경'] !== undefined) aggStock['양산'] += Number(p.locationStock['대경']);
+                                                                                                if (p.locationStock['부산'] !== undefined) aggStock['부산'] += Number(p.locationStock['부산']);
+                                                                                            } else {
+                                                                                                const pIsBusan = p.location1 === '부산' || (p.location1 && String(p.location1).includes('부산')) || p.location === '부산';
+                                                                                                const pIsSihwa = p.location1 === '시화' || (p.location1 && String(p.location1).includes('시화')) || p.location === '시화' || p.location === '서울' || p.location === '서울재고';
+                                                                                                const pIsYangsan = p.location === '양산' || p.location === '대경';
+                                                                                                const shQtyVal = p.shQty ?? p.sh_qty ?? 0;
+                                                                                                const ysQtyVal = p.ready_qty ?? p.currentStock ?? 0;
+                                                                                                if (pIsBusan) aggStock['부산'] += Number(shQtyVal);
+                                                                                                else if (pIsSihwa) aggStock['시화'] += Number(shQtyVal);
+                                                                                                if (pIsYangsan || p.ready_qty) aggStock['양산'] += Number(ysQtyVal);
+                                                                                            }
+                                                                                        }
+                                                                                    });
+                                                                                }
+                                                                                
+                                                                                const ysStock = product ? aggStock['양산'] : 0;
+                                                                                const shStock = product ? aggStock['시화'] : 0;
+                                                                                const bsStock = product ? aggStock['부산'] : 0;
 
                                                                             return (
                                                                                 <div className="flex flex-col items-center text-xs w-auto min-w-[75px] mx-auto px-1 space-y-0.5">

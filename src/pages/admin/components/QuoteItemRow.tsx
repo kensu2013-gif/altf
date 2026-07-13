@@ -33,10 +33,17 @@ function getPrimaryASize(sizeStr: string | undefined): number {
 }
 
 function normalizeMaterial(matStr: string | undefined): string {
-    const clean = String(matStr || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (clean.includes('316L') || clean.includes('316')) return '316L';
-    if (clean.includes('304L') || clean.includes('304')) return '304';
-    return clean;
+    const clean = String(matStr || '').toUpperCase().trim();
+    const isWelded = clean.endsWith('-W') || clean.includes('-W') || clean.endsWith('W');
+    const isSeamless = clean.endsWith('-S') || clean.includes('-S') || clean.endsWith('S');
+    
+    let base = clean.replace(/[^A-Z0-9]/g, '');
+    if (base.includes('316L') || base.includes('316')) base = '316L';
+    else if (base.includes('304L') || base.includes('304')) base = '304';
+    
+    if (isWelded) return base + '-W';
+    if (isSeamless) return base + '-S';
+    return base;
 }
 
 interface QuoteItemRowProps {
@@ -100,6 +107,7 @@ export const QuoteItemRow = React.memo(({
 
     // Anti-Gravity: Calculate bsStock dynamically by matching compatible logical specifications in inventory.
     // Works even if the product is unlinked (null) or a custom item by falling back to item details.
+    // Explicitly aggregates stock across duplicate entries of the same ID.
     const bsStock = (() => {
         const nameStr = (product?.name || item.name || '').toUpperCase().trim();
         const thickStr = formatThickness((product?.thickness || item.thickness || '').toUpperCase().trim());
@@ -108,12 +116,21 @@ export const QuoteItemRow = React.memo(({
         
         if (!nameStr) return 0;
         
-        const hasLocStock = product?.locationStock && Object.keys(product.locationStock).length > 0;
-        const isBusan = product?.location1 === '부산' || (product?.location1 && String(product?.location1).includes('부산')) || product?.location === '부산' || (product?.locationStock && product?.locationStock['부산'] !== undefined);
-
-        let sum = hasLocStock
-            ? (product?.locationStock?.['부산'] || 0) 
-            : (isBusan ? (product?.shQty ?? product?.sh_qty ?? 0) : 0);
+        let sum = 0;
+        if (product) {
+            inventory.forEach(p => {
+                if (p.id === product.id) {
+                    const pHasLocStock = p.locationStock && Object.keys(p.locationStock).length > 0;
+                    const pIsBusan = p.location1 === '부산' || (p.location1 && String(p.location1).includes('부산')) || p.location === '부산' || (p.locationStock && p.locationStock['부산'] !== undefined);
+                    sum += pHasLocStock 
+                        ? (p.locationStock?.['부산'] || 0) 
+                        : (pIsBusan ? (p.shQty ?? p.sh_qty ?? 0) : 0);
+                }
+            });
+        } else {
+            const isBusan = item.location === '부산' || (item.location && String(item.location).includes('부산'));
+            sum = isBusan ? (item.quantity ?? 0) : 0;
+        }
         
         inventory.forEach(p => {
             if (product && p.id === product.id) return;
@@ -246,14 +263,30 @@ export const QuoteItemRow = React.memo(({
                     </div>
                 ) : (
                     (() => {
-                        const hasLocStock = product?.locationStock && Object.keys(product.locationStock).length > 0;
-                        const isBusan = product?.location1 === '부산' || (product?.location1 && String(product?.location1).includes('부산')) || (product?.locationStock && product?.locationStock['부산'] !== undefined);
-                        const ysStock = hasLocStock 
-                            ? (product?.locationStock?.['양산'] || 0) 
-                            : (product?.currentStock !== undefined ? Math.max(0, product.currentStock - (isBusan ? 0 : (product.shQty ?? 0))) : 0);
-                        const shStock = hasLocStock 
-                            ? (product?.locationStock?.['시화'] || 0) 
-                            : (isBusan ? 0 : (product?.shQty ?? 0));
+                        // Aggregate stock across duplicate IDs in inventory to support items split across locations
+                        const aggStock = { 양산: 0, 시화: 0 };
+                        if (product) {
+                            inventory.forEach(p => {
+                                if (p.id === product.id) {
+                                    if (p.locationStock && Object.keys(p.locationStock).length > 0) {
+                                        if (p.locationStock['양산'] !== undefined) aggStock['양산'] += Number(p.locationStock['양산']);
+                                        if (p.locationStock['시화'] !== undefined) aggStock['시화'] += Number(p.locationStock['시화']);
+                                        if (p.locationStock['서울'] !== undefined) aggStock['시화'] += Number(p.locationStock['서울']);
+                                        if (p.locationStock['대경'] !== undefined) aggStock['양산'] += Number(p.locationStock['대경']);
+                                    } else {
+                                        const pIsSihwa = p.location1 === '시화' || (p.location1 && String(p.location1).includes('시화')) || p.location === '시화' || p.location === '서울' || p.location === '서울재고';
+                                        const pIsYangsan = p.location === '양산' || p.location === '대경';
+                                        const shQtyVal = p.shQty ?? p.sh_qty ?? 0;
+                                        const ysQtyVal = p.ready_qty ?? p.currentStock ?? 0;
+                                        if (pIsSihwa) aggStock['시화'] += Number(shQtyVal);
+                                        if (pIsYangsan || p.ready_qty) aggStock['양산'] += Number(ysQtyVal);
+                                    }
+                                }
+                            });
+                        }
+                        
+                        const ysStock = product ? aggStock['양산'] : 0;
+                        const shStock = product ? aggStock['시화'] : 0;
                         
                         const waitStock = product?.marking_wait_qty ?? item.marking_wait_qty ?? 0;
 
