@@ -130,36 +130,41 @@ export default function Search() {
     // 부산재고를 필터링(제외)한 앞단 전용 인벤토리 데이터 생성
     const processedInventory = useMemo(() => {
         if (!inventory) return [];
-        return inventory.map(item => {
-            const newLocationStock = item.locationStock ? { ...item.locationStock } : {};
-            delete newLocationStock['부산'];
-            
-            const newCurrentStock = (newLocationStock['시화'] || 0) + (newLocationStock['양산'] || 0);
-            
-            let newStockStatus = item.stockStatus;
-            if (newCurrentStock > 0) {
-                newStockStatus = 'AVAILABLE';
-            } else {
-                newStockStatus = 'OUT_OF_STOCK';
-            }
-            
-            let newLocation = item.location;
-            if (newLocation === '부산') {
-                if ((newLocationStock['양산'] || 0) > 0 && (newLocationStock['시화'] || 0) === 0) {
-                    newLocation = '양산';
+        return inventory
+            .filter(item => {
+                const busanQty = item.locationStock?.['부산'] || 0;
+                return busanQty <= 0;
+            })
+            .map(item => {
+                const newLocationStock = item.locationStock ? { ...item.locationStock } : {};
+                delete newLocationStock['부산'];
+                
+                const newCurrentStock = (newLocationStock['시화'] || 0) + (newLocationStock['양산'] || 0);
+                
+                let newStockStatus = item.stockStatus;
+                if (newCurrentStock > 0) {
+                    newStockStatus = 'AVAILABLE';
                 } else {
-                    newLocation = '시화';
+                    newStockStatus = 'OUT_OF_STOCK';
                 }
-            }
+                
+                let newLocation = item.location;
+                if (newLocation === '부산') {
+                    if ((newLocationStock['양산'] || 0) > 0 && (newLocationStock['시화'] || 0) === 0) {
+                        newLocation = '양산';
+                    } else {
+                        newLocation = '시화';
+                    }
+                }
 
-            return {
-                ...item,
-                locationStock: newLocationStock,
-                currentStock: newCurrentStock,
-                stockStatus: newStockStatus,
-                location: newLocation
-            };
-        });
+                return {
+                    ...item,
+                    locationStock: newLocationStock,
+                    currentStock: newCurrentStock,
+                    stockStatus: newStockStatus,
+                    location: newLocation
+                };
+            });
     }, [inventory]);
 
     // --- State Management ---
