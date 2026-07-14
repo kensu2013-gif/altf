@@ -35,6 +35,7 @@ const AdminBusanInventory = lazy(() => import('./pages/admin/BusanInventory'));
 const AdminInventory = lazy(() => import('./pages/admin/Inventory'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
 const AdminProfile = lazy(() => import('./pages/admin/Profile'));
+const PilotSplitPO = lazy(() => import('./pages/admin/PilotSplitPO'));
 
 // ... (keep existing code)
 
@@ -122,6 +123,7 @@ function AnimatedRoutes() {
               <Route path="inventory" element={<PageTransition><AdminInventory /></PageTransition>} />
               <Route path="settings" element={<PageTransition><AdminSettings /></PageTransition>} />
               <Route path="profile" element={<PageTransition><AdminProfile /></PageTransition>} />
+              <Route path="pilot-split-po" element={<PageTransition><PilotSplitPO /></PageTransition>} />
             </Route>
           </Route>
 
