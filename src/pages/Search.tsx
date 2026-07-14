@@ -127,6 +127,41 @@ export default function Search() {
     const user = useStore(state => state.auth.user);
     const { isLoading, error: loadError } = useInventory(); // Using hook to ensure data is fetched
 
+    // 부산재고를 필터링(제외)한 앞단 전용 인벤토리 데이터 생성
+    const processedInventory = useMemo(() => {
+        if (!inventory) return [];
+        return inventory.map(item => {
+            const newLocationStock = item.locationStock ? { ...item.locationStock } : {};
+            delete newLocationStock['부산'];
+            
+            const newCurrentStock = (newLocationStock['시화'] || 0) + (newLocationStock['양산'] || 0);
+            
+            let newStockStatus = item.stockStatus;
+            if (newCurrentStock > 0) {
+                newStockStatus = 'AVAILABLE';
+            } else {
+                newStockStatus = 'OUT_OF_STOCK';
+            }
+            
+            let newLocation = item.location;
+            if (newLocation === '부산') {
+                if ((newLocationStock['양산'] || 0) > 0 && (newLocationStock['시화'] || 0) === 0) {
+                    newLocation = '양산';
+                } else {
+                    newLocation = '시화';
+                }
+            }
+
+            return {
+                ...item,
+                locationStock: newLocationStock,
+                currentStock: newCurrentStock,
+                stockStatus: newStockStatus,
+                location: newLocation
+            };
+        });
+    }, [inventory]);
+
     // --- State Management ---
     const location = useLocation();
 
@@ -244,9 +279,9 @@ export default function Search() {
 
     // 1. Base Filter (Name & System) - Level 1
     const baseFilteredData = useMemo(() => {
-        if (!inventory) return [];
+        if (!processedInventory) return [];
 
-        let filtered = inventory;
+        let filtered = processedInventory;
 
         // Category Filter (Using Deferred Value)
         if (deferredCategory) {
@@ -274,7 +309,7 @@ export default function Search() {
         }
 
         return filtered;
-    }, [inventory, deferredCategory, selectedNameFilters, debouncedQuery]);
+    }, [processedInventory, deferredCategory, selectedNameFilters, debouncedQuery]);
 
     // 2. Available Options Derivation (Based on Level 1)
     const availableSizes = useMemo(() => {
@@ -475,7 +510,7 @@ export default function Search() {
             // Handle composite IDs for location selection: "ITEM_ID|LOCATION"
             const [itemId, locationKey] = compositeId.split('|');
 
-            const product = inventory.find(p => p.id === itemId);
+            const product = processedInventory.find(p => p.id === itemId);
             if (!product) return;
 
             // Determine specific location/stock if selected via button
@@ -655,7 +690,7 @@ export default function Search() {
         let addedCount = 0;
 
         items.forEach(importedItem => {
-            let matchedProduct: typeof inventory[0] | undefined;
+            let matchedProduct: typeof processedInventory[0] | undefined;
             let pName = '';
             let pSize = '';
             let pThickness = '';
@@ -668,7 +703,7 @@ export default function Search() {
                     const decodedId = atob(importedItem.item_id_b64);
 
                     // Strict Match in Inventory
-                    matchedProduct = inventory.find(p => p.id === decodedId);
+                    matchedProduct = processedInventory.find(p => p.id === decodedId);
 
                     // Fallback Parsing (only if product not found, for display purposes)
                     if (!matchedProduct) {
@@ -693,7 +728,7 @@ export default function Search() {
                 pMaterial = pMaterial || importedItem.material || '';
 
                 // Plaintext Search
-                matchedProduct = inventory.find(p =>
+                matchedProduct = processedInventory.find(p =>
                     p.name.includes(importedItem.item || '') &&
                     p.size === pSize &&
                     p.material === pMaterial
