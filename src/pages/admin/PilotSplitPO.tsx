@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Navigate, useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { useInventoryIndex } from '../../hooks/useInventoryIndex';
 import type { LineItem, SplitDelivery, Order } from '../../types';
@@ -1129,10 +1129,6 @@ export default function PilotSplitPO() {
     alert('최종 분할 발주 JSON 데이터가 브라우저 콘솔(F12)에 정상 출력되었습니다. 파일럿 검증을 위해 사용하세요.');
   };
 
-  if (!isLocal) {
-    return <Navigate to="/search" replace />;
-  }
-
   return (
     <div className="flex-1 bg-slate-50 text-slate-800 p-6 min-h-screen overflow-auto">
       {/* 뒤로가기 / 헤더 */}
@@ -1148,7 +1144,7 @@ export default function PilotSplitPO() {
               <h1 className="text-xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
                 주문접수 - 분할 매입 발주 관리
                 <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-bold">
-                  LOCAL DEVELOPMENT
+                  {isLocal ? 'LOCAL DEVELOPMENT' : 'PILOT BETA'}
                 </span>
               </h1>
               <p className="text-slate-500 text-xs mt-0.5">
