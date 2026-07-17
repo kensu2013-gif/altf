@@ -1102,6 +1102,7 @@ export default function PilotSplitPO() {
     });
   };
 
+  /* [숨김 처리] handleExportConsole 미사용으로 인한 주석 처리
   const handleExportConsole = () => {
     if (!currentOrder) return;
 
@@ -1128,6 +1129,7 @@ export default function PilotSplitPO() {
     console.log(JSON.stringify(finalData, null, 2));
     alert('최종 분할 발주 JSON 데이터가 브라우저 콘솔(F12)에 정상 출력되었습니다. 파일럿 검증을 위해 사용하세요.');
   };
+  */
 
   return (
     <div className="flex-1 bg-slate-50 text-slate-800 p-6 min-h-screen overflow-auto">
@@ -1201,7 +1203,7 @@ export default function PilotSplitPO() {
                   <span>발송 상태 리셋</span>
                 </Button>
 
-                {/* 최종 데이터 콘솔 출력 버튼 (디버그용) */}
+                {/* 최종 데이터 콘솔 출력 버튼 (디버그용) - 숨김 처리
                 <Button
                   variant="outline"
                   onClick={handleExportConsole}
@@ -1211,6 +1213,7 @@ export default function PilotSplitPO() {
                   <FileText className="w-3.5 h-3.5" />
                   <span>콘솔 출력</span>
                 </Button>
+                */}
 
                 {/* 분할 내역 저장 버튼 */}
                 <Button
