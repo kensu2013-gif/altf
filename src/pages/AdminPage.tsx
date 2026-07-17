@@ -1,4 +1,5 @@
 import { useState, useEffect, useDeferredValue } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { calculateCustomerGrade } from '../lib/customerUtils';
@@ -15,6 +16,7 @@ import { useInventoryIndex } from '../hooks/useInventoryIndex';
 
 
 export default function AdminPage() {
+    const navigate = useNavigate();
     const { orders, updateOrder, trashOrder, restoreOrder, permanentDeleteOrder, setOrders, inventory, users, fetchUsers } = useStore(useShallow((state) => ({
         orders: state.orders,
         updateOrder: state.updateOrder,
@@ -123,6 +125,7 @@ export default function AdminPage() {
 
     // Derived Data
     const orderCounts = orders.reduce((acc, order) => {
+        if (order.isSplitPoSubOrder) return acc; // 분할 매입발주서는 메인 집계에서 제외
         if (order.isDeleted) {
             acc.TRASH = (acc.TRASH || 0) + 1;
             return acc;
@@ -135,6 +138,8 @@ export default function AdminPage() {
     }, {} as Record<string, number>);
 
     const filteredOrders = orders.filter(order => {
+        if (order.isSplitPoSubOrder) return false; // 분할 매입발주서는 메인 리스트에서 제외
+
         // Status Match
         let statusMatch = true;
         if (filterStatus === 'TRASH') {
@@ -445,7 +450,7 @@ export default function AdminPage() {
                                                 } else if (item.supplierRate !== undefined) {
                                                     cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
                                                 } else {
-                                                    const rate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
+                                                    const rate = product?.rate_act2 || product?.rate_act || product?.rate_pct || item.discountRate || 72;
                                                     cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
                                                 }
 
@@ -478,15 +483,30 @@ export default function AdminPage() {
                                                                 {order.items[0]?.name}
                                                                 {order.items.length > 1 && <span className="text-slate-400 font-normal ml-1">외 {order.items.length - 1}건</span>}
                                                             </span>
-                                                            <div className="flex gap-2 text-xs text-slate-500">
-                                                                <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-mono">
+                                                            <div className="flex gap-2 text-xs text-slate-500 flex-wrap items-center">
+                                                                <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-mono text-[10px]" title="주문 고유 ID">
                                                                     {order.id.slice(0, 8)}
                                                                 </span>
                                                                 {order.poNumber && (
-                                                                    <span className="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-mono border border-indigo-100">
+                                                                    <span className="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-mono border border-indigo-100 text-[10px]" title="고객 발주번호">
                                                                         {order.poNumber}
                                                                     </span>
                                                                 )}
+                                                                {/* 분할발주 발송된 업체 스티커 표시 */}
+                                                                {order.splitDeliveries && order.splitDeliveries.filter(d => d.poSent).map(d => {
+                                                                    const name = d.supplier.company_name.replace('(주)', '').trim();
+                                                                    const dateStr = d.sentAt ? ` (${new Date(d.sentAt).toLocaleDateString()})` : '';
+                                                                    return (
+                                                                        <span 
+                                                                            key={d.supplier.company_name} 
+                                                                            className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded text-[10px] font-black shadow-xs inline-flex items-center gap-1 hover:bg-emerald-100 hover:text-emerald-800 transition-colors"
+                                                                            title={`${d.supplier.company_name} 분할발주 완료${dateStr}`}
+                                                                        >
+                                                                            <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                                            {name}
+                                                                        </span>
+                                                                    );
+                                                                })}
                                                             </div>
                                                         </div>
                                                     </td>
@@ -566,18 +586,44 @@ export default function AdminPage() {
                                                                 매출
                                                             </button>
 
+                                                            {(() => {
+                                                                 const isAllSupplierPoSent = 
+                                                                     order.poSent || 
+                                                                     !!order.supplierPO || 
+                                                                     (order.splitDeliveries && order.splitDeliveries.length > 0 && order.splitDeliveries.every(d => d.poSent));
+                                                                 const isPartialSupplierPoSent = 
+                                                                     !isAllSupplierPoSent && 
+                                                                     (order.splitDeliveries && order.splitDeliveries.length > 0 && order.splitDeliveries.some(d => d.poSent));
+                                                                 
+                                                                 return (
+                                                                     <button
+                                                                         onClick={(e) => {
+                                                                             e.stopPropagation();
+                                                                             setDetailInitialMode('SUPPLIER'); // Set to Supplier Mode
+                                                                             setSelectedOrder(order);
+                                                                         }}
+                                                                         className={`text-xs font-bold border rounded px-3 py-1.5 transition-colors whitespace-nowrap ${
+                                                                             isAllSupplierPoSent
+                                                                             ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                                                                             : isPartialSupplierPoSent
+                                                                             ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
+                                                                             : 'text-indigo-600 border-indigo-200 hover:bg-indigo-50'
+                                                                             }`}
+                                                                     >
+                                                                         {isPartialSupplierPoSent ? '매입 (미송부 있음)' : '매입'}
+                                                                     </button>
+                                                                 );
+                                                             })()}
+
+                                                            {/* 분할발주 (파일럿 스플릿) 진입 버튼 */}
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    setDetailInitialMode('SUPPLIER'); // Set to Supplier Mode
-                                                                    setSelectedOrder(order);
+                                                                    navigate(`/admin/pilot-split-po?orderId=${order.id}`);
                                                                 }}
-                                                                className={`text-xs font-bold border rounded px-3 py-1.5 transition-colors whitespace-nowrap ${order.poSent || !!order.supplierPO
-                                                                    ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
-                                                                    : 'text-indigo-600 border-indigo-200 hover:bg-indigo-50'
-                                                                    }`}
+                                                                className="text-xs font-bold border border-amber-200 rounded px-3 py-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 hover:border-amber-300 transition-colors whitespace-nowrap"
                                                             >
-                                                                매입
+                                                                분할발주
                                                             </button>
 
                                                             {/* Master/Admin Delete Button */}

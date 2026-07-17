@@ -34,6 +34,7 @@ export interface DocumentPayload {
         end_customer?: string; // Actual end customer (for POs)
         hide_supplier?: boolean; // Hide supplier info on print
         hide_customer?: boolean; // Hide customer info on print
+        hide_end_customer?: boolean; // Hide end customer info on print
     };
     supplier: { // Sender Info (Us or Vendor)
         company_name: string;

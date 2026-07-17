@@ -123,7 +123,7 @@ export function GlobalUploadManager() {
                                         const parsed = parseSku(importedItem.item_id.trim());
                                         pName = parsed.name || importedItem.item_id;
                                         pThickness = parsed.thickness || '-';
-                                        pSize = parsed.size ? parsed.size.replace(/^[A-Z]+-?/, '').trim().toUpperCase().replace(/\s*x\s*/gi, ' X ') : '-';
+                                        pSize = parsed.size ? parsed.size.trim().toUpperCase().replace(/\s*x\s*/gi, ' X ') : '-';
                                         pMaterial = parsed.material || '-';
                                     } catch {
                                         // Ignore parsing failures; use default values

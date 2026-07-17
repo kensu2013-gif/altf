@@ -1,6 +1,6 @@
 import { useState, memo, useMemo, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import type { Order, LineItem, Product, User as UserType } from '../../../types';
+import type { Order, LineItem, Product, User as UserType, SplitDelivery } from '../../../types';
 // import { generateSku } from '../../../lib/sku'; // REMOVED: Managed in useInventoryIndex
 import { useStore } from '../../../store/useStore';
 import { X, AlertTriangle, Check, Calendar, Package, User, Trash2, Plus, Download, FileText, Minus, Equal, Send, SplitSquareHorizontal, Image, Printer, ListChecks } from 'lucide-react';
@@ -95,14 +95,34 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
 
 
-    const [editableCustomerInfo, setEditableCustomerInfo] = useState({
-        bizNo: cleanDefault(order.customerBizNo || customerInfo.bizNo),
-        bizType: order.customerBizType || '',
-        contactName: cleanDefault(order.customerContactName || customerInfo.contactName),
-        tel: cleanDefault(order.customerTel || customerInfo.tel),
-        email: cleanDefault(order.customerEmail || customerInfo.email),
-        address: cleanDefault(order.customerAddress || customerInfo.address)
-    });
+    const isKyunggi = (name: string) => {
+        const normalized = (name || '').replace(/\s+/g, '');
+        return normalized.includes('경기공업사') || normalized.includes('경기배관');
+    };
+
+    const getInitialCustomerInfo = () => {
+        const name = order.poEndCustomer || order.customerName || '';
+        if (isKyunggi(name)) {
+            return {
+                bizNo: '890-38-01079',
+                bizType: '도소매',
+                contactName: '담당자님',
+                tel: '031-503-1019',
+                email: 'ggbg1019@naver.com',
+                address: '경기도 시흥시 공단1대로 204, 32동 1층 102,202,302호 정왕동, 시화유통상가'
+            };
+        }
+        return {
+            bizNo: cleanDefault(order.customerBizNo || customerInfo.bizNo),
+            bizType: order.customerBizType || '',
+            contactName: cleanDefault(order.customerContactName || customerInfo.contactName),
+            tel: cleanDefault(order.customerTel || customerInfo.tel),
+            email: cleanDefault(order.customerEmail || customerInfo.email),
+            address: cleanDefault(order.customerAddress || customerInfo.address)
+        };
+    };
+
+    const [editableCustomerInfo, setEditableCustomerInfo] = useState(getInitialCustomerInfo);
 
     const [crmCustomers, setCrmCustomers] = useState<CrmCustomerOption[]>([]);
     useEffect(() => {
@@ -139,7 +159,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     const [poEndCustomer, setPoEndCustomer] = useState(() => {
         const val = order.poEndCustomer || order.customerName || '';
-        return val.replace(/\uFFFD{1,3}동대로/g, '낙동대로').replace(/[\uFFFC\uFFFD]/g, '');
+        const cleaned = val.replace(/\uFFFD{1,3}동대로/g, '낙동대로').replace(/[\uFFFC\uFFFD]/g, '');
+        if (isKyunggi(cleaned)) {
+            return '경기배관';
+        }
+        return cleaned;
     });
 
     const orders = useStore((state) => state.orders);
@@ -215,9 +239,42 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         });
     });
     const [poItems, setPoItems] = useState<LineItem[]>(() => {
-        const initialPoItems = (order.po_items && order.po_items.length > 0)
+        let initialPoItems = (order.po_items && order.po_items.length > 0)
             ? order.po_items
             : (order.items ? [...order.items] : []);
+
+        // 부모 주문서인 경우, splitDeliveries에 요율이나 매입단가가 저장되어 있다면 그것을 우선 연동/상속합니다.
+        if (order.splitDeliveries && order.splitDeliveries.length > 0) {
+            initialPoItems = initialPoItems.map(item => {
+                let savedRate = item.supplierRate;
+                let savedOverride = item.supplierPriceOverride;
+                let isPoSent = item.poSent;
+
+                for (const delivery of order.splitDeliveries || []) {
+                    const matchedItem = delivery.items?.find(di => (di.parentId || di.id) === (item.parentId || item.id))
+                        || delivery.po_items?.find(di => (di.parentId || di.id) === (item.parentId || item.id));
+                    if (matchedItem) {
+                        if (matchedItem.supplierRate !== undefined) {
+                            savedRate = matchedItem.supplierRate;
+                        }
+                        if (matchedItem.supplierPriceOverride !== undefined) {
+                            savedOverride = matchedItem.supplierPriceOverride;
+                        }
+                        if (delivery.poSent) {
+                            isPoSent = true;
+                        }
+                        break;
+                    }
+                }
+
+                return {
+                    ...item,
+                    supplierRate: savedRate,
+                    supplierPriceOverride: savedOverride,
+                    poSent: isPoSent
+                };
+            });
+        }
 
         return initialPoItems.map(item => {
             let discountRate = item.discountRate;
@@ -633,9 +690,23 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const [poOptionStockCheck, setPoOptionStockCheck] = useState(initialMemo.includes('[재고장 확인의 건]'));
     const [poOptionCustomOrder, setPoOptionCustomOrder] = useState(initialMemo.includes('[주문제작 요청건]'));
 
+    const isDaekyungSupplier = useMemo(() => {
+        const supplierName = order.supplierInfo?.company_name || '';
+        return supplierName.includes('대경벤드') || order.id.includes('daekyung');
+    }, [order]);
+
+    const [poOptionPrintEndCustomer, setPoOptionPrintEndCustomer] = useState(() => {
+        if (isDaekyungSupplier) return true;
+        return false;
+    });
+
     // UX Animation Trackers
-    const isPoPersisted = !!order.supplierPO || !!order.poSent;
-    const [poNumTouched, setPoNumTouched] = useState(isPoPersisted);
+    const isPoPersisted = !!order.supplierPO || !!order.poSent || (order.splitDeliveries && order.splitDeliveries.length > 0 && order.splitDeliveries.some(d => d.poSent));
+    const [poNumTouched, setPoNumTouched] = useState(() => {
+        if (isPoPersisted) return true;
+        if (!order.poNumber || order.poNumber === 'ES-PILOT') return true;
+        return false;
+    });
     const [customerTouched, setCustomerTouched] = useState(isPoPersisted);
     const [printOptionTouched, setPrintOptionTouched] = useState(isPoPersisted);
     const [deliveryDateTouched, setDeliveryDateTouched] = useState(isPoPersisted);
@@ -665,8 +736,14 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     }, [poOptionNoMarking, poOptionStockCheck, poOptionCustomOrder, isSupplierMode, order]);
 
     // PO Info State
-    const [poNumber, setPoNumber] = useState(order.poNumber || autoPoNumber);
+    const [poNumber, setPoNumber] = useState(() => {
+        if (!order.poNumber || order.poNumber === 'ES-PILOT') {
+            return autoPoNumber;
+        }
+        return order.poNumber;
+    });
     const [poTitle, setPoTitle] = useState(order.poTitle || defaultSubject);
+
 
     // Transaction Statement Specific State
     const [transactionShipDate, setTransactionShipDate] = useState('');
@@ -681,6 +758,32 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         setPoTitle(newTitle);
         setEmailSubject(newTitle);
         setEmailAttachmentName(`${seq} 발주서 ${cleanSupplierName} ${poDateStr} (ALTF, ${poEndCustomer.replace('(주)', '').trim() || '에스제이엔브이'}).pdf`);
+    };
+
+    const handleGenerateNewPoNumber = () => {
+        const todayStr = poDateStr;
+        const highestIdx = useStore.getState().orders
+            .filter(o => o.poNumber?.startsWith(`ES${todayStr}-`))
+            .map(o => parseInt(o.poNumber!.split('-')[1], 10))
+            .filter(n => !isNaN(n))
+            .reduce((max, cur) => Math.max(max, cur), 0);
+        const nextSeq = String(highestIdx + 1).padStart(3, '0');
+        const newNum = `ES${todayStr}-${nextSeq}`;
+        
+        setPoNumber(newNum);
+        setPoNumTouched(true);
+
+        const cleanSupplier = supplierInfo.company_name.replace('(주)', '').trim();
+        const cleanBuyer = (order.poEndCustomer || order.customerName || '').replace('(주)', '').trim() || '에스제이엔브이';
+        
+        const newSubject = `[알트에프] ${cleanSupplier} 발주서 첨부건 - ${newNum}`;
+        const newFileName = `${newNum} 발주서 ${cleanSupplier} ${todayStr} (ALTF, ${cleanBuyer}).pdf`;
+        
+        setPoTitle(newSubject);
+        setEmailSubject(newSubject);
+        setEmailAttachmentName(newFileName);
+        
+        alert(`새 발주 번호 [ ${newNum} ]이(가) 적용되었습니다.`);
     };
 
     const [showCrmSuggestions, setShowCrmSuggestions] = useState(false);
@@ -758,7 +861,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const { totalSupplierAmount, totalProfit } = selectedItems.reduce((acc, item) => {
         const product = findProduct({ productId: item.productId });
         const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? 0;
-        const rate = item.supplierRate ?? 0;
+        const rate = item.supplierRate ?? product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? item.discountRate ?? 72;
 
         // [FIX] Use supplierPriceOverride if manually entered by the manager
         let supplierPrice = item.supplierPriceOverride;
@@ -774,6 +877,22 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             totalProfit: acc.totalProfit + profit
         };
     }, { totalSupplierAmount: 0, totalProfit: 0 });
+
+    const overallTotalSupplierAmount = enrichedPoItems.reduce((sum, item) => {
+        const product = findProduct({ productId: item.productId });
+        const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? 0;
+        const rate = item.supplierRate ?? product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? item.discountRate ?? 72;
+
+        let supplierPrice = item.supplierPriceOverride;
+        if (supplierPrice === undefined) {
+            supplierPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+        }
+
+        return sum + (supplierPrice * item.quantity);
+    }, 0);
+
+    const finalTotalAmount = isSupplierMode ? overallTotalSupplierAmount : overallTotalWithCharges;
+
 
     const handleItemSelect = (index: number, isSelected: boolean) => {
         const newItems = [...displayedItems];
@@ -875,17 +994,23 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         }
     };
 
-    const handleDownloadPO = () => {
+    const handleDownloadPO = (targetDelivery?: SplitDelivery) => {
+        const targetItems = targetDelivery ? targetDelivery.items : selectedItems;
+        const targetSupplier = targetDelivery ? targetDelivery.supplier : supplierInfo;
+        const targetPoNumber = targetDelivery ? targetDelivery.poNumber : poNumber;
+        const targetPoTitle = targetDelivery ? targetDelivery.poTitle : poTitle;
+
         const payload: DocumentPayload = {
             document_type: 'PURCHASE_ORDER',
             meta: {
-                doc_no: poNumber, // Custom PO Number
+                doc_no: targetPoNumber, // Custom PO Number
                 created_at: new Date().toLocaleDateString(),
                 channel: 'WEB',
-                title: poTitle, // Custom Title in meta
-                end_customer: poEndCustomer // Editable end customer field
+                title: targetPoTitle, // Custom Title in meta
+                end_customer: poEndCustomer, // Editable end customer field
+                hide_end_customer: !poOptionPrintEndCustomer
             },
-            supplier: supplierInfo, // Vendor
+            supplier: targetSupplier, // Vendor (분할된 공급사 정보)
             customer: {
                 ...buyerInfo, // Defaults to ALTF or Manager Info
                 contact_name: (() => {
@@ -899,7 +1024,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 address: buyerInfo.address,
                 memo: shippingMemo // Keep memo if it's used elsewhere, but we'll prioritize footer.note below
             },    // Buyer (ALTF)
-            items: selectedItems.map((item, idx) => {
+            items: targetItems.map((item, idx) => {
                 const product = inventory.find(i => i.id === item.productId);
                 const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? 0;
                 const supplierRate = item.supplierRate ?? 0;
@@ -910,7 +1035,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 }
 
                 const custName = (poEndCustomer || order.customerName || '').toLowerCase();
-                const supplierName = (supplierInfo?.company_name || '').toLowerCase();
+                const supplierName = (targetSupplier?.company_name || '').toLowerCase();
                 const isSelfTransaction = (custName.includes('서울재고') || custName.includes('시화재고') || custName.includes('알트에프') || custName.includes('altf')) &&
                     (supplierName.includes('알트에프') || supplierName.includes('altf') || supplierName.includes('서울재고') || supplierName.includes('시화재고') || !supplierName);
                 const finalSupplierPrice = isSelfTransaction ? 0 : supplierPrice;
@@ -925,7 +1050,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     qty: item.quantity,
                     unit_price: finalSupplierPrice,
                     amount: finalSupplierPrice * item.quantity,
-                    note: '',
+                    note: item.note || '',
                     stock_qty: product?.currentStock ?? item.currentStock ?? 0,
                     stock_status: (item.marking_wait_qty || 0) > 0
                         ? `마킹대기:${item.marking_wait_qty}`
@@ -939,6 +1064,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             }),
             totals: {
                 total_amount: (() => {
+                    if (targetDelivery) return targetDelivery.totalAmount;
+
                     const custName = (poEndCustomer || order.customerName || '').toLowerCase();
                     const supplierName = (supplierInfo?.company_name || '').toLowerCase();
                     const isSelfTransaction = (custName.includes('서울재고') || custName.includes('시화재고') || custName.includes('알트에프') || custName.includes('altf')) &&
@@ -946,17 +1073,30 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     return isSelfTransaction ? 0 : totalSupplierAmount;
                 })(),
                 currency: 'KRW',
+                vat_amount: (() => {
+                    const baseAmt = targetDelivery ? targetDelivery.totalAmount : (() => {
+                        const custName = (poEndCustomer || order.customerName || '').toLowerCase();
+                        const supplierName = (supplierInfo?.company_name || '').toLowerCase();
+                        const isSelfTransaction = (custName.includes('서울재고') || custName.includes('시화재고') || custName.includes('알트에프') || custName.includes('altf')) &&
+                            (supplierName.includes('알트에프') || supplierName.includes('altf') || supplierName.includes('서울재고') || supplierName.includes('시화재고') || !supplierName);
+                        return isSelfTransaction ? 0 : totalSupplierAmount;
+                    })();
+                    return Math.round(baseAmt * 0.1);
+                })(),
                 final_amount: (() => {
-                    const custName = (poEndCustomer || order.customerName || '').toLowerCase();
-                    const supplierName = (supplierInfo?.company_name || '').toLowerCase();
-                    const isSelfTransaction = (custName.includes('서울재고') || custName.includes('시화재고') || custName.includes('알트에프') || custName.includes('altf')) &&
-                        (supplierName.includes('알트에프') || supplierName.includes('altf') || supplierName.includes('서울재고') || supplierName.includes('시화재고') || !supplierName);
-                    return isSelfTransaction ? 0 : totalSupplierAmount;
+                    const baseAmt = targetDelivery ? targetDelivery.totalAmount : (() => {
+                        const custName = (poEndCustomer || order.customerName || '').toLowerCase();
+                        const supplierName = (supplierInfo?.company_name || '').toLowerCase();
+                        const isSelfTransaction = (custName.includes('서울재고') || custName.includes('시화재고') || custName.includes('알트에프') || custName.includes('altf')) &&
+                            (supplierName.includes('알트에프') || supplierName.includes('altf') || supplierName.includes('서울재고') || supplierName.includes('시화재고') || !supplierName);
+                        return isSelfTransaction ? 0 : totalSupplierAmount;
+                    })();
+                    return Math.round(baseAmt * 1.1);
                 })()
             },
             footer: {
                 message: '',
-                note: [shippingMemo, supplierInfo?.note].filter(Boolean).join('\n\n') // Combine notes into footer block designed for POs
+                note: [shippingMemo, targetSupplier?.note].filter(Boolean).join('\n\n') // Combine notes into footer block designed for POs
             }
         };
 
@@ -1211,7 +1351,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     const handleSupplierRateChange = (index: number, rate: number) => {
         const newItems = [...displayedItems];
-        newItems[index] = { ...newItems[index], supplierRate: rate };
+        const updatedItem = { ...newItems[index], supplierRate: rate };
+        delete updatedItem.supplierPriceOverride; // 요율 변경 시 수동 단가 고정 락 해제
+        newItems[index] = updatedItem;
         setDisplayedItems(newItems);
     };
 
@@ -1284,7 +1426,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     };
 
     const handleJustSave = async () => {
-        if (!poEndCustomer || !editableCustomerInfo.bizNo || !editableCustomerInfo.contactName || !editableCustomerInfo.tel || !editableCustomerInfo.address) {
+        if (isSupplierMode && (!poEndCustomer || !editableCustomerInfo.bizNo || !editableCustomerInfo.contactName || !editableCustomerInfo.tel || !editableCustomerInfo.address)) {
             alert("업체명, 사업자번호, 담당자명, 연락처, 주소를 모두 입력해야 저장이 가능합니다. (신규 거래처인 경우 상세 내역에 정보를 입력해 주세요.)");
             return;
         }
@@ -1352,12 +1494,47 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             }
         }
 
+        let nextSplitDeliveries = order.splitDeliveries;
+        if (nextSplitDeliveries && nextSplitDeliveries.length > 0) {
+            nextSplitDeliveries = nextSplitDeliveries.map(d => {
+                const updatedItems = d.items?.map(item => {
+                    const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
+                    if (matched) {
+                        return {
+                            ...item,
+                            supplierRate: matched.supplierRate,
+                            supplierPriceOverride: matched.supplierPriceOverride
+                        };
+                    }
+                    return item;
+                }) || [];
+
+                const updatedPoItems = d.po_items?.map(item => {
+                    const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
+                    if (matched) {
+                        return {
+                            ...item,
+                            supplierRate: matched.supplierRate,
+                            supplierPriceOverride: matched.supplierPriceOverride
+                        };
+                    }
+                    return item;
+                }) || [];
+
+                return {
+                    ...d,
+                    items: updatedItems,
+                    po_items: updatedPoItems
+                };
+            });
+        }
+
         const updateData: Partial<Order> = {
-            totalAmount: overallTotalWithCharges,
+            totalAmount: finalTotalAmount,
             isStockOrder: isStockOrderChecked,
             adminResponse: {
                 ...response,
-                confirmedPrice: overallTotalWithCharges,
+                confirmedPrice: finalTotalAmount,
                 additionalCharges: charges
             },
             status: order.status === 'SUBMITTED' ? 'PROCESSING' : order.status,
@@ -1376,6 +1553,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             memo: shippingMemo,
             items: enrichedItems,
             po_items: enrichedPoItems,
+            splitDeliveries: nextSplitDeliveries,
             lastUpdatedBy: {
                 name: user?.contactName || '관리자',
                 id: user?.id || 'admin',
@@ -1391,7 +1569,9 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             if (res) updateData.deliveryNote = res;
         }
         if (supplierPoFiles.length > 0) {
-            const res = await uploadFile(supplierPoFiles[0], 'po', order.id + '_po');
+            const originalFile = supplierPoFiles[0];
+            const renamedFile = new File([originalFile], emailAttachmentName, { type: originalFile.type });
+            const res = await uploadFile(renamedFile, 'po', order.id + '_po');
             if (res) updateData.supplierPO = res;
         }
 
@@ -1403,7 +1583,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     };
 
     const handleSave = async (extraUpdate: Partial<Order> = {}, skipDupCheck = false) => {
-        if (!poEndCustomer || !editableCustomerInfo.bizNo || !editableCustomerInfo.contactName || !editableCustomerInfo.tel || !editableCustomerInfo.address) {
+        if (isSupplierMode && (!poEndCustomer || !editableCustomerInfo.bizNo || !editableCustomerInfo.contactName || !editableCustomerInfo.tel || !editableCustomerInfo.address)) {
             alert("업체명, 사업자번호, 담당자명, 연락처, 주소를 모두 입력해야 저장이 가능합니다. (신규 거래처인 경우 상세 내역에 정보를 입력해 주세요.)");
             return;
         }
@@ -1491,12 +1671,47 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             }
         }
 
+        let nextSplitDeliveries = order.splitDeliveries;
+        if (nextSplitDeliveries && nextSplitDeliveries.length > 0) {
+            nextSplitDeliveries = nextSplitDeliveries.map(d => {
+                const updatedItems = d.items?.map(item => {
+                    const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
+                    if (matched) {
+                        return {
+                            ...item,
+                            supplierRate: matched.supplierRate,
+                            supplierPriceOverride: matched.supplierPriceOverride
+                        };
+                    }
+                    return item;
+                }) || [];
+
+                const updatedPoItems = d.po_items?.map(item => {
+                    const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
+                    if (matched) {
+                        return {
+                            ...item,
+                            supplierRate: matched.supplierRate,
+                            supplierPriceOverride: matched.supplierPriceOverride
+                        };
+                    }
+                    return item;
+                }) || [];
+
+                return {
+                    ...d,
+                    items: updatedItems,
+                    po_items: updatedPoItems
+                };
+            });
+        }
+
         const updateData: Partial<Order> = {
-            totalAmount: overallTotalWithCharges,
+            totalAmount: finalTotalAmount,
             isStockOrder: isStockOrderChecked,
             adminResponse: {
                 ...response,
-                confirmedPrice: overallTotalWithCharges,
+                confirmedPrice: finalTotalAmount,
                 additionalCharges: charges
             },
             status: finalStatus,
@@ -1515,6 +1730,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             memo: shippingMemo,
             items: enrichedItems,
             po_items: enrichedPoItems,
+            splitDeliveries: nextSplitDeliveries,
             lastUpdatedBy: {
                 name: user?.contactName || '관리자',
                 id: user?.id || 'admin',
@@ -1524,14 +1740,15 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             managers: currentManagers,
             ...extraUpdate
         };
-
-        if (deliveryNoteFiles.length > 0) {
+if (deliveryNoteFiles.length > 0) {
             const res = await uploadFile(deliveryNoteFiles[0], 'order', order.id + '_delivery');
             if (res) updateData.deliveryNote = res;
         }
         if (!extraUpdate.supplierPO && supplierPoFiles.length > 0) {
             // Only upload PO here if we haven't already uploaded it in handleSupplierSave
-            const res = await uploadFile(supplierPoFiles[0], 'po', order.id + '_po');
+            const originalFile = supplierPoFiles[0];
+            const renamedFile = new File([originalFile], emailAttachmentName, { type: originalFile.type });
+            const res = await uploadFile(renamedFile, 'po', order.id + '_po');
             if (res) updateData.supplierPO = res;
         }
 
@@ -1588,7 +1805,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
             if (supplierPoFiles.length > 0) {
                 const file = supplierPoFiles[0];
-                attachmentMimeType = file.type || 'application/pdf';
+                const renamedFile = new File([file], emailAttachmentName, { type: file.type });
+                attachmentMimeType = renamedFile.type || 'application/pdf';
 
                 attachmentBase64 = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
@@ -1597,11 +1815,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                         resolve(base64String);
                     };
                     reader.onerror = reject;
-                    reader.readAsDataURL(file);
+                    reader.readAsDataURL(renamedFile);
                 });
 
                 const { uploadFile } = useStore.getState();
-                const res = await uploadFile(file, 'po', order.id + '_po');
+                const res = await uploadFile(renamedFile, 'po', order.id + '_po');
                 if (res) {
                     attachmentUrl = res.url;
                     newSupplierPO = res;
@@ -1730,17 +1948,36 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     </div>
                     <div className="flex flex-wrap items-center gap-2 md:gap-3">
                         {isSupplierMode && (
-                            <Button
-                                variant="outline"
-                                onClick={() => {
-                                    setHasSavedPO(true);
-                                    alert('새 창이 열리면 "PDF로 저장" 기능 등을 이용해 PC에 문서를 저장해주세요!\n\n저장 후, 아래 "매입발주서 첨부" 영역에 파일을 등록해 주시면 전송이 가능합니다.');
-                                    setTimeout(() => handleDownloadPO(), 100);
-                                }}
-                                className="gap-2 font-bold bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50">
-                                <Download className="w-4 h-4" />
-                                발주서 인쇄 / PDF 저장(SAVE)
-                            </Button>
+                            order.splitDeliveries && order.splitDeliveries.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {order.splitDeliveries.map((delivery, dIdx) => (
+                                        <Button
+                                            key={dIdx}
+                                            variant="outline"
+                                            onClick={() => {
+                                                setHasSavedPO(true);
+                                                alert(`[${delivery.supplier.company_name}] 발주서 미리보기가 열리면 인쇄/PDF 저장을 진행해주세요.`);
+                                                setTimeout(() => handleDownloadPO(delivery), 100);
+                                            }}
+                                            className="gap-1.5 font-bold bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 text-xs py-1.5 px-3 rounded-lg shadow-sm">
+                                            <Download className="w-3.5 h-3.5" />
+                                            {delivery.supplier.company_name.replace('(주)', '').trim()} 발주서 인쇄
+                                        </Button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setHasSavedPO(true);
+                                        alert('새 창이 열리면 "PDF로 저장" 기능 등을 이용해 PC에 문서를 저장해주세요!\n\n저장 후, 아래 "매입발주서 첨부" 영역에 파일을 등록해 주시면 전송이 가능합니다.');
+                                        setTimeout(() => handleDownloadPO(), 100);
+                                    }}
+                                    className="gap-2 font-bold bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50">
+                                    <Download className="w-4 h-4" />
+                                    발주서 인쇄 / PDF 저장(SAVE)
+                                </Button>
+                            )
                         )}
                         {
                             !isSupplierMode && (
@@ -1804,7 +2041,16 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                 {/* PO Number & Title Inputs */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4 pb-4 border-b border-indigo-100">
                                     <div>
-                                        <label className="block text-xs font-bold text-indigo-700 mb-1"> 발주 번호(PO No.) </label>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <label className="block text-xs font-bold text-indigo-700"> 발주 번호(PO No.) </label>
+                                            <button
+                                                type="button"
+                                                onClick={handleGenerateNewPoNumber}
+                                                className="text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-0.5 rounded transition-all active:scale-95 shadow-sm"
+                                            >
+                                                새 발주번호 발급
+                                            </button>
+                                        </div>
                                         <input
                                             type="text"
                                             value={poNumber}
@@ -2105,9 +2351,23 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                 onChange={(e) => { setPoOptionCustomOrder(e.target.checked); if (!printOptionTouched) setPrintOptionTouched(true); }}
                                                             />
                                                             <label htmlFor="po-opt-custom" className="text-xs font-bold text-slate-700 cursor-pointer">
-                                                                주문제작 요청건
-                                                            </label>
-                                                        </div>
+                                                                 주문제작 요청건
+                                                             </label>
+                                                         </div>
+                                                         <div className="flex items-center gap-2 pt-2 border-t border-dashed border-indigo-100/65">
+                                                             <input
+                                                                 type="checkbox"
+                                                                 id="po-opt-print-customer"
+                                                                 className="w-4 h-4 cursor-pointer accent-indigo-600"
+                                                                 checked={poOptionPrintEndCustomer}
+                                                                 disabled={isDaekyungSupplier}
+                                                                 onChange={(e) => { setPoOptionPrintEndCustomer(e.target.checked); if (!printOptionTouched) setPrintOptionTouched(true); }}
+                                                             />
+                                                             <label htmlFor="po-opt-print-customer" className={`text-xs font-bold cursor-pointer ${isDaekyungSupplier ? 'text-indigo-650 font-extrabold' : 'text-slate-750'}`}>
+                                                                 요청고객사 출력 {isDaekyungSupplier && <span className="text-[10px] text-indigo-400 font-normal">(대경벤드는 필수)</span>}
+                                                             </label>
+                                                         </div>
+
                                                     </div>
 
                                                     <div className={`mt-3 pt-3 border-t border-indigo-200 border-dashed transition-all ${!deliveryDateTouched ? 'ring-2 ring-red-400 bg-red-50 p-2 -mx-2 rounded' : ''}`}>
@@ -2560,10 +2820,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                         if (e.key === 'Enter') {
                                                                             const val = Number(e.currentTarget.value);
                                                                             if (!isNaN(val)) {
-                                                                                const newItems = displayedItems.map(item => ({
-                                                                                    ...item,
-                                                                                    supplierRate: val
-                                                                                }));
+                                                                                const newItems = displayedItems.map(item => {
+                                                                                    const updated = { ...item, supplierRate: val };
+                                                                                    delete updated.supplierPriceOverride;
+                                                                                    return updated;
+                                                                                });
                                                                                 setDisplayedItems(newItems);
                                                                             }
                                                                         }
@@ -2574,13 +2835,16 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                         const val = Number(bulkSupplierRateInput);
                                                                         const hasInput = bulkSupplierRateInput.trim() !== '';
                                                                         const newItems = displayedItems.map(item => {
+                                                                            let updated;
                                                                             if (hasInput && !isNaN(val)) {
-                                                                                return { ...item, supplierRate: val };
+                                                                                updated = { ...item, supplierRate: val };
                                                                             } else {
                                                                                 const product = findProduct({ productId: item.productId });
                                                                                 const productRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
-                                                                                return { ...item, supplierRate: productRate };
+                                                                                updated = { ...item, supplierRate: productRate };
                                                                             }
+                                                                            delete updated.supplierPriceOverride;
+                                                                            return updated;
                                                                         });
                                                                         setDisplayedItems(newItems);
                                                                     }}
@@ -2800,24 +3064,35 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                             const supplierAmount = supplierPrice * item.quantity;
                                             const profit = (item.unitPrice - supplierPrice) * item.quantity;
                                             const isSelected = item.isSelected !== false;
+                                             const matchedDelivery = order.splitDeliveries?.find(d => 
+                                                 d.items.some(it => it.id === item.id || it.parentId === item.id)
+                                             );
+                                             const isSentItem = isSupplierMode && matchedDelivery ? matchedDelivery.poSent : false;
+                                             const sentSupplierName = matchedDelivery?.supplier.company_name;
 
                                             return (
-                                                <tr key={idx} className={`${isSelected ? '' : 'opacity-40 grayscale'} ${isUnlinked ? 'bg-red-50/30' : (isSupplierMode ? 'bg-white hover:bg-indigo-50/30' : (isStockInsufficient ? 'bg-red-50/50' : 'bg-white hover:bg-slate-50'))} transition-all`
+                                                <tr key={idx} className={`${isSentItem ? 'opacity-65 bg-slate-50' : (isSelected ? '' : 'opacity-40 grayscale')} ${isUnlinked ? 'bg-red-50/30' : (isSupplierMode ? 'bg-white hover:bg-indigo-50/30' : (isStockInsufficient ? 'bg-red-50/50' : 'bg-white hover:bg-slate-50'))} transition-all`
                                                 }>
                                                     <td className="px-2 py-3 text-center align-middle">
                                                         <input
                                                             type="checkbox"
-                                                            checked={isSelected}
+                                                            checked={isSentItem ? false : isSelected}
+                                                             disabled={isSentItem}
                                                             onChange={(e) => handleItemSelect(idx, e.target.checked)}
-                                                            className="w-3.5 h-3.5 cursor-pointer accent-teal-600"
-                                                            title="품목 선택"
+                                                            className={`w-3.5 h-3.5 accent-teal-600 ${isSentItem ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                                                            title={isSentItem ? '이미 매입 발송 완료된 품목입니다' : '품목 선택'}
                                                         />
                                                     </td>
                                                     <td className="px-1 py-3 text-center align-middle text-xs font-bold text-slate-500">
                                                         {idx + 1}
                                                     </td>
                                                     <td className="px-4 py-3 text-left align-middle">
-                                                        <div className="flex items-center gap-1">
+                                                        <div className="flex items-center gap-1 flex-wrap">
+                                                             {isSentItem && (
+                                                                 <span className="text-[9px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-1.5 py-0.5 whitespace-nowrap shadow-sm shrink-0" title="매입 발송이 완료된 분할 발주 품목입니다">
+                                                                     {sentSupplierName ? `${sentSupplierName.replace('(주)', '').trim()} 발송완료` : '발송완료'}
+                                                                 </span>
+                                                             )}
                                                             <input
                                                                 type="text"
                                                                 value={item.name}
@@ -3098,7 +3373,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                                                                     return null;
                                                                                 })()}
                                                                             </div>
-                                                                        ) : item.poSent ? (
+                                                                        ) : (isSupplierMode && item.poSent) ? (
                                                                             <div className="flex flex-col items-center justify-center gap-0.5">
                                                                                 <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded font-bold border border-indigo-100 whitespace-nowrap"> 발주완료 </span>
                                                                                 <span className="text-[9px] text-slate-500 max-w-[50px] overflow-hidden text-ellipsis whitespace-nowrap" title={item.vendorName}> {item.vendorName} </span>
@@ -3504,6 +3779,19 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                                 className="border-yellow-400 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 shadow-sm transition-colors text-xs font-bold px-4"
                                 title="이 발주를 취소하고 견적 단계로 다시 돌려보냅니다.">
                                 회수(견적으로 전환)
+                            </Button>
+                        )}
+                        {!isSupplierMode && (
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    onClose();
+                                    window.location.assign(`/admin/pilot-split-po?orderId=${order.id}`);
+                                }}
+                                className="border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-400 shadow-sm transition-colors text-xs font-bold px-4"
+                                title="이 주문을 매입처별로 분할하여 발주서를 발송합니다."
+                            >
+                                🥞 분할발주 진행
                             </Button>
                         )}
                         {!isSupplierMode && order.po_items && order.po_items.length > 0 && order.po_items.some(item => !item.transactionIssued) && (

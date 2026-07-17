@@ -43,10 +43,12 @@ export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
                 let cost = 0;
                 const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
 
-                if (item.supplierRate !== undefined) {
+                if (item.supplierPriceOverride !== undefined) {
+                    cost = item.supplierPriceOverride;
+                } else if (item.supplierRate !== undefined) {
                     cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
                 } else {
-                    const rate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
+                    const rate = product?.rate_act2 || product?.rate_act || product?.rate_pct || item.discountRate || 72;
                     cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
                 }
 

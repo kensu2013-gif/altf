@@ -112,7 +112,7 @@ export function useInventory() {
                 const mappedLocation = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
                 const id = (item.sku_key || item.id || '') as string;
                 const parsed = parseSku(id);
-                const finalSize = parsed.size.replace(/^[A-Z]+-?/, '').trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
+                const finalSize = parsed.size.trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
 
                 return {
                     ...item,
@@ -202,7 +202,7 @@ export function useInventory() {
 
                 const id = (item.sku_key || item.id || '') as string;
                 const parsed = parseSku(id);
-                const finalSize = parsed.size.replace(/^[A-Z]+-?/, '').trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
+                const finalSize = parsed.size.trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
 
                 return {
                     ...item, // Keep original props

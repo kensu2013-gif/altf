@@ -2,26 +2,10 @@ import { useState, useMemo, useEffect } from 'react';
 import { Users, MapPin, Building2, TrendingUp, Search, Contact, Activity, AlertTriangle, Trash2, Edit2, Plus, BarChart2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useInventory } from '../../hooks/useInventory';
-import type { Product, Quotation } from '../../types';
+import type { Product, Quotation, Customer } from '../../types';
 import { calculateCustomerGrade } from '../../lib/customerUtils';
 import FlowChartDashboard from '../../components/admin/FlowChartDashboard';
 
-interface Customer {
-    id: string;
-    companyName: string;
-    ceo: string;
-    businessNumber: string;
-    address: string;
-    region: string;
-    salesType: string;
-    industry: string;
-    items: string;
-    contactName: string;
-    phone: string;
-    email: string;
-    contacts?: { contactName: string; phone: string; email: string }[];
-    isDeleted?: boolean;
-}
 
 type AnalyticsPeriod = '3m' | '6m' | '12m' | 'ALL';
 

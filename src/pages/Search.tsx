@@ -715,7 +715,7 @@ export default function Search() {
                         const parsed = parseSku(decodedId);
                         pName = parsed.name;
                         pThickness = parsed.thickness;
-                        pSize = parsed.size.replace(/^[A-Z]+-?/, '').trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
+                        pSize = parsed.size.trim().toUpperCase().replace(/\s*x\s*/gi, ' X ');
                         pMaterial = parsed.material;
                     }
 

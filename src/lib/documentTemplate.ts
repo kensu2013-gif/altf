@@ -333,7 +333,7 @@ export const renderDocumentHTML = (payload: DocumentPayload): string => {
                     ${customer.tel ? `<div class="row"><span class="label">연락처</span><span class="value">${customer.tel}</span></div>` : ''}
                     ${customer.email ? `<div class="row"><span class="label">이메일</span><span class="value">${customer.email}</span></div>` : ''}
                     ${customer.address && document_type !== 'QUOTATION' ? `<div class="row"><span class="label">주소</span><span class="value">${customer.address}</span></div>` : ''}
-                    ${meta.end_customer ? `<div class="row"><span class="label" style="color: #6366f1; font-weight: 800;">요청고객사</span><span class="value" style="color: #6366f1; font-weight: 800;">${meta.end_customer}</span></div>` : ''}
+                    ${(meta.end_customer && !meta.hide_end_customer) ? `<div class="row"><span class="label" style="color: #6366f1; font-weight: 800;">요청고객사</span><span class="value" style="color: #6366f1; font-weight: 800;">${meta.end_customer}</span></div>` : ''}
                 </div>
                 ` : ''}
             </div>

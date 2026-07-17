@@ -128,7 +128,7 @@ export default function AdminLayout() {
                 <nav className="flex-1 py-6 px-2 space-y-1">
                     {NAV_ITEMS.filter(item => {
                         if (user?.role === 'MANAGER') {
-                            const baseAllowed = ['/admin/orders', '/admin/pending', '/admin/quotes'];
+                            const baseAllowed = ['/admin/orders', '/admin/pending', '/admin/quotes', '/admin/pilot-split-po'];
                             if (user.permissions?.viewCrm && item.path === '/admin/customers') return true;
                             if (user.permissions?.viewSihwa && (item.path === '/admin/sihwainventory' || item.path === '/admin/busaninventory')) return true;
                             return baseAllowed.includes(item.path);
