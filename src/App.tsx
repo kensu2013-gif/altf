@@ -35,7 +35,7 @@ const AdminBusanInventory = lazy(() => import('./pages/admin/BusanInventory'));
 const AdminInventory = lazy(() => import('./pages/admin/Inventory'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
 const AdminProfile = lazy(() => import('./pages/admin/Profile'));
-const PilotSplitPO = lazy(() => import('./pages/admin/PilotSplitPO.tsx'));
+const PilotSplitPO = lazy(() => import('./pages/admin/PilotSplitPO'));
 
 // ... (keep existing code)
 
