@@ -250,6 +250,7 @@ export default function SihwaInventory() {
     const [historyLoading, setHistoryLoading] = useState(true);
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [showGuide, setShowGuide] = useState(false);
     const [sihwaFilterItem, setSihwaFilterItem] = useState<string[]>([]);
     const [sihwaFilterMaterial, setSihwaFilterMaterial] = useState<string[]>([]);
     const [sihwaFilterSize, setSihwaFilterSize] = useState<string[]>([]);
@@ -795,6 +796,7 @@ export default function SihwaInventory() {
         dailyAvgSales: number;
         reorderPoint: number;
         deficit: number;
+        suggestedCriticalQty?: number;
         effectiveStock: number;
         statusCategory: string;
         statusLabel: string;
@@ -839,6 +841,106 @@ export default function SihwaInventory() {
         users.forEach(u => map.set(u.id, u));
         return map;
     }, [users]);
+
+    // ── 대경재고(양산) 평균 보유수량 분석 (3개월, 6개월) ──
+    const daekyungBaseStockAverages = useMemo(() => {
+        const dates: string[] = [];
+        const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+        for (let i = 0; i < 180; i++) {
+            const d = new Date(kstNow.getTime() - i * 24 * 60 * 60 * 1000);
+            dates.push(d.toISOString().slice(0, 10));
+        }
+
+        const targetProducts = inventory.filter((item: Product) => {
+            const isMakerDaekyung = item.maker === '대경' || item.maker1 === '대경';
+            let hasYsLoc = false;
+            if (item.locationStock) {
+                hasYsLoc = item.locationStock['양산'] !== undefined || item.locationStock['대경'] !== undefined;
+            } else {
+                hasYsLoc = (item.location || '').includes('양산') || (item.location || '').includes('대경');
+            }
+            return isMakerDaekyung && hasYsLoc;
+        });
+
+        const historyMapByDate: Record<string, Record<string, number>> = {};
+        (historyData.daekyungHistory || []).forEach(h => {
+            const dateStr = h.date.split('T')[0];
+            const dateMap: Record<string, number> = {};
+            (h.diff || []).forEach((d: { id: string; change: number }) => {
+                dateMap[d.id] = d.change;
+            });
+            historyMapByDate[dateStr] = dateMap;
+        });
+
+        const rawResults = targetProducts.map((item: Product) => {
+            let ysQty = 0;
+            if (item.locationStock) {
+                if (item.locationStock['양산'] !== undefined) ysQty += Number(item.locationStock['양산']);
+                if (item.locationStock['대경'] !== undefined) ysQty += Number(item.locationStock['대경']);
+            } else {
+                if ((item.location || '').includes('양산') || (item.location || '').includes('대경')) {
+                    ysQty = item.currentStock;
+                }
+            }
+
+            const dailyStocks: number[] = new Array(180).fill(0);
+            let currentStock = ysQty;
+
+            for (let i = 0; i < 180; i++) {
+                const date = dates[i];
+                dailyStocks[i] = currentStock;
+
+                const diffs = historyMapByDate[date] || {};
+                const change = diffs[item.id];
+                if (change !== undefined) {
+                    currentStock = Math.max(0, currentStock - change);
+                }
+            }
+
+            const stocks3m = dailyStocks.slice(0, 90);
+            const sum3m = stocks3m.reduce((s, val) => s + val, 0);
+            const avg3m = stocks3m.length > 0 ? parseFloat((sum3m / stocks3m.length).toFixed(1)) : ysQty;
+
+            const stocks6m = dailyStocks;
+            const sum6m = stocks6m.reduce((s, val) => s + val, 0);
+            const avg6m = stocks6m.length > 0 ? parseFloat((sum6m / stocks6m.length).toFixed(1)) : ysQty;
+
+            return {
+                id: item.id,
+                name: item.name || '미등록 상품',
+                material: item.material || '',
+                size: item.size || '',
+                thickness: item.thickness || '',
+                currentStock: ysQty,
+                avg3m,
+                avg6m,
+            };
+        });
+
+        const total3m = rawResults.reduce((s, r) => s + r.avg3m, 0);
+        const total6m = rawResults.reduce((s, r) => s + r.avg6m, 0);
+
+        return rawResults.map(r => {
+            const share3m = total3m > 0 ? parseFloat(((r.avg3m / total3m) * 100).toFixed(2)) : 0;
+            const share6m = total6m > 0 ? parseFloat(((r.avg6m / total6m) * 100).toFixed(2)) : 0;
+            const trend = r.avg6m > 0 ? parseFloat((((r.avg3m - r.avg6m) / r.avg6m) * 100).toFixed(1)) : (r.avg3m > 0 ? 100 : 0);
+
+            return {
+                ...r,
+                share3m,
+                share6m,
+                trend,
+            };
+        });
+    }, [inventory, historyData.daekyungHistory]);
+
+    const daekyungStockMap = useMemo(() => {
+        const map = new Map<string, { currentStock: number; avg3m: number; avg6m: number }>();
+        daekyungBaseStockAverages.forEach(item => {
+            map.set(item.id, { currentStock: item.currentStock, avg3m: item.avg3m, avg6m: item.avg6m });
+        });
+        return map;
+    }, [daekyungBaseStockAverages]);
 
     const baseAnalyzedInventory = useMemo(() => {
         const comparisonMap: Record<string, AnalyzedItem> = {};
@@ -1300,7 +1402,14 @@ export default function SihwaInventory() {
                 rawQty = baseDemand - effectiveStock;
             }
 
-            if (rawQty > 0 && !isExcessStock && row.ysQty < rawQty * 2) {
+            // ── 대경재고 평균 분석을 통한 발주 필요성 평가 ──
+            const dkStock = daekyungStockMap.get(row.product.id) || { currentStock: row.ysQty, avg3m: row.ysQty, avg6m: row.ysQty };
+            const requiredAmount = rawQty > 0 ? rawQty : finalDeficit;
+            
+            // 대경 평균재고(3M)가 필요량 이상일 경우 이송(Transfer) 가능으로 판단
+            const canTransfer = requiredAmount > 0 && dkStock.avg3m >= requiredAmount;
+
+            if (rawQty > 0 && !isExcessStock && row.ysQty < rawQty * 2 && !canTransfer) {
                 const sizeStr = row.product.size || '';
                 const sizeNum = parseInt(sizeStr.replace(/[^0-9]/g, ''), 10);
                 const isLargeSize = !isNaN(sizeNum) && sizeNum >= 300;
@@ -1330,6 +1439,7 @@ export default function SihwaInventory() {
                 safeStock,
                 deficit: finalDeficit,
                 recommendedQty,
+                suggestedCriticalQty: finalDeficit,
                 effectiveStock,
                 statusCategory,
                 statusLabel,
@@ -1338,6 +1448,7 @@ export default function SihwaInventory() {
                 reorderPoint,
                 isDeadStock,
                 isExcessStock,
+                canTransfer,
             };
         });
 
@@ -1430,97 +1541,7 @@ export default function SihwaInventory() {
         return { names, materials, sizes };
     }, [inventory]);
 
-    // ── 대경재고(양산) 평균 보유수량 분석 (3개월, 6개월) ──
-    const daekyungBaseStockAverages = useMemo(() => {
-        const dates: string[] = [];
-        const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
-        for (let i = 0; i < 180; i++) {
-            const d = new Date(kstNow.getTime() - i * 24 * 60 * 60 * 1000);
-            dates.push(d.toISOString().slice(0, 10));
-        }
 
-        const targetProducts = inventory.filter((item: Product) => {
-            const isMakerDaekyung = item.maker === '대경' || item.maker1 === '대경';
-            let hasYsLoc = false;
-            if (item.locationStock) {
-                hasYsLoc = item.locationStock['양산'] !== undefined || item.locationStock['대경'] !== undefined;
-            } else {
-                hasYsLoc = (item.location || '').includes('양산') || (item.location || '').includes('대경');
-            }
-            return isMakerDaekyung && hasYsLoc;
-        });
-
-        const historyMapByDate: Record<string, Record<string, number>> = {};
-        (historyData.daekyungHistory || []).forEach(h => {
-            const dateStr = h.date.split('T')[0];
-            const dateMap: Record<string, number> = {};
-            (h.diff || []).forEach((d: { id: string; change: number }) => {
-                dateMap[d.id] = d.change;
-            });
-            historyMapByDate[dateStr] = dateMap;
-        });
-
-        const rawResults = targetProducts.map((item: Product) => {
-            let ysQty = 0;
-            if (item.locationStock) {
-                if (item.locationStock['양산'] !== undefined) ysQty += Number(item.locationStock['양산']);
-                if (item.locationStock['대경'] !== undefined) ysQty += Number(item.locationStock['대경']);
-            } else {
-                if ((item.location || '').includes('양산') || (item.location || '').includes('대경')) {
-                    ysQty = item.currentStock;
-                }
-            }
-
-            const dailyStocks: number[] = new Array(180).fill(0);
-            let currentStock = ysQty;
-
-            for (let i = 0; i < 180; i++) {
-                const date = dates[i];
-                dailyStocks[i] = currentStock;
-
-                const diffs = historyMapByDate[date] || {};
-                const change = diffs[item.id];
-                if (change !== undefined) {
-                    currentStock = Math.max(0, currentStock - change);
-                }
-            }
-
-            const stocks3m = dailyStocks.slice(0, 90);
-            const sum3m = stocks3m.reduce((s, val) => s + val, 0);
-            const avg3m = stocks3m.length > 0 ? parseFloat((sum3m / stocks3m.length).toFixed(1)) : ysQty;
-
-            const stocks6m = dailyStocks;
-            const sum6m = stocks6m.reduce((s, val) => s + val, 0);
-            const avg6m = stocks6m.length > 0 ? parseFloat((sum6m / stocks6m.length).toFixed(1)) : ysQty;
-
-            return {
-                id: item.id,
-                name: item.name || '미등록 상품',
-                material: item.material || '',
-                size: item.size || '',
-                thickness: item.thickness || '',
-                currentStock: ysQty,
-                avg3m,
-                avg6m,
-            };
-        });
-
-        const total3m = rawResults.reduce((s, r) => s + r.avg3m, 0);
-        const total6m = rawResults.reduce((s, r) => s + r.avg6m, 0);
-
-        return rawResults.map(r => {
-            const share3m = total3m > 0 ? parseFloat(((r.avg3m / total3m) * 100).toFixed(2)) : 0;
-            const share6m = total6m > 0 ? parseFloat(((r.avg6m / total6m) * 100).toFixed(2)) : 0;
-            const trend = r.avg6m > 0 ? parseFloat((((r.avg3m - r.avg6m) / r.avg6m) * 100).toFixed(1)) : (r.avg3m > 0 ? 100 : 0);
-
-            return {
-                ...r,
-                share3m,
-                share6m,
-                trend,
-            };
-        });
-    }, [inventory, historyData.daekyungHistory]);
 
     const daekyungStockAverages = useMemo(() => {
         let filtered = daekyungBaseStockAverages;
@@ -1642,7 +1663,10 @@ export default function SihwaInventory() {
     // Aggregate stats and Asset Valuation totals
     const stats = useMemo(() => {
         const regular = analyzedInventory
-            .filter(r => r.statusCategory === 'SAFE' && r.salesFreq >= 20 && r.recommendedQty > 0)
+            .filter(r => 
+                (r.statusCategory === 'SAFE' && r.salesFreq >= 20 && r.recommendedQty > 0) ||
+                ((r.statusCategory === 'CRITICAL' || r.statusCategory === 'WARNING') && r.canTransfer)
+            )
             .filter(r => !(r.product.material || '').toLowerCase().startsWith('wp'));
 
         // 견적 문의가 많으나 재고가 없는 경우 기회손실 (결품)
@@ -1660,8 +1684,8 @@ export default function SihwaInventory() {
             .reduce((sum, r) => sum + r.shQty * r.recentPurchasePrice, 0);
 
         return {
-            critical: analyzedInventory.filter(r => r.statusCategory === 'CRITICAL' && !r.isExcessStock),
-            warning: analyzedInventory.filter(r => r.statusCategory === 'WARNING' && !r.isExcessStock),
+            critical: analyzedInventory.filter(r => r.statusCategory === 'CRITICAL' && !r.isExcessStock && !r.canTransfer),
+            warning: analyzedInventory.filter(r => r.statusCategory === 'WARNING' && !r.isExcessStock && !r.canTransfer),
             safeActive: analyzedInventory.filter(r => r.statusCategory === 'SAFE' && r.salesFreq > 10),
             regular,
             A2items,
@@ -2427,6 +2451,13 @@ export default function SihwaInventory() {
                     </p>
                 </div>
                 <div className="flex gap-2 shrink-0">
+                    <button
+                        onClick={() => setShowGuide(!showGuide)}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-sm shadow-md transition-all active:scale-95 border border-indigo-600"
+                    >
+                        <Info className="w-4 h-4" />
+                        {showGuide ? '재고분석 가이드 숨기기' : '재고분석 가이드 보기'}
+                    </button>
                     {user?.role === 'MASTER' && (
                         <button
                             onClick={handleDataRefresh}
@@ -2496,85 +2527,89 @@ export default function SihwaInventory() {
                     <p className="text-4xl font-black mb-1 z-10">{healthDiagnosis.missedDemandList.length}<span className="text-lg font-bold opacity-80 tracking-normal ml-1">품목</span></p>
                     <p className="text-sm font-medium opacity-80 z-10 mt-auto">최근 60일 내 견적 문의가 있었으나 시화/대경 재고가 없어 판매 기회를 잃었을 가능성이 높은 품목입니다.</p>
                 </div>
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-2 z-10 opacity-90">
-                        <Activity className="w-5 h-5 text-purple-500" />
-                        재고 건전성 등급 분포 (A~E) <span className="text-xs text-slate-400 font-normal ml-1">(총 {analyzedInventory.filter(r => r.healthGrade !== 'N').length}개 품목)</span>
-                    </h3>
-                    <p className="text-4xl font-black text-slate-800 mb-2 invisible h-0">0</p>
+                {showGuide && (
+                    <>
+                        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-2 z-10 opacity-90">
+                                <Activity className="w-5 h-5 text-purple-500" />
+                                재고 건전성 등급 분포 (A~E) <span className="text-xs text-slate-400 font-normal ml-1">(총 {analyzedInventory.filter(r => r.healthGrade !== 'N').length}개 품목)</span>
+                            </h3>
+                            <p className="text-4xl font-black text-slate-800 mb-2 invisible h-0">0</p>
 
-                    <div className="space-y-2 mt-auto">
-                        {(['A', 'B', 'C', 'D', 'E'] as const).map(grade => {
-                            const count = analyzedInventory.filter(r =>
-                                r.healthGrade === grade
-                            ).length;
-                            const total = analyzedInventory.filter(r => r.healthGrade !== 'N').length;
-                            const pct = total > 0 ? (count / total * 100).toFixed(1) : 0;
-                            const labels: Record<string, string> = {
-                                A: 'A급 최우수 (핵심)',
-                                B: 'B급 양호 (안정적)',
-                                C: 'C급 보통 (관망)',
-                                D: 'D급 주의 (과잉/정체)',
-                                E: 'E급 악성 (즉시처분)',
-                            };
-                            const colors: Record<string, string> = {
-                                A: '#10B981', B: '#3B82F6', C: '#F59E0B', D: '#F97316', E: '#EF4444'
-                            };
-                            return (
-                                <div key={grade} className="flex items-center gap-2">
-                                    <span className="text-[11px] font-bold w-28 text-slate-600 shrink-0">
-                                        {labels[grade]}
-                                    </span>
-                                    <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full transition-all"
-                                            {...{ style: { width: `${pct}%`, background: colors[grade] } }}
-                                        />
-                                    </div>
-                                    <span className="text-[11px] font-bold text-slate-500 w-12 text-right shrink-0 whitespace-nowrap">
-                                        {count}품목
-                                    </span>
+                            <div className="space-y-2 mt-auto">
+                                {(['A', 'B', 'C', 'D', 'E'] as const).map(grade => {
+                                    const count = analyzedInventory.filter(r =>
+                                        r.healthGrade === grade
+                                    ).length;
+                                    const total = analyzedInventory.filter(r => r.healthGrade !== 'N').length;
+                                    const pct = total > 0 ? (count / total * 100).toFixed(1) : 0;
+                                    const labels: Record<string, string> = {
+                                        A: 'A급 최우수 (핵심)',
+                                        B: 'B급 양호 (안정적)',
+                                        C: 'C급 보통 (관망)',
+                                        D: 'D급 주의 (과잉/정체)',
+                                        E: 'E급 악성 (즉시처분)',
+                                    };
+                                    const colors: Record<string, string> = {
+                                        A: '#10B981', B: '#3B82F6', C: '#F59E0B', D: '#F97316', E: '#EF4444'
+                                    };
+                                    return (
+                                        <div key={grade} className="flex items-center gap-2">
+                                            <span className="text-[11px] font-bold w-28 text-slate-600 shrink-0">
+                                                {labels[grade]}
+                                            </span>
+                                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full rounded-full transition-all"
+                                                    {...{ style: { width: `${pct}%`, background: colors[grade] } }}
+                                                />
+                                            </div>
+                                            <span className="text-[11px] font-bold text-slate-500 w-12 text-right shrink-0 whitespace-nowrap">
+                                                {count}품목
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-700 flex flex-col text-white">
+                            <h3 className="font-bold text-slate-100 flex items-center gap-2 mb-3 z-10 opacity-90 text-[13px] border-b border-slate-600 pb-2">
+                                <Info className="w-4 h-4 text-sky-400" />
+                                건전성 점수 산출 가이드 (100점 만점)
+                            </h3>
+                            <div className="text-[11px] text-slate-300 space-y-2.5 leading-tight mt-auto">
+                                <p><strong className="text-emerald-400">A급 (65점↑)</strong>: 초고회전, 핵심 매출</p>
+                                <p><strong className="text-blue-400">B급 (45점↑)</strong>: 안정적 유지, 지속 매출</p>
+                                <p><strong className="text-amber-400">C급 (25점↑)</strong>: 간헐적 매출, 관망 필요</p>
+                                <p><strong className="text-orange-400">D급 (10점↑)</strong>: 과잉/무발주, 정체 품목</p>
+                                <p><strong className="text-rose-400">E급 (10점↓)</strong>: 장기 무매출, 악성재고</p>
+                                <div className="border-t border-slate-700 pt-2.5 mt-2.5 text-slate-400 text-[10px]">
+                                    <span className="block mb-1.5 font-bold text-slate-300 text-[11px]">항목별 가중치 (배점)</span>
+                                    판매빈도(25) + 판매규모(15) + <br />최근트렌드(25) + 견적유입(20) + <br />이익률(15)
                                 </div>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                <div className="bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-700 flex flex-col text-white">
-                    <h3 className="font-bold text-slate-100 flex items-center gap-2 mb-3 z-10 opacity-90 text-[13px] border-b border-slate-600 pb-2">
-                        <Info className="w-4 h-4 text-sky-400" />
-                        건전성 점수 산출 가이드 (100점 만점)
-                    </h3>
-                    <div className="text-[11px] text-slate-300 space-y-2.5 leading-tight mt-auto">
-                        <p><strong className="text-emerald-400">A급 (65점↑)</strong>: 초고회전, 핵심 매출</p>
-                        <p><strong className="text-blue-400">B급 (45점↑)</strong>: 안정적 유지, 지속 매출</p>
-                        <p><strong className="text-amber-400">C급 (25점↑)</strong>: 간헐적 매출, 관망 필요</p>
-                        <p><strong className="text-orange-400">D급 (10점↑)</strong>: 과잉/무발주, 정체 품목</p>
-                        <p><strong className="text-rose-400">E급 (10점↓)</strong>: 장기 무매출, 악성재고</p>
-                        <div className="border-t border-slate-700 pt-2.5 mt-2.5 text-slate-400 text-[10px]">
-                            <span className="block mb-1.5 font-bold text-slate-300 text-[11px]">항목별 가중치 (배점)</span>
-                            판매빈도(25) + 판매규모(15) + <br />최근트렌드(25) + 견적유입(20) + <br />이익률(15)
+                            </div>
                         </div>
-                    </div>
-                </div>
 
-                <div className="bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-700 flex flex-col text-white">
-                    <h3 className="font-bold text-slate-100 flex items-center gap-2 mb-3 z-10 opacity-90 text-[13px] border-b border-slate-600 pb-2">
-                        <Activity className="w-4 h-4 text-emerald-400" />
-                        세부 항목별 산출 기준표
-                    </h3>
-                    <div className="text-[11px] text-slate-300 space-y-2.5 leading-tight mt-auto">
-                        <p><strong className="text-indigo-400">판매빈도(25)</strong>: 최근 6개월 내 판매 발생 월수. 매달 꾸준한 수요가 있는가?</p>
-                        <p><strong className="text-teal-400">판매규모(15)</strong>: 연간 총 판매액 기여도. 전체 매출에 얼마나 도움이 되는가?</p>
-                        <p><strong className="text-amber-400">최근트렌드(25)</strong>: 최근 60일 내 판매량이 연평균 대비 증가했는가? 최근 수요 유지 여부.</p>
-                        <p><strong className="text-rose-400">견적유입(20)</strong>: 최근 60일 내 견적 문의 횟수. 실제 판매가 없어도 시장 관심도가 있는가?</p>
-                        <p><strong className="text-blue-400">이익률(15)</strong>: 대경 원가 대비 시화의 추정 영업 이익률. 고수익 품목인가?</p>
-                        <div className="border-t border-slate-700 pt-2.5 mt-2.5 text-slate-400 text-[10px]">
-                            <span className="block mb-1.5 font-bold text-slate-300 text-[11px]">보정 및 예외</span>
-                            재고 0인 상태는 점수 0점(N등급). 과잉재고 및 악성재고 패널티는 점수에서 차감.
+                        <div className="bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-700 flex flex-col text-white">
+                            <h3 className="font-bold text-slate-100 flex items-center gap-2 mb-3 z-10 opacity-90 text-[13px] border-b border-slate-600 pb-2">
+                                <Activity className="w-4 h-4 text-emerald-400" />
+                                세부 항목별 산출 기준표
+                            </h3>
+                            <div className="text-[11px] text-slate-300 space-y-2.5 leading-tight mt-auto">
+                                <p><strong className="text-indigo-400">판매빈도(25)</strong>: 최근 6개월 내 판매 발생 월수. 매달 꾸준한 수요가 있는가?</p>
+                                <p><strong className="text-teal-400">판매규모(15)</strong>: 연간 총 판매액 기여도. 전체 매출에 얼마나 도움이 되는가?</p>
+                                <p><strong className="text-amber-400">최근트렌드(25)</strong>: 최근 60일 내 판매량이 연평균 대비 증가했는가? 최근 수요 유지 여부.</p>
+                                <p><strong className="text-rose-400">견적유입(20)</strong>: 최근 60일 내 견적 문의 횟수. 실제 판매가 없어도 시장 관심도가 있는가?</p>
+                                <p><strong className="text-blue-400">이익률(15)</strong>: 대경 원가 대비 시화의 추정 영업 이익률. 고수익 품목인가?</p>
+                                <div className="border-t border-slate-700 pt-2.5 mt-2.5 text-slate-400 text-[10px]">
+                                    <span className="block mb-1.5 font-bold text-slate-300 text-[11px]">보정 및 예외</span>
+                                    재고 0인 상태는 점수 0점(N등급). 과잉재고 및 악성재고 패널티는 점수에서 차감.
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </div>
+                    </>
+                )}
             </div>
 
             {/* Smart Table Settings & Filters */}
@@ -3005,7 +3040,7 @@ export default function SihwaInventory() {
                                                                         <span className="px-2 py-1 bg-teal-50 text-teal-700 font-extrabold font-mono rounded-lg border border-teal-200 shadow-sm">{row.ysQty}</span>
                                                                     </td>
                                                                     <td className="px-5 py-4 text-right font-bold text-slate-600">{formatCur(row.recentPurchasePrice)}</td>
-                                                                    <td className="px-5 py-4 text-right font-black text-amber-700 bg-amber-50/30">{formatCur(row.recentPurchasePrice * (row.recommendedQty > 0 ? row.recommendedQty : 1))}</td>
+                                                                    <td className="px-5 py-4 text-right font-black text-amber-700 bg-amber-50/30">{formatCur(row.recentPurchasePrice * row.recommendedQty)}</td>
                                                                     <td className="px-5 py-4 text-right font-mono text-slate-400 text-xs">
                                                                         {row.compSales > 0 ? (
                                                                             <span>{row.compSales.toLocaleString()}</span>
@@ -3209,10 +3244,31 @@ export default function SihwaInventory() {
                                                                         <div className="flex flex-col gap-0.5">
                                                                             <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
                                                                                 <Activity className="w-4 h-4 text-indigo-500" />
-                                                                                전략 목표치 <span className="text-indigo-600">{row.recommendedQty}</span>개 권장
+                                                                                {row.canTransfer ? (
+                                                                                    <span className="text-emerald-600">대경이송 가능 (권장발주량 0개)</span>
+                                                                                ) : (
+                                                                                    <span>전략 목표치 <span className="text-indigo-600">{row.recommendedQty}</span>개 권장</span>
+                                                                                )}
                                                                             </div>
                                                                             <div className="text-xs text-slate-500 pl-5">
                                                                                 월평균 {Math.round(row.salesVolume / 12)}개 소요 (회전율 기반)
+                                                                            </div>
+                                                                            <div className="border-t border-slate-100 pt-1.5 mt-1 pl-5">
+                                                                                {row.canTransfer ? (
+                                                                                    <div className="text-xs font-bold text-emerald-600 flex flex-col gap-0.5">
+                                                                                        <span className="flex items-center gap-1">🟢 대경 평균재고 충분 (3개월 평균: {(daekyungStockMap.get(row.product.id)?.avg3m ?? row.ysQty)}개) → 이송 조달 추천</span>
+                                                                                        <span className="text-[11px] text-slate-500 font-normal">
+                                                                                            평균 재고가 시화 필요량({row.recommendedQty || Math.ceil((row.recent60dSales > 0 ? row.recent60dSales / 40 : row.salesVolume / 250 * 0.2) * 40)}개)보다 많아 발주 불필요
+                                                                                        </span>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div className="text-xs font-bold text-rose-600 flex flex-col gap-0.5">
+                                                                                        <span className="flex items-center gap-1">🔴 대경 평균재고 부족 (3개월 평균: {(daekyungStockMap.get(row.product.id)?.avg3m ?? row.ysQty)}개) → 신규 발주 요망</span>
+                                                                                        <span className="text-[11px] text-slate-500 font-normal">
+                                                                                            대경 평균재고가 부족하여 신규 발주({row.recommendedQty}개)를 통한 보충이 필요합니다.
+                                                                                        </span>
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
                                                                         </div>
                                                                     </td>
@@ -5274,8 +5330,8 @@ if (displayList.length === 0) {
                 const totalSelectedCount = selectedCriticalIds.size + selectedWarningIds.size + selectedRegularIds.size;
                 if (totalSelectedCount > 0) {
                     const expectedTotal =
-                        stats.critical.filter(w => selectedCriticalIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1), 0) +
-                        stats.warning.filter(w => selectedWarningIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.deficit > 0 ? row.deficit : 1), 0) +
+                        stats.critical.filter(w => selectedCriticalIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * row.suggestedCriticalQty, 0) +
+                        stats.warning.filter(w => selectedWarningIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * row.recommendedQty, 0) +
                         stats.regular.filter(w => selectedRegularIds.has(w.product.id)).reduce((sum, row) => sum + row.recentPurchasePrice * (row.recommendedQty || 0), 0);
 
                     return (

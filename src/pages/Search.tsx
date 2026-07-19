@@ -563,9 +563,29 @@ export default function Search() {
     };
 
     // --- File Upload Logic ---
+    const validateImageFile = (file: File): boolean => {
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+        const fileExtension = '.' + (file.name.split('.').pop() || '').toLowerCase();
+        
+        const isMimeTypeAllowed = allowedTypes.includes(file.type) || file.type.startsWith('image/');
+        const isExtensionAllowed = allowedExtensions.includes(fileExtension);
+        
+        if (!isMimeTypeAllowed && !isExtensionAllowed) {
+            alert('사진 파일(png, jpg, jpeg, gif)만 업로드할 수 있습니다.');
+            return false;
+        }
+        return true;
+    };
+
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            setAttachedFile(e.target.files[0]);
+            const file = e.target.files[0];
+            if (validateImageFile(file)) {
+                setAttachedFile(file);
+            } else {
+                e.target.value = ''; // Reset input to allow selecting the same file later if needed
+            }
         }
     };
 
@@ -573,7 +593,10 @@ export default function Search() {
         e.preventDefault();
         setIsDragging(false);
         if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            setAttachedFile(e.dataTransfer.files[0]);
+            const file = e.dataTransfer.files[0];
+            if (validateImageFile(file)) {
+                setAttachedFile(file);
+            }
         }
     };
 
@@ -587,8 +610,9 @@ export default function Search() {
             if (mode !== 'UPLOAD') return;
             if (e.clipboardData?.files && e.clipboardData.files.length > 0) {
                 const file = e.clipboardData.files[0];
-                setAttachedFile(file);
-                // Optional: Show toast or feedback?
+                if (validateImageFile(file)) {
+                    setAttachedFile(file);
+                }
             }
         };
 
@@ -1324,7 +1348,7 @@ export default function Search() {
                             id="file-upload"
                             className="hidden"
                             onChange={handleFileSelect}
-                            accept=".xlsx,.xls,.pdf,.png,.jpg,.jpeg"
+                            accept=".png,.jpg,.jpeg,.gif,.webp"
                         />
                         {uploadStatus !== 'IDLE' ? (
                             <div

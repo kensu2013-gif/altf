@@ -663,9 +663,9 @@ const server = http.createServer(async (req, res) => {
                             let shStock = 0;
                             let ysStock = 0;
 
-                            // Only track maker '대경' for Sihwa/Daekyung and Yangsan/Daekyung
+                            // Track maker '대경' and '태일' for local inventory snapshot
                             const maker = item.maker || item.maker1 || '';
-                            if (maker !== '대경') {
+                            if (maker !== '대경' && maker !== '태일') {
                                 return;
                             }
 
@@ -688,8 +688,8 @@ const server = http.createServer(async (req, res) => {
                                 }
                             }
 
-                            if (locationStock['시화'] !== undefined) {
-                                shStock = locationStock['시화'];
+                            if (locationStock['시화'] !== undefined || locationStock['부산'] !== undefined) {
+                                shStock = (locationStock['시화'] || 0) + (locationStock['부산'] || 0);
                             }
                             if (locationStock['양산'] !== undefined) {
                                 ysStock = locationStock['양산'];
@@ -1396,9 +1396,9 @@ const server = http.createServer(async (req, res) => {
             const item = inventoryMap[id];
             if (!item) return false;
             const maker = item.maker || item.maker1 || '';
-            if (maker !== '대경') return false;
+            if (maker !== '대경' && maker !== '태일') return false;
             const locs = getItemLocations(item);
-            return locs['시화'] !== undefined;
+            return locs['시화'] !== undefined || locs['부산'] !== undefined;
         };
 
         const isYangsanDaekyung = (id) => {
