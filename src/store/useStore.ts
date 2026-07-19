@@ -549,9 +549,16 @@ export const useStore = create<AppState>()(
                 }));
 
                 try {
+                    const { auth } = get();
+                    const headers: Record<string, string> = {
+                        'Content-Type': 'application/json'
+                    };
+                    if (auth.token) {
+                        headers['Authorization'] = `Bearer ${auth.token}`;
+                    }
                     const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders/${orderId}`, {
                         method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers,
                         body: JSON.stringify(enrichedUpdates)
                     });
                     if (!res.ok) {
@@ -576,7 +583,15 @@ export const useStore = create<AppState>()(
 
             permanentDeleteOrder: async (orderId) => {
                 try {
-                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders/${orderId}`, { method: 'DELETE' });
+                    const { auth } = get();
+                    const headers: Record<string, string> = {};
+                    if (auth.token) {
+                        headers['Authorization'] = `Bearer ${auth.token}`;
+                    }
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders/${orderId}`, {
+                        method: 'DELETE',
+                        headers
+                    });
                     if (res.ok) {
                         set((state) => ({
                             orders: state.orders.filter(o => o.id !== orderId)
@@ -629,9 +644,16 @@ export const useStore = create<AppState>()(
 
                 // 2. Persist to API
                 try {
+                    const { auth } = get();
+                    const headers: Record<string, string> = {
+                        'Content-Type': 'application/json'
+                    };
+                    if (auth.token) {
+                        headers['Authorization'] = `Bearer ${auth.token}`;
+                    }
                     const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quoteId}`, {
                         method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers,
                         body: JSON.stringify(updates)
                     });
                     if (!res.ok) throw new Error('Failed to update quotation');
@@ -650,7 +672,15 @@ export const useStore = create<AppState>()(
 
             permanentDeleteQuotation: async (quoteId) => {
                 try {
-                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quoteId}`, { method: 'DELETE' });
+                    const { auth } = get();
+                    const headers: Record<string, string> = {};
+                    if (auth.token) {
+                        headers['Authorization'] = `Bearer ${auth.token}`;
+                    }
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quoteId}`, {
+                        method: 'DELETE',
+                        headers
+                    });
                     if (res.ok) {
                         set((state) => ({
                             quotes: state.quotes.filter(q => q.id !== quoteId)

@@ -627,7 +627,7 @@ export default function AdminPage() {
                                                             </button>
 
                                                             {/* Master/Admin Delete Button */}
-                                                            {((user?.role?.toUpperCase() === 'MASTER' || user?.role?.toLowerCase() === 'admin')) && (
+                                                            {user?.role?.toUpperCase() === 'MASTER' && (
                                                                 <>
                                                                     {filterStatus === 'TRASH' ? (
                                                                         <>

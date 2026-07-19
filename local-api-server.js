@@ -2438,12 +2438,34 @@ const server = http.createServer(async (req, res) => {
 
     // PATCH /api/my/quotations/:id (Update Quotation)
     if (req.method === 'PATCH' && url.pathname.startsWith('/api/my/quotations/')) {
+        const session = getAuthenticatedSession(req);
+        if (!session) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Unauthorized' }));
+            return;
+        }
+
         const id = url.pathname.split('/').pop();
         let body = '';
         req.on('data', chunk => body += chunk.toString());
         req.on('end', async () => {
             try {
                 const updates = JSON.parse(body);
+
+                // 휴지통 이동(isDeleted: true) 또는 복구(isDeleted: false)를 하려 할 때만 MASTER 권한 검증
+                if (updates.hasOwnProperty('isDeleted') && session.role !== 'MASTER') {
+                    res.writeHead(403, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Forbidden: Only MASTER can manage trash status' }));
+                    return;
+                }
+
+                // 일반 관리자/매니저 권한 체크 (상태 변경 등은 MASTER, admin, manager, MANAGER 모두 가능해야 함)
+                if (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER') {
+                    res.writeHead(403, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Forbidden' }));
+                    return;
+                }
+
                 const updatedQuote = await updateDb(() => {
                     const index = db.quotations.findIndex(q => q.id === id);
                     if (index !== -1) {
@@ -2552,12 +2574,34 @@ const server = http.createServer(async (req, res) => {
 
     // PATCH /api/my/orders/:id (Update Order)
     if (req.method === 'PATCH' && url.pathname.startsWith('/api/my/orders/')) {
+        const session = getAuthenticatedSession(req);
+        if (!session) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Unauthorized' }));
+            return;
+        }
+
         const id = url.pathname.split('/').pop();
         let body = '';
         req.on('data', chunk => body += chunk.toString());
         req.on('end', async () => {
             try {
                 const updates = JSON.parse(body);
+
+                // 휴지통 이동(isDeleted: true) 또는 복구(isDeleted: false)를 하려 할 때만 MASTER 권한 검증
+                if (updates.hasOwnProperty('isDeleted') && session.role !== 'MASTER') {
+                    res.writeHead(403, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Forbidden: Only MASTER can manage trash status' }));
+                    return;
+                }
+
+                // 일반 관리자/매니저 권한 체크 (상태 변경 등은 MASTER, admin, manager, MANAGER 모두 가능해야 함)
+                if (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER') {
+                    res.writeHead(403, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Forbidden' }));
+                    return;
+                }
+
                 const updatedOrder = await updateDb(() => {
                     const index = db.orders.findIndex(o => o.id === id);
                     if (index !== -1) {
@@ -2640,42 +2684,15 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // PATCH /api/my/quotations/:id (Update Quotation)
-    if (req.method === 'PATCH' && url.pathname.startsWith('/api/my/quotations/')) {
-        const id = url.pathname.split('/').pop();
-        let body = '';
-        req.on('data', chunk => body += chunk.toString());
-        req.on('end', async () => {
-            try {
-                const updates = JSON.parse(body);
-                const updatedQuote = await updateDb(() => {
-                    const index = db.quotations.findIndex(q => q.id === id);
-                    if (index !== -1) {
-                        db.quotations[index] = { ...db.quotations[index], ...updates };
-                        return db.quotations[index];
-                    }
-                    return null;
-                });
-
-                if (updatedQuote) {
-                    console.log(`[API] Updated quotation ${id}`);
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(updatedQuote));
-                } else {
-                    res.writeHead(404, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Not found' }));
-                }
-            } catch (e) {
-                console.error(e);
-                res.writeHead(500);
-                res.end(JSON.stringify({ error: 'Server Error' }));
-            }
-        });
-        return;
-    }
-
     // DELETE /api/my/quotations/:id
     if (req.method === 'DELETE' && url.pathname.startsWith('/api/my/quotations/')) {
+        const session = getAuthenticatedSession(req);
+        if (!session || session.role !== 'MASTER') {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Forbidden: MASTER role required' }));
+            return;
+        }
+
         const id = url.pathname.split('/').pop();
         try {
             const success = await updateDb(() => {
@@ -2705,6 +2722,13 @@ const server = http.createServer(async (req, res) => {
 
     // DELETE /api/my/orders/:id
     if (req.method === 'DELETE' && url.pathname.startsWith('/api/my/orders/')) {
+        const session = getAuthenticatedSession(req);
+        if (!session || session.role !== 'MASTER') {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Forbidden: MASTER role required' }));
+            return;
+        }
+
         const id = url.pathname.split('/').pop();
         try {
             const success = await updateDb(() => {

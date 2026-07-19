@@ -32,7 +32,7 @@ export default function AdminQuotes() {
 
     const user = useStore((state) => state.auth.user);
     const userRole = user?.role as string;
-    const canManageTrash = ['MASTER', 'admin', 'manager', 'MANAGER'].includes(userRole);
+    const canManageTrash = userRole === 'MASTER';
 
     // Sync with Server on Mount and Focus
     useEffect(() => {
