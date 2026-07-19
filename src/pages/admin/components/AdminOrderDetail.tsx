@@ -320,6 +320,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     const [bulkSupplierRateInput, setBulkSupplierRateInput] = useState<string>('');
     const [bulkDiscountRateInput, setBulkDiscountRateInput] = useState<string>('');
+    const [targetDiscountRate, setTargetDiscountRate] = useState<string>('all');
 
     const checkDuplicates = useCallback((currentPoItems: LineItem[]) => {
         const allOrders = useStore.getState().orders || [];
@@ -481,6 +482,13 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const displayedItems = isSupplierMode ? enrichedPoItems : enrichedItems;
     const setDisplayedItems = isSupplierMode ? setPoItems : setItems;
     const selectedItems = useMemo(() => displayedItems.filter(item => item.isSelected !== false), [displayedItems]);
+
+    const availableRates = useMemo(() => {
+        const rates = displayedItems
+            .map(item => item.discountRate ?? 0)
+            .filter(rate => rate > 0);
+        return Array.from(new Set(rates)).sort((a, b) => b - a);
+    }, [displayedItems]);
 
     const [charges, setCharges] = useState<{ name: string; amount: number; }[]>(order.adminResponse?.additionalCharges || []);
 
@@ -2875,10 +2883,20 @@ if (deliveryNoteFiles.length > 0) {
                                                     <th className="px-2 py-3 text-center w-[6%] whitespace-nowrap"> 현재재고 </th>
                                                     <th className="px-2 py-3 text-center w-[5%]"> 상태 </th>
                                                     <th className="px-2 py-3 text-right text-slate-500 w-[7%]"> 기준단가(Base) </th>
-                                                    <th className="px-4 py-3 text-center w-[8%]">
+                                                    <th className="px-4 py-3 text-center w-[12%]">
                                                         <div className="flex flex-col items-center gap-1">
                                                             <span className="text-xs font-bold text-slate-600"> Rate(요율) </span>
-                                                            <div className="flex items-center gap-1 w-full max-w-[80px]">
+                                                            <div className="flex flex-col gap-1 w-full max-w-[90px]">
+                                                                <select
+                                                                    value={targetDiscountRate}
+                                                                    onChange={(e) => setTargetDiscountRate(e.target.value)}
+                                                                    className="w-full px-1 py-0.5 text-[10px] border border-slate-300 rounded outline-none bg-white text-slate-700 font-medium"
+                                                                >
+                                                                    <option value="all">전체 (0% 제외)</option>
+                                                                    {availableRates.map(r => (
+                                                                        <option key={r} value={r}>{r}%</option>
+                                                                    ))}
+                                                                </select>
                                                                 <input
                                                                     type="number"
                                                                     inputMode="numeric"
@@ -2888,12 +2906,20 @@ if (deliveryNoteFiles.length > 0) {
                                                                     className="w-full px-1 py-0.5 text-center text-xs border border-slate-300 rounded focus:border-teal-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                     onKeyDown={(e) => {
                                                                         if (e.key === 'Enter') {
-                                                                            const val = Number(e.currentTarget.value);
-                                                                            if (!isNaN(val)) {
+                                                                            const val = Number(bulkDiscountRateInput);
+                                                                            if (!isNaN(val) && bulkDiscountRateInput.trim() !== '') {
                                                                                 const newItems = displayedItems.map(item => {
                                                                                     const product = findProduct({ productId: item.productId });
                                                                                     const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
                                                                                     if (basePrice > 0) {
+                                                                                        // 0% 요율 품목 보호
+                                                                                        if ((item.discountRate ?? 0) <= 0) return item;
+
+                                                                                        // 대상 필터링
+                                                                                        if (targetDiscountRate !== 'all' && item.discountRate !== Number(targetDiscountRate)) {
+                                                                                            return item;
+                                                                                        }
+
                                                                                         const newPrice = Math.round(Math.round(basePrice * (1 - val / 100)) / 10) * 10;
                                                                                         return {
                                                                                             ...item,
@@ -2902,48 +2928,13 @@ if (deliveryNoteFiles.length > 0) {
                                                                                             amount: newPrice * item.quantity
                                                                                         };
                                                                                     }
-                                                                                    return { ...item, discountRate: val };
+                                                                                    return item;
                                                                                 });
                                                                                 setDisplayedItems(newItems);
                                                                             }
                                                                         }
                                                                     }}
                                                                 />
-                                                                <button
-                                                                    onClick={() => {
-                                                                        const val = Number(bulkDiscountRateInput);
-                                                                        const hasInput = bulkDiscountRateInput.trim() !== '';
-                                                                        const newItems = displayedItems.map(item => {
-                                                                            if (hasInput && !isNaN(val)) {
-                                                                                const product = findProduct({ productId: item.productId });
-                                                                                const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
-                                                                                if (basePrice > 0) {
-                                                                                    const newPrice = Math.round(Math.round(basePrice * (1 - val / 100)) / 10) * 10;
-                                                                                    return {
-                                                                                        ...item,
-                                                                                        discountRate: val,
-                                                                                        unitPrice: newPrice,
-                                                                                        amount: newPrice * item.quantity
-                                                                                    };
-                                                                                }
-                                                                                return { ...item, discountRate: val };
-                                                                            } else {
-                                                                                const product = findProduct({ productId: item.productId });
-                                                                                const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
-                                                                                return {
-                                                                                    ...item,
-                                                                                    discountRate: 0,
-                                                                                    unitPrice: basePrice,
-                                                                                    amount: basePrice * item.quantity
-                                                                                };
-                                                                            }
-                                                                        });
-                                                                        setDisplayedItems(newItems);
-                                                                    }}
-                                                                    className="px-1 py-0.5 text-[10px] bg-teal-50 text-teal-600 border border-teal-200 rounded hover:bg-teal-100 whitespace-nowrap"
-                                                                    title="모두 기본단가 적용 (0%)">
-                                                                    All
-                                                                </button>
                                                             </div>
                                                             {recommendation.recommendedRate !== undefined && (
                                                                 <div className="mt-1 flex flex-col items-center gap-0.5">
@@ -2957,27 +2948,51 @@ if (deliveryNoteFiles.length > 0) {
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => {
+                                                                            const val = Number(bulkDiscountRateInput);
+                                                                            const hasInput = bulkDiscountRateInput.trim() !== '';
                                                                             const { recommendedRate } = recommendation;
+
                                                                             const newItems = displayedItems.map(item => {
                                                                                 const product = findProduct({ productId: item.productId });
                                                                                 const base = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0;
-                                                                                
-                                                                                // 기본 할인율 결정
-                                                                                let initialRate = product?.rate_pct ?? item.discountRate ?? 0;
-                                                                                if (initialRate === 0 && product) {
-                                                                                    const standardPrice = product.base_price ?? product.unitPrice ?? 0;
-                                                                                    if (standardPrice > 0 && product.unitPrice > 0) {
-                                                                                        initialRate = Math.round((1 - product.unitPrice / standardPrice) * 100);
-                                                                                    }
-                                                                                }
-                                                                                // 6/15 요율 보정 적용
-                                                                                if (isOrderAfterEffectiveDate) {
-                                                                                    if (initialRate === 65) initialRate = 47;
-                                                                                    else if (initialRate === 35) initialRate = 25;
-                                                                                }
+                                                                                if (base === 0) return item;
 
-                                                                                const targetRate = initialRate === 47 ? recommendedRate : initialRate;
-                                                                                if (base > 0) {
+                                                                                // 0% 요율 품목 보호
+                                                                                if ((item.discountRate ?? 0) <= 0) return item;
+
+                                                                                if (hasInput && !isNaN(val)) {
+                                                                                    // 수동 입력 시: 대상 요율 필터 적용
+                                                                                    if (targetDiscountRate !== 'all' && item.discountRate !== Number(targetDiscountRate)) {
+                                                                                        return item;
+                                                                                    }
+                                                                                    const newPrice = Math.round(Math.round(base * (1 - val / 100)) / 10) * 10;
+                                                                                    return {
+                                                                                        ...item,
+                                                                                        discountRate: val,
+                                                                                        unitPrice: newPrice,
+                                                                                        amount: newPrice * item.quantity
+                                                                                    };
+                                                                                } else {
+                                                                                    // 입력이 비어있는 경우: 추천 요율 적용 (기존 요율 47% 이고 targetDiscountRate가 'all' 또는 '47'일 때만)
+                                                                                    if (targetDiscountRate !== 'all' && targetDiscountRate !== '47') {
+                                                                                        return item;
+                                                                                    }
+
+                                                                                    let initialRate = product?.rate_pct ?? item.discountRate ?? 0;
+                                                                                    if (initialRate === 0 && product) {
+                                                                                        const standardPrice = product.base_price ?? product.unitPrice ?? 0;
+                                                                                        if (standardPrice > 0 && product.unitPrice > 0) {
+                                                                                            initialRate = Math.round((1 - product.unitPrice / standardPrice) * 100);
+                                                                                        }
+                                                                                    }
+                                                                                    if (isOrderAfterEffectiveDate) {
+                                                                                        if (initialRate === 65) initialRate = 47;
+                                                                                        else if (initialRate === 35) initialRate = 25;
+                                                                                    }
+
+                                                                                    const targetRate = initialRate === 47 ? recommendedRate : initialRate;
+                                                                                    if (item.discountRate === targetRate) return item;
+
                                                                                     const newPrice = Math.round(Math.round(base * (1 - targetRate / 100)) / 10) * 10;
                                                                                     return {
                                                                                         ...item,
@@ -2986,7 +3001,6 @@ if (deliveryNoteFiles.length > 0) {
                                                                                         amount: newPrice * item.quantity
                                                                                     };
                                                                                 }
-                                                                                return { ...item, discountRate: targetRate };
                                                                             });
                                                                             setDisplayedItems(newItems);
                                                                         }}

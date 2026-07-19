@@ -274,6 +274,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const [orderPayload, setOrderPayload] = useState<DocumentPayload | null>(null);
     const [isApiSubmitting, setIsApiSubmitting] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [bulkDiscountRateInput, setBulkDiscountRateInput] = useState<string>('');
+    const [targetDiscountRate, setTargetDiscountRate] = useState<string>('all');
 
     // Local state for customer info
 
@@ -501,6 +503,13 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         })
     );
 
+    const availableRates = useMemo(() => {
+        const rates = items
+            .map(item => item.discountRate ?? 0)
+            .filter(rate => rate > 0);
+        return Array.from(new Set(rates)).sort((a, b) => b - a);
+    }, [items]);
+
     const [orders, setOrders] = useState<Order[]>([]);
 
     useEffect(() => {
@@ -560,7 +569,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     }, [customerStats]);
 
     const handleApplyRecommendedRate = useCallback(() => {
-        const { recommendedRate } = recommendation;
+        const val = Number(bulkDiscountRateInput);
+        const hasInput = bulkDiscountRateInput.trim() !== '';
 
         setItems(prev => {
             let hasChanges = false;
@@ -569,36 +579,59 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 const base = product?.base_price || item.base_price || product?.unitPrice || item.unitPrice || 0;
                 if (base === 0) return item;
 
-                // 기본 할인율 결정
-                let initialRate = product?.rate_pct ?? item.discountRate ?? 0;
-                if (initialRate === 0 && product) {
-                    const standardPrice = product.base_price ?? product.unitPrice ?? 0;
-                    if (standardPrice > 0 && product.unitPrice > 0) {
-                        initialRate = Math.round((1 - product.unitPrice / standardPrice) * 100);
+                // 0% 요율 품목은 일괄 변경에서 절대 변경하지 않고 안전하게 보존
+                if ((item.discountRate ?? 0) <= 0) return item;
+
+                if (hasInput && !isNaN(val)) {
+                    // 수동 입력 시: 선택한 대상 요율 필터 적용
+                    if (targetDiscountRate !== 'all' && item.discountRate !== Number(targetDiscountRate)) {
+                        return item;
                     }
+                    if (item.discountRate === val) return item;
+
+                    hasChanges = true;
+                    const newPrice = Math.round(Math.round(base * (1 - val / 100)) / 10) * 10;
+                    return {
+                        ...item,
+                        discountRate: val,
+                        unitPrice: newPrice,
+                        amount: newPrice * item.quantity
+                    };
+                } else {
+                    // 입력창이 비어있는 경우: 추천 요율 적용 (기존 47%였고, targetDiscountRate가 'all' 또는 '47'일 때만)
+                    if (targetDiscountRate !== 'all' && targetDiscountRate !== '47') {
+                        return item;
+                    }
+
+                    const { recommendedRate } = recommendation;
+                    let initialRate = product?.rate_pct ?? item.discountRate ?? 0;
+                    if (initialRate === 0 && product) {
+                        const standardPrice = product.base_price ?? product.unitPrice ?? 0;
+                        if (standardPrice > 0 && product.unitPrice > 0) {
+                            initialRate = Math.round((1 - product.unitPrice / standardPrice) * 100);
+                        }
+                    }
+                    if (isQuoteAfterEffectiveDate) {
+                        if (initialRate === 65) initialRate = 47;
+                        else if (initialRate === 35) initialRate = 25;
+                    }
+
+                    const targetRate = initialRate === 47 ? recommendedRate : initialRate;
+                    if (item.discountRate === targetRate) return item;
+
+                    hasChanges = true;
+                    const newPrice = Math.round(Math.round(base * (1 - targetRate / 100)) / 10) * 10;
+                    return {
+                        ...item,
+                        discountRate: targetRate,
+                        unitPrice: newPrice,
+                        amount: newPrice * item.quantity
+                    };
                 }
-
-                // 6/15 요율 보정 적용
-                if (isQuoteAfterEffectiveDate) {
-                    if (initialRate === 65) initialRate = 47;
-                    else if (initialRate === 35) initialRate = 25;
-                }
-
-                const targetRate = initialRate === 47 ? recommendedRate : initialRate;
-                if (item.discountRate === targetRate) return item;
-
-                hasChanges = true;
-                const newPrice = Math.round(Math.round(base * (1 - targetRate / 100)) / 10) * 10;
-                return {
-                    ...item,
-                    discountRate: targetRate,
-                    unitPrice: newPrice,
-                    amount: newPrice * item.quantity
-                };
             });
             return hasChanges ? newItems : prev;
         });
-    }, [recommendation, inventory, isQuoteAfterEffectiveDate]);
+    }, [bulkDiscountRateInput, targetDiscountRate, recommendation, inventory, isQuoteAfterEffectiveDate]);
 
     // ... (keep helper functions)
 
@@ -1349,37 +1382,58 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             </th>
 
                                             {/* Rate (Previously Discount Rate) */}
-                                            <th className="px-2 py-3 text-center w-[10%]">
+                                            <th className="px-2 py-3 text-center w-[12%]">
                                                 <div className="flex flex-col items-center gap-1">
                                                     <span className="text-xs font-bold text-slate-600">요율 (%)</span>
-                                                    <div className="flex items-center gap-1 w-full max-w-[80px] mx-auto">
+                                                    <div className="flex flex-col gap-1 w-full max-w-[90px] mx-auto">
+                                                        <select
+                                                            value={targetDiscountRate}
+                                                            onChange={(e) => setTargetDiscountRate(e.target.value)}
+                                                            className="w-full px-1 py-0.5 text-[10px] border border-slate-300 rounded outline-none bg-white text-slate-700 font-medium"
+                                                        >
+                                                            <option value="all">전체 (0% 제외)</option>
+                                                            {availableRates.map(r => (
+                                                                <option key={r} value={r}>{r}%</option>
+                                                            ))}
+                                                        </select>
                                                         <input
                                                             type="number"
                                                             placeholder="일괄"
+                                                            value={bulkDiscountRateInput}
+                                                            onChange={(e) => setBulkDiscountRateInput(e.target.value)}
                                                             className="w-full px-1 py-0.5 text-center text-xs border border-slate-300 rounded focus:border-teal-500 outline-none"
                                                             onKeyDown={(e) => {
                                                                 if (e.key === 'Enter') {
-                                                                    const val = Number(e.currentTarget.value);
-                                                                    if (!isNaN(val)) {
-                                                                        const newItems = items.map(item => {
-                                                                            const product = getProductInfo(item.productId);
-                                                                            const productRate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
-                                                                            if (productRate === 0) {
-                                                                                return item;
-                                                                            }
-                                                                            const standardPrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0; 
-                                                                            if (standardPrice === 0) return item;
+                                                                    const val = Number(bulkDiscountRateInput);
+                                                                    if (!isNaN(val) && bulkDiscountRateInput.trim() !== '') {
+                                                                        setItems(prev => {
+                                                                            let hasChanges = false;
+                                                                            const newItems = prev.map(item => {
+                                                                                const product = getProductInfo(item.productId);
+                                                                                const standardPrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0;
+                                                                                if (standardPrice === 0) return item;
 
-                                                                            const newPrice = Math.round(Math.round(standardPrice * (1 - val / 100)) / 10) * 10;
+                                                                                // 0% 요율 품목 보호
+                                                                                if ((item.discountRate ?? 0) <= 0) return item;
 
-                                                                            return {
-                                                                                ...item,
-                                                                                unitPrice: newPrice,
-                                                                                discountRate: val,
-                                                                                amount: newPrice * item.quantity
-                                                                            };
+                                                                                // 변경 대상 필터링
+                                                                                if (targetDiscountRate !== 'all' && item.discountRate !== Number(targetDiscountRate)) {
+                                                                                    return item;
+                                                                                }
+
+                                                                                if (item.discountRate === val) return item;
+
+                                                                                hasChanges = true;
+                                                                                const newPrice = Math.round(Math.round(standardPrice * (1 - val / 100)) / 10) * 10;
+                                                                                return {
+                                                                                    ...item,
+                                                                                    unitPrice: newPrice,
+                                                                                    discountRate: val,
+                                                                                    amount: newPrice * item.quantity
+                                                                                };
+                                                                            });
+                                                                            return hasChanges ? newItems : prev;
                                                                         });
-                                                                        setItems(newItems);
                                                                     }
                                                                 }
                                                             }}
