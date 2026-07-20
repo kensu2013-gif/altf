@@ -2421,7 +2421,7 @@ const server = http.createServer(async (req, res) => {
                 res.end(JSON.stringify({ error: 'Forbidden' }));
                 return;
             }
-            const userQuotes = db.quotations.filter(q => q.userId === userId);
+            const userQuotes = db.quotations.filter(q => q.userId === userId && !q.isDeleted);
             sendJsonResponse(req, res, 200, userQuotes);
             return;
         }
@@ -2687,34 +2687,56 @@ const server = http.createServer(async (req, res) => {
     // DELETE /api/my/quotations/:id
     if (req.method === 'DELETE' && url.pathname.startsWith('/api/my/quotations/')) {
         const session = getAuthenticatedSession(req);
-        if (!session || session.role !== 'MASTER') {
-            res.writeHead(403, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Forbidden: MASTER role required' }));
+        if (!session) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Unauthorized' }));
             return;
         }
 
         const id = url.pathname.split('/').pop();
+        const permanent = url.searchParams.get('permanent') === 'true';
+
         try {
-            const success = await updateDb(() => {
+            const result = await updateDb(() => {
                 const index = db.quotations.findIndex(q => q.id === id);
                 if (index !== -1) {
-                    db.quotations.splice(index, 1);
-                    return true;
+                    const quote = db.quotations[index];
+                    
+                    // 권한 체크: 소유자이거나 관리자(MASTER, admin, manager, MANAGER)만 삭제 가능
+                    const isAdmin = session.role === 'MASTER' || session.role === 'admin' || session.role === 'manager' || session.role === 'MANAGER';
+                    if (quote.userId !== session.userId && !isAdmin) {
+                        return { error: 'Forbidden', status: 403 };
+                    }
+
+                    if (permanent && session.role === 'MASTER') {
+                        // 영구 삭제 (하드 딜리트)
+                        db.quotations.splice(index, 1);
+                        return { success: true, mode: 'hard' };
+                    } else {
+                        // 일반 삭제 (소프트 딜리트)
+                        db.quotations[index] = {
+                            ...db.quotations[index],
+                            isDeleted: true,
+                            deletedAt: new Date().toISOString(),
+                            deletedBy: session.userId
+                        };
+                        return { success: true, mode: 'soft' };
+                    }
                 }
-                return false;
+                return { error: 'Not found', status: 404 };
             });
 
-            if (success) {
-                console.log(`[API] Deleted quotation ${id}`);
+            if (result.success) {
+                console.log(`[API] ${result.mode === 'hard' ? 'Hard' : 'Soft'} Deleted quotation ${id}`);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true }));
+                res.end(JSON.stringify({ success: true, mode: result.mode }));
             } else {
-                res.writeHead(404, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Not found' }));
+                res.writeHead(result.status || 500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: result.error || 'Server Error' }));
             }
         } catch (e) {
             console.error(e);
-            res.writeHead(500);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Server Error' }));
         }
         return;

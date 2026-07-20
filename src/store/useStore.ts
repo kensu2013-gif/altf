@@ -677,7 +677,7 @@ export const useStore = create<AppState>()(
                     if (auth.token) {
                         headers['Authorization'] = `Bearer ${auth.token}`;
                     }
-                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quoteId}`, {
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quoteId}?permanent=true`, {
                         method: 'DELETE',
                         headers
                     });

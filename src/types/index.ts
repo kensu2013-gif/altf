@@ -97,6 +97,8 @@ export interface Quotation {
     adminResponse?: AdminResponse;
     manager?: { name: string; id: string; email: string; }; // Permanent Sales Rep
     isDeleted?: boolean; // Soft Delete Flag
+    deletedAt?: string; // Timestamp of soft deletion
+    deletedBy?: string; // User ID who performed soft deletion
     attachments?: { name: string; url: string; }[]; // Customer request files
     adminAttachments?: { name: string; url: string; }[]; // Official ALTF quote files
 }
@@ -181,6 +183,7 @@ export interface Order {
     poSent?: boolean; // [NEW] Track whether PO webhook was fired
     isStockOrder?: boolean; // [NEW] Track if it is a stock replenishment order
     supplierInfo?: {
+        id?: string;
         company_name: string;
         contact_name: string;
         tel: string;

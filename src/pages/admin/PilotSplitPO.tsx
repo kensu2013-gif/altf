@@ -1048,8 +1048,14 @@ export default function PilotSplitPO() {
     // 부모 주문의 splitDeliveries 내부 정보 동적 업데이트
     const nextSplitDeliveries = currentOrder.splitDeliveries.map(d => {
       if (d.supplier.id === supplierId) {
+        const nextSupplier = updates.supplierInfo ? {
+          ...d.supplier,
+          ...updates.supplierInfo
+        } : d.supplier;
+
         return {
           ...d,
+          supplier: nextSupplier,
           poSent: isSent,
           poNumber: updates.poNumber || d.poNumber,
           totalAmount: updates.totalAmount !== undefined ? updates.totalAmount : d.totalAmount, // 모달에서 확정된 실제 매입액 반영
@@ -1938,7 +1944,8 @@ export default function PilotSplitPO() {
                                 contact_name: s.contact_name,
                                 tel: s.tel,
                                 email: s.email,
-                                address: s.address
+                                address: s.address,
+                                note: s.note || ''
                               },
                               buyerInfo: buyerInfoData, // 배송지 정보 탑재
                               status: deliveryInfo?.poSent ? 'SHIPPED' : 'PENDING',

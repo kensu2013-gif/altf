@@ -324,7 +324,7 @@ export default function AdminQuotes() {
                                                 <span className={`w-1.5 h-1.5 rounded-full ${isModified ? 'bg-teal-400' : 'bg-indigo-400'} inline-block`}></span>
                                                 원주문: {quote.customerNumber}
                                             </div>
-                                            <div className="text-sm text-slate-500 flex items-center gap-4">
+                                            <div className="text-sm text-slate-500 flex flex-wrap items-center gap-4">
                                                 <span className="flex items-center gap-1">
                                                     <Calendar className="w-3 h-3" />
                                                     {new Date(quote.createdAt).toLocaleString()}
@@ -332,6 +332,12 @@ export default function AdminQuotes() {
                                                 <span className="flex items-center gap-1">
                                                     <span className="font-bold text-slate-700">{quote.items.length}</span> 개 품목
                                                 </span>
+                                                {quote.isDeleted && (
+                                                    <span className="text-xs text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded font-bold">
+                                                        삭제: {quote.deletedAt ? new Date(quote.deletedAt).toLocaleString() : ''} 
+                                                        {quote.deletedBy ? ` (ID: ${quote.deletedBy})` : ''}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

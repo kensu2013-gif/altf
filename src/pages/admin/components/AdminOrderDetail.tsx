@@ -516,6 +516,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
             };
         }
         return {
+            id: info.id,
             ...info,
             company_name: cleanText(info.company_name),
             contact_name: cleanText(info.contact_name),
@@ -1505,6 +1506,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         let nextSplitDeliveries = order.splitDeliveries;
         if (nextSplitDeliveries && nextSplitDeliveries.length > 0) {
             nextSplitDeliveries = nextSplitDeliveries.map(d => {
+                const isTarget = d.supplier.id === supplierInfo.id;
                 const updatedItems = d.items?.map(item => {
                     const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
                     if (matched) {
@@ -1531,6 +1533,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
                 return {
                     ...d,
+                    supplier: isTarget ? { ...d.supplier, ...supplierInfo, id: d.supplier.id } : d.supplier,
                     items: updatedItems,
                     po_items: updatedPoItems
                 };
@@ -1682,6 +1685,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         let nextSplitDeliveries = order.splitDeliveries;
         if (nextSplitDeliveries && nextSplitDeliveries.length > 0) {
             nextSplitDeliveries = nextSplitDeliveries.map(d => {
+                const isTarget = d.supplier.id === supplierInfo.id;
                 const updatedItems = d.items?.map(item => {
                     const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
                     if (matched) {
@@ -1708,6 +1712,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
                 return {
                     ...d,
+                    supplier: isTarget ? { ...d.supplier, ...supplierInfo, id: d.supplier.id } : d.supplier,
                     items: updatedItems,
                     po_items: updatedPoItems
                 };
