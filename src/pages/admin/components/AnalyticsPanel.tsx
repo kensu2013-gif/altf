@@ -33,28 +33,48 @@ export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
                 displayCustomer.includes('알트에프') || 
                 displayCustomer.includes('altf');
 
+            const isPoFullySent = (() => {
+                if (order.splitDeliveries && order.splitDeliveries.length > 0) {
+                    return order.splitDeliveries.every(d => d.poSent);
+                }
+                return !!order.poSent;
+            })();
+
             // Calculate cost from items
             let orderCost = 0;
-            if (order.splitDeliveries && order.splitDeliveries.length > 0) {
-                orderCost = order.splitDeliveries.reduce((sum, d) => sum + (d.totalAmount || 0), 0);
-            } else {
-                // Use po_items if available (which means it was edited in Supplier mode), otherwise items
-                const itemsToCalc = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
+            if (isPoFullySent) {
+                if (order.splitDeliveries && order.splitDeliveries.length > 0) {
+                    orderCost = order.splitDeliveries.reduce((sum, d) => sum + (d.totalAmount || 0), 0);
+                } else {
+                    // Use po_items if available (which means it was edited in Supplier mode), otherwise items
+                    const itemsToCalc = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
 
+                    itemsToCalc.forEach(item => {
+                        const product = findProduct(item);
+                        let cost = 0;
+                        const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
+
+                        if (item.supplierPriceOverride !== undefined) {
+                            cost = item.supplierPriceOverride;
+                        } else if (item.supplierRate !== undefined) {
+                            cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
+                        } else {
+                            const rate = product?.rate_act2 || product?.rate_act || product?.rate_pct || item.discountRate || 72;
+                            cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+                        }
+
+                        orderCost += (cost * item.quantity);
+                    });
+                }
+            } else {
+                // Fallback to original estimated buying cost so dashboard statistics cards are not distorted
+                const itemsToCalc = order.items || [];
                 itemsToCalc.forEach(item => {
                     const product = findProduct(item);
                     let cost = 0;
                     const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
-
-                    if (item.supplierPriceOverride !== undefined) {
-                        cost = item.supplierPriceOverride;
-                    } else if (item.supplierRate !== undefined) {
-                        cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
-                    } else {
-                        const rate = product?.rate_act2 || product?.rate_act || product?.rate_pct || item.discountRate || 72;
-                        cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
-                    }
-
+                    const rate = product?.rate_act2 || product?.rate_act || product?.rate_pct || item.discountRate || 72;
+                    cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
                     orderCost += (cost * item.quantity);
                 });
             }

@@ -444,6 +444,13 @@ export default function AdminPage() {
                                             const displayCustomerForCheck = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
                                             const isSeoulInventory = displayCustomerForCheck.includes('서울재고') || displayCustomerForCheck.includes('시화재고') || displayCustomerForCheck.includes('알트에프') || displayCustomerForCheck.toLowerCase().includes('altf');
                                             
+                                            const isPoFullySent = (() => {
+                                                 if (order.splitDeliveries && order.splitDeliveries.length > 0) {
+                                                     return order.splitDeliveries.every(d => d.poSent);
+                                                 }
+                                                 return !!order.poSent;
+                                             })();
+
                                             const totalBuyingCost = isSeoulInventory ? 0 : (
                                                 (order.splitDeliveries && order.splitDeliveries.length > 0)
                                                     ? order.splitDeliveries.reduce((sum, d) => sum + (d.totalAmount || 0), 0)
@@ -507,21 +514,56 @@ export default function AdminPage() {
                                                                         {order.poNumber}
                                                                     </span>
                                                                 )}
-                                                                {/* 분할발주 발송된 업체 스티커 표시 */}
-                                                                {order.splitDeliveries && order.splitDeliveries.filter(d => d.poSent).map(d => {
-                                                                    const name = d.supplier.company_name.replace('(주)', '').trim();
-                                                                    const dateStr = d.sentAt ? ` (${new Date(d.sentAt).toLocaleDateString()})` : '';
-                                                                    return (
-                                                                        <span 
-                                                                            key={d.supplier.company_name} 
-                                                                            className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded text-[10px] font-black shadow-xs inline-flex items-center gap-1 hover:bg-emerald-100 hover:text-emerald-800 transition-colors"
-                                                                            title={`${d.supplier.company_name} 분할발주 완료${dateStr}`}
-                                                                        >
-                                                                            <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
-                                                                            {name}
-                                                                        </span>
-                                                                    );
-                                                                })}
+                                                                {/* 분할발주 또는 단일발주 상태 스스티커 표시 */}
+                                                                {order.splitDeliveries && order.splitDeliveries.length > 0 ? (
+                                                                    order.splitDeliveries.map(d => {
+                                                                        const name = d.supplier.company_name.replace('(주)', '').trim();
+                                                                        const dateStr = d.sentAt ? ` (${new Date(d.sentAt).toLocaleDateString()})` : '';
+                                                                        if (d.poSent) {
+                                                                            return (
+                                                                                <span 
+                                                                                    key={d.supplier.company_name} 
+                                                                                    className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded text-[10px] font-black shadow-xs inline-flex items-center gap-1 hover:bg-emerald-100 hover:text-emerald-800 transition-colors"
+                                                                                    title={`${d.supplier.company_name} 분할발주 완료${dateStr}`}
+                                                                                >
+                                                                                    <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                                                    {name}
+                                                                                </span>
+                                                                            );
+                                                                        } else {
+                                                                            return (
+                                                                                <span 
+                                                                                    key={d.supplier.company_name} 
+                                                                                    className="bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded text-[10px] font-black shadow-xs inline-flex items-center gap-1 hover:bg-rose-100 hover:text-rose-800 transition-colors animate-pulse"
+                                                                                    title={`${d.supplier.company_name} 발주서 미송부`}
+                                                                                >
+                                                                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                                                                    {name} (미송부)
+                                                                                </span>
+                                                                            );
+                                                                        }
+                                                                    })
+                                                                ) : (
+                                                                    !isSeoulInventory && (
+                                                                        order.poSent ? (
+                                                                            <span 
+                                                                                className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded text-[10px] font-black shadow-xs inline-flex items-center gap-1 hover:bg-emerald-100 hover:text-emerald-800 transition-colors"
+                                                                                title="매입발주 완료"
+                                                                            >
+                                                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                                                발주완료
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span 
+                                                                                className="bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded text-[10px] font-black shadow-xs inline-flex items-center gap-1 hover:bg-rose-100 hover:text-rose-800 transition-colors animate-pulse"
+                                                                                title="발주서 미송부"
+                                                                            >
+                                                                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                                                                발주 미송부
+                                                                            </span>
+                                                                        )
+                                                                    )
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </td>
@@ -559,8 +601,14 @@ export default function AdminPage() {
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4 text-right whitespace-nowrap">
-                                                        <span className="font-bold text-slate-800"> {/* [MOD] Match Total Amount Styling */}
-                                                            {new Intl.NumberFormat('ko-KR').format(totalBuyingCost)}원
+                                                        <span className="font-bold text-slate-800">
+                                                            {isSeoulInventory 
+                                                                ? '0원' 
+                                                                : (isPoFullySent 
+                                                                    ? `${new Intl.NumberFormat('ko-KR').format(totalBuyingCost)}원` 
+                                                                    : '-'
+                                                                  )
+                                                            }
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4">
