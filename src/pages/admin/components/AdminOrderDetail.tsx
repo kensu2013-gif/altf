@@ -887,20 +887,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         };
     }, { totalSupplierAmount: 0, totalProfit: 0 });
 
-    const overallTotalSupplierAmount = enrichedPoItems.reduce((sum, item) => {
-        const product = findProduct({ productId: item.productId });
-        const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? 0;
-        const rate = item.supplierRate ?? product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? item.discountRate ?? 72;
 
-        let supplierPrice = item.supplierPriceOverride;
-        if (supplierPrice === undefined) {
-            supplierPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
-        }
 
-        return sum + (supplierPrice * item.quantity);
-    }, 0);
 
-    const finalTotalAmount = isSupplierMode ? overallTotalSupplierAmount : overallTotalWithCharges;
+
+
 
 
     const handleItemSelect = (index: number, isSelected: boolean) => {
@@ -1541,11 +1532,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         }
 
         const updateData: Partial<Order> = {
-            totalAmount: finalTotalAmount,
+            totalAmount: overallTotalWithCharges,
             isStockOrder: isStockOrderChecked,
             adminResponse: {
                 ...response,
-                confirmedPrice: finalTotalAmount,
+                confirmedPrice: overallTotalWithCharges,
                 additionalCharges: charges
             },
             status: order.status === 'SUBMITTED' ? 'PROCESSING' : order.status,
@@ -1720,11 +1711,11 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         }
 
         const updateData: Partial<Order> = {
-            totalAmount: finalTotalAmount,
+            totalAmount: overallTotalWithCharges,
             isStockOrder: isStockOrderChecked,
             adminResponse: {
                 ...response,
-                confirmedPrice: finalTotalAmount,
+                confirmedPrice: overallTotalWithCharges,
                 additionalCharges: charges
             },
             status: finalStatus,
