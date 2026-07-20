@@ -260,10 +260,21 @@ export default function AdminPage() {
                 const isSeoulInventory = displayCustomerForCheck.includes('서울재고') || displayCustomerForCheck.includes('시화재고') || displayCustomerForCheck.includes('알트에프') || displayCustomerForCheck.toLowerCase().includes('altf');
 
                 if (!isSeoulInventory) {
-                    if (item.supplierPriceOverride !== undefined) {
-                        unitCost = item.supplierPriceOverride;
-                    } else if (item.supplierRate !== undefined) {
-                        unitCost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
+                    let matchedItem = item;
+                    if (order.splitDeliveries && order.splitDeliveries.length > 0) {
+                        for (const d of order.splitDeliveries) {
+                            const found = (d.po_items || d.items || []).find(si => (si.parentId || si.id) === item.id);
+                            if (found) {
+                                matchedItem = found;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (matchedItem.supplierPriceOverride !== undefined) {
+                        unitCost = matchedItem.supplierPriceOverride;
+                    } else if (matchedItem.supplierRate !== undefined) {
+                        unitCost = Math.round((basePrice * (100 - matchedItem.supplierRate) / 100) / 10) * 10;
                     } else {
                         const rate = product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
                         unitCost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
@@ -433,29 +444,33 @@ export default function AdminPage() {
                                             const displayCustomerForCheck = order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '';
                                             const isSeoulInventory = displayCustomerForCheck.includes('서울재고') || displayCustomerForCheck.includes('시화재고') || displayCustomerForCheck.includes('알트에프') || displayCustomerForCheck.toLowerCase().includes('altf');
                                             
-                                            const totalBuyingCost = isSeoulInventory ? 0 : targetItems.reduce((acc, item) => {
-                                                // Optimized Lookup
-                                                const product = findProduct(item);
+                                            const totalBuyingCost = isSeoulInventory ? 0 : (
+                                                (order.splitDeliveries && order.splitDeliveries.length > 0)
+                                                    ? order.splitDeliveries.reduce((sum, d) => sum + (d.totalAmount || 0), 0)
+                                                    : targetItems.reduce((acc, item) => {
+                                                        // Optimized Lookup
+                                                        const product = findProduct(item);
 
-                                                // Use saved base_price if available, or current product base_price, or unitPrice fallback
-                                                // If we have explicit supplier rate saved, buying cost = base * (1 - rate)
-                                                // But usually `base_price` is reliable if matched.
+                                                        // Use saved base_price if available, or current product base_price, or unitPrice fallback
+                                                        // If we have explicit supplier rate saved, buying cost = base * (1 - rate)
+                                                        // But usually `base_price` is reliable if matched.
 
-                                                let cost = 0;
-                                                // [FIX] Include item.base_price for unlinked items
-                                                const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
+                                                        let cost = 0;
+                                                        // [FIX] Include item.base_price for unlinked items
+                                                        const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
 
-                                                if (item.supplierPriceOverride !== undefined) {
-                                                    cost = item.supplierPriceOverride;
-                                                } else if (item.supplierRate !== undefined) {
-                                                    cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
-                                                } else {
-                                                    const rate = product?.rate_act2 || product?.rate_act || product?.rate_pct || item.discountRate || 72;
-                                                    cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
-                                                }
+                                                        if (item.supplierPriceOverride !== undefined) {
+                                                            cost = item.supplierPriceOverride;
+                                                        } else if (item.supplierRate !== undefined) {
+                                                            cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
+                                                        } else {
+                                                            const rate = product?.rate_act2 || product?.rate_act || product?.rate_pct || item.discountRate || 72;
+                                                            cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+                                                        }
 
-                                                return acc + (cost * item.quantity);
-                                            }, 0);
+                                                        return acc + (cost * item.quantity);
+                                                    }, 0)
+                                            );
 
                                             const customerStats = calculateCustomerGrade(
                                                 orders,

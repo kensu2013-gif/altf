@@ -35,25 +35,29 @@ export function AnalyticsPanel({ orders, inventory }: AnalyticsPanelProps) {
 
             // Calculate cost from items
             let orderCost = 0;
-            // Use po_items if available (which means it was edited in Supplier mode), otherwise items
-            const itemsToCalc = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
+            if (order.splitDeliveries && order.splitDeliveries.length > 0) {
+                orderCost = order.splitDeliveries.reduce((sum, d) => sum + (d.totalAmount || 0), 0);
+            } else {
+                // Use po_items if available (which means it was edited in Supplier mode), otherwise items
+                const itemsToCalc = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
 
-            itemsToCalc.forEach(item => {
-                const product = findProduct(item);
-                let cost = 0;
-                const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
+                itemsToCalc.forEach(item => {
+                    const product = findProduct(item);
+                    let cost = 0;
+                    const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? 0;
 
-                if (item.supplierPriceOverride !== undefined) {
-                    cost = item.supplierPriceOverride;
-                } else if (item.supplierRate !== undefined) {
-                    cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
-                } else {
-                    const rate = product?.rate_act2 || product?.rate_act || product?.rate_pct || item.discountRate || 72;
-                    cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
-                }
+                    if (item.supplierPriceOverride !== undefined) {
+                        cost = item.supplierPriceOverride;
+                    } else if (item.supplierRate !== undefined) {
+                        cost = Math.round((basePrice * (100 - item.supplierRate) / 100) / 10) * 10;
+                    } else {
+                        const rate = product?.rate_act2 || product?.rate_act || product?.rate_pct || item.discountRate || 72;
+                        cost = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+                    }
 
-                orderCost += (cost * item.quantity);
-            });
+                    orderCost += (cost * item.quantity);
+                });
+            }
 
             // 서울재고, 알트에프 재고 등 내부 재고 주문인 경우 전체 금액에 반영하지 않고 재고 입고액으로만 분류
             if (isSeoulOrAltfInventory) {
