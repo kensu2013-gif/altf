@@ -723,7 +723,7 @@ export default function PilotSplitPO() {
         tel: supplier.tel,
         email: supplier.email,
         address: supplier.address,
-        note: supplier.note || ''
+        note: (currentOrder.supplierInfo?.note && currentOrder.supplierInfo.note.trim()) ? currentOrder.supplierInfo.note : (supplier.note || '')
       },
       customer: {
         company_name: '알트에프 (파일럿 분할발주)',
@@ -821,7 +821,7 @@ export default function PilotSplitPO() {
           tel: supplier.tel,
           email: supplier.email,
           address: supplier.address,
-          note: supplier.note || ''
+          note: (currentOrder.supplierInfo?.note && currentOrder.supplierInfo.note.trim()) ? currentOrder.supplierInfo.note : (supplier.note || '')
         },
         customer: {
           company_name: '알트에프 (파일럿 분할발주)',
@@ -954,8 +954,15 @@ export default function PilotSplitPO() {
       return agg && agg.items.length > 0;
     });
 
+    const parentNote = currentOrder.supplierInfo?.note;
+
     const splitDeliveries: SplitDelivery[] = activeSuppliersWithItems.map((s) => {
       const agg = supplierAggregations[s.id];
+      const effectiveNote = (parentNote && parentNote.trim()) ? parentNote : (s.note || '');
+      const supplierWithNote = {
+        ...s,
+        note: effectiveNote
+      };
 
       // 매출금액(salesAmount) 계산: 원래 수주 단가 * 분할 수량
       const salesAmount = agg.items.reduce((acc, item) => {
@@ -988,7 +995,7 @@ export default function PilotSplitPO() {
       });
 
       return {
-        supplier: s,
+        supplier: supplierWithNote,
         items: agg.items,
         po_items: poItems, // 매입 품목도 최초 저장 시점에 명시적으로 보존!
         totalAmount: agg.totalAmount, // 매입 합계
@@ -1070,10 +1077,34 @@ export default function PilotSplitPO() {
 
     console.log("[SplitPO] Syncing sub-order updates back to parent splitDeliveries without creating sub-order rows:", supplierId);
 
-    // 1. 부모 주문 데이터베이스에 반영
-    await updateOrder(currentOrder.id, {
+    const updatedNote = updates.supplierInfo?.note;
+    const parentUpdates: Partial<Order> = {
       splitDeliveries: nextSplitDeliveries
-    });
+    };
+
+    if (updatedNote !== undefined) {
+      // 자식 매입발주서 상세조정에서 Note가 수정되었을 때 부모 및 다른 자식의 note도 양방향 연동
+      parentUpdates.supplierInfo = {
+        ...(currentOrder.supplierInfo || {
+          company_name: '(주)대경벤드',
+          contact_name: '정호근 과장',
+          tel: '055-364-1800',
+          email: 'dksales@daekyungbend.com',
+          address: '경상남도 양산시 어실로 115'
+        }),
+        note: updatedNote
+      };
+      parentUpdates.splitDeliveries = nextSplitDeliveries.map(d => ({
+        ...d,
+        supplier: {
+          ...d.supplier,
+          note: updatedNote
+        }
+      }));
+    }
+
+    // 1. 부모 주문 데이터베이스에 반영
+    await updateOrder(currentOrder.id, parentUpdates);
 
     // 2. 부모 컴포넌트의 로컬 localItems 상태에도 수정된 요율과 단가 덮어씌워 갱신하기 (DND 보드와 상세조정 모달 동기화)
     if (updates.po_items) {
@@ -1945,7 +1976,11 @@ export default function PilotSplitPO() {
                                 tel: s.tel,
                                 email: s.email,
                                 address: s.address,
-                                note: s.note || ''
+                                note: (deliveryInfo?.supplier?.note && deliveryInfo.supplier.note.trim())
+                                  ? deliveryInfo.supplier.note
+                                  : ((currentOrder.supplierInfo?.note && currentOrder.supplierInfo.note.trim())
+                                    ? currentOrder.supplierInfo.note
+                                    : (s.note || ''))
                               },
                               buyerInfo: buyerInfoData, // 배송지 정보 탑재
                               status: deliveryInfo?.poSent ? 'SHIPPED' : 'PENDING',
