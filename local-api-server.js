@@ -70,6 +70,55 @@ async function loadData() {
                 } catch (e) {
                     console.log(`[API] Failed to seed customers mapping: ${e.message}`);
                 }
+            // Self-healing: Repair any 0% or missing supplierRate in splitDeliveries
+            let ordersRepaired = 0;
+            if (db.orders && Array.isArray(db.orders)) {
+                db.orders.forEach(order => {
+                    if (order.splitDeliveries && Array.isArray(order.splitDeliveries)) {
+                        order.splitDeliveries.forEach(d => {
+                            const defaultRate = (d.supplier && d.supplier.default_rate && d.supplier.default_rate > 0) ? d.supplier.default_rate : 45;
+                            let itemChanged = false;
+
+                            if (Array.isArray(d.items)) {
+                                d.items.forEach(item => {
+                                    if (!item.supplierRate || item.supplierRate <= 0) {
+                                        item.supplierRate = defaultRate;
+                                        itemChanged = true;
+                                    }
+                                });
+                            }
+                            if (Array.isArray(d.po_items)) {
+                                d.po_items.forEach(item => {
+                                    if (!item.supplierRate || item.supplierRate <= 0) {
+                                        item.supplierRate = defaultRate;
+                                        itemChanged = true;
+                                    }
+                                });
+                            }
+
+                            if (itemChanged) {
+                                ordersRepaired++;
+                                const targetList = d.po_items && d.po_items.length > 0 ? d.po_items : d.items;
+                                if (targetList) {
+                                    const newTotal = targetList.reduce((acc, item) => {
+                                        const basePrice = item.base_price || item.unitPrice || 0;
+                                        const rate = (item.supplierRate && item.supplierRate > 0) ? item.supplierRate : defaultRate;
+                                        let supplierPrice = item.supplierPriceOverride;
+                                        if (supplierPrice === undefined) {
+                                            supplierPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+                                        }
+                                        return acc + (supplierPrice * item.quantity);
+                                    }, 0);
+                                    if (newTotal > 0) d.totalAmount = newTotal;
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+            if (ordersRepaired > 0) {
+                console.log(`[SELF-HEAL] Successfully repaired 0% supplierRate for ${ordersRepaired} split deliveries.`);
+                await saveData();
             }
 
             // Self-healing recovery for missing daily diffs due to initialization overwrite (Disabled)
