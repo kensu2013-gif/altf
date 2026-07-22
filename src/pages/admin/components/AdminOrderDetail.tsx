@@ -246,7 +246,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         // 부모 주문서인 경우, splitDeliveries에 요율이나 매입단가가 저장되어 있다면 그것을 우선 연동/상속합니다.
         if (order.splitDeliveries && order.splitDeliveries.length > 0) {
             initialPoItems = initialPoItems.map(item => {
-                let savedRate = item.supplierRate;
+                let savedRate = (item.supplierRate && item.supplierRate > 0) ? item.supplierRate : undefined;
                 let savedOverride = item.supplierPriceOverride;
                 let isPoSent = item.poSent;
 
@@ -254,7 +254,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     const matchedItem = delivery.items?.find(di => (di.parentId || di.id) === (item.parentId || item.id))
                         || delivery.po_items?.find(di => (di.parentId || di.id) === (item.parentId || item.id));
                     if (matchedItem) {
-                        if (matchedItem.supplierRate !== undefined) {
+                        if (matchedItem.supplierRate !== undefined && matchedItem.supplierRate > 0) {
                             savedRate = matchedItem.supplierRate;
                         }
                         if (matchedItem.supplierPriceOverride !== undefined) {
@@ -295,19 +295,21 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                 else if (discountRate === 35) discountRate = 25;
             }
 
-            // 신규 발주서 작성이거나 supplierRate가 없을 때 인벤토리에서 매입율을 매칭
+            // 신규 발주서 작성이거나 supplierRate가 유효하지 않을 때 (undefined 또는 0 이하일 때)
             let supplierRate = item.supplierRate;
-            if (!order.po_items || order.po_items.length === 0 || supplierRate === undefined) {
+            if (!supplierRate || supplierRate <= 0) {
                 const product = findProduct(item);
                 if (product) {
-                    supplierRate = product.rate_act2 ?? product.rate_act ?? product.rate_pct ?? 0;
+                    supplierRate = product.rate_act2 ?? product.rate_act ?? product.rate_pct ?? item.discountRate ?? 45;
+                } else {
+                    supplierRate = item.discountRate && item.discountRate > 0 ? item.discountRate : 45; // 외주 기본 45% fallback
                 }
             }
 
             return {
                 ...item,
                 discountRate: discountRate ?? 0,
-                supplierRate: supplierRate ?? 0
+                supplierRate: supplierRate
             };
         });
     });

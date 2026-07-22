@@ -1890,7 +1890,7 @@ export default function PilotSplitPO() {
                                     분할
                                   </button>
                                 ) : (
-                                  <button
+                          <button
                                     onClick={() => handleRemoveSplitItem(item as SplitLineItem)}
                                     className="p-1 text-slate-450 hover:text-red-655 hover:bg-slate-200 rounded transition-colors"
                                     title="분할 품목 삭제 (수량 원본 반환)"
@@ -2008,7 +2008,9 @@ export default function PilotSplitPO() {
                                 || deliveryInfo?.po_items?.find(di => (di.parentId || di.id) === (item.parentId || item.id));
 
                               const product = findProduct(item);
-                              const defaultRate = savedItem?.supplierRate ?? item.supplierRate ?? product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
+                              const validSavedRate = (savedItem?.supplierRate && savedItem.supplierRate > 0) ? savedItem.supplierRate : undefined;
+                              const validItemRate = (item.supplierRate && item.supplierRate > 0) ? item.supplierRate : undefined;
+                              const defaultRate = validSavedRate ?? validItemRate ?? s.default_rate ?? product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? item.discountRate ?? 45;
                               const priceOverride = savedItem?.supplierPriceOverride ?? item.supplierPriceOverride;
 
                               return {
