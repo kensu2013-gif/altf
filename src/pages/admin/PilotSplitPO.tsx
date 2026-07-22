@@ -1115,37 +1115,71 @@ export default function PilotSplitPO() {
 
     // 하위 매입처 ID 추출
     const supplierId = orderId.split('-sub-')[2] || orderId.split('-sub-')[1];
-    if (!supplierId || !currentOrder.splitDeliveries) return;
+    if (!supplierId) return;
 
     const isSent = updates.poSent || updates.status === 'SHIPPED' || updates.status === 'COMPLETED';
     const supplierTotalAmount = updates.totalSupplierAmount;
 
-    // 부모 주문의 splitDeliveries 내부 정보 동적 업데이트
-    const nextSplitDeliveries = currentOrder.splitDeliveries.map(d => {
-      if (d.supplier.id === supplierId) {
-        const nextSupplier = updates.supplierInfo ? {
-          ...d.supplier,
-          ...updates.supplierInfo
-        } : d.supplier;
+    const existingDeliveries = currentOrder.splitDeliveries || [];
+    const hasSupplierDelivery = existingDeliveries.some(d => d.supplier.id === supplierId);
 
-        const targetTotal = supplierTotalAmount !== undefined 
-          ? supplierTotalAmount 
-          : (updates.totalAmount !== undefined ? updates.totalAmount : d.totalAmount);
+    const targetSupplier: Supplier = suppliers.find(s => s.id === supplierId) || {
+      id: supplierId,
+      company_name: updates.supplierInfo?.company_name || supplierId,
+      contact_name: updates.supplierInfo?.contact_name || '',
+      tel: updates.supplierInfo?.tel || '',
+      email: updates.supplierInfo?.email || '',
+      address: updates.supplierInfo?.address || '',
+      note: updates.supplierInfo?.note || ''
+    };
 
-        return {
-          ...d,
-          supplier: nextSupplier,
-          poSent: isSent,
-          poNumber: updates.poNumber || d.poNumber,
-          totalAmount: targetTotal, // 모달에서 확정된 실제 매입액(₩419,240) 반영
-          // 사용자가 매입 품목 명칭/수량/단가를 오버라이드한 경우를 대비해 갱신된 items 및 po_items 병합 상속
-          items: updates.items || d.items,
-          po_items: updates.po_items || d.po_items,
-          sentAt: isSent ? (d.sentAt || new Date().toISOString()) : d.sentAt
-        };
-      }
-      return d;
-    });
+    let nextSplitDeliveries: SplitDelivery[] = [];
+
+    if (hasSupplierDelivery) {
+      nextSplitDeliveries = existingDeliveries.map(d => {
+        if (d.supplier.id === supplierId) {
+          const nextSupplier = updates.supplierInfo ? {
+            ...d.supplier,
+            ...updates.supplierInfo
+          } : d.supplier;
+
+          const targetTotal = supplierTotalAmount !== undefined 
+            ? supplierTotalAmount 
+            : (updates.totalAmount !== undefined ? updates.totalAmount : d.totalAmount);
+
+          return {
+            ...d,
+            supplier: nextSupplier,
+            poSent: isSent,
+            poNumber: updates.poNumber || d.poNumber,
+            totalAmount: targetTotal, // 모달에서 확정된 실제 매입액(₩419,240 등) 반영
+            // 사용자가 매입 품목 명칭/수량/단가를 오버라이드한 경우를 대비해 갱신된 items 및 po_items 병합 상속
+            items: updates.items || d.items,
+            po_items: updates.po_items || d.po_items,
+            sentAt: isSent ? (d.sentAt || new Date().toISOString()) : d.sentAt
+          };
+        }
+        return d;
+      });
+    } else {
+      const targetTotal = supplierTotalAmount !== undefined 
+        ? supplierTotalAmount 
+        : (updates.totalAmount || 0);
+
+      const newDelivery: SplitDelivery = {
+        supplier: updates.supplierInfo ? { ...targetSupplier, ...updates.supplierInfo } : targetSupplier,
+        items: updates.items || [],
+        po_items: updates.po_items || [],
+        totalAmount: targetTotal,
+        salesAmount: (updates.items || []).reduce((acc, item) => acc + ((item.unitPrice || 0) * (item.quantity || 0)), 0),
+        poSent: isSent,
+        poNumber: updates.poNumber || '',
+        poTitle: updates.poTitle || `[분할발주] ${targetSupplier.company_name}`,
+        status: isSent ? 'SENT' : 'PENDING',
+        sentAt: isSent ? new Date().toISOString() : undefined
+      };
+      nextSplitDeliveries = [...existingDeliveries, newDelivery];
+    }
 
     console.log("[SplitPO] Syncing sub-order updates back to parent splitDeliveries without creating sub-order rows:", supplierId);
 
@@ -1175,22 +1209,24 @@ export default function PilotSplitPO() {
       }));
     }
 
-    // 1. 부모 주문 데이터베이스에 반영
+    // 1. 부모 주문 데이터베이스 및 글로벌 상태에 반영
     await updateOrder(currentOrder.id, parentUpdates);
 
     // 2. 부모 컴포넌트의 로컬 localItems 상태에도 수정된 요율과 단가 덮어씌워 갱신하기 (DND 보드와 상세조정 모달 동기화)
-    if (updates.po_items) {
+    const updatedPoItemsList = updates.po_items || updates.items;
+    if (updatedPoItemsList && updatedPoItemsList.length > 0) {
       setLocalItems(prevItems => {
         return prevItems.map(item => {
           if (assignments[item.id] === supplierId) {
-            const matchedPoItem = updates.po_items?.find(pi => 
-              (pi.parentId || pi.id) === (item.parentId || item.id) ||
+            const matchedPoItem = updatedPoItemsList.find(pi => 
+              (pi.parentId && (pi.parentId === item.id || pi.parentId === item.parentId)) ||
+              (pi.id && (pi.id === item.id || pi.id === item.parentId)) ||
               (pi.name === item.name && pi.size === item.size && pi.thickness === item.thickness && pi.material === item.material)
             );
             if (matchedPoItem) {
               return {
                 ...item,
-                supplierRate: matchedPoItem.supplierRate ?? item.supplierRate,
+                supplierRate: matchedPoItem.supplierRate !== undefined ? matchedPoItem.supplierRate : item.supplierRate,
                 supplierPriceOverride: matchedPoItem.supplierPriceOverride !== undefined ? matchedPoItem.supplierPriceOverride : item.supplierPriceOverride
               };
             }
@@ -2012,12 +2048,14 @@ export default function PilotSplitPO() {
 
                             // 가상 하위 주문서 매입 품목 빌드 (약정 요율 동적 복사 및 기저 저장 내역 보존 적용)
                             const poItems = agg.items.map((item) => {
-                              const savedItem = deliveryInfo?.items?.find(di => (di.parentId || di.id) === (item.parentId || item.id))
-                                || deliveryInfo?.po_items?.find(di => (di.parentId || di.id) === (item.parentId || item.id));
+                              const savedItem = deliveryInfo?.items?.find(di => (di.parentId && (di.parentId === item.id || di.parentId === item.parentId)) || (di.id && (di.id === item.id || di.id === item.parentId)))
+                                || deliveryInfo?.po_items?.find(di => (di.parentId && (di.parentId === item.id || di.parentId === item.parentId)) || (di.id && (di.id === item.id || di.id === item.parentId)))
+                                || deliveryInfo?.items?.find(di => di.name === item.name && di.size === item.size && di.thickness === item.thickness && di.material === item.material)
+                                || deliveryInfo?.po_items?.find(di => di.name === item.name && di.size === item.size && di.thickness === item.thickness && di.material === item.material);
 
                               const product = findProduct(item);
-                              const validSavedRate = (savedItem?.supplierRate && savedItem.supplierRate > 0) ? savedItem.supplierRate : undefined;
-                              const validItemRate = (item.supplierRate && item.supplierRate > 0) ? item.supplierRate : undefined;
+                              const validSavedRate = (savedItem?.supplierRate !== undefined && savedItem.supplierRate >= 0) ? savedItem.supplierRate : undefined;
+                              const validItemRate = (item.supplierRate !== undefined && item.supplierRate >= 0) ? item.supplierRate : undefined;
                               const defaultRate = validSavedRate ?? validItemRate ?? s.default_rate ?? product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? item.discountRate ?? 45;
                               const priceOverride = savedItem?.supplierPriceOverride ?? item.supplierPriceOverride;
 
