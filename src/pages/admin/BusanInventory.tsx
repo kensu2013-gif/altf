@@ -2517,16 +2517,17 @@ export default function BusanInventory() {
 
             // User requirement: "기준은 재고data에서 부산재고만 따로 추려서..." => We can include all to give full visibility, or just those with stock or pending.
             // Let's include everything in the analyzedInventory to act as the full baseline map.
+            const escapeCSV = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
             const r = [
-                `"${specName}"`,
-                `"${specThick}"`,
-                `"${specSize}"`,
-                `"${specMat}"`,
+                escapeCSV(specName),
+                escapeCSV(specThick),
+                escapeCSV(specSize),
+                escapeCSV(specMat),
                 row.shQty, // 현재고
                 row.pendingOrderQty, // 입고예정
-                `"${poNumbers.join(', ')}"`,
-                `"${poDates.join(', ')}"`,
-                `"${deliveryDates.join(', ')}"`
+                escapeCSV(poNumbers.join(', ')),
+                escapeCSV(poDates.join(', ')),
+                escapeCSV(deliveryDates.join(', '))
             ];
             csvRows.push(r.join(','));
         });
@@ -2545,6 +2546,7 @@ export default function BusanInventory() {
     };
 
     const handleExportAiSummary = () => {
+        const escapeCSV = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
         const headers = ['구분', '품목 코드', '품목', '두께', '사이즈', '재질', '현재고(부산)', '대경재고', '대기중(수량)', '발주서번호(들)', '납품예정일(들)', '매입단가', '권장/추천발주량', '필요예산', '분석근거'];
         const csvRows = [headers.join(',')];
 
@@ -2556,21 +2558,21 @@ export default function BusanInventory() {
                 const budget = row.recentPurchasePrice * (deficitOrRecommended > 0 ? deficitOrRecommended : 1);
                 
                 const r = [
-                    `"${category}"`,
-                    `"${row.product.id}"`,
-                    `"${row.product.name || ''}"`,
-                    `"${row.product.thickness || ''}"`,
-                    `"${row.product.size || ''}"`,
-                    `"${row.product.material || ''}"`,
+                    escapeCSV(category),
+                    escapeCSV(row.product.id),
+                    escapeCSV(row.product.name),
+                    escapeCSV(row.product.thickness),
+                    escapeCSV(row.product.size),
+                    escapeCSV(row.product.material),
                     row.shQty,
                     row.ysQty,
                     row.pendingOrderQty,
-                    `"${poNumbers}"`,
-                    `"${deliveryDates}"`,
+                    escapeCSV(poNumbers),
+                    escapeCSV(deliveryDates),
                     row.recentPurchasePrice,
                     deficitOrRecommended,
                     budget,
-                    `"적정 대비 ${row.deficit}개 부족 / 연판매 ${row.salesVolume}개"`
+                    escapeCSV(`적정 대비 ${row.deficit}개 부족 / 연판매 ${row.salesVolume}개`)
                 ];
                 csvRows.push(r.join(','));
             });

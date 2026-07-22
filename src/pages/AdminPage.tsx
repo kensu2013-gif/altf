@@ -217,6 +217,8 @@ export default function AdminPage() {
             return;
         }
 
+        const escapeCSV = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+
         const headers = ['발주번호', '주문일시', '고객사', '품목', '두께', '사이즈', '재질', '수량', '판매단가', '판매금액', '매입단가', '매입금액', '이익금', '상태', '담당자'];
         const csvRows = [headers.join(',')];
 
@@ -231,21 +233,21 @@ export default function AdminPage() {
 
             if (targetItems.length === 0) {
                 const row = [
-                    `"${order.id}"`,
-                    `"${dateStr}"`,
-                    `"${displayCustomer}"`,
-                    `""`,
-                    `""`,
-                    `""`,
-                    `""`,
+                    escapeCSV(order.id),
+                    escapeCSV(dateStr),
+                    escapeCSV(displayCustomer),
+                    '""',
+                    '""',
+                    '""',
+                    '""',
                     0,
                     0,
                     0,
                     0,
                     0,
                     0,
-                    `"${statusStr}"`,
-                    `"${managerName}"`
+                    escapeCSV(statusStr),
+                    escapeCSV(managerName)
                 ];
                 csvRows.push(row.join(','));
                 return;
@@ -291,21 +293,21 @@ export default function AdminPage() {
                 const profit = totalSalesPrice - totalCost;
 
                 const row = [
-                    `"${order.id}"`,
-                    `"${dateStr}"`,
-                    `"${displayCustomer}"`,
-                    `"${item.name || ''}"`,
-                    `"${item.thickness || ''}"`,
-                    `"${item.size || ''}"`,
-                    `"${item.material || ''}"`,
+                    escapeCSV(order.id),
+                    escapeCSV(dateStr),
+                    escapeCSV(displayCustomer),
+                    escapeCSV(item.name),
+                    escapeCSV(item.thickness),
+                    escapeCSV(item.size),
+                    escapeCSV(item.material),
                     item.quantity,
                     unitSalesPrice,
                     totalSalesPrice,
                     unitCost,
                     totalCost,
                     profit,
-                    `"${statusStr}"`,
-                    `"${managerName}"`
+                    escapeCSV(statusStr),
+                    escapeCSV(managerName)
                 ];
 
                 csvRows.push(row.join(','));

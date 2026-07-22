@@ -227,6 +227,8 @@ export default function AdminQuotes() {
             return;
         }
 
+        const escapeCSV = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+
         const headers = ['견적번호', '견적일시', '고객사', '담당자', '품목', '두께', '사이즈', '재질', '수량', '단가', '금액', '상태'];
         const csvRows = [headers.join(',')];
 
@@ -238,18 +240,18 @@ export default function AdminQuotes() {
 
             if (!quote.items || quote.items.length === 0) {
                 const row = [
-                    `"${quote.id}"`,
-                    `"${dateStr}"`,
-                    `"${customerName}"`,
-                    `"${contactName}"`,
-                    `""`,
-                    `""`,
-                    `""`,
-                    `""`,
+                    escapeCSV(quote.id),
+                    escapeCSV(dateStr),
+                    escapeCSV(customerName),
+                    escapeCSV(contactName),
+                    '""',
+                    '""',
+                    '""',
+                    '""',
                     0,
                     0,
                     0,
-                    `"${quote.status}"`
+                    escapeCSV(quote.status)
                 ];
                 csvRows.push(row.join(','));
                 return;
@@ -257,18 +259,18 @@ export default function AdminQuotes() {
 
             quote.items.forEach(item => {
                 const row = [
-                    `"${quote.id}"`,
-                    `"${dateStr}"`,
-                    `"${customerName}"`,
-                    `"${contactName}"`,
-                    `"${item.name || ''}"`,
-                    `"${item.thickness || ''}"`,
-                    `"${item.size || ''}"`,
-                    `"${item.material || ''}"`,
+                    escapeCSV(quote.id),
+                    escapeCSV(dateStr),
+                    escapeCSV(customerName),
+                    escapeCSV(contactName),
+                    escapeCSV(item.name),
+                    escapeCSV(item.thickness),
+                    escapeCSV(item.size),
+                    escapeCSV(item.material),
                     item.quantity,
                     item.unitPrice,
                     item.amount,
-                    `"${quote.status}"`
+                    escapeCSV(quote.status)
                 ];
                 csvRows.push(row.join(','));
             });

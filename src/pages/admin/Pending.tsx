@@ -692,6 +692,8 @@ export default function PendingOrders() {
             return;
         }
 
+        const escapeCSV = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+
         const headers = activeTab === 'ALL'
             ? ['고객명', '발주번호', '발주일자', '납기일자', '납기상태', '상태(태그)', '품목', '두께', '사이즈', '재질', '수량', '메모(특이사항)', '코멘트']
             : ['품목', '두께', '사이즈', '재질', '발주번호', '발주일자', '납기일자', '납기상태', '수량', '중복여부', '중복건수', '상태(태그)', '코멘트'];
@@ -711,19 +713,19 @@ export default function PendingOrders() {
 
             if (activeTab === 'ALL') {
                 const row = [
-                    `"${item.targetCustomerName || item.customerName}"`,
-                    `"${item.poNumber}"`,
-                    `"${item.poDate}"`,
-                    `"${item.deliveryDate}"`,
-                    `"${statusText}"`,
-                    `"${tagsString}"`,
-                    `"${item.itemName || ''}"`,
-                    `"${item.thickness || ''}"`,
-                    `"${item.size || ''}"`,
-                    `"${item.material || ''}"`,
+                    escapeCSV(item.targetCustomerName || item.customerName),
+                    escapeCSV(item.poNumber),
+                    escapeCSV(item.poDate),
+                    escapeCSV(item.deliveryDate),
+                    escapeCSV(statusText),
+                    escapeCSV(tagsString),
+                    escapeCSV(item.itemName),
+                    escapeCSV(item.thickness),
+                    escapeCSV(item.size),
+                    escapeCSV(item.material),
                     item.quantity,
-                    `"${item.memo.replace(/"/g, '""')}"`,
-                    `"${commentsString.replace(/"/g, '""')}"`
+                    escapeCSV(item.memo),
+                    escapeCSV(commentsString)
                 ];
                 csvRows.push(row.join(','));
             } else {
@@ -734,19 +736,19 @@ export default function PendingOrders() {
                 const dupCount = dupData?.count || 1;
 
                 const row = [
-                    `"${item.itemName || ''}"`,
-                    `"${item.thickness || ''}"`,
-                    `"${item.size || ''}"`,
-                    `"${item.material || ''}"`,
-                    `"${item.poNumber}"`,
-                    `"${item.poDate}"`,
-                    `"${item.deliveryDate}"`,
-                    `"${statusText}"`,
+                    escapeCSV(item.itemName),
+                    escapeCSV(item.thickness),
+                    escapeCSV(item.size),
+                    escapeCSV(item.material),
+                    escapeCSV(item.poNumber),
+                    escapeCSV(item.poDate),
+                    escapeCSV(item.deliveryDate),
+                    escapeCSV(statusText),
                     item.quantity,
-                    `"${dupText}"`,
+                    escapeCSV(dupText),
                     dupCount,
-                    `"${tagsString}"`,
-                    `"${commentsString.replace(/"/g, '""')}"`
+                    escapeCSV(tagsString),
+                    escapeCSV(commentsString)
                 ];
                 csvRows.push(row.join(','));
             }
