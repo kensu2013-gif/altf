@@ -181,6 +181,7 @@ export interface Order {
     isSplitPoSubOrder?: boolean; // Flag to indicate if this order is a sub-order generated from a split PO
     // Supplier PO Data
     poSent?: boolean; // [NEW] Track whether PO webhook was fired
+    totalSupplierAmount?: number; // [NEW] Total supplier purchase order amount
     isStockOrder?: boolean; // [NEW] Track if it is a stock replenishment order
     supplierInfo?: {
         id?: string;

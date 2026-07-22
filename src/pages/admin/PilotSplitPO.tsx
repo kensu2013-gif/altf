@@ -1118,7 +1118,7 @@ export default function PilotSplitPO() {
     if (!supplierId || !currentOrder.splitDeliveries) return;
 
     const isSent = updates.poSent || updates.status === 'SHIPPED' || updates.status === 'COMPLETED';
-    const supplierTotalAmount = (updates as any).totalSupplierAmount;
+    const supplierTotalAmount = updates.totalSupplierAmount;
 
     // 부모 주문의 splitDeliveries 내부 정보 동적 업데이트
     const nextSplitDeliveries = currentOrder.splitDeliveries.map(d => {
