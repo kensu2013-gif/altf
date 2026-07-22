@@ -36,6 +36,7 @@ interface Supplier {
   email: string;
   address: string;
   note?: string;
+  default_rate?: number; // [NEW] 기본 매입 요율 (%)
 }
 
 // CRM 고객 타입 정의
@@ -62,7 +63,8 @@ const DEFAULT_SUPPLIER: Supplier = {
   tel: '055-364-1800',
   email: 'dksales@daekyungbend.com',
   address: '경상남도 양산시 어실로 115',
-  note: '기본 매입처'
+  note: '기본 매입처',
+  default_rate: 47
 };
 
 function generateSupplierId() {
@@ -133,7 +135,8 @@ export default function PilotSplitPO() {
     tel: '',
     email: '',
     address: '',
-    note: ''
+    note: '',
+    default_rate: 45
   });
 
   // === CRM 거래처 목록 로드 및 검색 ===
@@ -203,7 +206,8 @@ export default function PilotSplitPO() {
       tel: '',
       email: '',
       address: '',
-      note: ''
+      note: '',
+      default_rate: 45
     });
     setShowAddSupplier(false);
   };
@@ -307,44 +311,104 @@ export default function PilotSplitPO() {
     setPrevSelectedOrderId(selectedOrderId);
     setSelectedItemIds([]);
 
-    if (currentOrder && currentOrder.splitDeliveries && currentOrder.splitDeliveries.length > 0) {
-      // 1. 이미 저장된 분할 배치 내역이 존재하는 경우 -> 보드 완벽 복원
+    if (currentOrder) {
       const restoredAssignments: Record<string, string> = {};
       const restoredItems: SplitLineItem[] = [];
+      const loadedSuppliers: Supplier[] = [];
 
-      currentOrder.splitDeliveries.forEach(d => {
-        if (Array.isArray(d.items)) {
-          d.items.forEach(item => {
-            const matchedPoItem = d.po_items?.find(pi => (pi.parentId || pi.id) === (item.parentId || item.id));
-            const restoredRate = matchedPoItem?.supplierRate ?? item.supplierRate;
-            const restoredOverride = matchedPoItem?.supplierPriceOverride ?? item.supplierPriceOverride;
+      // 1. splitDeliveries 내역이 이미 존재하는 경우
+      if (currentOrder.splitDeliveries && currentOrder.splitDeliveries.length > 0) {
+        currentOrder.splitDeliveries.forEach(d => {
+          if (d.supplier && d.supplier.id) {
+            loadedSuppliers.push(d.supplier);
+          }
+          if (Array.isArray(d.items)) {
+            d.items.forEach(item => {
+              const matchedPoItem = d.po_items?.find(pi => (pi.parentId || pi.id) === (item.parentId || item.id));
+              const product = findProduct(item);
+              const restoredRate = matchedPoItem?.supplierRate ?? item.supplierRate ?? d.supplier?.default_rate ?? product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? item.discountRate ?? 72;
+              const restoredOverride = matchedPoItem?.supplierPriceOverride ?? item.supplierPriceOverride;
 
-            restoredItems.push({
-              ...item,
-              supplierRate: restoredRate,
-              supplierPriceOverride: restoredOverride
-            } as SplitLineItem);
-            restoredAssignments[item.id] = d.supplier.id;
-          });
-        }
-      });
+              restoredItems.push({
+                ...item,
+                supplierRate: restoredRate,
+                supplierPriceOverride: restoredOverride
+              } as SplitLineItem);
+              restoredAssignments[item.id] = d.supplier.id;
+            });
+          }
+        });
 
-      // 혹시 원본 items 중에 splitDeliveries 에 포함되지 않고 누락된 품목이 있다면 (미지정 상태)
-      const rawItems = currentOrder.items || [];
-      rawItems.forEach(orig => {
-        const isRestored = restoredItems.some(it => it.id === orig.id || it.parentId === orig.id);
-        if (!isRestored) {
+        // 원본 items 중 splitDeliveries에 포함되지 않고 누락된 품목이 있다면
+        const rawItems = currentOrder.items || [];
+        rawItems.forEach(orig => {
+          const isRestored = restoredItems.some(it => it.id === orig.id || it.parentId === orig.id);
+          if (!isRestored) {
+            restoredItems.push(orig as SplitLineItem);
+          }
+        });
+      } 
+      // 2. splitDeliveries는 없으나 단일 supplierInfo(유성벤드 등)가 작성된 발주서 주문의 경우
+      else if (currentOrder.supplierInfo && currentOrder.supplierInfo.company_name) {
+        const supInfo = currentOrder.supplierInfo;
+        const supId = supInfo.id || `sup-${supInfo.company_name.replace(/[\s()]/g, '')}`;
+        const singleSupplier: Supplier = {
+          id: supId,
+          company_name: supInfo.company_name,
+          contact_name: supInfo.contact_name || '',
+          tel: supInfo.tel || '',
+          email: supInfo.email || '',
+          address: supInfo.address || '',
+          note: supInfo.note || '',
+          default_rate: 45
+        };
+        loadedSuppliers.push(singleSupplier);
+
+        const rawItems = currentOrder.items || [];
+        rawItems.forEach(orig => {
           restoredItems.push(orig as SplitLineItem);
-        }
+          restoredAssignments[orig.id] = supId;
+        });
+      } 
+      // 3. 완전히 새로운 미지정 주문서인 경우
+      else {
+        (currentOrder.items || []).forEach(orig => {
+          restoredItems.push(orig as SplitLineItem);
+        });
+      }
+
+      // 누락된 매입처가 있다면 suppliers 목록에 추가/갱신
+      if (loadedSuppliers.length > 0) {
+        setSuppliers(prev => {
+          const next = [...prev];
+          loadedSuppliers.forEach(ls => {
+            const idx = next.findIndex(s => s.id === ls.id || s.company_name === ls.company_name);
+            if (idx === -1) {
+              next.push(ls);
+            } else {
+              next[idx] = { ...next[idx], ...ls };
+            }
+          });
+          return next;
+        });
+      }
+
+      // ⭐ [핵심 픽스] 저장된 모든 매입처 카드 ID를 activeSupplierIds에 100% 강제 활성화 (대경벤드 기본 포함)
+      setActiveSupplierIds(prev => {
+        const set = new Set<string>(prev);
+        set.add(DEFAULT_SUPPLIER.id); // 대경벤드는 항상 켬
+        loadedSuppliers.forEach(ls => {
+          if (ls.id) set.add(ls.id);
+        });
+        return Array.from(set);
       });
 
       setLocalItems(restoredItems);
       setAssignments(restoredAssignments);
-      console.log("[SplitPO] Restored split PO assignments from DB for order:", selectedOrderId);
+      console.log("[SplitPO] Restored split PO assignments & forced active supplier cards for order:", selectedOrderId);
     } else {
-      // 2. 저장된 분할 배치 내역이 없는 신규 주문서의 경우 -> 초기 원본 리스트로 세팅
       setAssignments({});
-      setLocalItems(currentOrder ? (currentOrder.items || []) : []);
+      setLocalItems([]);
     }
   }
 
@@ -624,10 +688,13 @@ export default function PilotSplitPO() {
         result[supplierId] = { items: [], totalAmount: 0 };
       }
 
-      // 품목 인벤토리 조인으로 매입단가 계산
+      // 공급처 정보 및 품목 인벤토리 조인으로 매입단가 계산
+      const supplier = suppliers.find(s => s.id === supplierId);
       const product = findProduct(item);
-      const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? 0;
-      const rate = item.supplierRate ?? product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
+      const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0;
+      
+      // 우선순위: 품목 지정 요율 > 지정 공급처 기본 매입요율 > 인벤토리 요율 > 매출 할인율 > 기본 72%
+      const rate = item.supplierRate ?? supplier?.default_rate ?? product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? item.discountRate ?? 72;
       
       let supplierPrice = item.supplierPriceOverride;
       if (supplierPrice === undefined) {
@@ -986,7 +1053,7 @@ export default function PilotSplitPO() {
 
       const poItems = agg.items.map(item => {
         const product = findProduct(item);
-        const defaultRate = item.supplierRate ?? product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? 0;
+        const defaultRate = item.supplierRate ?? s.default_rate ?? product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? item.discountRate ?? 72;
         return {
           ...item,
           supplierRate: defaultRate,
@@ -1431,6 +1498,18 @@ export default function PilotSplitPO() {
                     className="w-full bg-white border border-slate-350 rounded-lg p-2 text-sm text-slate-800 focus:border-teal-500 outline-none"
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-slate-500 block font-bold">기본 매입 요율 (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="예: 45"
+                    value={newSupplier.default_rate ?? 45}
+                    onChange={e => setNewSupplier(prev => ({ ...prev, default_rate: parseFloat(e.target.value) || 0 }))}
+                    className="w-full bg-white border border-slate-350 rounded-lg p-2 text-sm text-slate-800 focus:border-teal-500 outline-none font-semibold text-teal-700"
+                  />
+                </div>
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-xs text-slate-500 block font-bold">주소</label>
                   <input
@@ -1488,6 +1567,9 @@ export default function PilotSplitPO() {
                         DEFAULT
                       </span>
                     )}
+                    <span className="text-[9px] bg-slate-100 text-slate-600 border border-slate-200 px-1.5 py-0.5 rounded font-bold">
+                      매입 {s.default_rate ?? 45}%
+                    </span>
                   </h3>
                   <p className="text-slate-500 text-xs mt-0.5 flex items-center gap-1">
                     <User className="w-3 h-3 text-slate-400" /> {s.contact_name || '-'}

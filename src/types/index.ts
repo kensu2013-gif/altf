@@ -252,6 +252,7 @@ export interface Supplier {
     email: string;
     address: string;
     note?: string;
+    default_rate?: number; // [NEW] 기본 매입 요율 (%) (e.g. 45)
 }
 
 export interface SplitDelivery {

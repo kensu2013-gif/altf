@@ -1498,35 +1498,53 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         if (nextSplitDeliveries && nextSplitDeliveries.length > 0) {
             nextSplitDeliveries = nextSplitDeliveries.map(d => {
                 const isTarget = d.supplier.id === supplierInfo.id;
+
                 const updatedItems = d.items?.map(item => {
-                    const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
-                    if (matched) {
-                        return {
-                            ...item,
-                            supplierRate: matched.supplierRate,
-                            supplierPriceOverride: matched.supplierPriceOverride
-                        };
+                    if (isTarget) {
+                        const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
+                        if (matched) {
+                            return {
+                                ...item,
+                                supplierRate: matched.supplierRate ?? item.supplierRate,
+                                supplierPriceOverride: matched.supplierPriceOverride !== undefined ? matched.supplierPriceOverride : item.supplierPriceOverride
+                            };
+                        }
                     }
                     return item;
                 }) || [];
 
                 const updatedPoItems = d.po_items?.map(item => {
-                    const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
-                    if (matched) {
-                        return {
-                            ...item,
-                            supplierRate: matched.supplierRate,
-                            supplierPriceOverride: matched.supplierPriceOverride
-                        };
+                    if (isTarget) {
+                        const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
+                        if (matched) {
+                            return {
+                                ...item,
+                                supplierRate: matched.supplierRate ?? item.supplierRate,
+                                supplierPriceOverride: matched.supplierPriceOverride !== undefined ? matched.supplierPriceOverride : item.supplierPriceOverride
+                            };
+                        }
                     }
                     return item;
                 }) || [];
+
+                const recalculatedTotal = updatedPoItems.reduce((acc, item) => {
+                    const product = findProduct(item);
+                    const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0;
+                    const rate = item.supplierRate ?? product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? item.discountRate ?? 72;
+
+                    let supplierPrice = item.supplierPriceOverride;
+                    if (supplierPrice === undefined) {
+                        supplierPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+                    }
+                    return acc + (supplierPrice * item.quantity);
+                }, 0);
 
                 return {
                     ...d,
                     supplier: isTarget ? { ...d.supplier, ...supplierInfo, id: d.supplier.id } : d.supplier,
                     items: updatedItems,
-                    po_items: updatedPoItems
+                    po_items: updatedPoItems,
+                    totalAmount: recalculatedTotal > 0 ? recalculatedTotal : d.totalAmount
                 };
             });
         }
@@ -1677,35 +1695,53 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         if (nextSplitDeliveries && nextSplitDeliveries.length > 0) {
             nextSplitDeliveries = nextSplitDeliveries.map(d => {
                 const isTarget = d.supplier.id === supplierInfo.id;
+
                 const updatedItems = d.items?.map(item => {
-                    const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
-                    if (matched) {
-                        return {
-                            ...item,
-                            supplierRate: matched.supplierRate,
-                            supplierPriceOverride: matched.supplierPriceOverride
-                        };
+                    if (isTarget) {
+                        const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
+                        if (matched) {
+                            return {
+                                ...item,
+                                supplierRate: matched.supplierRate ?? item.supplierRate,
+                                supplierPriceOverride: matched.supplierPriceOverride !== undefined ? matched.supplierPriceOverride : item.supplierPriceOverride
+                            };
+                        }
                     }
                     return item;
                 }) || [];
 
                 const updatedPoItems = d.po_items?.map(item => {
-                    const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
-                    if (matched) {
-                        return {
-                            ...item,
-                            supplierRate: matched.supplierRate,
-                            supplierPriceOverride: matched.supplierPriceOverride
-                        };
+                    if (isTarget) {
+                        const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
+                        if (matched) {
+                            return {
+                                ...item,
+                                supplierRate: matched.supplierRate ?? item.supplierRate,
+                                supplierPriceOverride: matched.supplierPriceOverride !== undefined ? matched.supplierPriceOverride : item.supplierPriceOverride
+                            };
+                        }
                     }
                     return item;
                 }) || [];
+
+                const recalculatedTotal = updatedPoItems.reduce((acc, item) => {
+                    const product = findProduct(item);
+                    const basePrice = item.base_price ?? product?.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0;
+                    const rate = item.supplierRate ?? product?.rate_act2 ?? product?.rate_act ?? product?.rate_pct ?? item.discountRate ?? 72;
+
+                    let supplierPrice = item.supplierPriceOverride;
+                    if (supplierPrice === undefined) {
+                        supplierPrice = Math.round((basePrice * (100 - rate) / 100) / 10) * 10;
+                    }
+                    return acc + (supplierPrice * item.quantity);
+                }, 0);
 
                 return {
                     ...d,
                     supplier: isTarget ? { ...d.supplier, ...supplierInfo, id: d.supplier.id } : d.supplier,
                     items: updatedItems,
-                    po_items: updatedPoItems
+                    po_items: updatedPoItems,
+                    totalAmount: recalculatedTotal > 0 ? recalculatedTotal : d.totalAmount
                 };
             });
         }
