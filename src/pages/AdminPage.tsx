@@ -217,7 +217,7 @@ export default function AdminPage() {
             return;
         }
 
-        const headers = ['발주번호', '주문일시', '고객사', '품목명', '규격', '수량', '판매단가', '판매금액', '매입단가', '매입금액', '이익금', '상태', '담당자'];
+        const headers = ['발주번호', '주문일시', '고객사', '품목', '두께', '사이즈', '재질', '수량', '판매단가', '판매금액', '매입단가', '매입금액', '이익금', '상태', '담당자'];
         const csvRows = [headers.join(',')];
 
         filteredOrders.forEach(order => {
@@ -234,6 +234,8 @@ export default function AdminPage() {
                     `"${order.id}"`,
                     `"${dateStr}"`,
                     `"${displayCustomer}"`,
+                    `""`,
+                    `""`,
                     `""`,
                     `""`,
                     0,
@@ -288,14 +290,14 @@ export default function AdminPage() {
 
                 const profit = totalSalesPrice - totalCost;
 
-                const spec = `${item.thickness || ''} ${item.size || ''} ${item.material || ''}`.trim() || `${(item as { options?: string[] }).options?.join(' ') || ''}`;
-
                 const row = [
                     `"${order.id}"`,
                     `"${dateStr}"`,
                     `"${displayCustomer}"`,
                     `"${item.name || ''}"`,
-                    `"${spec}"`,
+                    `"${item.thickness || ''}"`,
+                    `"${item.size || ''}"`,
+                    `"${item.material || ''}"`,
                     item.quantity,
                     unitSalesPrice,
                     totalSalesPrice,

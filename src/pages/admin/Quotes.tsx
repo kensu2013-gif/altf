@@ -221,6 +221,72 @@ export default function AdminQuotes() {
         }
     };
 
+    const handleExportCSV = () => {
+        if (filteredQuotes.length === 0) {
+            alert("다운로드할 데이터가 없습니다.");
+            return;
+        }
+
+        const headers = ['견적번호', '견적일시', '고객사', '담당자', '품목', '두께', '사이즈', '재질', '수량', '단가', '금액', '상태'];
+        const csvRows = [headers.join(',')];
+
+        filteredQuotes.forEach(quote => {
+            const dateStr = new Date(quote.createdAt).toLocaleString('ko-KR');
+            const quoteUser = users.find(u => u.id === quote.userId);
+            const customerName = quote.customerInfo?.companyName || quoteUser?.companyName || quote.customerName || '';
+            const contactName = quote.customerInfo?.contactName || quoteUser?.contactName || '';
+
+            if (!quote.items || quote.items.length === 0) {
+                const row = [
+                    `"${quote.id}"`,
+                    `"${dateStr}"`,
+                    `"${customerName}"`,
+                    `"${contactName}"`,
+                    `""`,
+                    `""`,
+                    `""`,
+                    `""`,
+                    0,
+                    0,
+                    0,
+                    `"${quote.status}"`
+                ];
+                csvRows.push(row.join(','));
+                return;
+            }
+
+            quote.items.forEach(item => {
+                const row = [
+                    `"${quote.id}"`,
+                    `"${dateStr}"`,
+                    `"${customerName}"`,
+                    `"${contactName}"`,
+                    `"${item.name || ''}"`,
+                    `"${item.thickness || ''}"`,
+                    `"${item.size || ''}"`,
+                    `"${item.material || ''}"`,
+                    item.quantity,
+                    item.unitPrice,
+                    item.amount,
+                    `"${quote.status}"`
+                ];
+                csvRows.push(row.join(','));
+            });
+        });
+
+        const csvString = csvRows.join('\n');
+        const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        const dateStr = new Date().toISOString().split('T')[0];
+        link.setAttribute('href', url);
+        link.setAttribute('download', `견적목록_${dateStr}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             <div>
@@ -249,16 +315,28 @@ export default function AdminQuotes() {
                     </button>
                 </div>
 
-                {/* Search */}
-                <div className="relative w-full sm:w-64">
-                    <input
-                        type="text"
-                        placeholder="고객명, 회사명 검색..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all font-medium placeholder-slate-400"
-                    />
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                {/* Controls */}
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {/* Search */}
+                    <div className="relative w-full sm:w-64">
+                        <input
+                            type="text"
+                            placeholder="고객명, 회사명 검색..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all font-medium placeholder-slate-400"
+                        />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    </div>
+
+                    <Button
+                        variant="outline"
+                        onClick={handleExportCSV}
+                        className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-xs"
+                    >
+                        <Download className="w-4 h-4 text-teal-600" />
+                        엑셀 다운로드
+                    </Button>
                 </div>
             </div>
 

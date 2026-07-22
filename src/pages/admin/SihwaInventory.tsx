@@ -2340,7 +2340,7 @@ export default function SihwaInventory() {
     };
 
     const handleExportAiSummary = () => {
-        const headers = ['구분', '품목 코드', '품명', '재질', '사이즈', '두께', '현재고(시화)', '대경재고', '대기중(수량)', '발주서번호(들)', '납품예정일(들)', '매입단가', '권장/추천발주량', '필요예산', '분석근거'];
+        const headers = ['구분', '품목 코드', '품목', '두께', '사이즈', '재질', '현재고(시화)', '대경재고', '대기중(수량)', '발주서번호(들)', '납품예정일(들)', '매입단가', '권장/추천발주량', '필요예산', '분석근거'];
         const csvRows = [headers.join(',')];
 
         const appendRows = (items: typeof stats.critical, category: string) => {
@@ -2354,9 +2354,9 @@ export default function SihwaInventory() {
                     `"${category}"`,
                     `"${row.product.id}"`,
                     `"${row.product.name || ''}"`,
-                    `"${row.product.material || ''}"`,
-                    `"${row.product.size || ''}"`,
                     `"${row.product.thickness || ''}"`,
+                    `"${row.product.size || ''}"`,
+                    `"${row.product.material || ''}"`,
                     row.shQty,
                     row.ysQty,
                     row.pendingOrderQty,

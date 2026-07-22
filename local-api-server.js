@@ -70,6 +70,7 @@ async function loadData() {
                 } catch (e) {
                     console.log(`[API] Failed to seed customers mapping: ${e.message}`);
                 }
+            }
             // Self-healing: Repair any 0% or missing supplierRate in splitDeliveries
             let ordersRepaired = 0;
             if (db.orders && Array.isArray(db.orders)) {

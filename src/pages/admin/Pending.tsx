@@ -693,12 +693,11 @@ export default function PendingOrders() {
         }
 
         const headers = activeTab === 'ALL'
-            ? ['고객명', '발주번호', '발주일자', '납기일자', '납기상태', '상태(태그)', '품목명', '규격', '수량', '메모(특이사항)', '코멘트']
-            : ['품목명', '규격', '발주번호', '발주일자', '납기일자', '납기상태', '수량', '중복여부', '중복건수', '상태(태그)', '코멘트'];
+            ? ['고객명', '발주번호', '발주일자', '납기일자', '납기상태', '상태(태그)', '품목', '두께', '사이즈', '재질', '수량', '메모(특이사항)', '코멘트']
+            : ['품목', '두께', '사이즈', '재질', '발주번호', '발주일자', '납기일자', '납기상태', '수량', '중복여부', '중복건수', '상태(태그)', '코멘트'];
         const csvRows = [headers.join(',')];
 
         itemsToExport.forEach(item => {
-            const spec = `${item.thickness || ''} ${item.size || ''} ${item.material || ''}`.trim();
             const statusInfo = getDeliveryStatus(item.deliveryDate);
             const statusText = statusInfo.type === 'DELAYED' ? statusInfo.text : (statusInfo.type === 'IMMINENT' ? '임박' : '정상');
 
@@ -718,8 +717,10 @@ export default function PendingOrders() {
                     `"${item.deliveryDate}"`,
                     `"${statusText}"`,
                     `"${tagsString}"`,
-                    `"${item.itemName}"`,
-                    `"${spec}"`,
+                    `"${item.itemName || ''}"`,
+                    `"${item.thickness || ''}"`,
+                    `"${item.size || ''}"`,
+                    `"${item.material || ''}"`,
                     item.quantity,
                     `"${item.memo.replace(/"/g, '""')}"`,
                     `"${commentsString.replace(/"/g, '""')}"`
@@ -733,8 +734,10 @@ export default function PendingOrders() {
                 const dupCount = dupData?.count || 1;
 
                 const row = [
-                    `"${item.itemName}"`,
-                    `"${spec}"`,
+                    `"${item.itemName || ''}"`,
+                    `"${item.thickness || ''}"`,
+                    `"${item.size || ''}"`,
+                    `"${item.material || ''}"`,
                     `"${item.poNumber}"`,
                     `"${item.poDate}"`,
                     `"${item.deliveryDate}"`,
