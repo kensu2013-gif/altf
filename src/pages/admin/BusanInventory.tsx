@@ -2517,7 +2517,7 @@ export default function BusanInventory() {
 
             // User requirement: "기준은 재고data에서 부산재고만 따로 추려서..." => We can include all to give full visibility, or just those with stock or pending.
             // Let's include everything in the analyzedInventory to act as the full baseline map.
-            const escapeCSV = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+            const escapeCSV = (val: unknown) => `"${String(val ?? '').replace(/"/g, '""')}"`;
             const r = [
                 escapeCSV(specName),
                 escapeCSV(specThick),
@@ -2546,7 +2546,7 @@ export default function BusanInventory() {
     };
 
     const handleExportAiSummary = () => {
-        const escapeCSV = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+        const escapeCSV = (val: unknown) => `"${String(val ?? '').replace(/"/g, '""')}"`;
         const headers = ['구분', '품목 코드', '품목', '두께', '사이즈', '재질', '현재고(부산)', '대경재고', '대기중(수량)', '발주서번호(들)', '납품예정일(들)', '매입단가', '권장/추천발주량', '필요예산', '분석근거'];
         const csvRows = [headers.join(',')];
 

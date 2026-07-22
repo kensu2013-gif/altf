@@ -227,7 +227,7 @@ export default function AdminQuotes() {
             return;
         }
 
-        const escapeCSV = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+        const escapeCSV = (val: unknown) => `"${String(val ?? '').replace(/"/g, '""')}"`;
 
         const headers = ['견적번호', '견적일시', '고객사', '담당자', '품목', '두께', '사이즈', '재질', '수량', '단가', '금액', '상태'];
         const csvRows = [headers.join(',')];

@@ -692,7 +692,7 @@ export default function PendingOrders() {
             return;
         }
 
-        const escapeCSV = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+        const escapeCSV = (val: unknown) => `"${String(val ?? '').replace(/"/g, '""')}"`;
 
         const headers = activeTab === 'ALL'
             ? ['고객명', '발주번호', '발주일자', '납기일자', '납기상태', '상태(태그)', '품목', '두께', '사이즈', '재질', '수량', '메모(특이사항)', '코멘트']
