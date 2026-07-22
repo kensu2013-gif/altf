@@ -1503,7 +1503,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
                 const updatedItems = d.items?.map(item => {
                     if (isTarget) {
-                        const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
+                        const matched = enrichedPoItems.find(epi => 
+                            (epi.parentId || epi.id) === (item.parentId || item.id) ||
+                            (epi.name === item.name && epi.size === item.size && epi.thickness === item.thickness && epi.material === item.material)
+                        );
                         if (matched) {
                             return {
                                 ...item,
@@ -1517,7 +1520,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
                 const updatedPoItems = d.po_items?.map(item => {
                     if (isTarget) {
-                        const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
+                        const matched = enrichedPoItems.find(epi => 
+                            (epi.parentId || epi.id) === (item.parentId || item.id) ||
+                            (epi.name === item.name && epi.size === item.size && epi.thickness === item.thickness && epi.material === item.material)
+                        );
                         if (matched) {
                             return {
                                 ...item,
@@ -1541,18 +1547,21 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     return acc + (supplierPrice * item.quantity);
                 }, 0);
 
+                const finalDeliveryTotal = isTarget ? totalSupplierAmount : (recalculatedTotal > 0 ? recalculatedTotal : d.totalAmount);
+
                 return {
                     ...d,
                     supplier: isTarget ? { ...d.supplier, ...supplierInfo, id: d.supplier.id } : d.supplier,
                     items: updatedItems,
                     po_items: updatedPoItems,
-                    totalAmount: recalculatedTotal > 0 ? recalculatedTotal : d.totalAmount
+                    totalAmount: finalDeliveryTotal
                 };
             });
         }
 
-        const updateData: Partial<Order> = {
+        const updateData: Partial<Order> & { totalSupplierAmount?: number } = {
             totalAmount: overallTotalWithCharges,
+            totalSupplierAmount: totalSupplierAmount,
             isStockOrder: isStockOrderChecked,
             adminResponse: {
                 ...response,
@@ -1700,7 +1709,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
                 const updatedItems = d.items?.map(item => {
                     if (isTarget) {
-                        const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
+                        const matched = enrichedPoItems.find(epi => 
+                            (epi.parentId || epi.id) === (item.parentId || item.id) ||
+                            (epi.name === item.name && epi.size === item.size && epi.thickness === item.thickness && epi.material === item.material)
+                        );
                         if (matched) {
                             return {
                                 ...item,
@@ -1714,7 +1726,10 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
                 const updatedPoItems = d.po_items?.map(item => {
                     if (isTarget) {
-                        const matched = enrichedPoItems.find(epi => (epi.parentId || epi.id) === (item.parentId || item.id));
+                        const matched = enrichedPoItems.find(epi => 
+                            (epi.parentId || epi.id) === (item.parentId || item.id) ||
+                            (epi.name === item.name && epi.size === item.size && epi.thickness === item.thickness && epi.material === item.material)
+                        );
                         if (matched) {
                             return {
                                 ...item,
@@ -1738,18 +1753,21 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
                     return acc + (supplierPrice * item.quantity);
                 }, 0);
 
+                const finalDeliveryTotal = isTarget ? totalSupplierAmount : (recalculatedTotal > 0 ? recalculatedTotal : d.totalAmount);
+
                 return {
                     ...d,
                     supplier: isTarget ? { ...d.supplier, ...supplierInfo, id: d.supplier.id } : d.supplier,
                     items: updatedItems,
                     po_items: updatedPoItems,
-                    totalAmount: recalculatedTotal > 0 ? recalculatedTotal : d.totalAmount
+                    totalAmount: finalDeliveryTotal
                 };
             });
         }
 
-        const updateData: Partial<Order> = {
+        const updateData: Partial<Order> & { totalSupplierAmount?: number } = {
             totalAmount: overallTotalWithCharges,
+            totalSupplierAmount: totalSupplierAmount,
             isStockOrder: isStockOrderChecked,
             adminResponse: {
                 ...response,

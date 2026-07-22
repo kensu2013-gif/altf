@@ -1118,6 +1118,7 @@ export default function PilotSplitPO() {
     if (!supplierId || !currentOrder.splitDeliveries) return;
 
     const isSent = updates.poSent || updates.status === 'SHIPPED' || updates.status === 'COMPLETED';
+    const supplierTotalAmount = (updates as any).totalSupplierAmount;
 
     // 부모 주문의 splitDeliveries 내부 정보 동적 업데이트
     const nextSplitDeliveries = currentOrder.splitDeliveries.map(d => {
@@ -1127,12 +1128,16 @@ export default function PilotSplitPO() {
           ...updates.supplierInfo
         } : d.supplier;
 
+        const targetTotal = supplierTotalAmount !== undefined 
+          ? supplierTotalAmount 
+          : (updates.totalAmount !== undefined ? updates.totalAmount : d.totalAmount);
+
         return {
           ...d,
           supplier: nextSupplier,
           poSent: isSent,
           poNumber: updates.poNumber || d.poNumber,
-          totalAmount: updates.totalAmount !== undefined ? updates.totalAmount : d.totalAmount, // 모달에서 확정된 실제 매입액 반영
+          totalAmount: targetTotal, // 모달에서 확정된 실제 매입액(₩419,240) 반영
           // 사용자가 매입 품목 명칭/수량/단가를 오버라이드한 경우를 대비해 갱신된 items 및 po_items 병합 상속
           items: updates.items || d.items,
           po_items: updates.po_items || d.po_items,
@@ -1178,7 +1183,10 @@ export default function PilotSplitPO() {
       setLocalItems(prevItems => {
         return prevItems.map(item => {
           if (assignments[item.id] === supplierId) {
-            const matchedPoItem = updates.po_items?.find(pi => (pi.parentId || pi.id) === (item.parentId || item.id));
+            const matchedPoItem = updates.po_items?.find(pi => 
+              (pi.parentId || pi.id) === (item.parentId || item.id) ||
+              (pi.name === item.name && pi.size === item.size && pi.thickness === item.thickness && pi.material === item.material)
+            );
             if (matchedPoItem) {
               return {
                 ...item,
