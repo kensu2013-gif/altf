@@ -1353,7 +1353,8 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     const handleSupplierRateChange = (index: number, rate: number) => {
         const newItems = [...displayedItems];
-        const updatedItem = { ...newItems[index], supplierRate: rate };
+        const val = isNaN(rate) ? 0 : rate;
+        const updatedItem = { ...newItems[index], supplierRate: val };
         delete updatedItem.supplierPriceOverride; // 요율 변경 시 수동 단가 고정 락 해제
         newItems[index] = updatedItem;
         setDisplayedItems(newItems);
@@ -1397,10 +1398,12 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         const newItems = [...displayedItems];
         const item = newItems[index];
         const product = findProduct({ productId: item.productId });
-        const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice;
-        if (basePrice === 0) return;
-        const newPrice = Math.round(Math.round(basePrice * (1 - discountRate / 100)) / 10) * 10;
-        newItems[index] = { ...item, unitPrice: newPrice, discountRate: discountRate, amount: newPrice * item.quantity };
+        const basePrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0;
+        const val = isNaN(discountRate) ? 0 : discountRate;
+        const newPrice = basePrice > 0 
+            ? Math.round(Math.round(basePrice * (1 - val / 100)) / 10) * 10 
+            : item.unitPrice;
+        newItems[index] = { ...item, unitPrice: newPrice, discountRate: val, amount: newPrice * item.quantity };
         setDisplayedItems(newItems);
     };
 
@@ -3237,11 +3240,11 @@ if (deliveryNoteFiles.length > 0) {
                                                                             <input
                                                                                 type="number"
                                                                                 inputMode="numeric"
-                                                                                value={supplierRate === 0 ? '' : supplierRate}
+                                                                                value={supplierRate === undefined || supplierRate === null ? '' : supplierRate}
                                                                                 placeholder="0"
                                                                                 title="Supplier Rate"
                                                                                 className="w-full text-center pr-3 pl-1 py-1.5 rounded border border-indigo-200 text-sm outline-none focus:border-indigo-500 font-bold text-indigo-600 bg-indigo-50/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                                                onChange={(e) => handleSupplierRateChange(idx, Number(e.target.value))}
+                                                                                onChange={(e) => handleSupplierRateChange(idx, e.target.value === '' ? 0 : Number(e.target.value))}
                                                                                 onKeyDown={handleKeyDown}
                                                                             />
                                                                             <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] text-indigo-300 pointer-events-none">% </span>
@@ -3462,11 +3465,11 @@ if (deliveryNoteFiles.length > 0) {
                                                                         <input
                                                                             type="number"
                                                                             inputMode="numeric"
-                                                                            value={item.discountRate || ''}
+                                                                            value={item.discountRate === undefined || item.discountRate === null ? '' : item.discountRate}
                                                                             placeholder="0"
                                                                             title="Discount Percentage"
                                                                             className="w-full text-center px-1 py-1.5 rounded border border-slate-200 text-sm outline-none focus:border-teal-500 font-bold text-red-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                                            onChange={(e) => handleDiscountChange(idx, Number(e.target.value))}
+                                                                            onChange={(e) => handleDiscountChange(idx, e.target.value === '' ? 0 : Number(e.target.value))}
                                                                             onKeyDown={handleKeyDown}
                                                                         />
                                                                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">% </span>

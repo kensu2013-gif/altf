@@ -1453,7 +1453,7 @@ export default function SihwaInventory() {
         });
 
         return processedList;
-    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, historyData, liveSalesHistory, quotes, orders, userMap]);
+    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, historyData, liveSalesHistory, quotes, orders, userMap, daekyungStockMap]);
 
     const baseAnalyzedInventoryMap = useMemo(() => {
         const map = new Map<string, typeof baseAnalyzedInventory[0]>();

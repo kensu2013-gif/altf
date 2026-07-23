@@ -337,10 +337,10 @@ export const QuoteItemRow = React.memo(({
             <td className="px-2 py-3 text-center align-middle">
                 <input
                     type="number"
-                    value={item.supplierRate ?? ''}
+                    value={item.supplierRate === undefined || item.supplierRate === null ? '' : item.supplierRate}
                     placeholder="0"
                     className="w-16 text-center px-1 py-1 rounded border border-indigo-100 focus:border-indigo-500 outline-none font-mono text-xs text-indigo-700 bg-indigo-50/10"
-                    onChange={(e) => onSupplierRateChange(index, Number(e.target.value))}
+                    onChange={(e) => onSupplierRateChange(index, e.target.value === '' ? 0 : Number(e.target.value))}
                     onKeyDown={handleKeyDown}
                 />
             </td>
@@ -356,11 +356,11 @@ export const QuoteItemRow = React.memo(({
                     <div className="relative w-full flex justify-center">
                         <input
                             type="number"
-                            value={item.discountRate || ''}
+                            value={item.discountRate === undefined || item.discountRate === null ? '' : item.discountRate}
                             placeholder={String(product?.rate_pct || 0)}
                             title="Rate (Discount Percentage)"
                             className="w-16 text-center px-1 py-1.5 rounded border border-slate-200 text-sm outline-none focus:border-teal-500 font-bold text-red-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            onChange={(e) => onDiscountRateChange(index, Number(e.target.value))}
+                            onChange={(e) => onDiscountRateChange(index, e.target.value === '' ? 0 : Number(e.target.value))}
                             onKeyDown={handleKeyDown}
                         />
                     </div>

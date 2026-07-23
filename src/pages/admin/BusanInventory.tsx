@@ -1648,7 +1648,7 @@ export default function BusanInventory() {
         });
 
         return processedList;
-    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, historyData, liveSalesHistory, quotes, orders, userMap, isKyunggiCompany]);
+    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, historyData, liveSalesHistory, quotes, orders, userMap, isKyunggiCompany, daekyungStockMap]);
 
     const baseAnalyzedInventoryMap = useMemo(() => {
         const map = new Map<string, typeof baseAnalyzedInventory[0]>();

@@ -761,7 +761,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const handleSupplierRateChange = useCallback((index: number, value: number) => {
         setItems(prev => {
             const newItems = [...prev];
-            newItems[index] = { ...newItems[index], supplierRate: value };
+            const val = isNaN(value) ? 0 : value;
+            newItems[index] = { ...newItems[index], supplierRate: val };
             return newItems;
         });
     }, []);
@@ -771,13 +772,13 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             const newItems = [...prev];
             const item = newItems[index];
             const product = inventory.find(p => p.id === item.productId);
-            // logic matches original inline logic
-            const base = product?.base_price || item.unitPrice;
-            const newPrice = Math.round(Math.round(base * (1 - value / 100)) / 10) * 10;
+            const val = isNaN(value) ? 0 : value;
+            const base = (product?.base_price && product.base_price > 0) ? product.base_price : (item.base_price && item.base_price > 0 ? item.base_price : item.unitPrice ?? 0);
+            const newPrice = base > 0 ? Math.round(Math.round(base * (1 - val / 100)) / 10) * 10 : item.unitPrice;
 
             newItems[index] = {
                 ...item,
-                discountRate: value,
+                discountRate: val,
                 unitPrice: newPrice,
                 amount: newPrice * item.quantity
             };
