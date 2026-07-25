@@ -298,6 +298,32 @@ async function loadData() {
                 console.error('[CLEANUP] Error during self-healing database cleanup:', cleanupErr);
             }
 
+            // Seed read-only test user if not exists
+            const testUserEmail = 'test1234@test.com';
+            const hasTestUser = db.users.some(u => u.email === testUserEmail);
+            if (!hasTestUser) {
+                const newTestUser = {
+                    id: crypto.randomUUID(),
+                    email: testUserEmail,
+                    password: '1234',
+                    companyName: 'AltF ViewOnly Partner',
+                    bizNo: '000-00-00000',
+                    contactName: '뷰어',
+                    phone: '010-0000-0000',
+                    address: 'Seoul, Korea',
+                    role: 'MANAGER',
+                    createdAt: new Date().toISOString(),
+                    agreedToTerms: true,
+                    agreedToPrivacy: true,
+                    agreedToMarketing: true,
+                    consentDate: new Date().toISOString(),
+                    status: 'APPROVED'
+                };
+                db.users.push(newTestUser);
+                console.log(`[API] Seeded View-Only Test User: ${testUserEmail}`);
+                await saveData();
+            }
+
             // June 19 self-healing block removed
         } else {
             // Seed Initial Admin if file doesn't exist
@@ -312,6 +338,23 @@ async function loadData() {
                     phone: '010-0000-0000',
                     address: 'Seoul, Korea',
                     role: 'MASTER',
+                    createdAt: new Date().toISOString(),
+                    agreedToTerms: true,
+                    agreedToPrivacy: true,
+                    agreedToMarketing: true,
+                    consentDate: new Date().toISOString(),
+                    status: 'APPROVED'
+                },
+                {
+                    id: crypto.randomUUID(),
+                    email: 'test1234@test.com',
+                    password: '1234',
+                    companyName: 'AltF ViewOnly Partner',
+                    bizNo: '000-00-00000',
+                    contactName: '뷰어',
+                    phone: '010-0000-0000',
+                    address: 'Seoul, Korea',
+                    role: 'MANAGER',
                     createdAt: new Date().toISOString(),
                     agreedToTerms: true,
                     agreedToPrivacy: true,
@@ -503,6 +546,19 @@ const server = http.createServer(async (req, res) => {
     }
 
     const url = new URL(req.url, `http://${req.headers.host}`);
+
+    // Read-only user (test1234@test.com) restriction middleware
+    const session = getAuthenticatedSession(req);
+    if (session && session.email === 'test1234@test.com') {
+        const isWriteMethod = !['GET', 'OPTIONS'].includes(req.method);
+        const isHeartbeatOrLogout = ['/api/auth/heartbeat', '/api/auth/logout'].includes(url.pathname);
+        if (isWriteMethod && !isHeartbeatOrLogout) {
+            console.log(`[ReadOnly Block] Prevented ${req.method} ${url.pathname} for user ${session.email}`);
+            res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ error: '수정 및 입력 권한이 없습니다. (읽기 전용 계정)' }));
+            return;
+        }
+    }
 
     // POST /api/quote/import
     if (req.method === 'POST' && url.pathname === '/api/quote/import') {
