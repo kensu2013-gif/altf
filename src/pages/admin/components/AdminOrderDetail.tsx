@@ -81,24 +81,45 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const { findProduct } = useInventoryIndex(inventory);
 
     const linkedUser = useMemo(() => users.find((u: UserType) => u.id === order.userId), [users, order.userId]);
-    const customerInfo = useMemo(() => {
-        const payloadCustomer = order.payload?.customer as Record<string, string> | undefined;
-        return {
-            name: payloadCustomer?.company_name || user?.companyName || 'Unknown',
-            contactName: payloadCustomer?.contact_name || user?.contactName || '',
-            tel: payloadCustomer?.tel || user?.phone || '',
-            bizNo: payloadCustomer?.business_no || payloadCustomer?.biz_no || user?.bizNo || '-',
-            email: payloadCustomer?.email || user?.email || '',
-            address: payloadCustomer?.address || user?.address || ''
-        };
-    }, [order.payload, user]);
-
-
 
     const isKyunggi = (name: string) => {
         const normalized = (name || '').replace(/\s+/g, '');
         return normalized.includes('경기공업사') || normalized.includes('경기배관');
     };
+
+    const [crmCustomers, setCrmCustomers] = useState<CrmCustomerOption[]>([]);
+
+    const [poEndCustomer, setPoEndCustomer] = useState(() => {
+        const val = order.poEndCustomer || order.customerName || '';
+        const cleaned = val.replace(/\uFFFD{1,3}동대로/g, '낙동대로').replace(/[\uFFFC\uFFFD]/g, '');
+        if (isKyunggi(cleaned)) {
+            return '경기배관';
+        }
+        return cleaned;
+    });
+
+    const customerInfo = useMemo(() => {
+        const payloadCustomer = order.payload?.customer as Record<string, string> | undefined;
+        
+        // CRM 데이터 매칭 시도
+        const targetName = (order.poEndCustomer || order.customerName || '').replace(/\(주\)|주식회사/g, '').replace(/[^a-zA-Z0-9가-힣]/g, '').trim().toLowerCase();
+        const normalizedTargetName = targetName.replace(/엔/g, '앤'); // '엔' vs '앤' 보정
+
+        const crmMatch = crmCustomers.find(c => {
+            const cName = (c.companyName || '').replace(/\(주\)|주식회사/g, '').replace(/[^a-zA-Z0-9가-힣]/g, '').trim().toLowerCase();
+            const normalizedCName = cName.replace(/엔/g, '앤');
+            return normalizedCName === normalizedTargetName || (normalizedTargetName.length > 1 && normalizedCName.includes(normalizedTargetName));
+        });
+
+        return {
+            name: payloadCustomer?.company_name || crmMatch?.companyName || order.customerName || 'Unknown',
+            contactName: payloadCustomer?.contact_name || crmMatch?.contactName || crmMatch?.ceo || '',
+            tel: payloadCustomer?.tel || crmMatch?.phone || '',
+            bizNo: payloadCustomer?.business_no || payloadCustomer?.biz_no || crmMatch?.businessNumber || '-',
+            email: payloadCustomer?.email || crmMatch?.email || '',
+            address: payloadCustomer?.address || crmMatch?.address || ''
+        };
+    }, [order.payload, order.customerName, order.poEndCustomer, crmCustomers]);
 
     const getInitialCustomerInfo = () => {
         const name = order.poEndCustomer || order.customerName || '';
@@ -124,7 +145,38 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     const [editableCustomerInfo, setEditableCustomerInfo] = useState(getInitialCustomerInfo);
 
-    const [crmCustomers, setCrmCustomers] = useState<CrmCustomerOption[]>([]);
+    // CRM 데이터 로드 완료 시 빈 정보 또는 기본 사상구 주소 자동 매칭 및 보정
+    useEffect(() => {
+        if (crmCustomers.length === 0) return;
+        
+        const isDefaultAddress = !editableCustomerInfo.address || 
+                                editableCustomerInfo.address === '부산시 사상구 낙동대로1330번길 67' ||
+                                editableCustomerInfo.address === '부산광역시 사상구 낙동대로 1330번길 67' ||
+                                editableCustomerInfo.address === '부산광역시 사상구 낙동대로1330번길, 67';
+                                
+        if (isDefaultAddress || !editableCustomerInfo.bizNo || editableCustomerInfo.bizNo === '-') {
+            const targetName = (poEndCustomer || order.customerName || '').replace(/\(주\)|주식회사/g, '').replace(/[^a-zA-Z0-9가-힣]/g, '').trim().toLowerCase();
+            const normalizedTargetName = targetName.replace(/엔/g, '앤'); // '엔' vs '앤' 보정
+            
+            const crmMatch = crmCustomers.find(c => {
+                const cName = (c.companyName || '').replace(/\(주\)|주식회사/g, '').replace(/[^a-zA-Z0-9가-힣]/g, '').trim().toLowerCase();
+                const normalizedCName = cName.replace(/엔/g, '앤');
+                return normalizedCName === normalizedTargetName || (normalizedTargetName.length > 1 && normalizedCName.includes(normalizedTargetName));
+            });
+            
+            if (crmMatch) {
+                setEditableCustomerInfo(prev => ({
+                    ...prev,
+                    bizNo: prev.bizNo && prev.bizNo !== '-' ? prev.bizNo : (crmMatch.businessNumber || ''),
+                    address: prev.address && !isDefaultAddress ? prev.address : (crmMatch.address || ''),
+                    contactName: prev.contactName ? prev.contactName : (crmMatch.contactName || crmMatch.ceo || ''),
+                    email: prev.email ? prev.email : (crmMatch.email || ''),
+                    tel: prev.tel ? prev.tel : (crmMatch.phone || '')
+                }));
+            }
+        }
+    }, [crmCustomers, poEndCustomer, order.customerName, editableCustomerInfo.address, editableCustomerInfo.bizNo]);
+
     useEffect(() => {
         fetch(`${import.meta.env.VITE_API_URL || ''}/api/customers`, {
             headers: {
@@ -156,15 +208,6 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         })
         .catch(console.error);
     }, [user]);
-
-    const [poEndCustomer, setPoEndCustomer] = useState(() => {
-        const val = order.poEndCustomer || order.customerName || '';
-        const cleaned = val.replace(/\uFFFD{1,3}동대로/g, '낙동대로').replace(/[\uFFFC\uFFFD]/g, '');
-        if (isKyunggi(cleaned)) {
-            return '경기배관';
-        }
-        return cleaned;
-    });
 
     const orders = useStore((state) => state.orders);
 

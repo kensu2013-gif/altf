@@ -40,6 +40,9 @@ export default {
                 ],
                 gowun: ["Gowun Dodum", "sans-serif"],
             },
+            minWidth: {
+                '250': '1000px',
+            },
         },
     },
     plugins: [],

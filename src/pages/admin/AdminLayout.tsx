@@ -16,13 +16,53 @@ export default function AdminLayout() {
     const location = useLocation();
     const logout = useStore((state) => state.logout);
     const user = useStore((state) => state.auth.user);
-    const { orders, quotes, isMobileModalOpen, lastCustomPriceSync, syncHistoricalCustomPrices } = useStore(useShallow((state) => ({
+    const { 
+        orders, 
+        quotes, 
+        isMobileModalOpen, 
+        lastCustomPriceSync, 
+        syncHistoricalCustomPrices,
+        users,
+        fetchUsers
+    } = useStore(useShallow((state) => ({
         orders: state.orders,
         quotes: state.quotes,
         isMobileModalOpen: state.isMobileModalOpen,
         lastCustomPriceSync: state.lastCustomPriceSync,
-        syncHistoricalCustomPrices: state.syncHistoricalCustomPrices
+        syncHistoricalCustomPrices: state.syncHistoricalCustomPrices,
+        users: state.users,
+        fetchUsers: state.fetchUsers
     })));
+
+    // Fetch users for MASTER or admin to check pending approval count
+    useEffect(() => {
+        if (user && (user.role === 'MASTER' || user.role === 'admin')) {
+            fetchUsers().catch(console.error);
+        }
+    }, [user, fetchUsers]);
+
+    // Handle toast alert for pending approvals
+    const [showPendingAlert, setShowPendingAlert] = useState(false);
+
+    // Derive pending count directly during render (Derived State) to avoid cascading renders
+    const isMasterOrAdmin = user && (user.role === 'MASTER' || user.role === 'admin');
+    const pendingUsers = isMasterOrAdmin && users.length > 0
+        ? users.filter(u => u.role !== 'MANAGER' && u.role !== 'MASTER' && u.status === 'PENDING')
+        : [];
+    const pendingCount = pendingUsers.length;
+
+    useEffect(() => {
+        if (pendingCount > 0) {
+            const hasShown = sessionStorage.getItem('hasShownPendingApprovalAlert');
+            if (!hasShown) {
+                const timer = setTimeout(() => {
+                    setShowPendingAlert(true);
+                    sessionStorage.setItem('hasShownPendingApprovalAlert', 'true');
+                }, 0);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [pendingCount]);
 
     // Auto-sync custom prices once every 24 hours
     useEffect(() => {
@@ -219,6 +259,49 @@ export default function AdminLayout() {
                     </AnimatePresence>
                 </main>
             </div>
+
+            {/* Pending Approvals Toast Notification */}
+            <AnimatePresence>
+                {showPendingAlert && pendingCount > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 50, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                        className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-white rounded-2xl shadow-2xl border border-amber-200 overflow-hidden font-pretendard"
+                    >
+                        <div className="p-5">
+                            <div className="flex items-start gap-3">
+                                <div className="bg-amber-100 p-2 rounded-xl text-amber-600 shrink-0">
+                                    <User className="w-5 h-5" />
+                                </div>
+                                <div className="space-y-1">
+                                    <h4 className="font-bold text-slate-800 text-sm">신규 가입 승인 대기</h4>
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                        현재 승인 대기 중인 회원(고객사)이 <span className="font-bold text-amber-600">{pendingCount}명</span> 있습니다.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2 mt-4">
+                                <button
+                                    onClick={() => setShowPendingAlert(false)}
+                                    className="flex-1 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                                >
+                                    닫기
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowPendingAlert(false);
+                                        navigate('/admin/members');
+                                    }}
+                                    className="flex-1 px-3 py-2 text-xs font-semibold rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors shadow-sm shadow-teal-600/10 cursor-pointer"
+                                >
+                                    회원 관리로 이동
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

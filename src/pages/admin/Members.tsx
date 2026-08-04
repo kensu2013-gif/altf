@@ -1,9 +1,10 @@
 import { useState, useEffect, useDeferredValue } from 'react';
 import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
-import { Check, X, Search, Clock, Trash2, RefreshCcw } from 'lucide-react';
+import { Check, X, Search, Clock, Trash2, RefreshCcw, Pencil } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
+import type { User } from '../../types';
 
 export default function AdminMembers() {
     const { users, fetchUsers, deleteUser, updateUser, auth } = useStore(useShallow((state) => ({
@@ -17,6 +18,8 @@ export default function AdminMembers() {
     const deferredSearchTerm = useDeferredValue(searchTerm);
     const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'APPROVED'>('ALL');
     const [openManagerDropdown, setOpenManagerDropdown] = useState<string | null>(null); // userId of open dropdown
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -86,6 +89,37 @@ export default function AdminMembers() {
         }
     };
 
+    const handleEditClick = (user: User) => {
+        setEditingUser({ ...user });
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdateUser = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingUser) return;
+        try {
+            const updates: Partial<User> = {
+                companyName: editingUser.companyName,
+                bizNo: editingUser.bizNo,
+                address: editingUser.address,
+                contactName: editingUser.contactName,
+                email: editingUser.email,
+                phone: editingUser.phone,
+            };
+
+            if (editingUser.password && editingUser.password.trim() !== '') {
+                updates.password = editingUser.password;
+            }
+
+            await updateUser(editingUser.id, updates);
+            alert('회원 정보가 수정되었습니다.');
+            setIsEditModalOpen(false);
+            setEditingUser(null);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     const handleToggleManager = async (userId: string, managerId: string, currentIds: string[]) => {
         let newIds = [...currentIds];
         if (newIds.includes(managerId)) {
@@ -134,7 +168,7 @@ export default function AdminMembers() {
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-visible min-h-[400px]">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-visible min-h-100">
                 <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
                         <tr>
@@ -175,7 +209,7 @@ export default function AdminMembers() {
                                         <div className="relative manager-dropdown-container">
                                             <button
                                                 onClick={() => setOpenManagerDropdown(openManagerDropdown === user.id ? null : user.id)}
-                                                className="w-full max-w-[200px] flex items-center justify-between text-xs border border-slate-200 rounded px-2 py-1.5 bg-white text-left hover:border-teal-500 transition-colors"
+                                                className="w-full max-w-50 flex items-center justify-between text-xs border border-slate-200 rounded px-2 py-1.5 bg-white text-left hover:border-teal-500 transition-colors"
                                             >
                                                 <span className="truncate">
                                                     {currentManagerIds.length > 0
@@ -194,11 +228,11 @@ export default function AdminMembers() {
                                             </button>
 
                                             {openManagerDropdown === user.id && (
-                                                <div className="absolute top-full left-0 mt-1 w-[260px] bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                                <div className="absolute top-full left-0 mt-1 w-65 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                                                     <div className="p-2 border-b border-slate-100 bg-slate-50 text-xs font-bold text-slate-500">
                                                         영업 담당자 선택 (다중가능)
                                                     </div>
-                                                    <div className="max-h-[240px] overflow-y-auto p-1">
+                                                    <div className="max-h-60 overflow-y-auto p-1">
                                                         {managers.map(m => {
                                                             const isSelected = currentManagerIds.includes(m.id);
                                                             return (
@@ -243,7 +277,7 @@ export default function AdminMembers() {
                                         )}
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <div className="flex justify-end gap-2">
+                                        <div className="flex justify-end gap-2 items-center">
                                             {currentStatus === 'PENDING' && (
                                                 <>
                                                     <Button size="sm" onClick={() => handleApprove(user.id, user.companyName)} className="bg-teal-600 h-8 text-xs">승인</Button>
@@ -256,10 +290,29 @@ export default function AdminMembers() {
                                             {currentStatus === 'REJECTED' && (
                                                 <Button size="sm" onClick={() => handleApprove(user.id, user.companyName)} className="bg-teal-600 h-8 text-xs">다시 승인</Button>
                                             )}
-                                            {currentStatus === 'REJECTED' && auth.user?.role === 'MASTER' && (
-                                                <Button size="sm" variant="ghost" onClick={() => handleDelete(user.id, user.companyName || user.contactName)} className="text-slate-400 hover:text-red-600 h-8 w-8 p-0" aria-label="삭제">
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
+
+                                            {/* 마스터 수정/삭제 관리 권한 */}
+                                            {(auth.user?.role === 'MASTER' || auth.user?.role === 'admin') && (
+                                                <>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleEditClick(user)}
+                                                        className="text-slate-600 border-slate-200 hover:bg-slate-50 h-8 w-8 p-0 flex items-center justify-center"
+                                                        title="수정"
+                                                    >
+                                                        <Pencil className="w-4 h-4" />
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleDelete(user.id, user.companyName || user.contactName)}
+                                                        className="text-slate-400 border-slate-200 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 h-8 w-8 p-0 flex items-center justify-center"
+                                                        title="삭제"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </>
                                             )}
                                         </div>
                                     </td>
@@ -269,6 +322,92 @@ export default function AdminMembers() {
                     </tbody>
                 </table>
             </div>
+
+            {/* Edit User Modal */}
+            {isEditModalOpen && editingUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 className="font-bold text-slate-800">회원 정보 수정</h3>
+                            <button onClick={() => { setIsEditModalOpen(false); setEditingUser(null); }} className="text-slate-400 hover:text-slate-600" aria-label="닫기">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleUpdateUser} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1">이메일 (ID)</label>
+                                <input disabled type="email" className="w-full px-3 py-2 border rounded-lg text-sm bg-slate-100 text-slate-500 cursor-not-allowed"
+                                    title="이메일 (ID)"
+                                    value={editingUser.email} />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1">비밀번호 변경 (선택)</label>
+                                <input
+                                    type="password"
+                                    className="w-full px-3 py-2 border rounded-lg text-sm text-slate-900 placeholder:text-slate-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition-all"
+                                    title="비밀번호"
+                                    placeholder="변경시에만 입력하세요"
+                                    value={editingUser.password || ''}
+                                    onChange={e => setEditingUser({ ...editingUser, password: e.target.value })}
+                                />
+                                <p className="text-[10px] text-slate-400 mt-1">* 입력하지 않으면 기존 비밀번호가 유지됩니다.</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">기업명</label>
+                                    <input required type="text" className="w-full px-3 py-2 border rounded-lg text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                                        title="기업명" placeholder="회사명 입력"
+                                        value={editingUser.companyName}
+                                        onChange={e => setEditingUser({ ...editingUser, companyName: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">사업자등록번호</label>
+                                    <input type="text" className="w-full px-3 py-2 border rounded-lg text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                                        title="사업자등록번호" placeholder="123-45-67890"
+                                        value={editingUser.bizNo || ''}
+                                        onChange={e => setEditingUser({ ...editingUser, bizNo: e.target.value })} />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">담당자 이름</label>
+                                    <input required type="text" className="w-full px-3 py-2 border rounded-lg text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                                        title="담당자 이름" placeholder="담당자 성함"
+                                        value={editingUser.contactName}
+                                        onChange={e => setEditingUser({ ...editingUser, contactName: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">연락처</label>
+                                    <input required type="text" className="w-full px-3 py-2 border rounded-lg text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                                        title="연락처" placeholder="010-0000-0000"
+                                        value={editingUser.phone}
+                                        onChange={e => setEditingUser({ ...editingUser, phone: e.target.value })} />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1">주소</label>
+                                <input required type="text" className="w-full px-3 py-2 border rounded-lg text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                                    title="주소" placeholder="회사 주소 입력"
+                                    value={editingUser.address}
+                                    onChange={e => setEditingUser({ ...editingUser, address: e.target.value })} />
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <Button type="button" variant="outline" onClick={() => { setIsEditModalOpen(false); setEditingUser(null); }} className="flex-1 border-slate-200 text-slate-600 hover:bg-slate-50">
+                                    취소
+                                </Button>
+                                <Button type="submit" className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-medium">
+                                    저장
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -277,7 +416,7 @@ function FilterTab({ label, active, onClick, count }: { label: string, active: b
     return (
         <button
             onClick={onClick}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors relative top-[1px] flex items-center gap-2 ${active ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50/50' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors relative top-px flex items-center gap-2 ${active ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50/50' : 'text-slate-500 hover:text-slate-700'}`}
         >
             {label}
             {count !== undefined && count > 0 && (

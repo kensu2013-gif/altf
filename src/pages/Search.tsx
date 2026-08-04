@@ -251,6 +251,14 @@ export default function Search() {
     // Selection & Cart
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [defaultQty, setDefaultQty] = useState(1);
+    const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
+
+    const handleQuantityChange = (id: string, qty: number) => {
+        setItemQuantities(prev => ({
+            ...prev,
+            [id]: Math.max(1, qty)
+        }));
+    };
 
     // File Upload States
     const [isDragging, setIsDragging] = useState(false);
@@ -534,6 +542,9 @@ export default function Search() {
                 finalStock = stockMap ? (stockMap[req.loc] || 0) : 0;
             }
 
+            // Determine item quantity from row input or default quantity
+            const itemQty = itemQuantities[compositeId] ?? itemQuantities[itemId] ?? defaultQty;
+
             const lineItem: LineItem = {
                 id: crypto.randomUUID(), // Always new ID
                 productId: product.id,
@@ -541,9 +552,9 @@ export default function Search() {
                 thickness: product.thickness,
                 size: product.size,
                 material: product.material,
-                quantity: defaultQty,
+                quantity: itemQty,
                 unitPrice: Number(product.unitPrice),
-                amount: Number(product.unitPrice) * defaultQty,
+                amount: Number(product.unitPrice) * itemQty,
                 isVerified: true,
                 stockStatus: product.stockStatus,
                 location: finalLocation, // Plaintext
@@ -1267,6 +1278,9 @@ export default function Search() {
                                                     data={tableData}
                                                     selectedIds={selectedIds}
                                                     onToggleSelect={handleToggleSelect}
+                                                    itemQuantities={itemQuantities}
+                                                    defaultQty={defaultQty}
+                                                    onQuantityChange={handleQuantityChange}
                                                 />
                                             </div>
                                         </InventoryErrorBoundary>

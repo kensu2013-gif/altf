@@ -330,10 +330,10 @@ export default function AdminPage() {
     let hasHiddenOrders = false;
 
     if (!showAllExpanded && (filterStatus === 'all' || filterStatus === 'COMPLETED')) {
-        const threeDaysAgo = new Date();
-        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+        const twentyDaysAgo = new Date();
+        twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20);
 
-        displayedOrders = filteredOrders.filter(o => new Date(o.createdAt) >= threeDaysAgo);
+        displayedOrders = filteredOrders.filter(o => new Date(o.createdAt) >= twentyDaysAgo);
         if (displayedOrders.length < filteredOrders.length) {
             hasHiddenOrders = true;
         }
@@ -418,13 +418,13 @@ export default function AdminPage() {
                             <table className="w-full min-w-[1000px] text-sm text-left">
                                 <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                                     <tr>
-                                        <th scope="col" className="px-6 py-3 font-bold w-[5%] text-center min-w-[60px]">No.</th>
-                                        <th scope="col" className="px-6 py-3 font-bold w-[20%] min-w-[150px]">주문 품목 (Items)</th>
+                                        <th scope="col" className="px-6 py-3 font-bold w-[5%] text-center min-w-15">No.</th>
+                                        <th scope="col" className="px-6 py-3 font-bold w-[20%] min-w-37.5">주문 품목 (Items)</th>
                                         <th scope="col" className="px-6 py-3 font-bold w-[20%] min-w-[180px]">고객 / 주문일시 (Customer)</th>
                                         <th scope="col" className="px-6 py-3 font-bold text-right w-[15%] min-w-[120px] whitespace-nowrap">주문금액 (Sales)</th>
                                         <th scope="col" className="px-6 py-3 font-bold text-right w-[15%] min-w-[120px] whitespace-nowrap">매입금액 (Buying)</th>
                                         <th scope="col" className="px-6 py-3 font-bold text-center w-[12%] min-w-[120px]">상태 (Status)</th>
-                                        <th scope="col" className="px-6 py-3 font-bold text-center w-[13%] min-w-[150px]">관리 (Manage)</th>
+                                        <th scope="col" className="px-6 py-3 font-bold text-center w-[13%] min-w-37.5">관리 (Manage)</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">

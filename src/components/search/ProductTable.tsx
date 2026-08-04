@@ -7,9 +7,19 @@ interface ProductTableProps {
     visibleLocations?: string[]; // Optional: if provided, only show these locations
     onToggleSelect: (id: string) => void;
     onToggleAll: (ids: string[]) => void;
+    itemQuantities: Record<string, number>;
+    defaultQty: number;
+    onQuantityChange: (id: string, qty: number) => void;
 }
 
-export function ProductTable({ data, selectedIds, onToggleSelect }: Omit<ProductTableProps, 'onToggleAll' | 'visibleLocations'>) {
+export function ProductTable({
+    data,
+    selectedIds,
+    onToggleSelect,
+    itemQuantities,
+    defaultQty,
+    onQuantityChange
+}: Omit<ProductTableProps, 'onToggleAll' | 'visibleLocations'>) {
 
     // Helper to check if a specific location is selected for an item
     const isLocationSelected = (itemId: string, location: string) => {
@@ -103,6 +113,7 @@ export function ProductTable({ data, selectedIds, onToggleSelect }: Omit<Product
                                 const now = item; // Alias
                                 const price = now.unitPrice;
                                 const locStock = now.locationStock;
+                                const currentQty = itemQuantities[item.id] ?? defaultQty;
 
                                 return (
                                     <tr
@@ -184,12 +195,6 @@ export function ProductTable({ data, selectedIds, onToggleSelect }: Omit<Product
                                         <td className="px-2 py-3 text-center border-r border-gray-100">
                                             <span className="text-[13px] font-bold font-mono text-slate-700">
                                                 {(() => {
-                                                    // Maker Display Logic:
-                                                    // 1. If maker1 exists and differs from maker
-                                                    // 2. AND Sihwa has stock (location1)
-                                                    // 3. AND Yangsan has NO stock (location)
-                                                    // -> Show maker1
-
                                                     const m1 = item.maker1;
                                                     const m = item.maker;
 
@@ -211,7 +216,11 @@ export function ProductTable({ data, selectedIds, onToggleSelect }: Omit<Product
                                                 type="number"
                                                 min="1"
                                                 className="w-12 text-center text-sm font-bold text-slate-900 border border-slate-200 rounded focus:border-teal-500 outline-none p-1"
-                                                defaultValue={1}
+                                                value={currentQty}
+                                                onChange={(e) => {
+                                                    const val = parseInt(e.target.value, 10);
+                                                    onQuantityChange(item.id, isNaN(val) ? 1 : val);
+                                                }}
                                                 aria-label="Quantity"
                                             />
                                         </td>

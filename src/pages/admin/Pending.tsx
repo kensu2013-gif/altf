@@ -936,7 +936,7 @@ export default function PendingOrders() {
                     <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] custom-scrollbar pb-4">
                         {activeTab === 'ALL' ? (
                             groupBy === 'ORDER' ? (
-                                <table className="w-full min-w-[1000px] text-left">
+                                <table className="w-full min-w-250 text-left">
                                     <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 whitespace-nowrap sticky top-0 z-10">
                                         <tr>
                                             <th scope="col" className="px-5 py-3 font-bold w-[13%] min-w-[120px]">고객명 (Customer)</th>
