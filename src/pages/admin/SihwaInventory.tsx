@@ -269,6 +269,7 @@ export default function SihwaInventory() {
     const [dkFilterItem, setDkFilterItem] = useState('');
     const [dkFilterMaterial, setDkFilterMaterial] = useState('');
     const [dkFilterSize, setDkFilterSize] = useState('');
+    const [dkFilterProcurement, setDkFilterProcurement] = useState<'ALL' | 'ORDER_NEEDED' | 'RECOMMENDED' | 'DOUBLE_STOCKOUT' | 'STABLE'>('ALL');
     const [dkViewMode, setDkViewMode] = useState<'ITEM' | 'MATERIAL'>('ITEM');
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
         'CRITICAL': true,
@@ -1585,7 +1586,8 @@ export default function SihwaInventory() {
             dkSearchQuery.trim() ||
             dkFilterItem ||
             dkFilterMaterial ||
-            dkFilterSize
+            dkFilterSize ||
+            dkFilterProcurement !== 'ALL'
         );
 
         // 기본 상태에서는 시화 재고의 건강도 등급이 A, B인 것만 필터링하여 보여줌
@@ -1612,6 +1614,29 @@ export default function SihwaInventory() {
         }
         if (dkFilterSize) {
             filtered = filtered.filter(r => (r.size || '').trim() === dkFilterSize.trim());
+        }
+
+        if (dkFilterProcurement !== 'ALL') {
+            filtered = filtered.filter(r => {
+                const sihwaRow = baseAnalyzedInventoryMap.get(r.id);
+                const recQty = sihwaRow?.recommendedQty ?? 0;
+                const isDoubleStockout = sihwaRow?.isDoubleStockoutWithDemand ?? (sihwaRow ? (sihwaRow.shQty === 0 && sihwaRow.ysQty === 0 && (sihwaRow.recent60dSales > 0 || sihwaRow.salesVolume > 0 || sihwaRow.quoteCount > 0)) : false);
+                const isCriticalOrWarning = sihwaRow?.statusCategory === 'CRITICAL' || sihwaRow?.statusCategory === 'WARNING';
+
+                if (dkFilterProcurement === 'ORDER_NEEDED') {
+                    return recQty > 0 || isDoubleStockout || isCriticalOrWarning;
+                }
+                if (dkFilterProcurement === 'RECOMMENDED') {
+                    return recQty > 0;
+                }
+                if (dkFilterProcurement === 'DOUBLE_STOCKOUT') {
+                    return isDoubleStockout;
+                }
+                if (dkFilterProcurement === 'STABLE') {
+                    return recQty === 0 && !isDoubleStockout && !isCriticalOrWarning;
+                }
+                return true;
+            });
         }
 
         let finalResults: DaekyungStockAnalysisItem[] = [];
@@ -1690,7 +1715,8 @@ export default function SihwaInventory() {
                 default: return 0;
             }
         });
-    }, [daekyungBaseStockAverages, baseAnalyzedInventoryMap, dkSearchQuery, dkFilterItem, dkFilterMaterial, dkFilterSize, dkViewMode, dkSortConfig]);
+    }, [daekyungBaseStockAverages, baseAnalyzedInventoryMap, dkSearchQuery, dkFilterItem, dkFilterMaterial, dkFilterSize, dkFilterProcurement, dkViewMode, dkSortConfig]);
+
 
     const daekyungStats = useMemo(() => {
         const totalCurrentStock = daekyungStockAverages.reduce((sum, item) => sum + item.currentStock, 0);
@@ -5244,7 +5270,7 @@ if (displayList.length === 0) {
                                         </div>
 
                                         {/* 드롭다운 필터 */}
-                                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
                                             <div className="flex flex-col gap-1">
                                                 <label htmlFor="dk-item-filter" className="text-[10px] font-bold text-slate-500">품목 필터</label>
                                                 <select
@@ -5290,6 +5316,22 @@ if (displayList.length === 0) {
                                                 </select>
                                             </div>
 
+                                            <div className="flex flex-col gap-1">
+                                                <label htmlFor="dk-procurement-filter" className="text-[10px] font-bold text-slate-500">조달 상태 필터</label>
+                                                <select
+                                                    id="dk-procurement-filter"
+                                                    value={dkFilterProcurement}
+                                                    onChange={e => setDkFilterProcurement(e.target.value as 'ALL' | 'ORDER_NEEDED' | 'RECOMMENDED' | 'DOUBLE_STOCKOUT' | 'STABLE')}
+                                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                                >
+                                                    <option value="ALL">전체 조달 상태</option>
+                                                    <option value="ORDER_NEEDED">발주 필요 (종합)</option>
+                                                    <option value="RECOMMENDED">AI 발주 추천</option>
+                                                    <option value="DOUBLE_STOCKOUT">이중 품절</option>
+                                                    <option value="STABLE">안정</option>
+                                                </select>
+                                            </div>
+
                                             <div className="flex items-end">
                                                 <button
                                                     onClick={() => {
@@ -5297,8 +5339,9 @@ if (displayList.length === 0) {
                                                         setDkFilterItem('');
                                                         setDkFilterMaterial('');
                                                         setDkFilterSize('');
+                                                        setDkFilterProcurement('ALL');
                                                     }}
-                                                    disabled={!dkSearchQuery && !dkFilterItem && !dkFilterMaterial && !dkFilterSize}
+                                                    disabled={!dkSearchQuery && !dkFilterItem && !dkFilterMaterial && !dkFilterSize && dkFilterProcurement === 'ALL'}
                                                     className="w-full bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
                                                 >
                                                     🔄 필터 초기화
