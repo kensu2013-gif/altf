@@ -55,8 +55,10 @@ interface DaekyungStockAnalysisItem {
     size?: string;
     thickness?: string;
     currentStock: number;
+    avg1m: number;
     avg3m: number;
     avg6m: number;
+    share1m: number;
     share3m: number;
     share6m: number;
     trend: number;
@@ -260,7 +262,7 @@ export default function SihwaInventory() {
 
     const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE' | 'HEALTH_DIAGNOSIS' | 'DAEKYUNG_STOCK'>('AI_SUMMARY');
     const [dkSortConfig, setDkSortConfig] = useState<{
-        key: 'id' | 'name' | 'material' | 'size' | 'currentStock' | 'avg3m' | 'avg6m' | 'share3m' | 'share6m' | 'trend';
+        key: 'id' | 'name' | 'material' | 'size' | 'currentStock' | 'avg1m' | 'avg3m' | 'avg6m' | 'share1m' | 'share3m' | 'share6m' | 'trend';
         direction: 'asc' | 'desc';
     }>({ key: 'currentStock', direction: 'desc' });
     const [dkSearchQuery, setDkSearchQuery] = useState('');
@@ -897,6 +899,10 @@ export default function SihwaInventory() {
                 }
             }
 
+            const stocks1m = dailyStocks.slice(0, 30);
+            const sum1m = stocks1m.reduce((s, val) => s + val, 0);
+            const avg1m = stocks1m.length > 0 ? parseFloat((sum1m / stocks1m.length).toFixed(1)) : ysQty;
+
             const stocks3m = dailyStocks.slice(0, 90);
             const sum3m = stocks3m.reduce((s, val) => s + val, 0);
             const avg3m = stocks3m.length > 0 ? parseFloat((sum3m / stocks3m.length).toFixed(1)) : ysQty;
@@ -912,21 +918,25 @@ export default function SihwaInventory() {
                 size: item.size || '',
                 thickness: item.thickness || '',
                 currentStock: ysQty,
+                avg1m,
                 avg3m,
                 avg6m,
             };
         });
 
+        const total1m = rawResults.reduce((s, r) => s + r.avg1m, 0);
         const total3m = rawResults.reduce((s, r) => s + r.avg3m, 0);
         const total6m = rawResults.reduce((s, r) => s + r.avg6m, 0);
 
         return rawResults.map(r => {
+            const share1m = total1m > 0 ? parseFloat(((r.avg1m / total1m) * 100).toFixed(2)) : 0;
             const share3m = total3m > 0 ? parseFloat(((r.avg3m / total3m) * 100).toFixed(2)) : 0;
             const share6m = total6m > 0 ? parseFloat(((r.avg6m / total6m) * 100).toFixed(2)) : 0;
             const trend = r.avg6m > 0 ? parseFloat((((r.avg3m - r.avg6m) / r.avg6m) * 100).toFixed(1)) : (r.avg3m > 0 ? 100 : 0);
 
             return {
                 ...r,
+                share1m,
                 share3m,
                 share6m,
                 trend,
@@ -935,9 +945,9 @@ export default function SihwaInventory() {
     }, [inventory, historyData.daekyungHistory]);
 
     const daekyungStockMap = useMemo(() => {
-        const map = new Map<string, { currentStock: number; avg3m: number; avg6m: number }>();
+        const map = new Map<string, { currentStock: number; avg1m: number; avg3m: number; avg6m: number }>();
         daekyungBaseStockAverages.forEach(item => {
-            map.set(item.id, { currentStock: item.currentStock, avg3m: item.avg3m, avg6m: item.avg6m });
+            map.set(item.id, { currentStock: item.currentStock, avg1m: item.avg1m, avg3m: item.avg3m, avg6m: item.avg6m });
         });
         return map;
     }, [daekyungBaseStockAverages]);
@@ -1564,20 +1574,20 @@ export default function SihwaInventory() {
         }
 
         if (dkSearchQuery) {
-            const query = dkSearchQuery.toLowerCase();
+            const query = dkSearchQuery.trim().toLowerCase();
             filtered = filtered.filter(r =>
                 r.id.toLowerCase().includes(query) ||
                 r.name.toLowerCase().includes(query)
             );
         }
         if (dkFilterItem) {
-            filtered = filtered.filter(r => r.name === dkFilterItem);
+            filtered = filtered.filter(r => (r.name || '').trim() === dkFilterItem.trim());
         }
         if (dkFilterMaterial) {
-            filtered = filtered.filter(r => r.material === dkFilterMaterial);
+            filtered = filtered.filter(r => (r.material || '').trim() === dkFilterMaterial.trim());
         }
         if (dkFilterSize) {
-            filtered = filtered.filter(r => r.size === dkFilterSize);
+            filtered = filtered.filter(r => (r.size || '').trim() === dkFilterSize.trim());
         }
 
         let finalResults: DaekyungStockAnalysisItem[] = [];
@@ -1588,27 +1598,33 @@ export default function SihwaInventory() {
             const materialGroups: Record<string, {
                 material: string;
                 currentStock: number;
+                avg1m: number;
                 avg3m: number;
                 avg6m: number;
+                share1m: number;
                 share3m: number;
                 share6m: number;
             }> = {};
 
             filtered.forEach(r => {
-                const mat = r.material || '미지정';
+                const mat = (r.material || '').trim() || '미지정';
                 if (!materialGroups[mat]) {
                     materialGroups[mat] = {
                         material: mat,
                         currentStock: 0,
+                        avg1m: 0,
                         avg3m: 0,
                         avg6m: 0,
+                        share1m: 0,
                         share3m: 0,
                         share6m: 0,
                     };
                 }
                 materialGroups[mat].currentStock += r.currentStock;
+                materialGroups[mat].avg1m += r.avg1m;
                 materialGroups[mat].avg3m += r.avg3m;
                 materialGroups[mat].avg6m += r.avg6m;
+                materialGroups[mat].share1m += r.share1m;
                 materialGroups[mat].share3m += r.share3m;
                 materialGroups[mat].share6m += r.share6m;
             });
@@ -1620,8 +1636,10 @@ export default function SihwaInventory() {
                     name: g.material,
                     material: g.material,
                     currentStock: g.currentStock,
+                    avg1m: parseFloat(g.avg1m.toFixed(1)),
                     avg3m: parseFloat(g.avg3m.toFixed(1)),
                     avg6m: parseFloat(g.avg6m.toFixed(1)),
+                    share1m: parseFloat(g.share1m.toFixed(2)),
                     share3m: parseFloat(g.share3m.toFixed(2)),
                     share6m: parseFloat(g.share6m.toFixed(2)),
                     trend,
@@ -1629,7 +1647,8 @@ export default function SihwaInventory() {
             });
         }
 
-        return finalResults.sort((a, b) => {
+        // Return new shallow copy to prevent in-place mutation of memoized daekyungBaseStockAverages
+        return [...finalResults].sort((a, b) => {
             const dir = dkSortConfig.direction === 'asc' ? 1 : -1;
             switch (dkSortConfig.key) {
                 case 'id': return a.id.localeCompare(b.id) * dir;
@@ -1637,8 +1656,10 @@ export default function SihwaInventory() {
                 case 'material': return (a.material || '').localeCompare(b.material || '') * dir;
                 case 'size': return (a.size || '').localeCompare(b.size || '') * dir;
                 case 'currentStock': return (a.currentStock - b.currentStock) * dir;
+                case 'avg1m': return (a.avg1m - b.avg1m) * dir;
                 case 'avg3m': return (a.avg3m - b.avg3m) * dir;
                 case 'avg6m': return (a.avg6m - b.avg6m) * dir;
+                case 'share1m': return (a.share1m - b.share1m) * dir;
                 case 'share3m': return (a.share3m - b.share3m) * dir;
                 case 'share6m': return (a.share6m - b.share6m) * dir;
                 case 'trend': return (a.trend - b.trend) * dir;
@@ -1649,12 +1670,14 @@ export default function SihwaInventory() {
 
     const daekyungStats = useMemo(() => {
         const totalCurrentStock = daekyungStockAverages.reduce((sum, item) => sum + item.currentStock, 0);
+        const totalAvg1m = daekyungStockAverages.reduce((sum, item) => sum + item.avg1m, 0);
         const totalAvg3m = daekyungStockAverages.reduce((sum, item) => sum + item.avg3m, 0);
         const totalAvg6m = daekyungStockAverages.reduce((sum, item) => sum + item.avg6m, 0);
 
         return {
             totalItems: daekyungStockAverages.length,
             totalCurrentStock,
+            totalAvg1m: parseFloat(totalAvg1m.toFixed(1)),
             totalAvg3m: parseFloat(totalAvg3m.toFixed(1)),
             totalAvg6m: parseFloat(totalAvg6m.toFixed(1)),
         };
@@ -2751,7 +2774,7 @@ export default function SihwaInventory() {
                                         </button>
 
                                         {expandedGroups['CRITICAL'] && (
-                                            <div className="bg-white border-t border-rose-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
+                                            <div className="bg-white border-t border-rose-100 overflow-x-auto overflow-y-auto max-h-150 custom-scrollbar">
                                                 {stats.critical.length > 0 ? (
                                                     <table className="w-full text-sm text-left whitespace-nowrap">
                                                         <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
@@ -2831,7 +2854,7 @@ export default function SihwaInventory() {
                                                                             <div className="flex flex-col items-center">
                                                                                 <span className="text-indigo-600 font-black">+{row.pendingOrderQty} 대기중</span>
                                                                                 {row.pendingOrderDetails && row.pendingOrderDetails.length > 0 && (
-                                                                                    <div className="text-[10px] text-slate-500 mt-1 space-y-0.5 max-w-[150px] overflow-hidden text-ellipsis">
+                                                                                    <div className="text-[10px] text-slate-500 mt-1 space-y-0.5 max-w-37.5 overflow-hidden text-ellipsis">
                                                                                         {row.pendingOrderDetails.map((d, idx) => (
                                                                                             <div key={idx} className="whitespace-nowrap" title={`${d.poNumber}${d.deliveryDate ? ` (납기: ${d.deliveryDate})` : ''}`}>
                                                                                                 <span className="font-mono bg-slate-100 px-1 rounded text-slate-600 border border-slate-200">{d.poNumber.slice(-8)}</span>
@@ -2948,7 +2971,7 @@ export default function SihwaInventory() {
                                         </button>
 
                                         {expandedGroups['WARNING'] && (
-                                            <div className="bg-white border-t border-amber-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
+                                            <div className="bg-white border-t border-amber-100 overflow-x-auto overflow-y-auto max-h-150 custom-scrollbar">
                                                 {stats.warning.length > 0 ? (
                                                     <table className="w-full text-sm text-left whitespace-nowrap">
                                                         <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
@@ -3024,7 +3047,7 @@ export default function SihwaInventory() {
                                                                             <div className="flex flex-col items-center">
                                                                                 <span className="text-blue-600 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md font-black shadow-sm">+{row.pendingOrderQty}</span>
                                                                                 {row.pendingOrderDetails && row.pendingOrderDetails.length > 0 && (
-                                                                                    <div className="text-[10px] text-slate-500 mt-1 space-y-0.5 max-w-[150px] overflow-hidden text-ellipsis">
+                                                                                    <div className="text-[10px] text-slate-500 mt-1 space-y-0.5 max-w-37.5 overflow-hidden text-ellipsis">
                                                                                         {row.pendingOrderDetails.map((d, idx) => (
                                                                                             <div key={idx} className="whitespace-nowrap" title={`${d.poNumber}${d.deliveryDate ? ` (납기: ${d.deliveryDate})` : ''}`}>
                                                                                                 <span className="font-mono bg-slate-100 px-1 rounded text-slate-600 border border-slate-200">{d.poNumber.slice(-8)}</span>
@@ -3141,7 +3164,7 @@ export default function SihwaInventory() {
                                         </button>
 
                                         {expandedGroups['REGULAR'] && (
-                                            <div className="bg-white border-t border-indigo-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
+                                            <div className="bg-white border-t border-indigo-100 overflow-x-auto overflow-y-auto max-h-150 custom-scrollbar">
                                                 {stats.regular.length > 0 ? (
                                                     <table className="w-full text-sm text-left whitespace-nowrap">
                                                         <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
@@ -3356,7 +3379,7 @@ export default function SihwaInventory() {
                                                     <h2 className="font-bold text-slate-800">일간 변동 트렌드 (실제 출고/입고 파악)</h2>
                                                 </div>
                                             </div>
-                                            <div className="p-0 flex-1 h-[320px] overflow-y-auto">
+                                            <div className="p-0 flex-1 h-80 overflow-y-auto">
                                                 {historyLoading ? (
                                                     <div className="p-8 text-center text-slate-400">불러오는 중입니다...</div>
                                                 ) : historyData.inventoryHistory.length === 0 ? (
@@ -3465,7 +3488,7 @@ export default function SihwaInventory() {
                                                                                             </div>
                                                                                             <div className="flex items-center gap-2 shrink-0">
                                                                                                 <div className="flex flex-col items-end gap-1">
-                                                                                                    <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-[200px]">
+                                                                                                    <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-50">
                                                                                                         {analysis && (
                                                                                                             <div className="text-[10px] w-full text-right text-slate-500 group-hover:text-slate-700 transition-colors mt-0.5">
                                                                                                                 현재고 <span className="font-bold text-slate-700">{analysis.shQty}</span> / 적정재고 <span className="font-bold text-slate-700">{analysis.safeStock}</span>
@@ -3540,7 +3563,7 @@ export default function SihwaInventory() {
                                                     <option value="180D">최근 180일</option>
                                                 </select>
                                             </div>
-                                            <div className="p-0 flex-1 h-[320px] overflow-y-auto bg-slate-50/30">
+                                            <div className="p-0 flex-1 h-80 overflow-y-auto bg-slate-50/30">
                                                 <div className="grid grid-cols-1 divide-y divide-slate-100">
                                                     {(() => {
                                                         const field = topPeriod === '7D' ? 'recent7dSales' :
@@ -3574,7 +3597,7 @@ export default function SihwaInventory() {
                                                                         <span className="text-[9px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-bold">{item.salesFreq.toLocaleString()}회발생</span>
                                                                         <span className="font-black text-slate-700 text-sm drop-shadow-sm">{(item[field] as number).toLocaleString()} <span className="font-normal text-[10px] text-slate-400">개</span></span>
                                                                     </div>
-                                                                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-[80px]" title={`기간누적매출 ${formatCur((item[field] as number) * item.sellingPrice)}원`}>
+                                                                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-20" title={`기간누적매출 ${formatCur((item[field] as number) * item.sellingPrice)}원`}>
                                                                         ₩{formatCur((item[field] as number) * item.sellingPrice)}
                                                                     </span>
                                                                 </div>
@@ -3591,7 +3614,7 @@ export default function SihwaInventory() {
 
                             {/* TAB 3: ALL TABLE WITH SORTING */}
                             {activeTab === 'ALL_TABLE' && (
-                                <div className="space-y-4 overflow-x-auto overflow-y-auto max-h-[800px] custom-scrollbar pb-4 bg-white">
+                                <div className="space-y-4 overflow-x-auto overflow-y-auto max-h-200 custom-scrollbar pb-4 bg-white">
                                     <table className="w-full text-left text-sm whitespace-nowrap min-w-[1000px]">
                                         <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none sticky top-0 z-10 shadow-sm">
                                             <tr className="text-xs uppercase tracking-wider text-slate-500 font-bold border-b-2 border-slate-200">
@@ -4407,7 +4430,7 @@ if (displayList.length === 0) {
                                                         </select>
 
                                                         {/* 검색창 */}
-                                                        <div className="relative min-w-[200px] flex-1 max-w-xs">
+                                                        <div className="relative min-w-50 flex-1 max-w-xs">
                                                             <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400 text-xs">🔍</span>
                                                             <input
                                                                 type="text"
@@ -4557,25 +4580,25 @@ if (displayList.length === 0) {
                                                                 </th>
                                                                 <th className="p-3 w-10 text-center">순위</th>
                                                                 <th 
-                                                                    className="p-3 w-32 min-w-[120px] cursor-pointer hover:bg-slate-200 transition-colors text-left"
+                                                                    className="p-3 w-32 min-w-30 cursor-pointer hover:bg-slate-200 transition-colors text-left"
                                                                     onClick={() => setMdSortConfig(prev => ({ key: 'name', direction: prev.key === 'name' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
                                                                 >
                                                                     품목명 {mdSortConfig.key === 'name' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
                                                                 </th>
                                                                 <th 
-                                                                    className="p-3 w-32 min-w-[120px] cursor-pointer hover:bg-slate-200 transition-colors text-left"
+                                                                    className="p-3 w-32 min-w-30 cursor-pointer hover:bg-slate-200 transition-colors text-left"
                                                                     onClick={() => setMdSortConfig(prev => ({ key: 'thickness', direction: prev.key === 'thickness' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
                                                                 >
                                                                     두께 {mdSortConfig.key === 'thickness' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
                                                                 </th>
                                                                 <th 
-                                                                    className="p-3 w-32 min-w-[120px] cursor-pointer hover:bg-slate-200 transition-colors text-left"
+                                                                    className="p-3 w-32 min-w-30 cursor-pointer hover:bg-slate-200 transition-colors text-left"
                                                                     onClick={() => setMdSortConfig(prev => ({ key: 'size', direction: prev.key === 'size' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
                                                                 >
                                                                     사이즈 {mdSortConfig.key === 'size' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
                                                                 </th>
                                                                 <th 
-                                                                    className="p-3 w-32 min-w-[120px] cursor-pointer hover:bg-slate-200 transition-colors text-left"
+                                                                    className="p-3 w-32 min-w-30 cursor-pointer hover:bg-slate-200 transition-colors text-left"
                                                                     onClick={() => setMdSortConfig(prev => ({ key: 'material', direction: prev.key === 'material' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
                                                                 >
                                                                     재질 {mdSortConfig.key === 'material' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
@@ -4640,10 +4663,10 @@ if (displayList.length === 0) {
                                                                                 />
                                                                             </td>
                                                                             <td className="p-3 text-center text-slate-500 font-mono text-[10px]">{i + 1}</td>
-                                                                            <td className="p-3 w-32 min-w-[120px] text-slate-700 font-semibold text-left">{m.row?.product?.name || m.id}</td>
-                                                                            <td className="p-3 w-32 min-w-[120px] text-slate-500 font-mono text-[11px] text-left">{m.row?.product?.thickness || '-'}</td>
-                                                                            <td className="p-3 w-32 min-w-[120px] text-slate-500 font-mono text-[11px] text-left">{m.row?.product?.size || '-'}</td>
-                                                                            <td className="p-3 w-32 min-w-[120px] text-slate-500 text-left">{m.row?.product?.material || '알수없음'}</td>
+                                                                            <td className="p-3 w-32 min-w-30 text-slate-700 font-semibold text-left">{m.row?.product?.name || m.id}</td>
+                                                                            <td className="p-3 w-32 min-w-30 text-slate-500 font-mono text-[11px] text-left">{m.row?.product?.thickness || '-'}</td>
+                                                                            <td className="p-3 w-32 min-w-30 text-slate-500 font-mono text-[11px] text-left">{m.row?.product?.size || '-'}</td>
+                                                                            <td className="p-3 w-32 min-w-30 text-slate-500 text-left">{m.row?.product?.material || '알수없음'}</td>
                                                                             
                                                                             {/* 재고 데이터 */}
                                                                             <td className={`p-3 text-right font-mono font-semibold ${shQty === 0 ? 'text-slate-400' : 'text-slate-800'}`}>
@@ -5008,42 +5031,51 @@ if (displayList.length === 0) {
                             {activeTab === 'DAEKYUNG_STOCK' && (
                                 <div className="space-y-6 p-4 md:p-0 pb-8 animate-in fade-in duration-300">
                                     {/* ── 1. 대경재고 요약 카드 ── */}
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                        <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4 shadow-xs">
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                        <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-3.5 shadow-xs">
                                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                                                🏭 분석 대상 대경 {dkViewMode === 'ITEM' ? '품목' : '재질'}
+                                                🏭 분석 대상 {dkViewMode === 'ITEM' ? '품목' : '재질'}
                                             </div>
-                                            <div className="text-2xl font-black text-slate-800">
+                                            <div className="text-xl font-black text-slate-800">
                                                 {daekyungStats.totalItems} <span className="text-xs text-slate-500 font-bold">{dkViewMode === 'ITEM' ? '개 품목' : '개 재질'}</span>
                                             </div>
-                                            <div className="text-[9px] text-slate-400 mt-1 font-medium">양산 하치장 보유 & 메이커 '대경' 기준</div>
+                                            <div className="text-[9px] text-slate-400 mt-1 font-medium">양산 창고 & 메이커 '대경'</div>
                                         </div>
-                                        <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4 shadow-xs">
+                                        <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-3.5 shadow-xs">
                                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                                                 📦 현재 재고 합계
                                             </div>
-                                            <div className="text-2xl font-black text-teal-600 font-mono">
+                                            <div className="text-xl font-black text-teal-600 font-mono">
                                                 {daekyungStats.totalCurrentStock.toLocaleString()} <span className="text-xs text-slate-500 font-bold">개</span>
                                             </div>
-                                            <div className="text-[9px] text-slate-400 mt-1 font-medium">현재 양산 창고 실시간 재고량</div>
+                                            <div className="text-[9px] text-slate-400 mt-1 font-medium">양산 창고 실시간 재고량</div>
                                         </div>
-                                        <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 shadow-xs">
-                                            <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">
-                                                📈 3개월 평균 보유량 합계
+                                        <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-3.5 shadow-xs">
+                                            <div className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1">
+                                                ⚡ 1개월 평균 보유량
                                             </div>
-                                            <div className="text-2xl font-black text-indigo-600 font-mono">
+                                            <div className="text-xl font-black text-blue-600 font-mono">
+                                                {daekyungStats.totalAvg1m.toLocaleString()} <span className="text-xs text-slate-500 font-bold">개</span>
+                                            </div>
+                                            <div className="text-[9px] text-blue-400 mt-1 font-medium">최근 30일 일별 재고 산술평균</div>
+                                        </div>
+                                        <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-3.5 shadow-xs">
+                                            <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">
+                                                📈 3개월 평균 보유량
+                                            </div>
+                                            <div className="text-xl font-black text-indigo-600 font-mono">
                                                 {daekyungStats.totalAvg3m.toLocaleString()} <span className="text-xs text-slate-500 font-bold">개</span>
                                             </div>
-                                            <div className="text-[9px] text-indigo-400 mt-1 font-medium">최근 90일 일별 재고의 산술평균</div>
+                                            <div className="text-[9px] text-indigo-400 mt-1 font-medium">최근 90일 일별 재고 산술평균</div>
                                         </div>
-                                        <div className="bg-violet-50/50 border border-violet-100 rounded-2xl p-4 shadow-xs">
+                                        <div className="bg-violet-50/50 border border-violet-100 rounded-2xl p-3.5 shadow-xs">
                                             <div className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-1">
-                                                📊 6개월 평균 보유량 합계
+                                                📊 6개월 평균 보유량
                                             </div>
-                                            <div className="text-2xl font-black text-violet-600 font-mono">
+                                            <div className="text-xl font-black text-violet-600 font-mono">
                                                 {daekyungStats.totalAvg6m.toLocaleString()} <span className="text-xs text-slate-500 font-bold">개</span>
                                             </div>
-                                            <div className="text-[9px] text-violet-400 mt-1 font-medium">최근 180일 일별 재고의 산술평균</div>
+                                            <div className="text-[9px] text-violet-400 mt-1 font-medium">최근 180일 일별 재고 산술평균</div>
                                         </div>
                                     </div>
 
@@ -5054,8 +5086,8 @@ if (displayList.length === 0) {
                                                 💡 대경재고(양산) 평균 보유 분석 안내
                                             </h4>
                                             <p className="text-[11px] text-slate-300 leading-relaxed">
-                                                데이터 갱신은 불특정일에 진행되므로 일별 단순 변동량보다는 <strong>3개월(90일) 및 6개월(180일) 평균 재고 보유량</strong>을 확인하는 것이 안정적인 재고 흐름 파악에 합당합니다.
-                                                각 품목이 전체 대경 재고에서 차지하는 <strong>상대적 비중(Relative Share)</strong>을 비교 분석하여 앞으로 우리가 상시 보유해야 할 상대적 품목을 파악해 보세요.
+                                                데이터 갱신은 불특정일에 진행되므로 일별 단기 변동량 파악을 위한 <strong>1개월(30일) 평균 재고</strong>와 중장기 흐름을 위한 <strong>3개월/6개월 평균 재고</strong>를 조합하여 파악하는 것이 합당합니다.
+                                                각 품목이 전체 대경 재고에서 차지하는 <strong>상대적 비중(Relative Share)</strong>을 비교 분석하여 앞으로 상시 보유해야 할 품목을 관리를 진행하세요.
                                             </p>
                                         </div>
                                     </div>
@@ -5078,7 +5110,7 @@ if (displayList.length === 0) {
                                                 <button
                                                     onClick={() => {
                                                         setDkViewMode('MATERIAL');
-                                                        if (!['material', 'currentStock', 'avg3m', 'avg6m', 'share3m', 'share6m', 'trend'].includes(dkSortConfig.key)) {
+                                                        if (!['material', 'currentStock', 'avg1m', 'avg3m', 'avg6m', 'share1m', 'share3m', 'share6m', 'trend'].includes(dkSortConfig.key)) {
                                                             setDkSortConfig({ key: 'material', direction: 'desc' });
                                                         }
                                                     }}
@@ -5186,7 +5218,7 @@ if (displayList.length === 0) {
                                                 검색 필터 결과: {daekyungStockAverages.length}개 {dkViewMode === 'ITEM' ? '품목' : '재질'}
                                             </span>
                                         </div>
-                                        <div className="overflow-auto max-h-[600px]">
+                                        <div className="overflow-auto max-h-150">
                                             <table className="w-full text-xs text-left whitespace-nowrap">
                                                 <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100 sticky top-0 z-10 shadow-sm">
                                                     <tr>
@@ -5214,11 +5246,17 @@ if (displayList.length === 0) {
                                                         <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'currentStock', direction: prev.key === 'currentStock' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
                                                             현재고 {dkSortConfig.key === 'currentStock' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                         </th>
+                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'avg1m', direction: prev.key === 'avg1m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                            1개월 평균고 {dkSortConfig.key === 'avg1m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        </th>
                                                         <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'avg3m', direction: prev.key === 'avg3m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
                                                             3개월 평균고 {dkSortConfig.key === 'avg3m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                         </th>
                                                         <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'avg6m', direction: prev.key === 'avg6m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
                                                             6개월 평균고 {dkSortConfig.key === 'avg6m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        </th>
+                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'share1m', direction: prev.key === 'share1m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                            1개월 상대비중 {dkSortConfig.key === 'share1m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                         </th>
                                                         <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'share3m', direction: prev.key === 'share3m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
                                                             3개월 상대비중 {dkSortConfig.key === 'share3m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -5281,11 +5319,22 @@ if (displayList.length === 0) {
                                                                 <td className="px-4 py-2.5 text-right font-bold text-slate-700">
                                                                     {row.currentStock.toLocaleString()}개
                                                                 </td>
+                                                                <td className="px-4 py-2.5 text-right font-black text-blue-600 font-mono">
+                                                                    {row.avg1m.toLocaleString()}개
+                                                                </td>
                                                                 <td className="px-4 py-2.5 text-right font-black text-indigo-600 font-mono">
                                                                     {row.avg3m.toLocaleString()}개
                                                                 </td>
                                                                 <td className="px-4 py-2.5 text-right font-black text-violet-600 font-mono">
                                                                     {row.avg6m.toLocaleString()}개
+                                                                </td>
+                                                                <td className="px-4 py-2.5 text-right font-mono text-[10px]">
+                                                                    <div className="flex items-center justify-end gap-1.5">
+                                                                        <span className="font-bold text-slate-600">{row.share1m.toFixed(2)}%</span>
+                                                                        <div className="w-12 bg-slate-100 h-1.5 rounded-full overflow-hidden hidden sm:block">
+                                                                            <div className={`bg-blue-500 h-full rounded-full w-pct-${Math.min(100, Math.round((row.share1m * 5) / 5) * 5)}`}></div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                                 <td className="px-4 py-2.5 text-right font-mono text-[10px]">
                                                                     <div className="flex items-center justify-end gap-1.5">
@@ -5311,7 +5360,7 @@ if (displayList.length === 0) {
                                                     })}
                                                     {daekyungStockAverages.length === 0 && (
                                                         <tr>
-                                                            <td colSpan={dkViewMode === 'ITEM' ? 11 : 8} className="px-4 py-16 text-center text-slate-400 font-medium">
+                                                            <td colSpan={dkViewMode === 'ITEM' ? 13 : 10} className="px-4 py-16 text-center text-slate-400 font-medium">
                                                                 조건에 부합하는 대경재고 데이터가 없거나 분석 중입니다.
                                                             </td>
                                                         </tr>

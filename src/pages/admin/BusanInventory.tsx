@@ -2956,7 +2956,7 @@ export default function BusanInventory() {
                                         </button>
 
                                         {expandedGroups['CRITICAL'] && (
-                                            <div className="bg-white border-t border-rose-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
+                                            <div className="bg-white border-t border-rose-100 overflow-x-auto overflow-y-auto max-h-150 custom-scrollbar">
                                                 {stats.critical.length > 0 ? (
                                                     <table className="w-full text-sm text-left whitespace-nowrap">
                                                         <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
@@ -3036,7 +3036,7 @@ export default function BusanInventory() {
                                                                             <div className="flex flex-col items-center">
                                                                                 <span className="text-indigo-600 font-black">+{row.pendingOrderQty} 대기중</span>
                                                                                 {row.pendingOrderDetails && row.pendingOrderDetails.length > 0 && (
-                                                                                    <div className="text-[10px] text-slate-500 mt-1 space-y-0.5 max-w-[150px] overflow-hidden text-ellipsis">
+                                                                                    <div className="text-[10px] text-slate-500 mt-1 space-y-0.5 max-w-37.5 overflow-hidden text-ellipsis">
                                                                                         {row.pendingOrderDetails.map((d, idx) => (
                                                                                             <div key={idx} className="whitespace-nowrap" title={`${d.poNumber}${d.deliveryDate ? ` (납기: ${d.deliveryDate})` : ''}`}>
                                                                                                 <span className="font-mono bg-slate-100 px-1 rounded text-slate-600 border border-slate-200">{d.poNumber.slice(-8)}</span>
@@ -3166,7 +3166,7 @@ export default function BusanInventory() {
                                         </button>
 
                                         {expandedGroups['WARNING'] && (
-                                            <div className="bg-white border-t border-amber-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
+                                            <div className="bg-white border-t border-amber-100 overflow-x-auto overflow-y-auto max-h-150 custom-scrollbar">
                                                 {stats.warning.length > 0 ? (
                                                     <table className="w-full text-sm text-left whitespace-nowrap">
                                                         <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
@@ -3242,7 +3242,7 @@ export default function BusanInventory() {
                                                                             <div className="flex flex-col items-center">
                                                                                 <span className="text-blue-600 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md font-black shadow-sm">+{row.pendingOrderQty}</span>
                                                                                 {row.pendingOrderDetails && row.pendingOrderDetails.length > 0 && (
-                                                                                    <div className="text-[10px] text-slate-500 mt-1 space-y-0.5 max-w-[150px] overflow-hidden text-ellipsis">
+                                                                                    <div className="text-[10px] text-slate-500 mt-1 space-y-0.5 max-w-37.5 overflow-hidden text-ellipsis">
                                                                                         {row.pendingOrderDetails.map((d, idx) => (
                                                                                             <div key={idx} className="whitespace-nowrap" title={`${d.poNumber}${d.deliveryDate ? ` (납기: ${d.deliveryDate})` : ''}`}>
                                                                                                 <span className="font-mono bg-slate-100 px-1 rounded text-slate-600 border border-slate-200">{d.poNumber.slice(-8)}</span>
@@ -3375,7 +3375,7 @@ export default function BusanInventory() {
                                         </button>
 
                                         {expandedGroups['REGULAR'] && (
-                                            <div className="bg-white border-t border-indigo-100 overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
+                                            <div className="bg-white border-t border-indigo-100 overflow-x-auto overflow-y-auto max-h-150 custom-scrollbar">
                                                 {stats.regular.length > 0 ? (
                                                     <table className="w-full text-sm text-left whitespace-nowrap">
                                                         <thead className="bg-slate-50 text-slate-500 font-bold border-y border-slate-100 select-none sticky top-0 z-10 shadow-sm">
@@ -3590,7 +3590,7 @@ export default function BusanInventory() {
                                                     <h2 className="font-bold text-slate-800">일간 변동 트렌드 (실제 출고/입고 파악)</h2>
                                                 </div>
                                             </div>
-                                            <div className="p-0 flex-1 h-[320px] overflow-y-auto">
+                                            <div className="p-0 flex-1 h-80 overflow-y-auto">
                                                 {historyLoading ? (
                                                     <div className="p-8 text-center text-slate-400">불러오는 중입니다...</div>
                                                 ) : historyData.inventoryHistory.length === 0 ? (
@@ -3699,7 +3699,7 @@ export default function BusanInventory() {
                                                                                             </div>
                                                                                             <div className="flex items-center gap-2 shrink-0">
                                                                                                 <div className="flex flex-col items-end gap-1">
-                                                                                                    <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-[200px]">
+                                                                                                    <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-50">
                                                                                                         {analysis && (
                                                                                                             <div className="text-[10px] w-full text-right text-slate-500 group-hover:text-slate-700 transition-colors mt-0.5">
                                                                                                                 현재고 <span className="font-bold text-slate-700">{analysis.shQty}</span> / 적정재고 <span className="font-bold text-slate-700">{analysis.safeStock}</span>
@@ -3774,7 +3774,7 @@ export default function BusanInventory() {
                                                     <option value="180D">최근 180일</option>
                                                 </select>
                                             </div>
-                                            <div className="p-0 flex-1 h-[320px] overflow-y-auto bg-slate-50/30">
+                                            <div className="p-0 flex-1 h-80 overflow-y-auto bg-slate-50/30">
                                                 <div className="grid grid-cols-1 divide-y divide-slate-100">
                                                     {(() => {
                                                         const field = topPeriod === '7D' ? 'recent7dSales' :
@@ -3808,7 +3808,7 @@ export default function BusanInventory() {
                                                                         <span className="text-[9px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-bold">{item.salesFreq.toLocaleString()}회발생</span>
                                                                         <span className="font-black text-slate-700 text-sm drop-shadow-sm">{(item[field] as number).toLocaleString()} <span className="font-normal text-[10px] text-slate-400">개</span></span>
                                                                     </div>
-                                                                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-[80px]" title={`기간누적매출 ${formatCur((item[field] as number) * item.sellingPrice)}원`}>
+                                                                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-20" title={`기간누적매출 ${formatCur((item[field] as number) * item.sellingPrice)}원`}>
                                                                         ₩{formatCur((item[field] as number) * item.sellingPrice)}
                                                                     </span>
                                                                 </div>
@@ -3825,7 +3825,7 @@ export default function BusanInventory() {
 
                             {/* TAB 3: ALL TABLE WITH SORTING */}
                             {activeTab === 'ALL_TABLE' && (
-                                <div className="space-y-4 overflow-x-auto overflow-y-auto max-h-[800px] custom-scrollbar pb-4 bg-white">
+                                <div className="space-y-4 overflow-x-auto overflow-y-auto max-h-200 custom-scrollbar pb-4 bg-white">
                                     <table className="w-full text-left text-sm whitespace-nowrap min-w-[1000px]">
                                         <thead className="text-slate-500 font-bold bg-slate-50 border-y border-slate-200 select-none sticky top-0 z-10 shadow-sm">
                                             <tr className="text-xs uppercase tracking-wider text-slate-500 font-bold border-b-2 border-slate-200">
@@ -4641,7 +4641,7 @@ if (displayList.length === 0) {
                                                         </select>
 
                                                         {/* 검색창 */}
-                                                        <div className="relative min-w-[200px] flex-1 max-w-xs">
+                                                        <div className="relative min-w-50 flex-1 max-w-xs">
                                                             <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400 text-xs">🔍</span>
                                                             <input
                                                                 type="text"
@@ -4791,25 +4791,25 @@ if (displayList.length === 0) {
                                                                 </th>
                                                                 <th className="p-3 w-10 text-center">순위</th>
                                                                 <th 
-                                                                    className="p-3 w-32 min-w-[120px] cursor-pointer hover:bg-slate-200 transition-colors text-left"
+                                                                    className="p-3 w-32 min-w-30 cursor-pointer hover:bg-slate-200 transition-colors text-left"
                                                                     onClick={() => setMdSortConfig(prev => ({ key: 'name', direction: prev.key === 'name' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
                                                                 >
                                                                     품목명 {mdSortConfig.key === 'name' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
                                                                 </th>
                                                                 <th 
-                                                                    className="p-3 w-32 min-w-[120px] cursor-pointer hover:bg-slate-200 transition-colors text-left"
+                                                                    className="p-3 w-32 min-w-30 cursor-pointer hover:bg-slate-200 transition-colors text-left"
                                                                     onClick={() => setMdSortConfig(prev => ({ key: 'thickness', direction: prev.key === 'thickness' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
                                                                 >
                                                                     두께 {mdSortConfig.key === 'thickness' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
                                                                 </th>
                                                                 <th 
-                                                                    className="p-3 w-32 min-w-[120px] cursor-pointer hover:bg-slate-200 transition-colors text-left"
+                                                                    className="p-3 w-32 min-w-30 cursor-pointer hover:bg-slate-200 transition-colors text-left"
                                                                     onClick={() => setMdSortConfig(prev => ({ key: 'size', direction: prev.key === 'size' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
                                                                 >
                                                                     사이즈 {mdSortConfig.key === 'size' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
                                                                 </th>
                                                                 <th 
-                                                                    className="p-3 w-32 min-w-[120px] cursor-pointer hover:bg-slate-200 transition-colors text-left"
+                                                                    className="p-3 w-32 min-w-30 cursor-pointer hover:bg-slate-200 transition-colors text-left"
                                                                     onClick={() => setMdSortConfig(prev => ({ key: 'material', direction: prev.key === 'material' && prev.direction === 'desc' ? 'asc' : 'desc' }))}
                                                                 >
                                                                     재질 {mdSortConfig.key === 'material' ? (mdSortConfig.direction === 'asc' ? '▲' : '▼') : ''}
@@ -4874,10 +4874,10 @@ if (displayList.length === 0) {
                                                                                 />
                                                                             </td>
                                                                             <td className="p-3 text-center text-slate-500 font-mono text-[10px]">{i + 1}</td>
-                                                                            <td className="p-3 w-32 min-w-[120px] text-slate-700 font-semibold text-left">{m.row?.product?.name || m.id}</td>
-                                                                            <td className="p-3 w-32 min-w-[120px] text-slate-500 font-mono text-[11px] text-left">{m.row?.product?.thickness || '-'}</td>
-                                                                            <td className="p-3 w-32 min-w-[120px] text-slate-500 font-mono text-[11px] text-left">{m.row?.product?.size || '-'}</td>
-                                                                            <td className="p-3 w-32 min-w-[120px] text-slate-500 text-left">{m.row?.product?.material || '알수없음'}</td>
+                                                                            <td className="p-3 w-32 min-w-30 text-slate-700 font-semibold text-left">{m.row?.product?.name || m.id}</td>
+                                                                            <td className="p-3 w-32 min-w-30 text-slate-500 font-mono text-[11px] text-left">{m.row?.product?.thickness || '-'}</td>
+                                                                            <td className="p-3 w-32 min-w-30 text-slate-500 font-mono text-[11px] text-left">{m.row?.product?.size || '-'}</td>
+                                                                            <td className="p-3 w-32 min-w-30 text-slate-500 text-left">{m.row?.product?.material || '알수없음'}</td>
                                                                             
                                                                             {/* 재고 데이터 */}
                                                                             <td className={`p-3 text-right font-mono font-semibold ${shQty === 0 ? 'text-slate-400' : 'text-slate-800'}`}>
@@ -5420,7 +5420,7 @@ if (displayList.length === 0) {
                                                 검색 필터 결과: {daekyungStockAverages.length}개 {dkViewMode === 'ITEM' ? '품목' : '재질'}
                                             </span>
                                         </div>
-                                        <div className="overflow-auto max-h-[600px]">
+                                        <div className="overflow-auto max-h-150">
                                             <table className="w-full text-xs text-left whitespace-nowrap">
                                                 <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100 sticky top-0 z-10 shadow-sm">
                                                     <tr>
