@@ -2476,6 +2476,7 @@ export default function BusanInventory() {
         const csvRows = [headers.join(',')];
 
         analyzedInventory.forEach(row => {
+            if (!row || !row.product) return;
             const specName = row.product.name || '';
             const specThick = row.product.thickness || '';
             const specSize = row.product.size || '';

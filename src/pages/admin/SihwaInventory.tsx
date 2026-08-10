@@ -357,7 +357,7 @@ export default function SihwaInventory() {
         if (selectedWarningIds.size === stats.warning.length) {
             setSelectedWarningIds(new Set());
         } else {
-            setSelectedWarningIds(new Set(stats.warning.map(w => w.product.id)));
+            setSelectedWarningIds(new Set(stats.warning.map(w => w?.product?.id).filter((id): id is string => Boolean(id))));
         }
     };
 
@@ -1437,7 +1437,11 @@ export default function SihwaInventory() {
                     const dynamicCap = Math.max(100, Math.ceil(row.salesVolume / 4));
                     recommendedQty = Math.min(dynamicCap, recommendedQty);
                 } else if (recommendedQty > 500) {
-                // ★ 3개월 수요 지표 및 특수 수급 위험 판단
+                    recommendedQty = 500;
+                }
+            }
+
+            // ★ 3개월 수요 지표 및 특수 수급 위험 판단
                 const avgDemand3m = Math.round(row.salesVolume / 12);
                 const minDemand3m = Math.max(0, Math.round(avgDemand3m * 0.5));
                 const maxDemand3m = Math.round(Math.max(row.recent30dSales, avgDemand3m * 1.6));
@@ -2314,6 +2318,7 @@ export default function SihwaInventory() {
         const csvRows = [headers.join(',')];
 
         analyzedInventory.forEach(row => {
+            if (!row || !row.product) return;
             const specName = row.product.name || '';
             const specThick = row.product.thickness || '';
             const specSize = row.product.size || '';
