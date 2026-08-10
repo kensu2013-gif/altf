@@ -2335,7 +2335,7 @@ export default function SihwaInventory() {
         navigate('/cart');
     };
 
-    const handleCreateSingleDaekyungOrder = (row: typeof daekyungBaseStockAverages[0], e?: React.MouseEvent) => {
+    const handleCreateSingleDaekyungOrder = (row: { id: string; name?: string; material?: string; size?: string; thickness?: string }, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
         const sihwaRow = baseAnalyzedInventoryMap.get(row.id);
         const recQty = sihwaRow?.recommendedQty ?? 0;
