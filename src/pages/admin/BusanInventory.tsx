@@ -5446,44 +5446,20 @@ if (displayList.length === 0) {
                                                             </th>
                                                         )}
                                                         <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'currentStock', direction: prev.key === 'currentStock' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            현재고 {dkSortConfig.key === 'currentStock' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                            대경 현재고 {dkSortConfig.key === 'currentStock' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                         </th>
                                                         <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'avg3m', direction: prev.key === 'avg3m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            3개월 평균고 {dkSortConfig.key === 'avg3m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                            3개월 평균 보유 {dkSortConfig.key === 'avg3m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                         </th>
-                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'avg6m', direction: prev.key === 'avg6m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            6개월 평균고 {dkSortConfig.key === 'avg6m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
-                                                        </th>
-                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'share3m', direction: prev.key === 'share3m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            3개월 상대비중 {dkSortConfig.key === 'share3m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
-                                                        </th>
-                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'share6m', direction: prev.key === 'share6m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            6개월 상대비중 {dkSortConfig.key === 'share6m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
-                                                        </th>
-                                                        <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'trend', direction: prev.key === 'trend' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            추세 (3M vs 6M) {dkSortConfig.key === 'trend' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
-                                                        </th>
+                                                        <th className="px-4 py-3 text-right">부산 안전재고량</th>
+                                                        <th className="px-4 py-3 text-left">수급 상태</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
                                                     {daekyungStockAverages.map((row, index) => {
-                                                        const trendVal = row.trend;
-                                                        let trendBadge = (
-                                                            <span className="text-slate-400 font-bold">-</span>
-                                                        );
-                                                        if (trendVal > 0.5) {
-                                                            trendBadge = (
-                                                                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-black text-[9px] flex items-center gap-0.5 justify-center w-fit mx-auto">
-                                                                    ▲ +{trendVal.toFixed(1)}%
-                                                                </span>
-                                                            );
-                                                        } else if (trendVal < -0.5) {
-                                                            trendBadge = (
-                                                                <span className="bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded font-black text-[9px] flex items-center gap-0.5 justify-center w-fit mx-auto">
-                                                                    ▼ {trendVal.toFixed(1)}%
-                                                                </span>
-                                                            );
-                                                        }
+                                                        const busanRow = baseAnalyzedInventoryMap.get(row.id);
+                                                        const safeStockVal = busanRow?.safeStock ?? 0;
+                                                        const isStockout = row.currentStock === 0;
 
                                                         return (
                                                             <tr key={row.id} className="hover:bg-slate-50/60 transition">
@@ -5512,33 +5488,19 @@ if (displayList.length === 0) {
                                                                         {row.material}
                                                                     </td>
                                                                 )}
-                                                                <td className="px-4 py-2.5 text-right font-bold text-slate-700">
+                                                                <td className={`px-4 py-2.5 text-right font-black font-mono ${isStockout ? 'text-rose-600 bg-rose-50/40' : 'text-slate-700'}`}>
                                                                     {row.currentStock.toLocaleString()}개
                                                                 </td>
                                                                 <td className="px-4 py-2.5 text-right font-black text-indigo-600 font-mono">
                                                                     {row.avg3m.toLocaleString()}개
                                                                 </td>
-                                                                <td className="px-4 py-2.5 text-right font-black text-violet-600 font-mono">
-                                                                    {row.avg6m.toLocaleString()}개
+                                                                <td className="px-4 py-2.5 text-right font-bold text-slate-700 font-mono">
+                                                                    {safeStockVal}개
                                                                 </td>
-                                                                <td className="px-4 py-2.5 text-right font-mono text-[10px]">
-                                                                    <div className="flex items-center justify-end gap-1.5">
-                                                                        <span className="font-bold text-slate-600">{row.share3m.toFixed(2)}%</span>
-                                                                        <div className="w-12 bg-slate-100 h-1.5 rounded-full overflow-hidden hidden sm:block">
-                                                                            <div className={`bg-indigo-500 h-full rounded-full w-pct-${Math.min(100, Math.round((row.share3m * 5) / 5) * 5)}`}></div>
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-4 py-2.5 text-right font-mono text-[10px]">
-                                                                    <div className="flex items-center justify-end gap-1.5">
-                                                                        <span className="font-bold text-slate-600">{row.share6m.toFixed(2)}%</span>
-                                                                        <div className="w-12 bg-slate-100 h-1.5 rounded-full overflow-hidden hidden sm:block">
-                                                                            <div className={`bg-violet-500 h-full rounded-full w-pct-${Math.min(100, Math.round((row.share6m * 5) / 5) * 5)}`}></div>
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-4 py-2.5 text-center">
-                                                                    {trendBadge}
+                                                                <td className="px-4 py-2.5 text-left text-xs">
+                                                                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${isStockout ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
+                                                                        {isStockout ? '🚨 대경 결품 (수급 유의)' : '✅ 대경 정상 수급'}
+                                                                    </span>
                                                                 </td>
                                                             </tr>
                                                         );

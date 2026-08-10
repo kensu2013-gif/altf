@@ -1437,32 +1437,52 @@ export default function SihwaInventory() {
                     const dynamicCap = Math.max(100, Math.ceil(row.salesVolume / 4));
                     recommendedQty = Math.min(dynamicCap, recommendedQty);
                 } else if (recommendedQty > 500) {
-                    recommendedQty = 500;
+                // ★ 3개월 수요 지표 및 특수 수급 위험 판단
+                const avgDemand3m = Math.round(row.salesVolume / 12);
+                const minDemand3m = Math.max(0, Math.round(avgDemand3m * 0.5));
+                const maxDemand3m = Math.round(Math.max(row.recent30dSales, avgDemand3m * 1.6));
+                const isDoubleStockoutWithDemand = row.shQty === 0 && row.ysQty === 0 && (row.recent60dSales > 0 || row.salesVolume > 0 || row.quoteCount > 0);
+
+                let procurementReason = "";
+                if (isDoubleStockoutWithDemand) {
+                    procurementReason = "🚨 자사·공급처 동시 결품 (최근 주문/견적 수요 존재) - 기회손실 방지 최우선 긴급 수급 필요";
+                } else if (row.shQty < safeStock && recommendedQty > 0) {
+                    procurementReason = `⚠️ 시화재고(${row.shQty}개)가 적정 안전재고(${safeStock}개) 미달 - ${recommendedQty}개 선발주 권장`;
+                } else if (isExcessStock) {
+                    procurementReason = `📉 직전 수요 대비 과잉재고 (${row.shQty}개 보유) - 추가 발주 보류 및 소진/할인 검토`;
+                } else if (isDeadStock) {
+                    procurementReason = "❌ 최근 6개월 수요 없음 - 불필요 재고 처분 권장";
+                } else {
+                    procurementReason = "✅ 수급 및 재고 상태 안정적";
                 }
-            }
 
-            return {
-                ...row,
-                compositeScore,
-                healthGrade,
-                excessCategory,
-                safeStock,
-                deficit: finalDeficit,
-                recommendedQty,
-                suggestedCriticalQty: finalDeficit,
-                effectiveStock,
-                statusCategory,
-                statusLabel,
-                daysOnHand,
-                dailyAvgSales,
-                reorderPoint,
-                isDeadStock,
-                isExcessStock,
-                canTransfer,
-            };
-        });
+                return {
+                    ...row,
+                    compositeScore,
+                    healthGrade,
+                    excessCategory,
+                    safeStock,
+                    deficit: finalDeficit,
+                    recommendedQty,
+                    suggestedCriticalQty: finalDeficit,
+                    effectiveStock,
+                    statusCategory,
+                    statusLabel,
+                    daysOnHand,
+                    dailyAvgSales,
+                    reorderPoint,
+                    isDeadStock,
+                    isExcessStock,
+                    canTransfer,
+                    minDemand3m,
+                    maxDemand3m,
+                    avgDemand3m,
+                    isDoubleStockoutWithDemand,
+                    procurementReason,
+                };
+            });
 
-        return processedList;
+            return processedList;
     }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, historyData, liveSalesHistory, quotes, orders, userMap, daekyungStockMap]);
 
     const baseAnalyzedInventoryMap = useMemo(() => {
@@ -3937,6 +3957,80 @@ if (displayList.length === 0) {
                             {activeTab === 'HEALTH_DIAGNOSIS' && (
                                 <div className="space-y-5 p-4 md:p-0 pb-8 animate-in fade-in duration-300">
 
+                                    {/* ── 🎯 1~3개월 구매 수급 & 데이터 기반 종합 진단 요약 리포트 ── */}
+                                    <div className="bg-linear-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-xl border border-indigo-800/40 relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3"></div>
+                                        <div className="relative z-10 space-y-4">
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-indigo-800/60 pb-4">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="bg-indigo-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full tracking-wider">
+                                                            PROCUREMENT INTELLIGENCE
+                                                        </span>
+                                                        <span className="text-xs text-indigo-300 font-medium">직전 3개월 실수요 분석 기반</span>
+                                                    </div>
+                                                    <h2 className="text-xl font-black text-white mt-1 flex items-center gap-2">
+                                                        <span>📊 다음 1~3개월 준비 구매 품목 선정 & 근거 종합 분석</span>
+                                                    </h2>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-bold text-indigo-200 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-xs">
+                                                        분석 대상 품목: {analyzedInventory.length}개
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                                <div className="bg-white/10 p-4 rounded-xl border border-white/10 backdrop-blur-xs">
+                                                    <div className="text-xs text-rose-300 font-bold mb-1 flex items-center gap-1.5">
+                                                        🚨 기회손실 최우선 긴급 수급
+                                                    </div>
+                                                    <div className="text-2xl font-black text-rose-400 font-mono">
+                                                        {analyzedInventory.filter(r => r.isDoubleStockoutWithDemand).length}개 품목
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-300 mt-1">
+                                                        자사 0개 & 대경 0개 (최근 주문/견적 수요 존재)
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white/10 p-4 rounded-xl border border-white/10 backdrop-blur-xs">
+                                                    <div className="text-xs text-amber-300 font-bold mb-1 flex items-center gap-1.5">
+                                                        ⚠️ 안전재고 미달 (선발주 권장)
+                                                    </div>
+                                                    <div className="text-2xl font-black text-amber-400 font-mono">
+                                                        {analyzedInventory.filter(r => r.shQty < r.safeStock && r.recommendedQty > 0).length}개 품목
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-300 mt-1">
+                                                        시화재고가 최소유지수준(Safety Stock) 이하
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white/10 p-4 rounded-xl border border-white/10 backdrop-blur-xs">
+                                                    <div className="text-xs text-indigo-300 font-bold mb-1 flex items-center gap-1.5">
+                                                        📦 총 권장 수급 요구량
+                                                    </div>
+                                                    <div className="text-2xl font-black text-indigo-300 font-mono">
+                                                        {analyzedInventory.reduce((sum, r) => sum + (r.recommendedQty || 0), 0).toLocaleString()}개
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-300 mt-1">
+                                                        직전 3개월 월수요 및 리드타임 감안
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-slate-900/60 p-4 rounded-xl border border-indigo-900/60 text-xs leading-relaxed space-y-1.5">
+                                                <div className="font-bold text-indigo-200 flex items-center gap-1.5">
+                                                    💡 1~3개월 수급 전략 종합 판단 요약:
+                                                </div>
+                                                <p className="text-slate-200 font-normal">
+                                                    1. <strong className="text-rose-300">🚨 최우선 긴급 수급 품목</strong>: 시화재고와 대경 본사 재고가 모두 0개인 상태에서 최근 주문/견적 수요가 발생하고 있는 품목입니다. 고객사 이탈 및 기회손실을 막기 위해 직전 3개월 수요 기반 즉시선발주 조치가 타당합니다.<br/>
+                                                    2. <strong className="text-amber-300">⚠️ 적정 유지보유 품목</strong>: 최근 3개월간 꾸준히 주문이 유입되고 있으나 시화재고가 최소 안전재고 미달인 품목으로, 최소유지수량 이상 보유를 적극 추천합니다.<br/>
+                                                    3. <strong className="text-slate-400">📉 보유 비권장/처분 품목</strong>: 직전 3개월간 수요가 저조하고 대경재고가 충분하거나 자사재고가 과다한 품목은 추가 구매를 일시 중단하고 처분을 권장합니다.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* ── 섹션 1: 건강도 점수 + 구성 개요 ── */}
                                     <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr] gap-4">
 
@@ -5244,60 +5338,36 @@ if (displayList.length === 0) {
                                                             </th>
                                                         )}
                                                         <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'currentStock', direction: prev.key === 'currentStock' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            현재고 {dkSortConfig.key === 'currentStock' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
-                                                        </th>
-                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'avg1m', direction: prev.key === 'avg1m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            1개월 평균고 {dkSortConfig.key === 'avg1m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                            대경 현재고 {dkSortConfig.key === 'currentStock' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                         </th>
                                                         <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'avg3m', direction: prev.key === 'avg3m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            3개월 평균고 {dkSortConfig.key === 'avg3m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                            3개월 평균 보유 {dkSortConfig.key === 'avg3m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                         </th>
-                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'avg6m', direction: prev.key === 'avg6m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            6개월 평균고 {dkSortConfig.key === 'avg6m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
-                                                        </th>
-                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'share1m', direction: prev.key === 'share1m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            1개월 상대비중 {dkSortConfig.key === 'share1m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
-                                                        </th>
-                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'share3m', direction: prev.key === 'share3m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            3개월 상대비중 {dkSortConfig.key === 'share3m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
-                                                        </th>
-                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'share6m', direction: prev.key === 'share6m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            6개월 상대비중 {dkSortConfig.key === 'share6m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
-                                                        </th>
-                                                        <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'trend', direction: prev.key === 'trend' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            추세 (3M vs 6M) {dkSortConfig.key === 'trend' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
-                                                        </th>
+                                                        <th className="px-4 py-3 text-right">시화 안전재고량</th>
+                                                        <th className="px-4 py-3 text-right">1~3개월 권장구매</th>
+                                                        <th className="px-4 py-3 text-left">🎯 수급 진단 & 데이터 근거</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
                                                     {daekyungStockAverages.map((row, index) => {
-                                                        const trendVal = row.trend;
-                                                        let trendBadge = (
-                                                            <span className="text-slate-400 font-bold">-</span>
+                                                        const sihwaRow = baseAnalyzedInventoryMap.get(row.id);
+                                                        const safeStockVal = sihwaRow?.safeStock ?? 0;
+                                                        const recQtyVal = sihwaRow?.recommendedQty ?? 0;
+                                                        const reasoningVal = sihwaRow?.procurementReason || (
+                                                            row.currentStock === 0 
+                                                                ? "🚨 대경 본사 재고 0개 (장기 수급 차질 우려)" 
+                                                                : "✅ 정상 대경 수급 유지 중"
                                                         );
-                                                        if (trendVal > 0.5) {
-                                                            trendBadge = (
-                                                                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-black text-[9px] flex items-center gap-0.5 justify-center w-fit mx-auto">
-                                                                    ▲ +{trendVal.toFixed(1)}%
-                                                                </span>
-                                                            );
-                                                        } else if (trendVal < -0.5) {
-                                                            trendBadge = (
-                                                                <span className="bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded font-black text-[9px] flex items-center gap-0.5 justify-center w-fit mx-auto">
-                                                                    ▼ {trendVal.toFixed(1)}%
-                                                                </span>
-                                                            );
-                                                        }
 
                                                         return (
-                                                            <tr key={row.id} className="hover:bg-slate-50/60 transition">
+                                                            <tr key={row.id} className="hover:bg-slate-50/80 transition cursor-pointer" onClick={() => sihwaRow && setSelectedIntelligenceItem(sihwaRow)}>
                                                                 <td className="px-4 py-2.5 text-center text-[10px] text-slate-400 font-bold">
                                                                     {index + 1}
                                                                 </td>
                                                                 {dkViewMode === 'ITEM' ? (
                                                                     <>
                                                                         <td className="px-4 py-2.5">
-                                                                            <span className="font-mono font-bold text-slate-800 tracking-tight">
+                                                                            <span className="font-mono font-bold text-slate-800 hover:text-indigo-600 transition-colors">
                                                                                 {row.id}
                                                                             </span>
                                                                         </td>
@@ -5316,44 +5386,22 @@ if (displayList.length === 0) {
                                                                         {row.material}
                                                                     </td>
                                                                 )}
-                                                                <td className="px-4 py-2.5 text-right font-bold text-slate-700">
+                                                                <td className={`px-4 py-2.5 text-right font-black font-mono ${row.currentStock === 0 ? 'text-rose-600 bg-rose-50/40' : 'text-slate-700'}`}>
                                                                     {row.currentStock.toLocaleString()}개
                                                                 </td>
-                                                                <td className="px-4 py-2.5 text-right font-black text-blue-600 font-mono">
-                                                                    {row.avg1m.toLocaleString()}개
-                                                                </td>
-                                                                <td className="px-4 py-2.5 text-right font-black text-indigo-600 font-mono">
+                                                                <td className="px-4 py-2.5 text-right font-bold text-indigo-600 font-mono">
                                                                     {row.avg3m.toLocaleString()}개
                                                                 </td>
-                                                                <td className="px-4 py-2.5 text-right font-black text-violet-600 font-mono">
-                                                                    {row.avg6m.toLocaleString()}개
+                                                                <td className="px-4 py-2.5 text-right font-bold text-slate-700 font-mono">
+                                                                    {safeStockVal}개
                                                                 </td>
-                                                                <td className="px-4 py-2.5 text-right font-mono text-[10px]">
-                                                                    <div className="flex items-center justify-end gap-1.5">
-                                                                        <span className="font-bold text-slate-600">{row.share1m.toFixed(2)}%</span>
-                                                                        <div className="w-12 bg-slate-100 h-1.5 rounded-full overflow-hidden hidden sm:block">
-                                                                            <div className={`bg-blue-500 h-full rounded-full w-pct-${Math.min(100, Math.round((row.share1m * 5) / 5) * 5)}`}></div>
-                                                                        </div>
-                                                                    </div>
+                                                                <td className={`px-4 py-2.5 text-right font-black font-mono ${recQtyVal > 0 ? 'text-indigo-600' : 'text-slate-400'}`}>
+                                                                    {recQtyVal}개
                                                                 </td>
-                                                                <td className="px-4 py-2.5 text-right font-mono text-[10px]">
-                                                                    <div className="flex items-center justify-end gap-1.5">
-                                                                        <span className="font-bold text-slate-600">{row.share3m.toFixed(2)}%</span>
-                                                                        <div className="w-12 bg-slate-100 h-1.5 rounded-full overflow-hidden hidden sm:block">
-                                                                            <div className={`bg-indigo-500 h-full rounded-full w-pct-${Math.min(100, Math.round((row.share3m * 5) / 5) * 5)}`}></div>
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-4 py-2.5 text-right font-mono text-[10px]">
-                                                                    <div className="flex items-center justify-end gap-1.5">
-                                                                        <span className="font-bold text-slate-600">{row.share6m.toFixed(2)}%</span>
-                                                                        <div className="w-12 bg-slate-100 h-1.5 rounded-full overflow-hidden hidden sm:block">
-                                                                            <div className={`bg-violet-500 h-full rounded-full w-pct-${Math.min(100, Math.round((row.share6m * 5) / 5) * 5)}`}></div>
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-4 py-2.5 text-center">
-                                                                    {trendBadge}
+                                                                <td className="px-4 py-2.5 text-left text-xs font-medium text-slate-700">
+                                                                    <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${sihwaRow?.isDoubleStockoutWithDemand ? 'bg-rose-100 text-rose-800 font-bold border border-rose-200' : recQtyVal > 0 ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-600'}`}>
+                                                                        {reasoningVal}
+                                                                    </span>
                                                                 </td>
                                                             </tr>
                                                         );

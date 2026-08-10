@@ -19,6 +19,13 @@ interface InventoryDataProps {
     recent60dSales?: number;
     statusCategory?: string;
     statusLabel?: string;
+    safeStock?: number | string;
+    recommendedQty?: number | string;
+    procurementReason?: string;
+    minDemand3m?: number;
+    maxDemand3m?: number;
+    avgDemand3m?: number;
+    isDoubleStockoutWithDemand?: boolean;
     [key: string]: unknown;
 }
 
@@ -478,6 +485,63 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                             )}
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+                            {/* 🎯 데이터 기반 수급 진단 및 1~3개월 구매 추천 카드 */}
+                            {inventoryData && (
+                                <div className={`border rounded-2xl p-5 shadow-sm space-y-4 ${inventoryData.isDoubleStockoutWithDemand ? 'bg-rose-50/70 border-rose-200' : 'bg-slate-50/60 border-slate-200'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                            <BrainCircuit className={`w-4 h-4 ${inventoryData.isDoubleStockoutWithDemand ? 'text-rose-600' : 'text-indigo-600'}`} />
+                                            🎯 직전 3개월 데이터 기반 수급 진단 & 1~3개월 구매 추천
+                                        </div>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${inventoryData.isDoubleStockoutWithDemand ? 'bg-rose-200 text-rose-800' : 'bg-indigo-100 text-indigo-800'}`}>
+                                            {inventoryData.isDoubleStockoutWithDemand ? '🚨 긴급 결품 수급' : '종합 진단'}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                                        <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs">
+                                            <span className="text-[10px] font-bold text-slate-400 block mb-1">최소유지재고 (안전재고)</span>
+                                            <div className="font-mono font-black text-slate-800 text-base">
+                                                {inventoryData.safeStock ?? 0}개
+                                            </div>
+                                        </div>
+                                        <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs">
+                                            <span className="text-[10px] font-bold text-slate-400 block mb-1">최근 3개월 월수요 (Min/Max)</span>
+                                            <div className="font-mono font-bold text-slate-700 text-xs mt-1">
+                                                {inventoryData.minDemand3m ?? 0}개 ~ {inventoryData.maxDemand3m ?? 0}개 <span className="text-[10px] text-slate-400 font-normal">(Avg: {inventoryData.avgDemand3m ?? 0}개)</span>
+                                            </div>
+                                        </div>
+                                        <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs">
+                                            <span className="text-[10px] font-bold text-slate-400 block mb-1">다음 1~3개월 준비 권장 구매량</span>
+                                            <div className={`font-mono font-black text-base ${Number(inventoryData.recommendedQty || 0) > 0 ? 'text-indigo-600' : 'text-slate-500'}`}>
+                                                {inventoryData.recommendedQty ?? 0}개
+                                            </div>
+                                        </div>
+                                        <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs">
+                                            <span className="text-[10px] font-bold text-slate-400 block mb-1">대경본사 수급 상태</span>
+                                            <div className={`font-bold text-xs mt-1 ${Number(inventoryData.ysQty || 0) === 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                {Number(inventoryData.ysQty || 0) === 0 ? '❌ 0개 (장기 수급차질)' : `✅ ${inventoryData.ysQty}개 보유`}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1">
+                                        <div className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+                                            <span>📝 진단 및 발주 필요성 타당성 근거 (Reasoning):</span>
+                                        </div>
+                                        <p className="text-xs font-semibold text-slate-800 leading-relaxed">
+                                            {inventoryData.procurementReason || (
+                                                inventoryData.isDoubleStockoutWithDemand
+                                                    ? "🚨 자사(시화) 및 주요 매입처(대경)가 동시에 결품 상태이나 최근 주문/견적 수요가 지속 발생하고 있습니다. 다음 1~3개월간 기회손실 방지를 위해 최우선적으로 선발주 구매가 요구됩니다."
+                                                    : Number(inventoryData.shQty || 0) < Number(inventoryData.safeStock || 0)
+                                                    ? `⚠️ 현재 시화재고(${inventoryData.shQty}개)가 적정 최소유지재고(${inventoryData.safeStock}개) 미달 상태입니다. 향후 1~3개월간 안정적인 대응을 위해 ${inventoryData.recommendedQty || 0}개 수급을 추천합니다.`
+                                                    : "✅ 현 재고 수준 및 공급처 수급 상태가 직전 수요 대비 적정 범위를 유지하고 있습니다."
+                                            )}
+                                        </p>
+                                    </div>
                                 </div>
                             )}
                         </>
