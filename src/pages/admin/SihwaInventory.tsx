@@ -264,7 +264,7 @@ export default function SihwaInventory() {
     const [dkSortConfig, setDkSortConfig] = useState<{
         key: 'id' | 'name' | 'material' | 'size' | 'currentStock' | 'avg1m' | 'avg3m' | 'avg6m' | 'share1m' | 'share3m' | 'share6m' | 'trend';
         direction: 'asc' | 'desc';
-    }>({ key: 'currentStock', direction: 'desc' });
+    }>({ key: 'id', direction: 'asc' });
     const [dkSearchQuery, setDkSearchQuery] = useState('');
     const [dkFilterItem, setDkFilterItem] = useState('');
     const [dkFilterMaterial, setDkFilterMaterial] = useState('');
@@ -1621,10 +1621,9 @@ export default function SihwaInventory() {
                 const sihwaRow = baseAnalyzedInventoryMap.get(r.id);
                 const recQty = sihwaRow?.recommendedQty ?? 0;
                 const isDoubleStockout = sihwaRow?.isDoubleStockoutWithDemand ?? (sihwaRow ? (sihwaRow.shQty === 0 && sihwaRow.ysQty === 0 && (sihwaRow.recent60dSales > 0 || sihwaRow.salesVolume > 0 || sihwaRow.quoteCount > 0)) : false);
-                const isCriticalOrWarning = sihwaRow?.statusCategory === 'CRITICAL' || sihwaRow?.statusCategory === 'WARNING';
 
                 if (dkFilterProcurement === 'ORDER_NEEDED') {
-                    return recQty > 0 || isDoubleStockout || isCriticalOrWarning;
+                    return recQty > 0 || isDoubleStockout;
                 }
                 if (dkFilterProcurement === 'RECOMMENDED') {
                     return recQty > 0;
@@ -1633,7 +1632,7 @@ export default function SihwaInventory() {
                     return isDoubleStockout;
                 }
                 if (dkFilterProcurement === 'STABLE') {
-                    return recQty === 0 && !isDoubleStockout && !isCriticalOrWarning;
+                    return recQty === 0 && !isDoubleStockout;
                 }
                 return true;
             });
@@ -2330,6 +2329,30 @@ export default function SihwaInventory() {
             unitPrice: unitPrice,
             amount: qty * unitPrice,
             note: `[결품 기회손실 즉시발주]`,
+            isVerified: false
+        });
+
+        navigate('/cart');
+    };
+
+    const handleCreateSingleDaekyungOrder = (row: typeof daekyungBaseStockAverages[0], e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        const sihwaRow = baseAnalyzedInventoryMap.get(row.id);
+        const recQty = sihwaRow?.recommendedQty ?? 0;
+        const qty = recQty > 0 ? recQty : (sihwaRow?.deficit && sihwaRow.deficit > 0 ? sihwaRow.deficit : 10);
+        const unitPrice = sihwaRow?.recentPurchasePrice ?? 0;
+
+        addItem({
+            id: crypto.randomUUID(),
+            productId: row.id,
+            name: row.name || row.id,
+            thickness: (sihwaRow?.product as { thickness?: string })?.thickness || row.thickness || '',
+            size: row.size || '',
+            material: row.material || '',
+            quantity: qty,
+            unitPrice: unitPrice,
+            amount: qty * unitPrice,
+            note: `[대경 수급분석 즉시발주]`,
             isVerified: false
         });
 
@@ -5394,6 +5417,7 @@ if (displayList.length === 0) {
                                                         <th className="px-4 py-3 text-right">시화 안전재고량</th>
                                                         <th className="px-4 py-3 text-right">1~3개월 권장구매</th>
                                                         <th className="px-4 py-3 text-left">🎯 수급 진단 & 데이터 근거</th>
+                                                        <th className="px-4 py-3 text-center">작업/발주</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
@@ -5450,6 +5474,24 @@ if (displayList.length === 0) {
                                                                     <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${sihwaRow?.isDoubleStockoutWithDemand ? 'bg-rose-100 text-rose-800 font-bold border border-rose-200' : recQtyVal > 0 ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-600'}`}>
                                                                         {reasoningVal}
                                                                     </span>
+                                                                </td>
+                                                                <td className="px-4 py-2.5 text-center">
+                                                                    {dkViewMode === 'ITEM' ? (
+                                                                        <button
+                                                                            onClick={(e) => handleCreateSingleDaekyungOrder(row, e)}
+                                                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 mx-auto whitespace-nowrap ${
+                                                                                recQtyVal > 0 || sihwaRow?.isDoubleStockoutWithDemand
+                                                                                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white ring-2 ring-indigo-300'
+                                                                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                                                                            }`}
+                                                                            title="즉시 장바구니 담기 및 발주서 작성"
+                                                                        >
+                                                                            <ShoppingCart className="w-3.5 h-3.5" />
+                                                                            <span>{recQtyVal > 0 ? `${recQtyVal}개 발주` : '발주 작성'}</span>
+                                                                        </button>
+                                                                    ) : (
+                                                                        <span className="text-[10px] text-slate-400 font-medium">-</span>
+                                                                    )}
                                                                 </td>
                                                             </tr>
                                                         );
