@@ -259,6 +259,8 @@ export default function SihwaInventory() {
     const [sihwaFilterThickness, setSihwaFilterThickness] = useState<string[]>([]);
     const [pinnedItemIds, setPinnedItemIds] = useState<Set<string>>(new Set());
     const [topPeriod, setTopPeriod] = useState<'7D' | '30D' | '60D' | '90D' | '180D'>('30D');
+    const [trendRightTab, setTrendRightTab] = useState<'TOP_SALES' | 'SURGING_DEMAND'>('TOP_SALES');
+    const [selectedDkIds, setSelectedDkIds] = useState<Set<string>>(new Set());
 
     const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE' | 'HEALTH_DIAGNOSIS' | 'DAEKYUNG_STOCK'>('AI_SUMMARY');
     const [dkSortConfig, setDkSortConfig] = useState<{
@@ -269,10 +271,11 @@ export default function SihwaInventory() {
     const [dkFilterItem, setDkFilterItem] = useState('');
     const [dkFilterMaterial, setDkFilterMaterial] = useState('');
     const [dkFilterSize, setDkFilterSize] = useState('');
-    const [dkFilterProcurement, setDkFilterProcurement] = useState<'ALL' | 'ORDER_NEEDED' | 'RECOMMENDED' | 'DOUBLE_STOCKOUT' | 'STABLE'>('ALL');
+    const [dkFilterProcurement, setDkFilterProcurement] = useState<'ALL' | 'ORDER_NEEDED' | 'RECOMMENDED' | 'DOUBLE_STOCKOUT' | 'SURGING_DEMAND' | 'STABLE'>('ALL');
     const [dkViewMode, setDkViewMode] = useState<'ITEM' | 'MATERIAL'>('ITEM');
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
         'CRITICAL': true,
+        'SURGING': true,
         'WARNING': true,
         'REGULAR': true
     });
@@ -805,6 +808,8 @@ export default function SihwaInventory() {
         statusLabel: string;
         isDeadStock?: boolean;
         isExcessStock?: boolean;
+        isSurgingDemand?: boolean;
+        surgeReason?: string;
     }
 
     // Dynamically calculate Real-Time Sales History combining static base ERP data and real-time orders
@@ -1621,9 +1626,10 @@ export default function SihwaInventory() {
                 const sihwaRow = baseAnalyzedInventoryMap.get(r.id);
                 const recQty = sihwaRow?.recommendedQty ?? 0;
                 const isDoubleStockout = sihwaRow?.isDoubleStockoutWithDemand ?? (sihwaRow ? (sihwaRow.shQty === 0 && sihwaRow.ysQty === 0 && (sihwaRow.recent60dSales > 0 || sihwaRow.salesVolume > 0 || sihwaRow.quoteCount > 0)) : false);
+                const isSurging = sihwaRow?.isSurgingDemand ?? false;
 
                 if (dkFilterProcurement === 'ORDER_NEEDED') {
-                    return recQty > 0 || isDoubleStockout;
+                    return recQty > 0 || isDoubleStockout || isSurging;
                 }
                 if (dkFilterProcurement === 'RECOMMENDED') {
                     return recQty > 0;
@@ -1631,8 +1637,11 @@ export default function SihwaInventory() {
                 if (dkFilterProcurement === 'DOUBLE_STOCKOUT') {
                     return isDoubleStockout;
                 }
+                if (dkFilterProcurement === 'SURGING_DEMAND') {
+                    return isSurging;
+                }
                 if (dkFilterProcurement === 'STABLE') {
-                    return recQty === 0 && !isDoubleStockout;
+                    return recQty === 0 && !isDoubleStockout && !isSurging;
                 }
                 return true;
             });
@@ -1801,6 +1810,37 @@ export default function SihwaInventory() {
         if (listType === 'CRITICAL') setSelectedCriticalIds(new Set());
         else if (listType === 'WARNING') setSelectedWarningIds(new Set());
         else setSelectedRegularIds(new Set());
+    };
+
+    const handleCreateSelectedDaekyungOrders = () => {
+        if (selectedDkIds.size === 0) return;
+        let addedCount = 0;
+        selectedDkIds.forEach(id => {
+            const sihwaRow = baseAnalyzedInventoryMap.get(id);
+            const dkRow = daekyungStockAverages.find(r => r.id === id);
+            const qty = sihwaRow?.recommendedQty && sihwaRow.recommendedQty > 0 ? sihwaRow.recommendedQty : 1;
+            const price = sihwaRow?.recentPurchasePrice ?? 0;
+            const name = dkRow?.name || sihwaRow?.product.name || id;
+
+            addItem({
+                id: crypto.randomUUID(),
+                productId: id,
+                name: name,
+                thickness: sihwaRow?.product.thickness || '',
+                size: dkRow?.size || sihwaRow?.product.size || '',
+                material: dkRow?.material || sihwaRow?.product.material || '',
+                quantity: qty,
+                unitPrice: price,
+                amount: price * qty,
+                note: '[대경재고 분석] 일괄 발주',
+                isVerified: false
+            });
+            addedCount++;
+        });
+
+        alert(`선택한 ${addedCount}개 품목이 발주 장바구니에 추가되었습니다. 매입/발주 페이지로 이동합니다.`);
+        setSelectedDkIds(new Set());
+        navigate('/admin/purchases');
     };
 
     const handleCreateOrder = (selectedSet: Set<string>, listType: 'CRITICAL' | 'WARNING' | 'REGULAR') => {
@@ -3616,69 +3656,120 @@ export default function SihwaInventory() {
                                         </div>
 
                                         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                                            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-2 bg-slate-50 shrink-0">
-                                                <div className="flex items-center gap-2">
-                                                    <TrendingUp className="w-5 h-5 text-emerald-500" />
-                                                    <h2 className="font-bold text-slate-800">
-                                                        최근 {topPeriod === '7D' ? '7일' : topPeriod === '30D' ? '30일' : topPeriod === '60D' ? '60일' : topPeriod === '90D' ? '90일' : '180일'} 판매 TOP 품목
-                                                    </h2>
+                                            <div className="px-5 py-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50 shrink-0">
+                                                <div className="flex items-center bg-slate-200/60 p-1 rounded-lg">
+                                                    <button
+                                                        onClick={() => setTrendRightTab('TOP_SALES')}
+                                                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${trendRightTab === 'TOP_SALES' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                                                    >
+                                                        <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                                                        판매 TOP
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setTrendRightTab('SURGING_DEMAND')}
+                                                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${trendRightTab === 'SURGING_DEMAND' ? 'bg-white text-rose-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                                                    >
+                                                        🔥 주문 급상승 ({analyzedInventory.filter(r => r.isSurgingDemand).length})
+                                                    </button>
                                                 </div>
-                                                <select
-                                                    title="조회 기간"
-                                                    aria-label="조회 기간"
-                                                    value={topPeriod}
-                                                    onChange={(e) => setTopPeriod(e.target.value as '7D' | '30D' | '60D' | '90D' | '180D')}
-                                                    className="bg-white border border-slate-300 rounded text-xs py-1 px-2 text-slate-700 focus:ring-1 focus:ring-indigo-500 focus:outline-hidden font-bold cursor-pointer"
-                                                >
-                                                    <option value="7D">최근 7일</option>
-                                                    <option value="30D">최근 30일</option>
-                                                    <option value="60D">최근 60일</option>
-                                                    <option value="90D">최근 90일</option>
-                                                    <option value="180D">최근 180일</option>
-                                                </select>
+                                                {trendRightTab === 'TOP_SALES' && (
+                                                    <select
+                                                        title="조회 기간"
+                                                        aria-label="조회 기간"
+                                                        value={topPeriod}
+                                                        onChange={(e) => setTopPeriod(e.target.value as '7D' | '30D' | '60D' | '90D' | '180D')}
+                                                        className="bg-white border border-slate-300 rounded text-xs py-1 px-2 text-slate-700 focus:ring-1 focus:ring-indigo-500 focus:outline-hidden font-bold cursor-pointer"
+                                                    >
+                                                        <option value="7D">최근 7일</option>
+                                                        <option value="30D">최근 30일</option>
+                                                        <option value="60D">최근 60일</option>
+                                                        <option value="90D">최근 90일</option>
+                                                        <option value="180D">최근 180일</option>
+                                                    </select>
+                                                )}
                                             </div>
                                             <div className="p-0 flex-1 h-80 overflow-y-auto bg-slate-50/30">
-                                                <div className="grid grid-cols-1 divide-y divide-slate-100">
-                                                    {(() => {
-                                                        const field = topPeriod === '7D' ? 'recent7dSales' :
-                                                                      topPeriod === '60D' ? 'recent60dSales' :
-                                                                      topPeriod === '90D' ? 'recent90dSales' :
-                                                                      topPeriod === '180D' ? 'recent180dSales' :
-                                                                      'recent30dSales';
+                                                {trendRightTab === 'TOP_SALES' ? (
+                                                    <div className="grid grid-cols-1 divide-y divide-slate-100">
+                                                        {(() => {
+                                                            const field = topPeriod === '7D' ? 'recent7dSales' :
+                                                                          topPeriod === '60D' ? 'recent60dSales' :
+                                                                          topPeriod === '90D' ? 'recent90dSales' :
+                                                                          topPeriod === '180D' ? 'recent180dSales' :
+                                                                          'recent30dSales';
 
-                                                        const topItems = [...analyzedInventory]
-                                                            .filter(item => (item[field] as number) > 0 && !item.product.id.startsWith('STUBEND') && item.sellingPrice > 0)
-                                                            .sort((a, b) => (b[field] as number) - (a[field] as number))
-                                                            .slice(0, 50); // Get top 50
+                                                            const topItems = [...analyzedInventory]
+                                                                .filter(item => (item[field] as number) > 0 && !item.product.id.startsWith('STUBEND') && item.sellingPrice > 0)
+                                                                .sort((a, b) => (b[field] as number) - (a[field] as number))
+                                                                .slice(0, 50);
 
-                                                        if (topItems.length === 0) {
-                                                            return <div className="p-8 text-center text-slate-400">데이터가 없습니다.</div>;
-                                                        }
+                                                            if (topItems.length === 0) {
+                                                                return <div className="p-8 text-center text-slate-400">데이터가 없습니다.</div>;
+                                                            }
 
-                                                        return topItems.map((item, idx) => (
-                                                            <div key={item.product.id} className="p-3 hover:bg-slate-50 transition-colors flex items-center justify-between">
-                                                                <div className="flex items-center gap-3 overflow-hidden">
-                                                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${idx < 3 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                                        {idx + 1}
+                                                            return topItems.map((item, idx) => (
+                                                                <div key={item.product.id} className="p-3 hover:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer" onClick={() => setSelectedIntelligenceItem(item)}>
+                                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${idx < 3 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                                            {idx + 1}
+                                                                        </div>
+                                                                        <div className="flex flex-col min-w-0 pr-2">
+                                                                            <span className="font-bold text-slate-700 text-xs truncate" title={item.product.id}>{item.product.id}</span>
+                                                                            <span className="text-[10px] text-slate-400 font-medium">단위매출 ₩{formatCur(item.sellingPrice)}</span>
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="flex flex-col min-w-0 pr-2">
-                                                                        <span className="font-bold text-slate-700 text-xs truncate" title={item.product.id}>{item.product.id}</span>
-                                                                        <span className="text-[10px] text-slate-400 font-medium">단위매출 ₩{formatCur(item.sellingPrice)}</span>
+                                                                    <div className="flex flex-col items-end shrink-0 pl-1">
+                                                                        <div className="flex items-center gap-1 justify-end">
+                                                                            <span className="text-[9px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-bold">{item.salesFreq.toLocaleString()}회발생</span>
+                                                                            <span className="font-black text-slate-700 text-sm drop-shadow-sm">{(item[field] as number).toLocaleString()} <span className="font-normal text-[10px] text-slate-400">개</span></span>
+                                                                        </div>
+                                                                        <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-20" title={`기간누적매출 ${formatCur((item[field] as number) * item.sellingPrice)}원`}>
+                                                                            ₩{formatCur((item[field] as number) * item.sellingPrice)}
+                                                                        </span>
                                                                     </div>
                                                                 </div>
-                                                                <div className="flex flex-col items-end shrink-0 pl-1">
-                                                                    <div className="flex items-center gap-1 justify-end">
-                                                                        <span className="text-[9px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-bold">{item.salesFreq.toLocaleString()}회발생</span>
-                                                                        <span className="font-black text-slate-700 text-sm drop-shadow-sm">{(item[field] as number).toLocaleString()} <span className="font-normal text-[10px] text-slate-400">개</span></span>
+                                                            ));
+                                                        })()}
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid grid-cols-1 divide-y divide-slate-100">
+                                                        {(() => {
+                                                            const surgingItems = [...analyzedInventory]
+                                                                .filter(r => r.isSurgingDemand)
+                                                                .sort((a, b) => b.recent7dSales - a.recent7dSales || b.recent30dSales - a.recent30dSales);
+
+                                                            if (surgingItems.length === 0) {
+                                                                return (
+                                                                    <div className="p-8 text-center text-slate-400 text-xs font-medium">
+                                                                        현재 최근 주문이 급상승한 품목이 없습니다.
                                                                     </div>
-                                                                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-20" title={`기간누적매출 ${formatCur((item[field] as number) * item.sellingPrice)}원`}>
-                                                                        ₩{formatCur((item[field] as number) * item.sellingPrice)}
-                                                                    </span>
+                                                                );
+                                                            }
+
+                                                            return surgingItems.map((item, idx) => (
+                                                                <div key={item.product.id} className="p-3 hover:bg-rose-50/40 transition-colors flex items-center justify-between cursor-pointer" onClick={() => setSelectedIntelligenceItem(item)}>
+                                                                    <div className="flex items-center gap-2.5 overflow-hidden">
+                                                                        <div className="w-6 h-6 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center text-[10px] font-black shrink-0">
+                                                                            🔥{idx + 1}
+                                                                        </div>
+                                                                        <div className="flex flex-col min-w-0 pr-1">
+                                                                            <span className="font-bold text-slate-800 text-xs font-mono truncate" title={item.product.id}>{item.product.id}</span>
+                                                                            <span className="text-[10px] text-rose-600 font-medium truncate">{item.surgeReason || '소요량 폭증'}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex flex-col items-end shrink-0 pl-1">
+                                                                        <span className="text-xs font-black text-rose-600">
+                                                                            7일: {item.recent7dSales}개 / 30일: {item.recent30dSales}개
+                                                                        </span>
+                                                                        <span className="text-[10px] text-slate-500">
+                                                                            시화재고: <span className="font-bold text-slate-700">{item.shQty}개</span>
+                                                                        </span>
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        ))
-                                                    })()}
-                                                </div>
+                                                            ));
+                                                        })()}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -5344,14 +5435,15 @@ if (displayList.length === 0) {
                                                 <select
                                                     id="dk-procurement-filter"
                                                     value={dkFilterProcurement}
-                                                    onChange={e => setDkFilterProcurement(e.target.value as 'ALL' | 'ORDER_NEEDED' | 'RECOMMENDED' | 'DOUBLE_STOCKOUT' | 'STABLE')}
+                                                    onChange={e => setDkFilterProcurement(e.target.value as 'ALL' | 'ORDER_NEEDED' | 'RECOMMENDED' | 'DOUBLE_STOCKOUT' | 'SURGING_DEMAND' | 'STABLE')}
                                                     className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                                 >
                                                     <option value="ALL">전체 조달 상태</option>
                                                     <option value="ORDER_NEEDED">발주 필요 (종합)</option>
                                                     <option value="RECOMMENDED">AI 발주 추천</option>
-                                                    <option value="DOUBLE_STOCKOUT">이중 품절</option>
-                                                    <option value="STABLE">안정</option>
+                                                    <option value="DOUBLE_STOCKOUT">🚨 이중 품절</option>
+                                                    <option value="SURGING_DEMAND">🔥 최근 주문급상승</option>
+                                                    <option value="STABLE">✅ 수급 안정</option>
                                                 </select>
                                             </div>
 
@@ -5374,7 +5466,7 @@ if (displayList.length === 0) {
                                     </div>
 
                                     {/* ── 4. 상세 품목 분석 테이블 ── */}
-                                    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+                                    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden relative">
                                         <div className="px-5 py-3.5 bg-slate-50/70 border-b border-slate-200/60 flex items-center justify-between">
                                             <div className="text-xs font-black text-slate-600">
                                                 {dkViewMode === 'ITEM' ? '품목별 평균 보유량 및 상대 비중 목록' : '재질별 집계 평균 보유량 및 상대 비중 목록'}
@@ -5387,6 +5479,20 @@ if (displayList.length === 0) {
                                             <table className="w-full text-xs text-left whitespace-nowrap">
                                                 <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100 sticky top-0 z-10 shadow-sm">
                                                     <tr>
+                                                        {dkViewMode === 'ITEM' && (
+                                                            <th className="px-3 py-3 w-10 text-center">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    title="전체 품목 선택"
+                                                                    checked={daekyungStockAverages.length > 0 && daekyungStockAverages.every(r => selectedDkIds.has(r.id))}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) setSelectedDkIds(new Set(daekyungStockAverages.map(r => r.id)));
+                                                                        else setSelectedDkIds(new Set());
+                                                                    }}
+                                                                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                                />
+                                                            </th>
+                                                        )}
                                                         <th className="px-4 py-3 text-center">순위</th>
                                                         {dkViewMode === 'ITEM' ? (
                                                             <>
@@ -5414,6 +5520,7 @@ if (displayList.length === 0) {
                                                         <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'avg3m', direction: prev.key === 'avg3m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
                                                             3개월 평균 보유 {dkSortConfig.key === 'avg3m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                         </th>
+                                                        <th className="px-4 py-3 text-right font-black text-teal-700 bg-teal-50/50">시화 현재고</th>
                                                         <th className="px-4 py-3 text-right">시화 안전재고량</th>
                                                         <th className="px-4 py-3 text-right">1~3개월 권장구매</th>
                                                         <th className="px-4 py-3 text-left">🎯 수급 진단 & 데이터 근거</th>
@@ -5425,14 +5532,35 @@ if (displayList.length === 0) {
                                                         const sihwaRow = baseAnalyzedInventoryMap.get(row.id);
                                                         const safeStockVal = sihwaRow?.safeStock ?? 0;
                                                         const recQtyVal = sihwaRow?.recommendedQty ?? 0;
+                                                        const shQtyVal = sihwaRow?.shQty ?? 0;
                                                         const reasoningVal = sihwaRow?.procurementReason || (
                                                             row.currentStock === 0 
                                                                 ? "🚨 대경 본사 재고 0개 (장기 수급 차질 우려)" 
                                                                 : "✅ 정상 대경 수급 유지 중"
                                                         );
 
+                                                        const isSelected = selectedDkIds.has(row.id);
+
                                                         return (
-                                                            <tr key={row.id} className="hover:bg-slate-50/80 transition cursor-pointer" onClick={() => sihwaRow && setSelectedIntelligenceItem(sihwaRow)}>
+                                                            <tr key={row.id} className={`hover:bg-slate-50/80 transition cursor-pointer ${isSelected ? 'bg-indigo-50/50' : ''}`} onClick={() => sihwaRow && setSelectedIntelligenceItem(sihwaRow)}>
+                                                                {dkViewMode === 'ITEM' && (
+                                                                    <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            title={`${row.id} 선택`}
+                                                                            checked={isSelected}
+                                                                            onChange={(e) => {
+                                                                                setSelectedDkIds(prev => {
+                                                                                    const next = new Set(prev);
+                                                                                    if (e.target.checked) next.add(row.id);
+                                                                                    else next.delete(row.id);
+                                                                                    return next;
+                                                                                });
+                                                                            }}
+                                                                            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                                        />
+                                                                    </td>
+                                                                )}
                                                                 <td className="px-4 py-2.5 text-center text-[10px] text-slate-400 font-bold">
                                                                     {index + 1}
                                                                 </td>
@@ -5464,6 +5592,9 @@ if (displayList.length === 0) {
                                                                 <td className="px-4 py-2.5 text-right font-bold text-indigo-600 font-mono">
                                                                     {row.avg3m.toLocaleString()}개
                                                                 </td>
+                                                                <td className="px-4 py-2.5 text-right font-black font-mono text-teal-700 bg-teal-50/30">
+                                                                    {shQtyVal.toLocaleString()}개
+                                                                </td>
                                                                 <td className="px-4 py-2.5 text-right font-bold text-slate-700 font-mono">
                                                                     {safeStockVal}개
                                                                 </td>
@@ -5471,7 +5602,7 @@ if (displayList.length === 0) {
                                                                     {recQtyVal}개
                                                                 </td>
                                                                 <td className="px-4 py-2.5 text-left text-xs font-medium text-slate-700">
-                                                                    <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${sihwaRow?.isDoubleStockoutWithDemand ? 'bg-rose-100 text-rose-800 font-bold border border-rose-200' : recQtyVal > 0 ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-600'}`}>
+                                                                    <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${sihwaRow?.isDoubleStockoutWithDemand ? 'bg-rose-100 text-rose-800 font-bold border border-rose-200' : sihwaRow?.isSurgingDemand ? 'bg-amber-100 text-amber-900 font-extrabold border border-amber-300' : recQtyVal > 0 ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-600'}`}>
                                                                         {reasoningVal}
                                                                     </span>
                                                                 </td>
@@ -5552,6 +5683,36 @@ if (displayList.length === 0) {
                 }
                 return null;
             })()}
+
+            {/* 대경재고 다중 선택 발주 플로팅 바 (Daekyung Order Action Bar) */}
+            {selectedDkIds.size > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-indigo-500 p-2 sm:px-6 sm:py-4 rounded-xl sm:rounded-full shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-8 z-50 animate-in slide-in-from-bottom">
+                    <div className="flex flex-col items-center sm:items-start text-white">
+                        <span className="font-extrabold text-sm sm:text-base flex items-center gap-2">
+                            <span>대경재고 분석: 총 <span className="text-indigo-400 font-black text-lg">{selectedDkIds.size}</span>개 품목 선택됨</span>
+                        </span>
+                        <span className="text-xs text-slate-400 font-medium">
+                            선택된 항목들을 일괄로 장바구니에 담고 발주 작성 페이지로 이동합니다.
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setSelectedDkIds(new Set())}
+                            className="text-slate-400 hover:text-white text-xs font-bold px-3 py-2 rounded-lg"
+                        >
+                            선택 해제
+                        </button>
+                        <button
+                            onClick={handleCreateSelectedDaekyungOrders}
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white font-black px-6 py-2.5 rounded-lg sm:rounded-full flex items-center gap-2 transition-all shadow-lg hover:shadow-indigo-500/50"
+                        >
+                            <ShoppingCart className="w-5 h-5" />
+                            선택 품목 일괄 발주서 작성 ({selectedDkIds.size}건)
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {selectedIntelligenceItem && (
                 <ItemIntelligenceCard
                     productId={selectedIntelligenceItem.product.id}
