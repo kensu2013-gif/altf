@@ -5581,6 +5581,7 @@ if (displayList.length === 0) {
                                                     {daekyungStockAverages.map((row, index) => {
                                                         const sihwaRow = baseAnalyzedInventoryMap.get(row.id);
                                                         const isSelected = selectedDkIds.has(row.id);
+                                                        const recQtyVal = row.recommendedQty || 0;
 
                                                         return (
                                                             <tr key={row.id} className={`hover:bg-slate-50/80 transition cursor-pointer ${isSelected ? 'bg-indigo-50/50' : ''}`} onClick={() => sihwaRow && setSelectedIntelligenceItem(sihwaRow)}>
