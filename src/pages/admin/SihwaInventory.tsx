@@ -1454,48 +1454,62 @@ export default function SihwaInventory() {
             }
 
             // ★ 3개월 수요 지표 및 특수 수급 위험 판단
-                const avgDemand3m = Math.round(row.salesVolume / 12);
-                const minDemand3m = Math.max(0, Math.round(avgDemand3m * 0.5));
-                const maxDemand3m = Math.round(Math.max(row.recent30dSales, avgDemand3m * 1.6));
-                const isDoubleStockoutWithDemand = row.shQty === 0 && row.ysQty === 0 && (row.recent60dSales > 0 || row.salesVolume > 0 || row.quoteCount > 0);
+            const avgDemand3m = Math.round(row.salesVolume / 12);
+            const minDemand3m = Math.max(0, Math.round(avgDemand3m * 0.5));
+            const maxDemand3m = Math.round(Math.max(row.recent30dSales, avgDemand3m * 1.6));
+            const isDoubleStockoutWithDemand = row.shQty === 0 && row.ysQty === 0 && (row.recent60dSales > 0 || row.salesVolume > 0 || row.quoteCount > 0);
+            const isSurgingDemand = !isDoubleStockoutWithDemand && (
+                (row.recent30dSales > 0 && row.recent30dSales >= Math.round((row.salesVolume / 12) * 1.5)) ||
+                (row.recent60dOrderCount >= 4 && row.recent60dSales >= 10)
+            );
 
-                let procurementReason = "";
-                if (isDoubleStockoutWithDemand) {
-                    procurementReason = "🚨 자사·공급처 동시 결품 (최근 주문/견적 수요 존재) - 기회손실 방지 최우선 긴급 수급 필요";
-                } else if (row.shQty < safeStock && recommendedQty > 0) {
-                    procurementReason = `⚠️ 시화재고(${row.shQty}개)가 적정 안전재고(${safeStock}개) 미달 - ${recommendedQty}개 선발주 권장`;
-                } else if (isExcessStock) {
-                    procurementReason = `📉 직전 수요 대비 과잉재고 (${row.shQty}개 보유) - 추가 발주 보류 및 소진/할인 검토`;
-                } else if (isDeadStock) {
-                    procurementReason = "❌ 최근 6개월 수요 없음 - 불필요 재고 처분 권장";
-                } else {
-                    procurementReason = "✅ 수급 및 재고 상태 안정적";
-                }
+            // 시화 재고가 안전재고 이상이거나, 과잉/악성 재고인 경우 recommendedQty를 0으로 초기화하여 오탐지 방지
+            if (isExcessStock || isDeadStock || (!isDoubleStockoutWithDemand && !isSurgingDemand && row.shQty >= safeStock)) {
+                recommendedQty = 0;
+            }
 
-                return {
-                    ...row,
-                    compositeScore,
-                    healthGrade,
-                    excessCategory,
-                    safeStock,
-                    deficit: finalDeficit,
-                    recommendedQty,
-                    suggestedCriticalQty: finalDeficit,
-                    effectiveStock,
-                    statusCategory,
-                    statusLabel,
-                    daysOnHand,
-                    dailyAvgSales,
-                    reorderPoint,
-                    isDeadStock,
-                    isExcessStock,
-                    canTransfer,
-                    minDemand3m,
-                    maxDemand3m,
-                    avgDemand3m,
-                    isDoubleStockoutWithDemand,
-                    procurementReason,
-                };
+            let procurementReason = "";
+            if (isDoubleStockoutWithDemand) {
+                procurementReason = "🚨 자사·공급처 동시 결품 (최근 주문/견적 수요 존재) - 기회손실 방지 최우선 긴급 수급 필요";
+            } else if (isSurgingDemand && recommendedQty > 0) {
+                procurementReason = `🔥 최근 주문/출고 급상승 (${row.recent30dSales || row.recent60dSales}개) - ${recommendedQty}개 선발주 권장`;
+            } else if (row.shQty < safeStock && recommendedQty > 0) {
+                procurementReason = `⚠️ 시화재고(${row.shQty}개)가 적정 안전재고(${safeStock}개) 미달 - ${recommendedQty}개 선발주 권장`;
+            } else if (isSurgingDemand) {
+                procurementReason = "🔥 최근 주문/출고 급상승 - 결품 예방을 위한 모니터링 필요";
+            } else if (isExcessStock) {
+                procurementReason = `📉 직전 수요 대비 과잉재고 (${row.shQty}개 보유) - 추가 발주 보류 및 소진/할인 검토`;
+            } else if (isDeadStock) {
+                procurementReason = "❌ 최근 6개월 수요 없음 - 불필요 재고 처분 권장";
+            } else {
+                procurementReason = "✅ 수급 및 재고 상태 안정적";
+            }
+
+            return {
+                ...row,
+                compositeScore,
+                healthGrade,
+                excessCategory,
+                safeStock,
+                deficit: finalDeficit,
+                recommendedQty,
+                suggestedCriticalQty: finalDeficit,
+                effectiveStock,
+                statusCategory,
+                statusLabel,
+                daysOnHand,
+                dailyAvgSales,
+                reorderPoint,
+                isDeadStock,
+                isExcessStock,
+                canTransfer,
+                minDemand3m,
+                maxDemand3m,
+                avgDemand3m,
+                isDoubleStockoutWithDemand,
+                isSurgingDemand,
+                procurementReason,
+            };
             });
 
             return processedList;
