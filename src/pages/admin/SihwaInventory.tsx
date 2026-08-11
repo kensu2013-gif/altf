@@ -62,6 +62,12 @@ interface DaekyungStockAnalysisItem {
     share3m: number;
     share6m: number;
     trend: number;
+    shQty: number;
+    safeStock: number;
+    recommendedQty: number;
+    procurementReason: string;
+    isDoubleStockoutWithDemand: boolean;
+    isSurgingDemand: boolean;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -264,7 +270,7 @@ export default function SihwaInventory() {
 
     const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE' | 'HEALTH_DIAGNOSIS' | 'DAEKYUNG_STOCK'>('AI_SUMMARY');
     const [dkSortConfig, setDkSortConfig] = useState<{
-        key: 'id' | 'name' | 'material' | 'size' | 'currentStock' | 'avg1m' | 'avg3m' | 'avg6m' | 'share1m' | 'share3m' | 'share6m' | 'trend';
+        key: 'id' | 'name' | 'material' | 'size' | 'currentStock' | 'avg1m' | 'avg3m' | 'avg6m' | 'share1m' | 'share3m' | 'share6m' | 'trend' | 'shQty' | 'safeStock' | 'recommendedQty' | 'procurementReason';
         direction: 'asc' | 'desc';
     }>({ key: 'id', direction: 'asc' });
     const [dkSearchQuery, setDkSearchQuery] = useState('');
@@ -1584,7 +1590,29 @@ export default function SihwaInventory() {
 
 
     const daekyungStockAverages = useMemo(() => {
-        let filtered = daekyungBaseStockAverages;
+        let items: DaekyungStockAnalysisItem[] = daekyungBaseStockAverages.map(r => {
+            const sihwaRow = baseAnalyzedInventoryMap.get(r.id);
+            const shQty = sihwaRow?.shQty ?? 0;
+            const safeStock = sihwaRow?.safeStock ?? 0;
+            const recommendedQty = sihwaRow?.recommendedQty ?? 0;
+            const isDoubleStockoutWithDemand = sihwaRow?.isDoubleStockoutWithDemand ?? false;
+            const isSurgingDemand = sihwaRow?.isSurgingDemand ?? false;
+            const procurementReason = sihwaRow?.procurementReason || (
+                r.currentStock === 0 
+                    ? "🚨 대경 본사 재고 0개 (장기 수급 차질 우려)" 
+                    : "✅ 정상 대경 수급 유지 중"
+            );
+
+            return {
+                ...r,
+                shQty,
+                safeStock,
+                recommendedQty,
+                procurementReason,
+                isDoubleStockoutWithDemand,
+                isSurgingDemand,
+            };
+        });
 
         // 필터/검색 활성화 여부 확인
         const isFilterActive = !!(
@@ -1597,7 +1625,7 @@ export default function SihwaInventory() {
 
         // 기본 상태에서는 시화 재고의 건강도 등급이 A, B인 것만 필터링하여 보여줌
         if (!isFilterActive) {
-            filtered = filtered.filter(r => {
+            items = items.filter(r => {
                 const sihwaRow = baseAnalyzedInventoryMap.get(r.id);
                 if (!sihwaRow) return false;
                 return sihwaRow.healthGrade === 'A' || sihwaRow.healthGrade === 'B';
@@ -1606,42 +1634,37 @@ export default function SihwaInventory() {
 
         if (dkSearchQuery) {
             const query = dkSearchQuery.trim().toLowerCase();
-            filtered = filtered.filter(r =>
+            items = items.filter(r =>
                 r.id.toLowerCase().includes(query) ||
                 r.name.toLowerCase().includes(query)
             );
         }
         if (dkFilterItem) {
-            filtered = filtered.filter(r => (r.name || '').trim() === dkFilterItem.trim());
+            items = items.filter(r => (r.name || '').trim() === dkFilterItem.trim());
         }
         if (dkFilterMaterial) {
-            filtered = filtered.filter(r => (r.material || '').trim() === dkFilterMaterial.trim());
+            items = items.filter(r => (r.material || '').trim() === dkFilterMaterial.trim());
         }
         if (dkFilterSize) {
-            filtered = filtered.filter(r => (r.size || '').trim() === dkFilterSize.trim());
+            items = items.filter(r => (r.size || '').trim() === dkFilterSize.trim());
         }
 
         if (dkFilterProcurement !== 'ALL') {
-            filtered = filtered.filter(r => {
-                const sihwaRow = baseAnalyzedInventoryMap.get(r.id);
-                const recQty = sihwaRow?.recommendedQty ?? 0;
-                const isDoubleStockout = sihwaRow?.isDoubleStockoutWithDemand ?? (sihwaRow ? (sihwaRow.shQty === 0 && sihwaRow.ysQty === 0 && (sihwaRow.recent60dSales > 0 || sihwaRow.salesVolume > 0 || sihwaRow.quoteCount > 0)) : false);
-                const isSurging = sihwaRow?.isSurgingDemand ?? false;
-
+            items = items.filter(r => {
                 if (dkFilterProcurement === 'ORDER_NEEDED') {
-                    return recQty > 0 || isDoubleStockout || isSurging;
+                    return r.recommendedQty > 0 || r.isDoubleStockoutWithDemand || r.isSurgingDemand;
                 }
                 if (dkFilterProcurement === 'RECOMMENDED') {
-                    return recQty > 0;
+                    return r.recommendedQty > 0;
                 }
                 if (dkFilterProcurement === 'DOUBLE_STOCKOUT') {
-                    return isDoubleStockout;
+                    return r.isDoubleStockoutWithDemand;
                 }
                 if (dkFilterProcurement === 'SURGING_DEMAND') {
-                    return isSurging;
+                    return r.isSurgingDemand;
                 }
                 if (dkFilterProcurement === 'STABLE') {
-                    return recQty === 0 && !isDoubleStockout && !isSurging;
+                    return r.recommendedQty === 0 && !r.isDoubleStockoutWithDemand && !r.isSurgingDemand;
                 }
                 return true;
             });
@@ -1649,7 +1672,7 @@ export default function SihwaInventory() {
 
         let finalResults: DaekyungStockAnalysisItem[] = [];
         if (dkViewMode === 'ITEM') {
-            finalResults = filtered;
+            finalResults = items;
         } else {
             // Group by Material
             const materialGroups: Record<string, {
@@ -1661,9 +1684,12 @@ export default function SihwaInventory() {
                 share1m: number;
                 share3m: number;
                 share6m: number;
+                shQty: number;
+                safeStock: number;
+                recommendedQty: number;
             }> = {};
 
-            filtered.forEach(r => {
+            items.forEach(r => {
                 const mat = (r.material || '').trim() || '미지정';
                 if (!materialGroups[mat]) {
                     materialGroups[mat] = {
@@ -1675,6 +1701,9 @@ export default function SihwaInventory() {
                         share1m: 0,
                         share3m: 0,
                         share6m: 0,
+                        shQty: 0,
+                        safeStock: 0,
+                        recommendedQty: 0,
                     };
                 }
                 materialGroups[mat].currentStock += r.currentStock;
@@ -1684,6 +1713,9 @@ export default function SihwaInventory() {
                 materialGroups[mat].share1m += r.share1m;
                 materialGroups[mat].share3m += r.share3m;
                 materialGroups[mat].share6m += r.share6m;
+                materialGroups[mat].shQty += r.shQty;
+                materialGroups[mat].safeStock += r.safeStock;
+                materialGroups[mat].recommendedQty += r.recommendedQty;
             });
 
             finalResults = Object.values(materialGroups).map(g => {
@@ -1700,6 +1732,12 @@ export default function SihwaInventory() {
                     share3m: parseFloat(g.share3m.toFixed(2)),
                     share6m: parseFloat(g.share6m.toFixed(2)),
                     trend,
+                    shQty: g.shQty,
+                    safeStock: g.safeStock,
+                    recommendedQty: g.recommendedQty,
+                    procurementReason: g.recommendedQty > 0 ? `발주 필요 (${g.recommendedQty}개)` : '정상 수급',
+                    isDoubleStockoutWithDemand: false,
+                    isSurgingDemand: false,
                 };
             });
         }
@@ -1720,6 +1758,10 @@ export default function SihwaInventory() {
                 case 'share3m': return (a.share3m - b.share3m) * dir;
                 case 'share6m': return (a.share6m - b.share6m) * dir;
                 case 'trend': return (a.trend - b.trend) * dir;
+                case 'shQty': return (a.shQty - b.shQty) * dir;
+                case 'safeStock': return (a.safeStock - b.safeStock) * dir;
+                case 'recommendedQty': return (a.recommendedQty - b.recommendedQty) * dir;
+                case 'procurementReason': return (a.procurementReason || '').localeCompare(b.procurementReason || '') * dir;
                 default: return 0;
             }
         });
@@ -5520,25 +5562,24 @@ if (displayList.length === 0) {
                                                         <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'avg3m', direction: prev.key === 'avg3m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
                                                             3개월 평균 보유 {dkSortConfig.key === 'avg3m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                         </th>
-                                                        <th className="px-4 py-3 text-right font-black text-teal-700 bg-teal-50/50">시화 현재고</th>
-                                                        <th className="px-4 py-3 text-right">시화 안전재고량</th>
-                                                        <th className="px-4 py-3 text-right">1~3개월 권장구매</th>
-                                                        <th className="px-4 py-3 text-left">🎯 수급 진단 & 데이터 근거</th>
+                                                        <th className="px-4 py-3 text-right font-black text-teal-700 bg-teal-50/50 cursor-pointer hover:bg-teal-100/50 transition" onClick={() => setDkSortConfig(prev => ({ key: 'shQty', direction: prev.key === 'shQty' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                            시화 현재고 {dkSortConfig.key === 'shQty' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        </th>
+                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'safeStock', direction: prev.key === 'safeStock' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                            시화 안전재고량 {dkSortConfig.key === 'safeStock' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        </th>
+                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'recommendedQty', direction: prev.key === 'recommendedQty' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                            1~3개월 권장구매 {dkSortConfig.key === 'recommendedQty' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        </th>
+                                                        <th className="px-4 py-3 text-left cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'procurementReason', direction: prev.key === 'procurementReason' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                            🎯 수급 진단 & 데이터 근거 {dkSortConfig.key === 'procurementReason' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        </th>
                                                         <th className="px-4 py-3 text-center">작업/발주</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
                                                     {daekyungStockAverages.map((row, index) => {
                                                         const sihwaRow = baseAnalyzedInventoryMap.get(row.id);
-                                                        const safeStockVal = sihwaRow?.safeStock ?? 0;
-                                                        const recQtyVal = sihwaRow?.recommendedQty ?? 0;
-                                                        const shQtyVal = sihwaRow?.shQty ?? 0;
-                                                        const reasoningVal = sihwaRow?.procurementReason || (
-                                                            row.currentStock === 0 
-                                                                ? "🚨 대경 본사 재고 0개 (장기 수급 차질 우려)" 
-                                                                : "✅ 정상 대경 수급 유지 중"
-                                                        );
-
                                                         const isSelected = selectedDkIds.has(row.id);
 
                                                         return (
@@ -5593,17 +5634,17 @@ if (displayList.length === 0) {
                                                                     {row.avg3m.toLocaleString()}개
                                                                 </td>
                                                                 <td className="px-4 py-2.5 text-right font-black font-mono text-teal-700 bg-teal-50/30">
-                                                                    {shQtyVal.toLocaleString()}개
+                                                                    {row.shQty.toLocaleString()}개
                                                                 </td>
                                                                 <td className="px-4 py-2.5 text-right font-bold text-slate-700 font-mono">
-                                                                    {safeStockVal}개
+                                                                    {row.safeStock}개
                                                                 </td>
-                                                                <td className={`px-4 py-2.5 text-right font-black font-mono ${recQtyVal > 0 ? 'text-indigo-600' : 'text-slate-400'}`}>
-                                                                    {recQtyVal}개
+                                                                <td className={`px-4 py-2.5 text-right font-black font-mono ${row.recommendedQty > 0 ? 'text-indigo-600' : 'text-slate-400'}`}>
+                                                                    {row.recommendedQty}개
                                                                 </td>
                                                                 <td className="px-4 py-2.5 text-left text-xs font-medium text-slate-700">
-                                                                    <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${sihwaRow?.isDoubleStockoutWithDemand ? 'bg-rose-100 text-rose-800 font-bold border border-rose-200' : sihwaRow?.isSurgingDemand ? 'bg-amber-100 text-amber-900 font-extrabold border border-amber-300' : recQtyVal > 0 ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-600'}`}>
-                                                                        {reasoningVal}
+                                                                    <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${row.isDoubleStockoutWithDemand ? 'bg-rose-100 text-rose-800 font-bold border border-rose-200' : row.isSurgingDemand ? 'bg-amber-100 text-amber-900 font-extrabold border border-amber-300' : row.recommendedQty > 0 ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-600'}`}>
+                                                                        {row.procurementReason}
                                                                     </span>
                                                                 </td>
                                                                 <td className="px-4 py-2.5 text-center">
