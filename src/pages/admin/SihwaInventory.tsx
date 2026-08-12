@@ -48,6 +48,8 @@ const WORKING_DAYS = 250;      // 연간 영업일수
 const LEAD_TIME = 5;           // 리드타임 (대경 → 시화, 영업일 기준)
 const Z_VALUE = 1.645;         // 목표 서비스율 95% (데이터 충분하면 2.33 = 99%로 상향)
 
+export type DkProcurementFilterType = 'ALL' | 'ORDER_NEEDED' | 'RECOMMENDED' | 'DOUBLE_STOCKOUT' | 'SURGING_DEMAND' | 'SIHWA_UNMET' | 'EXCESS' | 'STABLE';
+
 interface DaekyungStockAnalysisItem {
     id: string;
     name: string;
@@ -65,9 +67,12 @@ interface DaekyungStockAnalysisItem {
     shQty: number;
     safeStock: number;
     recommendedQty: number;
+    procurementCategory?: 'DOUBLE_STOCKOUT' | 'SURGING_DEMAND' | 'SIHWA_UNMET' | 'EXCESS' | 'STABLE';
     procurementReason: string;
     isDoubleStockoutWithDemand: boolean;
     isSurgingDemand: boolean;
+    isExcessStock?: boolean;
+    isDeadStock?: boolean;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -277,7 +282,7 @@ export default function SihwaInventory() {
     const [dkFilterItem, setDkFilterItem] = useState('');
     const [dkFilterMaterial, setDkFilterMaterial] = useState('');
     const [dkFilterSize, setDkFilterSize] = useState('');
-    const [dkFilterProcurement, setDkFilterProcurement] = useState<'ALL' | 'ORDER_NEEDED' | 'RECOMMENDED' | 'DOUBLE_STOCKOUT' | 'SURGING_DEMAND' | 'STABLE'>('ALL');
+    const [dkFilterProcurement, setDkFilterProcurement] = useState<DkProcurementFilterType>('ORDER_NEEDED');
     const [dkViewMode, setDkViewMode] = useState<'ITEM' | 'MATERIAL'>('ITEM');
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
         'CRITICAL': true,
@@ -865,16 +870,22 @@ export default function SihwaInventory() {
             dates.push(d.toISOString().slice(0, 10));
         }
 
-        const targetProducts = inventory.filter((item: Product) => {
-            const isMakerDaekyung = item.maker === '대경' || item.maker1 === '대경';
-            let hasYsLoc = false;
-            if (item.locationStock) {
-                hasYsLoc = item.locationStock['양산'] !== undefined || item.locationStock['대경'] !== undefined;
+        const targetProductsMap = new Map<string, Product>();
+        inventory.forEach(item => {
+            if (!item.id) return;
+            if (!targetProductsMap.has(item.id)) {
+                targetProductsMap.set(item.id, { ...item });
             } else {
-                hasYsLoc = (item.location || '').includes('양산') || (item.location || '').includes('대경');
+                const existing = targetProductsMap.get(item.id)!;
+                if (item.locationStock) {
+                    existing.locationStock = {
+                        ...(existing.locationStock || {}),
+                        ...item.locationStock
+                    };
+                }
             }
-            return isMakerDaekyung && hasYsLoc;
         });
+        const targetProducts = Array.from(targetProductsMap.values());
 
         const historyMapByDate: Record<string, Record<string, number>> = {};
         (historyData.daekyungHistory || []).forEach(h => {
@@ -1089,10 +1100,14 @@ export default function SihwaInventory() {
 
             // Populate items (if it has stock or sales data, we analyze it)
             if (shQty > 0 || ysQty > 0 || salesData.salesVolume > 0 || recentSales.recent30d > 0 || compData.compSales > 0) {
-                comparisonMap[item.id] = {
-                    product: item,
-                    shQty,
-                    ysQty,
+                if (comparisonMap[item.id]) {
+                    comparisonMap[item.id].shQty += shQty;
+                    comparisonMap[item.id].ysQty += ysQty;
+                } else {
+                    comparisonMap[item.id] = {
+                        product: item,
+                        shQty,
+                        ysQty,
                     pendingOrderQty: 0,
                     recentPurchasePrice: purchasePrice,
                     recentPurchaseDate: recentInfo ? recentInfo.date : null,
@@ -1128,7 +1143,8 @@ export default function SihwaInventory() {
                     statusLabel: '대기/데이터없음'
                 };
             }
-        });
+        }
+    });
 
         // Add Pending Order quantities bounded for Sihwa
         sihwaOrders.filter(o => o.status !== 'COMPLETED').forEach(order => {
@@ -1343,11 +1359,15 @@ export default function SihwaInventory() {
             // 악성재고: E급만
             const isDeadStock = healthGrade === 'E';
 
-            // 과잉재고: E급 제외, 안전재고의 3배 이상이거나 최소 6개월치(120영업일) 이상 보유 시 과잉으로 판정
-            // 시화에서 보통 한 번에 200~300개씩 입고하므로, 단순히 safeStock의 1.5배로 잡으면 대다수가 과잉으로 오탐지됨
+            // 과잉재고: E급 제외, 시화 현재고 > 안전재고 및 최근 1~3개월 판매량/수요 대비 재고가 과잉인 품목
             const isExcessStock = !isDeadStock
                 && safeStock > 0
-                && row.shQty > Math.max(safeStock * 3, Math.ceil(sihwaDailySales * 120))
+                && row.shQty > safeStock
+                && (
+                    row.recent60dSales === 0 ||
+                    row.recent30dSales === 0 ||
+                    row.shQty > Math.max(safeStock * 1.5, safeStock + Math.ceil(sihwaDailySales * 90))
+                )
                 && row.recentPurchasePrice > 0;
 
             let excessCategory: string | null = null;
@@ -1457,10 +1477,16 @@ export default function SihwaInventory() {
             const avgDemand3m = Math.round(row.salesVolume / 12);
             const minDemand3m = Math.max(0, Math.round(avgDemand3m * 0.5));
             const maxDemand3m = Math.round(Math.max(row.recent30dSales, avgDemand3m * 1.6));
-            const isDoubleStockoutWithDemand = row.shQty === 0 && row.ysQty === 0 && (row.recent60dSales > 0 || row.salesVolume > 0 || row.quoteCount > 0);
-            const isSurgingDemand = !isDoubleStockoutWithDemand && (
-                (row.recent30dSales > 0 && row.recent30dSales >= Math.round((row.salesVolume / 12) * 1.5)) ||
-                (row.recent60dOrderCount >= 4 && row.recent60dSales >= 10)
+
+            // 자사·공급처 동시결품: 최근 주문/판매 이력이 있는 경우만 인정 (주문건수 필수)
+            const hasRecentOrderDemand = (row.recent60dSales > 0 || row.recent60dOrderCount > 0 || row.recent30dSales > 0);
+            const isDoubleStockoutWithDemand = row.shQty === 0 && row.ysQty === 0 && hasRecentOrderDemand;
+
+            // 출고 급상승: 시화 현재고가 안전재고보다 작은 경우 (shQty < safeStock) 필수 전제 + 최근 1달/60일 수요 급증 품목
+            const isSurgingDemand = !isDoubleStockoutWithDemand && (row.shQty < safeStock) && (
+                (row.recent30dSales > 0 && row.recent30dSales >= Math.max(1, Math.round((row.salesVolume / 12) * 1.2))) ||
+                (row.recent60dOrderCount >= 3 && row.recent60dSales >= 5) ||
+                (row.recent60dSales > Math.ceil(row.salesVolume / 6))
             );
 
             // 시화 재고가 안전재고 이상이거나, 과잉/악성 재고인 경우 recommendedQty를 0으로 초기화하여 오탐지 방지
@@ -1468,20 +1494,26 @@ export default function SihwaInventory() {
                 recommendedQty = 0;
             }
 
+            let procurementCategory: 'DOUBLE_STOCKOUT' | 'SURGING_DEMAND' | 'SIHWA_UNMET' | 'EXCESS' | 'STABLE' = 'STABLE';
             let procurementReason = "";
             if (isDoubleStockoutWithDemand) {
+                procurementCategory = 'DOUBLE_STOCKOUT';
                 procurementReason = "🚨 자사·공급처 동시 결품 (최근 주문/견적 수요 존재) - 기회손실 방지 최우선 긴급 수급 필요";
-            } else if (isSurgingDemand && recommendedQty > 0) {
-                procurementReason = `🔥 최근 주문/출고 급상승 (${row.recent30dSales || row.recent60dSales}개) - ${recommendedQty}개 선발주 권장`;
-            } else if (row.shQty < safeStock && recommendedQty > 0) {
-                procurementReason = `⚠️ 시화재고(${row.shQty}개)가 적정 안전재고(${safeStock}개) 미달 - ${recommendedQty}개 선발주 권장`;
             } else if (isSurgingDemand) {
-                procurementReason = "🔥 최근 주문/출고 급상승 - 결품 예방을 위한 모니터링 필요";
+                procurementCategory = 'SURGING_DEMAND';
+                const surgingQty = row.recent30dSales || row.recent60dSales || 0;
+                procurementReason = `🔥 최근 주문/출고 급상승 (${surgingQty}개) - ${recommendedQty > 0 ? `${recommendedQty}개 선발주 권장` : '결품 예방 모니터링'}`;
+            } else if (row.shQty < safeStock && recommendedQty > 0) {
+                procurementCategory = 'SIHWA_UNMET';
+                procurementReason = `⚠️ 시화재고(${row.shQty}개)가 적정 안전재고(${safeStock}개) 미달 - ${recommendedQty}개 선발주 권장`;
             } else if (isExcessStock) {
+                procurementCategory = 'EXCESS';
                 procurementReason = `📉 직전 수요 대비 과잉재고 (${row.shQty}개 보유) - 추가 발주 보류 및 소진/할인 검토`;
             } else if (isDeadStock) {
-                procurementReason = "❌ 최근 6개월 수요 없음 - 불필요 재고 처분 권장";
+                procurementCategory = 'EXCESS';
+                procurementReason = `❌ 최근 6개월 수요 없음 (${row.shQty}개 보유) - 불필요 재고 처분 권장`;
             } else {
+                procurementCategory = 'STABLE';
                 procurementReason = "✅ 수급 및 재고 상태 안정적";
             }
 
@@ -1508,6 +1540,7 @@ export default function SihwaInventory() {
                 avgDemand3m,
                 isDoubleStockoutWithDemand,
                 isSurgingDemand,
+                procurementCategory,
                 procurementReason,
             };
             });
@@ -1583,20 +1616,9 @@ export default function SihwaInventory() {
 
     // ── 대경재고(양산) 필터링 옵션 추출 ──
     const daekyungFilterOptions = useMemo(() => {
-        const targetProducts = inventory.filter((item: Product) => {
-            const isMakerDaekyung = item.maker === '대경' || item.maker1 === '대경';
-            let hasYsLoc = false;
-            if (item.locationStock) {
-                hasYsLoc = item.locationStock['양산'] !== undefined || item.locationStock['대경'] !== undefined;
-            } else {
-                hasYsLoc = (item.location || '').includes('양산') || (item.location || '').includes('대경');
-            }
-            return isMakerDaekyung && hasYsLoc;
-        });
-
-        const names = Array.from(new Set(targetProducts.map(p => p.name).filter(Boolean))).sort();
-        const materials = Array.from(new Set(targetProducts.map(p => p.material).filter(Boolean))).sort();
-        const sizes = Array.from(new Set(targetProducts.map(p => p.size).filter(Boolean))).sort();
+        const names = Array.from(new Set(inventory.map(p => p.name).filter(Boolean))).sort();
+        const materials = Array.from(new Set(inventory.map(p => p.material).filter(Boolean))).sort();
+        const sizes = Array.from(new Set(inventory.map(p => p.size).filter(Boolean))).sort();
 
         return { names, materials, sizes };
     }, [inventory]);
@@ -1611,10 +1633,13 @@ export default function SihwaInventory() {
             const recommendedQty = sihwaRow?.recommendedQty ?? 0;
             const isDoubleStockoutWithDemand = sihwaRow?.isDoubleStockoutWithDemand ?? false;
             const isSurgingDemand = sihwaRow?.isSurgingDemand ?? false;
+            const isExcessStock = sihwaRow?.isExcessStock ?? false;
+            const isDeadStock = sihwaRow?.isDeadStock ?? false;
+            const procurementCategory = sihwaRow?.procurementCategory ?? 'STABLE';
             const procurementReason = sihwaRow?.procurementReason || (
                 r.currentStock === 0 
                     ? "🚨 대경 본사 재고 0개 (장기 수급 차질 우려)" 
-                    : "✅ 정상 대경 수급 유지 중"
+                    : "✅ 수급 및 재고 상태 안정적"
             );
 
             return {
@@ -1622,29 +1647,16 @@ export default function SihwaInventory() {
                 shQty,
                 safeStock,
                 recommendedQty,
+                procurementCategory,
                 procurementReason,
                 isDoubleStockoutWithDemand,
                 isSurgingDemand,
+                isExcessStock,
+                isDeadStock,
             };
         });
 
-        // 필터/검색 활성화 여부 확인
-        const isFilterActive = !!(
-            dkSearchQuery.trim() ||
-            dkFilterItem ||
-            dkFilterMaterial ||
-            dkFilterSize ||
-            dkFilterProcurement !== 'ALL'
-        );
-
-        // 기본 상태에서는 시화 재고의 건강도 등급이 A, B인 것만 필터링하여 보여줌
-        if (!isFilterActive) {
-            items = items.filter(r => {
-                const sihwaRow = baseAnalyzedInventoryMap.get(r.id);
-                if (!sihwaRow) return false;
-                return sihwaRow.healthGrade === 'A' || sihwaRow.healthGrade === 'B';
-            });
-        }
+        // 전체 품목 분석 대상 유지
 
         if (dkSearchQuery) {
             const query = dkSearchQuery.trim().toLowerCase();
@@ -1663,22 +1675,39 @@ export default function SihwaInventory() {
             items = items.filter(r => (r.size || '').trim() === dkFilterSize.trim());
         }
 
-        if (dkFilterProcurement !== 'ALL') {
+        if (dkFilterProcurement === 'ALL') {
+            const hasAnyFilter = !!(dkSearchQuery.trim() || dkFilterItem || dkFilterMaterial || dkFilterSize);
+            if (!hasAnyFilter) {
+                items = [];
+            } else {
+                // 수급 및 재고 상태 안정적(STABLE) 품목은 확인 불필요하므로 기본 거름 처리
+                items = items.filter(r => r.procurementCategory !== 'STABLE');
+            }
+        } else {
             items = items.filter(r => {
+                const cat = r.procurementCategory;
+                const recQty = r.recommendedQty || 0;
+
                 if (dkFilterProcurement === 'ORDER_NEEDED') {
-                    return r.recommendedQty > 0 || r.isDoubleStockoutWithDemand || r.isSurgingDemand;
+                    return recQty > 0 || cat === 'DOUBLE_STOCKOUT' || cat === 'SURGING_DEMAND' || cat === 'SIHWA_UNMET';
                 }
                 if (dkFilterProcurement === 'RECOMMENDED') {
-                    return r.recommendedQty > 0;
+                    return recQty > 0;
                 }
                 if (dkFilterProcurement === 'DOUBLE_STOCKOUT') {
-                    return r.isDoubleStockoutWithDemand;
+                    return r.isDoubleStockoutWithDemand === true;
                 }
                 if (dkFilterProcurement === 'SURGING_DEMAND') {
-                    return r.isSurgingDemand;
+                    return cat === 'SURGING_DEMAND' && r.shQty < r.safeStock;
+                }
+                if (dkFilterProcurement === 'SIHWA_UNMET') {
+                    return cat === 'SIHWA_UNMET';
+                }
+                if (dkFilterProcurement === 'EXCESS') {
+                    return cat === 'EXCESS' || r.isExcessStock;
                 }
                 if (dkFilterProcurement === 'STABLE') {
-                    return r.recommendedQty === 0 && !r.isDoubleStockoutWithDemand && !r.isSurgingDemand;
+                    return cat === 'STABLE';
                 }
                 return true;
             });
@@ -1775,7 +1804,30 @@ export default function SihwaInventory() {
                 case 'shQty': return (a.shQty - b.shQty) * dir;
                 case 'safeStock': return (a.safeStock - b.safeStock) * dir;
                 case 'recommendedQty': return (a.recommendedQty - b.recommendedQty) * dir;
-                case 'procurementReason': return (a.procurementReason || '').localeCompare(b.procurementReason || '') * dir;
+                case 'procurementReason': {
+                    const getReasonRank = (item: DaekyungStockAnalysisItem) => {
+                        const sihwaRow = baseAnalyzedInventoryMap.get(item.id);
+                        const isDoubleStockout = item.isDoubleStockoutWithDemand || item.procurementReason.includes('동시 결품');
+                        const isSurging = item.isSurgingDemand || item.procurementReason.includes('급상승');
+                        const isUnmet = (item.shQty < item.safeStock && item.recommendedQty > 0) || item.procurementReason.includes('적정 안전재고') || item.procurementReason.includes('미달');
+                        const isExcess = item.isExcessStock || sihwaRow?.isExcessStock || item.procurementReason.includes('과잉재고');
+                        const isDead = item.isDeadStock || sihwaRow?.isDeadStock || item.procurementReason.includes('수요 없음');
+
+                        if (isDoubleStockout) return 1;
+                        if (isSurging) return 2;
+                        if (isUnmet) return 3;
+                        if (isExcess) return 4;
+                        if (isDead) return 5;
+                        if (item.recommendedQty > 0) return 6;
+                        return 7; // 안정적
+                    };
+                    const rankA = getReasonRank(a);
+                    const rankB = getReasonRank(b);
+                    if (rankA !== rankB) {
+                        return (rankA - rankB) * dir;
+                    }
+                    return (b.recommendedQty - a.recommendedQty) * dir || a.id.localeCompare(b.id) * dir;
+                }
                 default: return 0;
             }
         });
@@ -5491,15 +5543,17 @@ if (displayList.length === 0) {
                                                 <select
                                                     id="dk-procurement-filter"
                                                     value={dkFilterProcurement}
-                                                    onChange={e => setDkFilterProcurement(e.target.value as 'ALL' | 'ORDER_NEEDED' | 'RECOMMENDED' | 'DOUBLE_STOCKOUT' | 'SURGING_DEMAND' | 'STABLE')}
+                                                    onChange={e => setDkFilterProcurement(e.target.value as DkProcurementFilterType)}
                                                     className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                                 >
                                                     <option value="ALL">전체 조달 상태</option>
                                                     <option value="ORDER_NEEDED">발주 필요 (종합)</option>
                                                     <option value="RECOMMENDED">AI 발주 추천</option>
-                                                    <option value="DOUBLE_STOCKOUT">🚨 이중 품절</option>
-                                                    <option value="SURGING_DEMAND">🔥 최근 주문급상승</option>
-                                                    <option value="STABLE">✅ 수급 안정</option>
+                                                    <option value="DOUBLE_STOCKOUT">🚨 자사·공급처 동시 결품 (이중 품절)</option>
+                                                    <option value="SURGING_DEMAND">🔥 최근 주문/출고 급상승</option>
+                                                    <option value="SIHWA_UNMET">⚠️ 시화재고 미달 (선발주 권장)</option>
+                                                    <option value="EXCESS">📉 직전수요 대비 과잉재고</option>
+                                                    <option value="STABLE">✅ 수급 및 재고 상태 안정적</option>
                                                 </select>
                                             </div>
 
@@ -5510,9 +5564,9 @@ if (displayList.length === 0) {
                                                         setDkFilterItem('');
                                                         setDkFilterMaterial('');
                                                         setDkFilterSize('');
-                                                        setDkFilterProcurement('ALL');
+                                                        setDkFilterProcurement('ORDER_NEEDED');
                                                     }}
-                                                    disabled={!dkSearchQuery && !dkFilterItem && !dkFilterMaterial && !dkFilterSize && dkFilterProcurement === 'ALL'}
+                                                    disabled={!dkSearchQuery && !dkFilterItem && !dkFilterMaterial && !dkFilterSize && dkFilterProcurement === 'ORDER_NEEDED'}
                                                     className="w-full bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
                                                 >
                                                     🔄 필터 초기화
@@ -5686,7 +5740,9 @@ if (displayList.length === 0) {
                                                     {daekyungStockAverages.length === 0 && (
                                                         <tr>
                                                             <td colSpan={dkViewMode === 'ITEM' ? 13 : 10} className="px-4 py-16 text-center text-slate-400 font-medium">
-                                                                조건에 부합하는 대경재고 데이터가 없거나 분석 중입니다.
+                                                                {dkFilterProcurement === 'ALL' && !dkSearchQuery && !dkFilterItem && !dkFilterMaterial && !dkFilterSize
+                                                                    ? "전체 품목 자동 로딩 방지를 위해 '조달 상태 필터'를 선택하거나 검색어를 입력하세요."
+                                                                    : "조건에 부합하는 대경재고 데이터가 없거나 분석 중입니다."}
                                                             </td>
                                                         </tr>
                                                     )}
