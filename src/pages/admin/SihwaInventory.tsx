@@ -1619,15 +1619,6 @@ export default function SihwaInventory() {
         return { names, materials, sizes, thicknesses };
     }, [inventory]);
 
-    // ── 대경재고(양산) 필터링 옵션 추출 ──
-    const daekyungFilterOptions = useMemo(() => {
-        const names = Array.from(new Set(inventory.map(p => p.name).filter(Boolean))).sort();
-        const materials = Array.from(new Set(inventory.map(p => p.material).filter(Boolean))).sort();
-        const sizes = Array.from(new Set(inventory.map(p => p.size).filter(Boolean))).sort();
-
-        return { names, materials, sizes };
-    }, [inventory]);
-
 
 
     const daekyungStockAverages = useMemo(() => {
@@ -5538,53 +5529,8 @@ if (displayList.length === 0) {
                                         </div>
 
                                         {/* 드롭다운 필터 */}
-                                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-                                            <div className="flex flex-col gap-1">
-                                                <label htmlFor="dk-item-filter" className="text-[10px] font-bold text-slate-500">품목 필터</label>
-                                                <select
-                                                    id="dk-item-filter"
-                                                    value={dkFilterItem}
-                                                    onChange={e => setDkFilterItem(e.target.value)}
-                                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                                >
-                                                    <option value="">전체 품목</option>
-                                                    {daekyungFilterOptions.names.map(name => (
-                                                        <option key={name} value={name}>{name}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-
-                                            <div className="flex flex-col gap-1">
-                                                <label htmlFor="dk-material-filter" className="text-[10px] font-bold text-slate-500">재질 필터</label>
-                                                <select
-                                                    id="dk-material-filter"
-                                                    value={dkFilterMaterial}
-                                                    onChange={e => setDkFilterMaterial(e.target.value)}
-                                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                                >
-                                                    <option value="">전체 재질</option>
-                                                    {daekyungFilterOptions.materials.map(mat => (
-                                                        <option key={mat} value={mat}>{mat}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-
-                                            <div className="flex flex-col gap-1">
-                                                <label htmlFor="dk-size-filter" className="text-[10px] font-bold text-slate-500">사이즈 필터</label>
-                                                <select
-                                                    id="dk-size-filter"
-                                                    value={dkFilterSize}
-                                                    onChange={e => setDkFilterSize(e.target.value)}
-                                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                                >
-                                                    <option value="">전체 사이즈</option>
-                                                    {daekyungFilterOptions.sizes.map(size => (
-                                                        <option key={size} value={size}>{size}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-
-                                            <div className="flex flex-col gap-1">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div className="flex flex-col gap-1 sm:col-span-2">
                                                 <label htmlFor="dk-procurement-filter" className="text-[10px] font-bold text-slate-500">조달 상태 필터</label>
                                                 <select
                                                     id="dk-procurement-filter"
