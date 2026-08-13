@@ -48,7 +48,7 @@ const WORKING_DAYS = 250;      // 연간 영업일수
 const LEAD_TIME = 5;           // 리드타임 (대경 → 시화, 영업일 기준)
 const Z_VALUE = 1.645;         // 목표 서비스율 95% (데이터 충분하면 2.33 = 99%로 상향)
 
-export type DkProcurementFilterType = 'ALL' | 'ORDER_NEEDED' | 'RECOMMENDED' | 'DOUBLE_STOCKOUT' | 'SURGING_DEMAND' | 'SIHWA_UNMET' | 'EXCESS' | 'STABLE';
+export type DkProcurementFilterType = 'ALL' | 'ORDER_NEEDED' | 'RECOMMENDED' | 'DOUBLE_STOCKOUT' | 'SURGING_DEMAND' | 'SURGING_MONITORING' | 'SURGING_RECOMMENDED' | 'SIHWA_UNMET' | 'EXCESS' | 'STABLE';
 
 interface DaekyungStockAnalysisItem {
     id: string;
@@ -275,7 +275,7 @@ export default function SihwaInventory() {
 
     const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE' | 'HEALTH_DIAGNOSIS' | 'DAEKYUNG_STOCK'>('AI_SUMMARY');
     const [dkSortConfig, setDkSortConfig] = useState<{
-        key: 'id' | 'name' | 'material' | 'size' | 'currentStock' | 'avg1m' | 'avg3m' | 'avg6m' | 'share1m' | 'share3m' | 'share6m' | 'trend' | 'shQty' | 'safeStock' | 'recommendedQty' | 'procurementReason';
+        key: 'id' | 'name' | 'material' | 'size' | 'currentStock' | 'avg1m' | 'avg3m' | 'avg6m' | 'share1m' | 'share3m' | 'share6m' | 'trend' | 'shQty' | 'safeStock' | 'recommendedQty' | 'procurementReason' | 'healthGrade' | 'turnoverRate' | 'recent60dSales' | 'quoteCount' | 'recent60dOrderCount';
         direction: 'asc' | 'desc';
     }>({ key: 'id', direction: 'asc' });
     const [dkSearchQuery, setDkSearchQuery] = useState('');
@@ -1698,7 +1698,13 @@ export default function SihwaInventory() {
                     return r.isDoubleStockoutWithDemand === true;
                 }
                 if (dkFilterProcurement === 'SURGING_DEMAND') {
-                    return cat === 'SURGING_DEMAND' && r.shQty < r.safeStock;
+                    return r.isSurgingDemand === true || cat === 'SURGING_DEMAND';
+                }
+                if (dkFilterProcurement === 'SURGING_MONITORING') {
+                    return (r.isSurgingDemand === true || cat === 'SURGING_DEMAND') && (recQty <= 0 || r.procurementReason.includes('모니터링') || r.shQty >= r.safeStock);
+                }
+                if (dkFilterProcurement === 'SURGING_RECOMMENDED') {
+                    return (r.isSurgingDemand === true || cat === 'SURGING_DEMAND') && (recQty > 0 || r.procurementReason.includes('선발주') || r.shQty < r.safeStock);
                 }
                 if (dkFilterProcurement === 'SIHWA_UNMET') {
                     return cat === 'SIHWA_UNMET';
@@ -1793,6 +1799,31 @@ export default function SihwaInventory() {
                 case 'name': return a.name.localeCompare(b.name) * dir;
                 case 'material': return (a.material || '').localeCompare(b.material || '') * dir;
                 case 'size': return (a.size || '').localeCompare(b.size || '') * dir;
+                case 'healthGrade': {
+                    const sihwaA = baseAnalyzedInventoryMap.get(a.id);
+                    const sihwaB = baseAnalyzedInventoryMap.get(b.id);
+                    return ((sihwaA?.healthGrade || 'N').localeCompare(sihwaB?.healthGrade || 'N')) * dir;
+                }
+                case 'turnoverRate': {
+                    const sihwaA = baseAnalyzedInventoryMap.get(a.id);
+                    const sihwaB = baseAnalyzedInventoryMap.get(b.id);
+                    return ((sihwaA?.turnoverRate || 0) - (sihwaB?.turnoverRate || 0)) * dir;
+                }
+                case 'recent60dSales': {
+                    const sihwaA = baseAnalyzedInventoryMap.get(a.id);
+                    const sihwaB = baseAnalyzedInventoryMap.get(b.id);
+                    return ((sihwaA?.recent60dSales || 0) - (sihwaB?.recent60dSales || 0)) * dir;
+                }
+                case 'quoteCount': {
+                    const sihwaA = baseAnalyzedInventoryMap.get(a.id);
+                    const sihwaB = baseAnalyzedInventoryMap.get(b.id);
+                    return ((sihwaA?.quoteCount || 0) - (sihwaB?.quoteCount || 0)) * dir;
+                }
+                case 'recent60dOrderCount': {
+                    const sihwaA = baseAnalyzedInventoryMap.get(a.id);
+                    const sihwaB = baseAnalyzedInventoryMap.get(b.id);
+                    return ((sihwaA?.recent60dOrderCount || 0) - (sihwaB?.recent60dOrderCount || 0)) * dir;
+                }
                 case 'currentStock': return (a.currentStock - b.currentStock) * dir;
                 case 'avg1m': return (a.avg1m - b.avg1m) * dir;
                 case 'avg3m': return (a.avg3m - b.avg3m) * dir;
@@ -5550,7 +5581,9 @@ if (displayList.length === 0) {
                                                     <option value="ORDER_NEEDED">발주 필요 (종합)</option>
                                                     <option value="RECOMMENDED">AI 발주 추천</option>
                                                     <option value="DOUBLE_STOCKOUT">🚨 자사·공급처 동시 결품 (이중 품절)</option>
-                                                    <option value="SURGING_DEMAND">🔥 최근 주문/출고 급상승</option>
+                                                    <option value="SURGING_DEMAND">🔥 최근 주문/출고 급상승 (전체)</option>
+                                                    <option value="SURGING_MONITORING">🛡️ 최근 주문/출고 급상승 - 결품 예방 모니터링</option>
+                                                    <option value="SURGING_RECOMMENDED">📦 최근 주문/출고 급상승 - 선발주 권장</option>
                                                     <option value="SIHWA_UNMET">⚠️ 시화재고 미달 (선발주 권장)</option>
                                                     <option value="EXCESS">📉 직전수요 대비 과잉재고</option>
                                                     <option value="STABLE">✅ 수급 및 재고 상태 안정적</option>
@@ -5609,14 +5642,35 @@ if (displayList.length === 0) {
                                                                 <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'id', direction: prev.key === 'id' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
                                                                     품목코드 {dkSortConfig.key === 'id' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                                 </th>
-                                                                <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'name', direction: prev.key === 'name' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                                    품목명 {dkSortConfig.key === 'name' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                                <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-100 transition group relative" onClick={() => setDkSortConfig(prev => ({ key: 'healthGrade', direction: prev.key === 'healthGrade' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                                    등급 <span className="text-[10px] text-slate-400">ⓘ</span> {dkSortConfig.key === 'healthGrade' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 bg-slate-800 text-white text-[11px] p-3 rounded shadow-lg hidden group-hover:block z-50 text-left font-normal whitespace-normal cursor-auto">
+                                                                        <div className="font-bold mb-1 border-b border-slate-600 pb-1">건전성 평가 항목(%) 기준</div>
+                                                                        <div className="mb-2 text-slate-300">실제 판매량, 견적 유입량, 주문 데이터를 복합 연계하여 산출한 종합 등급입니다.</div>
+                                                                        <ul className="space-y-1">
+                                                                            <li><span className="text-emerald-300 font-bold">A급 (최우수)</span>: 회전율 우수, 꾸준한 매출 기여</li>
+                                                                            <li><span className="text-blue-300 font-bold">B급 (양호)</span>: 회전율 양호, 안정적 유지권</li>
+                                                                            <li><span className="text-amber-300 font-bold">C급 (보통)</span>: 저회전 또는 간헐적 판매 발생</li>
+                                                                            <li><span className="text-orange-300 font-bold">D급 (주의)</span>: 과잉재고 또는 최근 무판매 정체</li>
+                                                                            <li><span className="text-rose-300 font-bold">E급 (악성)</span>: 장기 무판매 사장재고 (처분 요망)</li>
+                                                                            <li><span className="text-slate-300 font-bold">N급 (제외)</span>: 판매/재고 없음 (평가 불가)</li>
+                                                                        </ul>
+                                                                    </div>
                                                                 </th>
-                                                                <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'size', direction: prev.key === 'size' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                                    사이즈 {dkSortConfig.key === 'size' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                                <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'turnoverRate', direction: prev.key === 'turnoverRate' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                                    회전율 {dkSortConfig.key === 'turnoverRate' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                                 </th>
-                                                                <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'material', direction: prev.key === 'material' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                                    재질 {dkSortConfig.key === 'material' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                                <th className="px-4 py-3 text-center">
+                                                                    최근 실적(60일)
+                                                                    <div className="flex items-center justify-center gap-2 mt-1 text-[10px] font-bold">
+                                                                        <span className={`cursor-pointer transition ${dkSortConfig.key === 'quoteCount' ? 'text-indigo-600 font-black' : 'text-slate-400 hover:text-indigo-600'}`} onClick={() => setDkSortConfig(prev => ({ key: 'quoteCount', direction: prev.key === 'quoteCount' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                                            견적순 {dkSortConfig.key === 'quoteCount' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                                        </span>
+                                                                        <span className="text-slate-300">|</span>
+                                                                        <span className={`cursor-pointer transition ${dkSortConfig.key === 'recent60dOrderCount' ? 'text-emerald-600 font-black' : 'text-slate-400 hover:text-emerald-600'}`} onClick={() => setDkSortConfig(prev => ({ key: 'recent60dOrderCount', direction: prev.key === 'recent60dOrderCount' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                                            발주순 {dkSortConfig.key === 'recent60dOrderCount' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                                        </span>
+                                                                    </div>
                                                                 </th>
                                                             </>
                                                         ) : (
