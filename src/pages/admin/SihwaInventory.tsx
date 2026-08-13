@@ -1268,6 +1268,9 @@ export default function SihwaInventory() {
             // 통계 기반 기초 계산 (σ)
             const dailyAvgSales = row.salesVolume / WORKING_DAYS;
 
+            // 대경 재고 정보 사전 조회 (안전재고 연동용)
+            const dkStock = daekyungStockMap.get(row.product.id) || { currentStock: row.ysQty, avg3m: row.ysQty, avg6m: row.ysQty };
+
             // 시화의 실제 평균 출고량 추정 (최근 60일 시화 출고량 기준)
             const sihwaDailySales = row.recent60dSales > 0 ? (row.recent60dSales / 40) : (dailyAvgSales * 0.2); // 출고 없으면 연간의 20%만 잡음
 
@@ -1280,19 +1283,21 @@ export default function SihwaInventory() {
             // 1. 기초 안전재고 축소: 안전재고 + 20일치 평균 (약 1개월)
             let safeStock = safetyStockSigma + Math.ceil(sihwaDailySales * 20);
 
-            // 2. 최대 발주 상한선 캡 (시화에서 한 번에 나가는 물량은 보통 200~300개를 넘지 않으므로 최대 500개 캡, 단, 월판매량이 아주 큰 경우는 2개월치 허용)
+            // 2. 최대 발주 상한선 캡 (기본 상한선 500개)
             const absoluteMax = Math.max(500, Math.ceil(sihwaDailySales * 40));
             safeStock = Math.min(safeStock, absoluteMax);
 
-            // 3. 주문 횟수(Freq) 및 견적(Quote) 기반 제한
-            if (row.salesFreq < 12 && row.quoteCount < 2) {
-                safeStock = Math.min(safeStock, Math.ceil(sihwaDailySales * 10)); // 최대 2주 치
+            // 3. 주문 횟수(Freq) 및 최근 출고 건수 기반 저빈도 품목 제한 (사례 2 수정)
+            const isLowFreqItem = (row.salesFreq < 12 && row.quoteCount < 2) || (row.recent60dOrderCount <= 2 && row.recent60dSales <= 30);
+            if (isLowFreqItem) {
+                const avgOrderSize = row.salesFreq > 0 ? Math.ceil(row.salesVolume / row.salesFreq) : 10;
+                safeStock = Math.min(safeStock, Math.max(10, Math.min(20, avgOrderSize))); // 저빈도 품목은 최대 20개 이하 Capping
             }
             if (row.salesVolume < 50 && row.salesFreq < 5) {
                 safeStock = 0; // 극소량, 극저빈도 품목은 재고 미보유
             }
 
-            // 3.5. 대경 직발주 비중이 압도적으로 높고 시화 출고가 없는 경우, 기초 재고 10개 강제 보류 해제
+            // 3.5. 대경 직발주 비중이 압도적으로 높고 시화 출고가 없는 경우
             const isMostlyDropShipped = row.recent60dOrderCount > 0 && row.recent60dSales === 0;
 
             if (isMostlyDropShipped) {
@@ -1301,12 +1306,17 @@ export default function SihwaInventory() {
                 safeStock = safeStock > 0 ? Math.max(10, Math.round(safeStock / 10) * 10) : 0;
             }
 
-            // 4. 대경 재고(ysQty) 기반 페널티는 여기서 제외합니다. 
-            // 목표재고(safeStock) 자체를 깎아버리면 정상적인 재고가 '과잉'으로 오탐지되므로,
-            // 대경 재고가 많을 때 발주를 막는 로직은 하단의 '정기발주' 계산에서만 처리합니다.
+            // 4. 대경 재고(ysQty/avg3m) 연동 시화 안전재고 감축 (사례 1 수정)
+            // 대경에 1,000개 이상 또는 3개월 판매량을 초과하는 대량 버퍼가 보유된 경우 시화 버퍼 목표를 대폭 절감
+            if (dkStock.avg3m >= 1000 || row.ysQty >= 1000) {
+                const maxSihwaBuffer = Math.max(100, Math.ceil(sihwaDailySales * 20)); // 대경 대량재고 시 시화는 약 20일치만 보유
+                safeStock = Math.min(safeStock, maxSihwaBuffer);
+            } else if (dkStock.avg3m >= 500 || row.ysQty >= 500) {
+                const maxSihwaBuffer = Math.max(200, Math.ceil(sihwaDailySales * 30));
+                safeStock = Math.min(safeStock, maxSihwaBuffer);
+            }
 
             // 4.5. 최근 60일 실적(트렌드) 기반 동적 페널티
-            // 수요 급감 시 적정재고 삭감. 단, 연간 판매빈도/수량이 높거나 대경재고가 넉넉할 때는 덜 삭감함.
             if (row.salesVolume > 0 && row.recent60dSales === 0 && row.quoteCount === 0 && row.recent60dOrderCount === 0) {
                 if ((row.salesFreq >= 30 && row.salesVolume >= 100) || row.ysQty >= 500) {
                     safeStock = Math.round((safeStock * 0.4) / 10) * 10; // 60% 삭감
@@ -1318,12 +1328,11 @@ export default function SihwaInventory() {
             }
 
             // 4.6 최근 견적/발주 집중 시 적정재고 상향 (결품 예방)
-            // 단, 실제 판매량(salesFreq)이 아예 없거나(0), 300A 이상의 대형 사이즈(주문제작 위주)인 경우 무조건 10개로 올리지 않음
             const sizeStr = row.product.size || '';
             const sizeNum = parseInt(sizeStr.replace(/[^0-9]/g, ''), 10);
             const isLargeSize = !isNaN(sizeNum) && sizeNum >= 300;
 
-            if (!isMostlyDropShipped && row.salesFreq > 0 && !isLargeSize && (row.quoteCount >= 2 || row.recent60dOrderCount >= 3)) {
+            if (!isMostlyDropShipped && row.salesFreq > 0 && !isLargeSize && !isLowFreqItem && (row.quoteCount >= 2 || row.recent60dOrderCount >= 3)) {
                 const trendDemand = Math.max(10, Math.ceil((row.recent60dSales > 0 ? row.recent60dSales : (row.salesVolume / 6)) * 1.2));
                 safeStock = Math.max(safeStock, Math.round(trendDemand / 10) * 10);
             }
@@ -1331,8 +1340,6 @@ export default function SihwaInventory() {
             // 5. WP 및 Material Filter Rules
             const mat = (row.product.material || '').toUpperCase();
             if (mat.startsWith('WP') || mat.includes('CARBON')) {
-                // WP/CARBON은 기본적으로 시화재고에서 제외 (0개)
-                // 단, 월 3회 이상(연 36회) 초고빈도 필수 품목은 최대 20개까지만 예외 허용
                 if (row.salesFreq >= 36 && row.salesVolume >= 500) {
                     safeStock = Math.min(safeStock, 20);
                 } else {
@@ -1340,14 +1347,14 @@ export default function SihwaInventory() {
                 }
             }
 
-            // 6. 건전성 등급(Health Grade) 가중치에 따른 목표재고 증감 (A/B급 상향, D/E급 하향)
+            // 6. 건전성 등급(Health Grade) 가중치에 따른 목표재고 증감
             if (healthGrade === 'A') safeStock = Math.ceil(safeStock * 1.5);
             else if (healthGrade === 'B') safeStock = Math.ceil(safeStock * 1.2);
             else if (healthGrade === 'D') {
                 safeStock = Math.ceil(safeStock * 0.5);
                 if (row.salesFreq > 0) {
                     const avgOrderSize = row.salesVolume / row.salesFreq;
-                    safeStock = Math.max(safeStock, Math.ceil(avgOrderSize)); // D등급이라도 최소 1회 평균 출고량은 보장
+                    safeStock = Math.max(safeStock, Math.ceil(avgOrderSize));
                 }
             }
             else if (healthGrade === 'E') safeStock = 0;
@@ -1360,6 +1367,10 @@ export default function SihwaInventory() {
                 else if (sizeNum >= 150) { if (safeStock > 150) safeStock = 150; }
                 else if (sizeNum >= 100) { if (safeStock > 300) safeStock = 300; }
             }
+
+            // ★ 최종 안전재고 상한선(Cap) 재적용 (가중치 승수 적용 후 오버플로우 방지)
+            const finalAbsoluteCap = Math.max(300, Math.min(1000, Math.ceil(sihwaDailySales * 45)));
+            safeStock = Math.min(safeStock, finalAbsoluteCap);
 
             // 악성재고: E급만
             const isDeadStock = healthGrade === 'E';
@@ -1403,7 +1414,6 @@ export default function SihwaInventory() {
                 const shouldSkipWarning = isLowDemandCGrade || isRecentZeroSales;
 
                 if (effectiveStock <= 0) {
-                    // 선발주 요망(CRITICAL) 조건: 대경 재고가 없으면서, A/B급 핵심 품목이거나 일정 수준 이상 팔리는 품목
                     if (row.ysQty <= 0 && (healthGrade === 'A' || healthGrade === 'B' || (row.salesVolume >= 30 && row.salesFreq >= 5))) {
                         statusCategory = 'CRITICAL';
                         statusLabel = '🚨 선발주 요망 (매입결품)';
@@ -1434,29 +1444,19 @@ export default function SihwaInventory() {
             const daysOnHand = dailyAvgSales > 0 && row.shQty > 0 ? parseFloat((row.shQty / dailyAvgSales).toFixed(1)) : (row.shQty > 0 ? 9999 : 0);
             const finalDeficit = Math.max(0, safeStock - effectiveStock);
 
-            // 신규: 예측 기반 권장 발주량(recommendedQty) 통합 산출 로직
+            // 예측 기반 권장 발주량(recommendedQty) 통합 산출 로직 (수식 오류 수정: 2중 중복 계산 제거)
             let recommendedQty = 0;
-            const sihwaDailySalesCurrent = row.recent60dSales > 0 ? (row.recent60dSales / 40) : (row.salesVolume / 250 * 0.2);
-            let twoMonthDemand = Math.ceil(sihwaDailySalesCurrent * 40);
-            if (twoMonthDemand < 10 && row.salesVolume > 0) twoMonthDemand = Math.ceil(row.salesVolume / 6);
+            
+            // rawQty는 finalDeficit(목표 안전재고 대비 부족분)을 기본으로 잡음
+            const rawQty = (statusCategory === 'WARNING' || statusCategory === 'CRITICAL') ? finalDeficit : 0;
 
-            let rawQty = 0;
-            if (statusCategory === 'WARNING' || statusCategory === 'CRITICAL') {
-                rawQty = finalDeficit + twoMonthDemand;
-            } else if (statusCategory === 'SAFE' && row.salesFreq >= 20 && !isExcessStock && !(row.product.material || '').toUpperCase().startsWith('WP')) {
-                let baseDemand = Math.round(twoMonthDemand / 10) * 10;
-                if (twoMonthDemand < 10) baseDemand = twoMonthDemand;
-                rawQty = baseDemand - effectiveStock;
-            }
-
-            // ── 대경재고 평균 분석을 통한 발주 필요성 평가 ──
-            const dkStock = daekyungStockMap.get(row.product.id) || { currentStock: row.ysQty, avg3m: row.ysQty, avg6m: row.ysQty };
-            const requiredAmount = rawQty > 0 ? rawQty : finalDeficit;
+            const requiredAmount = finalDeficit;
             
             // 대경 평균재고(3M)가 필요량 이상일 경우 이송(Transfer) 가능으로 판단
             const canTransfer = requiredAmount > 0 && dkStock.avg3m >= requiredAmount;
 
-            if (rawQty > 0 && !isExcessStock && row.ysQty < rawQty * 2 && !canTransfer) {
+            // 대경재고 이송이 불가능하고, 실제로 외부 발주가 필요한 경우만 권장구매수량 산출
+            if (rawQty > 0 && !isExcessStock && !canTransfer) {
                 const sizeStr = row.product.size || '';
                 const sizeNum = parseInt(sizeStr.replace(/[^0-9]/g, ''), 10);
                 const isLargeSize = !isNaN(sizeNum) && sizeNum >= 300;
