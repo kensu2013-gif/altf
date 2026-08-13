@@ -26,11 +26,13 @@ import salesHistoryRaw from '../../data/sales_history.json';
 import { COMPETITOR_DATA, getStrategicGrade, type StrategicGrade } from '../../../competitorData';
 import { ItemIntelligenceCard } from './components/ItemIntelligenceCard';
 import { SearchableMultiSelect } from '../../components/ui/SearchableMultiSelect';
+import { matchesSmartSearch } from '../../utils/searchUtils';
 
 const salesHistory = salesHistoryRaw as Record<string, { salesVolume: number, salesFreq: number }>;
 
 // Helper: Format currency
 const formatCur = (num: number) => new Intl.NumberFormat('ko-KR').format(num);
+
 
 // Helper: Calculate Selling Price based on item rules
 const calculateSellingPrice = (id: string, basePrice: number): number => {
@@ -1564,11 +1566,7 @@ export default function SihwaInventory() {
     const analyzedInventory = useMemo(() => {
         let filtered = baseAnalyzedInventory;
         if (searchTerm) {
-            const lowerQuery = searchTerm.toLowerCase();
-            filtered = baseAnalyzedInventory.filter(row =>
-                row.product.id.toLowerCase().includes(lowerQuery) ||
-                (row.product.name && row.product.name.toLowerCase().includes(lowerQuery))
-            );
+            filtered = baseAnalyzedInventory.filter(row => matchesSmartSearch(row.product, searchTerm));
         }
         if (sihwaFilterItem.length > 0) {
             filtered = filtered.filter(row => sihwaFilterItem.includes(row.product.name || ''));
@@ -1665,11 +1663,7 @@ export default function SihwaInventory() {
         // 전체 품목 분석 대상 유지
 
         if (dkSearchQuery) {
-            const query = dkSearchQuery.trim().toLowerCase();
-            items = items.filter(r =>
-                r.id.toLowerCase().includes(query) ||
-                r.name.toLowerCase().includes(query)
-            );
+            items = items.filter(r => matchesSmartSearch(r, dkSearchQuery));
         }
         if (dkFilterItem) {
             items = items.filter(r => (r.name || '').trim() === dkFilterItem.trim());
@@ -1685,10 +1679,8 @@ export default function SihwaInventory() {
             const hasAnyFilter = !!(dkSearchQuery.trim() || dkFilterItem || dkFilterMaterial || dkFilterSize);
             if (!hasAnyFilter) {
                 items = [];
-            } else {
-                // 수급 및 재고 상태 안정적(STABLE) 품목은 확인 불필요하므로 기본 거름 처리
-                items = items.filter(r => r.procurementCategory !== 'STABLE');
             }
+            // 검색어나 특정 필터 조건이 있는 경우 STABLE 품목을 포함하여 사용자가 찾고자 하는 품목이 모두 검색되도록 함
         } else {
             items = items.filter(r => {
                 const cat = r.procurementCategory;

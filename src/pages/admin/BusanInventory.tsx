@@ -26,11 +26,13 @@ import salesHistoryRaw from '../../data/sales_history.json';
 import { COMPETITOR_DATA, getStrategicGrade, type StrategicGrade } from '../../../competitorData';
 import { ItemIntelligenceCard } from './components/ItemIntelligenceCard';
 import { SearchableMultiSelect } from '../../components/ui/SearchableMultiSelect';
+import { matchesSmartSearch } from '../../utils/searchUtils';
 
 const salesHistory = salesHistoryRaw as Record<string, { salesVolume: number, salesFreq: number }>;
 
 // Helper: Format currency
 const formatCur = (num: number) => new Intl.NumberFormat('ko-KR').format(num);
+
 
 // Helper: Calculate Selling Price based on item rules
 const calculateSellingPrice = (id: string, basePrice: number): number => {
@@ -1661,11 +1663,7 @@ export default function BusanInventory() {
     const analyzedInventory = useMemo(() => {
         let filtered = baseAnalyzedInventory;
         if (searchTerm) {
-            const lowerQuery = searchTerm.toLowerCase();
-            filtered = baseAnalyzedInventory.filter(row =>
-                row.product.id.toLowerCase().includes(lowerQuery) ||
-                (row.product.name && row.product.name.toLowerCase().includes(lowerQuery))
-            );
+            filtered = baseAnalyzedInventory.filter(row => matchesSmartSearch(row.product, searchTerm));
         }
         if (sihwaFilterItem.length > 0) {
             filtered = filtered.filter(row => sihwaFilterItem.includes(row.product.name || ''));
@@ -1759,11 +1757,7 @@ export default function BusanInventory() {
         }
 
         if (dkSearchQuery) {
-            const query = dkSearchQuery.toLowerCase();
-            filtered = filtered.filter(r =>
-                r.id.toLowerCase().includes(query) ||
-                r.name.toLowerCase().includes(query)
-            );
+            filtered = filtered.filter(r => matchesSmartSearch(r, dkSearchQuery));
         }
         if (dkFilterItem) {
             filtered = filtered.filter(r => r.name === dkFilterItem);
