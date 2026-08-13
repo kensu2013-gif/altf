@@ -73,6 +73,11 @@ interface DaekyungStockAnalysisItem {
     isSurgingDemand: boolean;
     isExcessStock?: boolean;
     isDeadStock?: boolean;
+    healthGrade?: 'A' | 'B' | 'C' | 'D' | 'E' | 'N';
+    turnoverRate?: number;
+    quoteCount?: number;
+    recent60dSales?: number;
+    recent60dOrderCount?: number;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1635,6 +1640,11 @@ export default function SihwaInventory() {
             const isSurgingDemand = sihwaRow?.isSurgingDemand ?? false;
             const isExcessStock = sihwaRow?.isExcessStock ?? false;
             const isDeadStock = sihwaRow?.isDeadStock ?? false;
+            const healthGrade = sihwaRow?.healthGrade ?? 'N';
+            const turnoverRate = sihwaRow?.turnoverRate ?? 0;
+            const quoteCount = sihwaRow?.quoteCount ?? 0;
+            const recent60dSales = sihwaRow?.recent60dSales ?? 0;
+            const recent60dOrderCount = sihwaRow?.recent60dOrderCount ?? 0;
             const procurementCategory = sihwaRow?.procurementCategory ?? 'STABLE';
             const procurementReason = sihwaRow?.procurementReason || (
                 r.currentStock === 0 
@@ -1653,6 +1663,11 @@ export default function SihwaInventory() {
                 isSurgingDemand,
                 isExcessStock,
                 isDeadStock,
+                healthGrade,
+                turnoverRate,
+                quoteCount,
+                recent60dSales,
+                recent60dOrderCount,
             };
         });
 
@@ -5735,14 +5750,53 @@ if (displayList.length === 0) {
                                                                                 {row.id}
                                                                             </span>
                                                                         </td>
-                                                                        <td className="px-4 py-2.5 text-slate-500 font-medium">
-                                                                            {row.name}
+                                                                        <td className="px-4 py-2.5 text-center">
+                                                                            <span className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-black ${
+                                                                                (sihwaRow?.healthGrade || row.healthGrade) === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                                                (sihwaRow?.healthGrade || row.healthGrade) === 'B' ? 'bg-blue-100 text-blue-700' :
+                                                                                (sihwaRow?.healthGrade || row.healthGrade) === 'C' ? 'bg-amber-100 text-amber-700' :
+                                                                                (sihwaRow?.healthGrade || row.healthGrade) === 'D' ? 'bg-orange-100 text-orange-700' :
+                                                                                (sihwaRow?.healthGrade || row.healthGrade) === 'E' ? 'bg-rose-100 text-rose-700' :
+                                                                                'bg-slate-100 text-slate-500'
+                                                                            }`} title="종합 건전성 등급">
+                                                                                {(sihwaRow?.healthGrade || row.healthGrade || 'N')}급
+                                                                            </span>
                                                                         </td>
-                                                                        <td className="px-4 py-2.5 text-slate-500 font-medium">
-                                                                            {row.size}
+                                                                        <td className="px-4 py-2.5 text-center">
+                                                                            {(sihwaRow?.healthGrade || row.healthGrade) && (sihwaRow?.healthGrade || row.healthGrade) !== 'N' ? (
+                                                                                <div className="flex flex-col items-center">
+                                                                                    <span className={`text-[10px] font-black px-1.5 rounded ${
+                                                                                        (sihwaRow?.healthGrade || row.healthGrade) === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                                                        (sihwaRow?.healthGrade || row.healthGrade) === 'B' ? 'bg-amber-100 text-amber-700' :
+                                                                                        (sihwaRow?.healthGrade || row.healthGrade) === 'C' ? 'bg-blue-100 text-blue-600' :
+                                                                                        'bg-rose-100 text-rose-500'
+                                                                                    }`}>
+                                                                                        {(sihwaRow?.healthGrade || row.healthGrade)}급
+                                                                                    </span>
+                                                                                    <span className="text-[10px] font-mono text-slate-400 mt-0.5">
+                                                                                        {(sihwaRow?.turnoverRate ?? row.turnoverRate ?? 0) > 0 ? `${(sihwaRow?.turnoverRate ?? row.turnoverRate)}x` : ''}
+                                                                                    </span>
+                                                                                </div>
+                                                                            ) : <span className="text-slate-200">—</span>}
                                                                         </td>
-                                                                        <td className="px-4 py-2.5 text-slate-500 font-medium">
-                                                                            {row.material}
+                                                                        <td className="px-4 py-2.5 text-center text-slate-600">
+                                                                            <div className="flex flex-col items-center gap-1">
+                                                                                <span className="font-black text-slate-800 text-[12px]">
+                                                                                    {(sihwaRow?.recent60dSales ?? row.recent60dSales ?? 0).toLocaleString()}
+                                                                                    <span className="text-[10px] text-slate-500 font-bold ml-0.5 mr-1">개 /</span>
+                                                                                    {(sihwaRow?.recent60dOrderCount ?? row.recent60dOrderCount ?? 0).toLocaleString()}
+                                                                                    <span className="text-[10px] text-slate-500 font-bold ml-0.5">회출고</span>
+                                                                                </span>
+                                                                                <div className="flex items-center gap-1 text-[10px] bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 shadow-sm">
+                                                                                    <span className="text-slate-500 font-bold">견적</span>
+                                                                                    <span className="font-black text-indigo-600">{(sihwaRow?.quoteCount ?? row.quoteCount ?? 0).toLocaleString()}</span>
+                                                                                    <span className="text-slate-400">건</span>
+                                                                                    <span className="w-px h-2.5 bg-slate-300 mx-0.5"></span>
+                                                                                    <span className="text-slate-500 font-bold">발주</span>
+                                                                                    <span className="font-black text-emerald-600">{(sihwaRow?.recent60dOrderCount ?? row.recent60dOrderCount ?? 0).toLocaleString()}</span>
+                                                                                    <span className="text-slate-400">건</span>
+                                                                                </div>
+                                                                            </div>
                                                                         </td>
                                                                     </>
                                                                 ) : (
