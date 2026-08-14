@@ -277,6 +277,7 @@ export default function SihwaInventory() {
     const [sihwaFilterThickness, setSihwaFilterThickness] = useState<string[]>([]);
     const [pinnedItemIds, setPinnedItemIds] = useState<Set<string>>(new Set());
     const [topPeriod, setTopPeriod] = useState<'7D' | '30D' | '60D' | '90D' | '180D'>('30D');
+    const [performancePeriod, setPerformancePeriod] = useState<'60D' | '90D' | '1Y'>('90D');
     const [trendRightTab, setTrendRightTab] = useState<'TOP_SALES' | 'SURGING_DEMAND'>('TOP_SALES');
     const [selectedDkIds, setSelectedDkIds] = useState<Set<string>>(new Set());
 
@@ -801,7 +802,9 @@ export default function SihwaInventory() {
         recent60dSales: number;
         recent90dSales: number;
         recent180dSales: number;
+        recent365dSales: number;
         quoteCount: number;
+        recentOrderCount: number;
         recent90dOrderCount: number;
         daekyungDirectRatio: number;
         profitMarginRate: number;
@@ -1006,8 +1009,11 @@ export default function SihwaInventory() {
         const sevenDaysAgo = nowTime - (7 * 24 * 60 * 60 * 1000);
         const ninetyDaysAgo = nowTime - (90 * 24 * 60 * 60 * 1000);
         const oneEightyDaysAgo = nowTime - (180 * 24 * 60 * 60 * 1000);
+        const oneYearAgo = nowTime - (365 * 24 * 60 * 60 * 1000);
 
-        const recentSalesMap: Record<string, { recent7d: number, recent30d: number, recent60d: number, recent90d: number, recent180d: number }> = {};
+        const activeOrderCutoff = performancePeriod === '60D' ? sixtyDaysAgo : performancePeriod === '1Y' ? oneYearAgo : ninetyDaysAgo;
+
+        const recentSalesMap: Record<string, { recent7d: number, recent30d: number, recent60d: number, recent90d: number, recent180d: number, recent365d: number }> = {};
         historyData.inventoryHistory.forEach((snap: InventoryHistorySnapshot) => {
             const snapDate = new Date(snap.date).getTime();
             if (isNaN(snapDate)) return;
@@ -1016,13 +1022,17 @@ export default function SihwaInventory() {
             const isWithin60d = snapDate >= sixtyDaysAgo;
             const isWithin90d = snapDate >= ninetyDaysAgo;
             const isWithin180d = snapDate >= oneEightyDaysAgo;
+            const isWithin365d = snapDate >= oneYearAgo;
 
-            if (isWithin180d && snap.diff) {
+            if (isWithin365d && snap.diff) {
                 snap.diff.forEach((d: InventoryDiffItem) => {
                     if (d.change < 0) {
                         const absChg = Math.abs(d.change);
-                        if (!recentSalesMap[d.id]) recentSalesMap[d.id] = { recent7d: 0, recent30d: 0, recent60d: 0, recent90d: 0, recent180d: 0 };
-                        recentSalesMap[d.id].recent180d += absChg;
+                        if (!recentSalesMap[d.id]) recentSalesMap[d.id] = { recent7d: 0, recent30d: 0, recent60d: 0, recent90d: 0, recent180d: 0, recent365d: 0 };
+                        recentSalesMap[d.id].recent365d += absChg;
+                        if (isWithin180d) {
+                            recentSalesMap[d.id].recent180d += absChg;
+                        }
                         if (isWithin90d) {
                             recentSalesMap[d.id].recent90d += absChg;
                         }
@@ -1044,7 +1054,7 @@ export default function SihwaInventory() {
         quotes.forEach(quote => {
             if (['CANCELLED', 'WITHDRAWN'].includes(quote.status) || quote.isDeleted) return;
             const quoteDate = new Date(quote.createdAt).getTime();
-            if (isNaN(quoteDate) || quoteDate < sixtyDaysAgo) return; // Only count recent 60 days
+            if (isNaN(quoteDate) || quoteDate < activeOrderCutoff) return;
 
             const quoteUser = userMap.get(quote.userId);
             const customerStr = (quote.customerName || quote.customerInfo?.companyName || quote.customerInfo?.contactName || quoteUser?.companyName || '').toLowerCase().replace(/\s+/g, '');
@@ -1057,13 +1067,13 @@ export default function SihwaInventory() {
             });
         });
 
-        const recent90dOrderCountMap: Record<string, number> = {};
+        const activeOrderCountMap: Record<string, number> = {};
         orders.forEach(order => {
             if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
             if (order.status !== 'COMPLETED') return;
 
             const orderDate = new Date(order.createdAt).getTime();
-            if (isNaN(orderDate) || orderDate < ninetyDaysAgo) return;
+            if (isNaN(orderDate) || orderDate < activeOrderCutoff) return;
 
             const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
             if (customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf')) return;
@@ -1076,18 +1086,18 @@ export default function SihwaInventory() {
                 if (!id) return;
                 const qty = Number(item.quantity ?? item.qty ?? 0);
                 if (qty <= 0) return;
-                recent90dOrderCountMap[id] = (recent90dOrderCountMap[id] || 0) + 1;
+                activeOrderCountMap[id] = (activeOrderCountMap[id] || 0) + 1;
             });
         });
 
-        // Also add outgoing diff events (shipments) from inventory history in recent 90 days
+        // Also add outgoing diff events (shipments) from inventory history in active performance period
         historyData.inventoryHistory.forEach((snap: InventoryHistorySnapshot) => {
             const snapDate = new Date(snap.date).getTime();
-            if (isNaN(snapDate) || snapDate < ninetyDaysAgo) return;
+            if (isNaN(snapDate) || snapDate < activeOrderCutoff) return;
             if (snap.diff) {
                 snap.diff.forEach((d: InventoryDiffItem) => {
                     if (d.change < 0) {
-                        recent90dOrderCountMap[d.id] = (recent90dOrderCountMap[d.id] || 0) + 1;
+                        activeOrderCountMap[d.id] = (activeOrderCountMap[d.id] || 0) + 1;
                     }
                 });
             }
@@ -1154,8 +1164,10 @@ export default function SihwaInventory() {
                     recent60dSales: recentSales.recent60d,
                     recent90dSales: recentSales.recent90d,
                     recent180dSales: recentSales.recent180d,
+                    recent365dSales: recentSales.recent365d || 0,
                     quoteCount: quoteCountMap[item.id] || 0,
-                    recent90dOrderCount: recent90dOrderCountMap[item.id] || 0,
+                    recentOrderCount: activeOrderCountMap[item.id] || 0,
+                    recent90dOrderCount: activeOrderCountMap[item.id] || 0,
                     daekyungDirectRatio,
                     profitMarginRate,
                     compositeScore: 0,
@@ -1239,8 +1251,10 @@ export default function SihwaInventory() {
                         recent60dSales: recentSales.recent60d,
                         recent90dSales: recentSales.recent90d,
                         recent180dSales: recentSales.recent180d,
+                        recent365dSales: recentSales.recent365d || 0,
                         quoteCount: quoteCountMap[id] || 0,
-                        recent90dOrderCount: recent90dOrderCountMap[id] || 0,
+                        recentOrderCount: activeOrderCountMap[id] || 0,
+                        recent90dOrderCount: activeOrderCountMap[id] || 0,
                         daekyungDirectRatio,
                         profitMarginRate,
                         compositeScore: 0,
@@ -1581,7 +1595,7 @@ export default function SihwaInventory() {
             });
 
             return processedList;
-    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, historyData, liveSalesHistory, quotes, orders, userMap, daekyungStockMap]);
+    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, historyData, liveSalesHistory, quotes, orders, userMap, daekyungStockMap, performancePeriod]);
 
     const baseAnalyzedInventoryMap = useMemo(() => {
         const map = new Map<string, typeof baseAnalyzedInventory[0]>();
@@ -2961,7 +2975,28 @@ export default function SihwaInventory() {
                         </button>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-bold shadow-xs">
+                            <span className="px-2 text-slate-500 font-semibold text-[11px]">⚡ 분석 실적 기간:</span>
+                            <button
+                                className={`px-2.5 py-1 rounded-md transition cursor-pointer ${performancePeriod === '60D' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200'}`}
+                                onClick={() => setPerformancePeriod('60D')}
+                            >
+                                60일
+                            </button>
+                            <button
+                                className={`px-2.5 py-1 rounded-md transition cursor-pointer ${performancePeriod === '90D' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200'}`}
+                                onClick={() => setPerformancePeriod('90D')}
+                            >
+                                90일
+                            </button>
+                            <button
+                                className={`px-2.5 py-1 rounded-md transition cursor-pointer ${performancePeriod === '1Y' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200'}`}
+                                onClick={() => setPerformancePeriod('1Y')}
+                            >
+                                1년
+                            </button>
+                        </div>
                         <input
                             type="text"
                             placeholder="코드 또는 품명 검색..."
@@ -4010,7 +4045,7 @@ export default function SihwaInventory() {
                                                 </th>
                                                 <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('turnoverRate')}>회전율 {sortConfig.key === 'turnoverRate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                                 <th className="px-4 py-3 text-center">
-                                                    최근 실적(90일)
+                                                    최근 실적({performancePeriod === '60D' ? '60일' : performancePeriod === '1Y' ? '1년' : '90일'})
                                                     <div className="flex items-center justify-center gap-2 mt-1 text-[10px] font-bold">
                                                         <span className={`cursor-pointer transition ${sortConfig.key === 'quoteCount' ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-600'}`} onClick={() => handleSort('quoteCount')}>
                                                             견적순 {sortConfig.key === 'quoteCount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
