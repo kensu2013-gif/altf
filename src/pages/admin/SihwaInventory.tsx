@@ -291,6 +291,8 @@ export default function SihwaInventory() {
     const [dkFilterMaterial, setDkFilterMaterial] = useState('');
     const [dkFilterSize, setDkFilterSize] = useState('');
     const [dkFilterProcurement, setDkFilterProcurement] = useState<DkProcurementFilterType>('ORDER_NEEDED');
+    const [dkFilterHealthGrade, setDkFilterHealthGrade] = useState<string>('ALL');
+    const [sihwaFilterHealthGrade, setSihwaFilterHealthGrade] = useState<string>('ALL');
     const [dkViewMode, setDkViewMode] = useState<'ITEM' | 'MATERIAL'>('ITEM');
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
         'CRITICAL': true,
@@ -1622,6 +1624,9 @@ export default function SihwaInventory() {
         if (sihwaFilterThickness.length > 0) {
             filtered = filtered.filter(row => sihwaFilterThickness.includes(row.product.thickness || ''));
         }
+        if (sihwaFilterHealthGrade && sihwaFilterHealthGrade !== 'ALL') {
+            filtered = filtered.filter(row => (row.healthGrade || 'N') === sihwaFilterHealthGrade);
+        }
 
         return filtered.sort((a, b) => {
             const pinA = pinnedItemIds.has(a.product.id) ? 1 : 0;
@@ -1648,7 +1653,7 @@ export default function SihwaInventory() {
                 default: return 0; // Fallback
             }
         });
-    }, [baseAnalyzedInventory, searchTerm, sihwaFilterItem, sihwaFilterMaterial, sihwaFilterSize, sihwaFilterThickness, pinnedItemIds, sortConfig]);
+    }, [baseAnalyzedInventory, searchTerm, sihwaFilterItem, sihwaFilterMaterial, sihwaFilterSize, sihwaFilterThickness, sihwaFilterHealthGrade, pinnedItemIds, sortConfig]);
 
     // ── 시화재고 필터링 옵션 추출 ──
     const sihwaFilterOptions = useMemo(() => {
@@ -1716,6 +1721,9 @@ export default function SihwaInventory() {
         }
         if (dkFilterSize) {
             items = items.filter(r => (r.size || '').trim() === dkFilterSize.trim());
+        }
+        if (dkFilterHealthGrade && dkFilterHealthGrade !== 'ALL') {
+            items = items.filter(r => (r.healthGrade || 'N') === dkFilterHealthGrade);
         }
 
         // 검색어나 개별 드롭다운 필터(품목/재질/사이즈)가 입력되어 있는 경우에는 조달 상태 필터 조건에 관계없이 해당 품목을 항상 표시함
@@ -1900,7 +1908,7 @@ export default function SihwaInventory() {
                 default: return 0;
             }
         });
-    }, [daekyungBaseStockAverages, baseAnalyzedInventoryMap, dkSearchQuery, searchTerm, dkFilterItem, dkFilterMaterial, dkFilterSize, dkFilterProcurement, dkViewMode, dkSortConfig]);
+    }, [daekyungBaseStockAverages, baseAnalyzedInventoryMap, dkSearchQuery, searchTerm, dkFilterItem, dkFilterMaterial, dkFilterSize, dkFilterProcurement, dkFilterHealthGrade, dkViewMode, dkSortConfig]);
 
 
     const daekyungStats = useMemo(() => {
@@ -3032,6 +3040,23 @@ export default function SihwaInventory() {
                                 selectedValues={sihwaFilterSize}
                                 onChange={setSihwaFilterSize}
                             />
+                            <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded px-2 py-1 shadow-xs">
+                                <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">건전성 등급:</span>
+                                <select
+                                    aria-label="전체 재고 건전성 등급 필터"
+                                    value={sihwaFilterHealthGrade}
+                                    onChange={e => setSihwaFilterHealthGrade(e.target.value)}
+                                    className="bg-transparent text-xs text-slate-700 font-bold focus:outline-hidden cursor-pointer"
+                                >
+                                    <option value="ALL">전체 등급</option>
+                                    <option value="A">💚 A급 (최우수)</option>
+                                    <option value="B">💙 B급 (양호)</option>
+                                    <option value="C">💛 C급 (보통)</option>
+                                    <option value="D">🧡 D급 (주의)</option>
+                                    <option value="E">❤️ E급 (악성)</option>
+                                    <option value="N">⚪ N급 (미평가)</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div className="shrink-0 w-full sm:w-auto flex flex-col sm:flex-row gap-2">
@@ -3042,9 +3067,10 @@ export default function SihwaInventory() {
                                     setSihwaFilterMaterial([]);
                                     setSihwaFilterSize([]);
                                     setSihwaFilterThickness([]);
+                                    setSihwaFilterHealthGrade('ALL');
                                 }}
-                                disabled={!searchTerm && sihwaFilterItem.length === 0 && sihwaFilterMaterial.length === 0 && sihwaFilterSize.length === 0 && sihwaFilterThickness.length === 0}
-                                className="w-full sm:w-auto bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+                                disabled={!searchTerm && sihwaFilterItem.length === 0 && sihwaFilterMaterial.length === 0 && sihwaFilterSize.length === 0 && sihwaFilterThickness.length === 0 && sihwaFilterHealthGrade === 'ALL'}
+                                className="w-full sm:w-auto bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
                             >
                                 🔄 필터 초기화
                             </button>
@@ -5586,14 +5612,14 @@ if (displayList.length === 0) {
                                         </div>
 
                                         {/* 드롭다운 필터 */}
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                                             <div className="flex flex-col gap-1 sm:col-span-2">
                                                 <label htmlFor="dk-procurement-filter" className="text-[10px] font-bold text-slate-500">조달 상태 필터</label>
                                                 <select
                                                     id="dk-procurement-filter"
                                                     value={dkFilterProcurement}
                                                     onChange={e => setDkFilterProcurement(e.target.value as DkProcurementFilterType)}
-                                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer"
                                                 >
                                                     <option value="ALL">전체 조달 상태</option>
                                                     <option value="ORDER_NEEDED">발주 필요 (종합)</option>
@@ -5608,7 +5634,25 @@ if (displayList.length === 0) {
                                                 </select>
                                             </div>
 
-                                            <div className="flex items-end">
+                                            <div className="flex flex-col gap-1 sm:col-span-1">
+                                                <label htmlFor="dk-health-grade-filter" className="text-[10px] font-bold text-slate-500">건전성 등급 필터</label>
+                                                <select
+                                                    id="dk-health-grade-filter"
+                                                    value={dkFilterHealthGrade}
+                                                    onChange={e => setDkFilterHealthGrade(e.target.value)}
+                                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer"
+                                                >
+                                                    <option value="ALL">전체 등급 (A~N급)</option>
+                                                    <option value="A">💚 A급 (최우수 / 핵심)</option>
+                                                    <option value="B">💙 B급 (양호 / 안정)</option>
+                                                    <option value="C">💛 C급 (보통 / 관망)</option>
+                                                    <option value="D">🧡 D급 (주의 / 과잉)</option>
+                                                    <option value="E">❤️ E급 (악성 / 처분)</option>
+                                                    <option value="N">⚪ N급 (평가제외 / 데이터없음)</option>
+                                                </select>
+                                            </div>
+
+                                            <div className="flex items-end sm:col-span-1">
                                                 <button
                                                     onClick={() => {
                                                         setDkSearchQuery('');
@@ -5617,8 +5661,9 @@ if (displayList.length === 0) {
                                                         setDkFilterMaterial('');
                                                         setDkFilterSize('');
                                                         setDkFilterProcurement('ORDER_NEEDED');
+                                                        setDkFilterHealthGrade('ALL');
                                                     }}
-                                                    disabled={!dkSearchQuery && !searchTerm && !dkFilterItem && !dkFilterMaterial && !dkFilterSize && dkFilterProcurement === 'ORDER_NEEDED'}
+                                                    disabled={!dkSearchQuery && !searchTerm && !dkFilterItem && !dkFilterMaterial && !dkFilterSize && dkFilterProcurement === 'ORDER_NEEDED' && dkFilterHealthGrade === 'ALL'}
                                                     className="w-full bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
                                                 >
                                                     🔄 필터 초기화
