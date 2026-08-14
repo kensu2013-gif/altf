@@ -1703,9 +1703,10 @@ export default function SihwaInventory() {
         });
 
         // 전체 품목 분석 대상 유지
+        const effectiveQuery = (dkSearchQuery || searchTerm || '').trim();
 
-        if (dkSearchQuery) {
-            items = items.filter(r => matchesSmartSearch(r, dkSearchQuery));
+        if (effectiveQuery) {
+            items = items.filter(r => matchesSmartSearch(r, effectiveQuery));
         }
         if (dkFilterItem) {
             items = items.filter(r => (r.name || '').trim() === dkFilterItem.trim());
@@ -1717,13 +1718,10 @@ export default function SihwaInventory() {
             items = items.filter(r => (r.size || '').trim() === dkFilterSize.trim());
         }
 
-        if (dkFilterProcurement === 'ALL') {
-            const hasAnyFilter = !!(dkSearchQuery.trim() || dkFilterItem || dkFilterMaterial || dkFilterSize);
-            if (!hasAnyFilter) {
-                items = [];
-            }
-            // 검색어나 특정 필터 조건이 있는 경우 STABLE 품목을 포함하여 사용자가 찾고자 하는 품목이 모두 검색되도록 함
-        } else {
+        // 검색어나 개별 드롭다운 필터(품목/재질/사이즈)가 입력되어 있는 경우에는 조달 상태 필터 조건에 관계없이 해당 품목을 항상 표시함
+        const isSearchOrSpecificFiltered = !!(effectiveQuery || dkFilterItem || dkFilterMaterial || dkFilterSize);
+
+        if (dkFilterProcurement !== 'ALL' && !isSearchOrSpecificFiltered) {
             items = items.filter(r => {
                 const cat = r.procurementCategory;
                 const recQty = r.recommendedQty || 0;
@@ -1902,7 +1900,7 @@ export default function SihwaInventory() {
                 default: return 0;
             }
         });
-    }, [daekyungBaseStockAverages, baseAnalyzedInventoryMap, dkSearchQuery, dkFilterItem, dkFilterMaterial, dkFilterSize, dkFilterProcurement, dkViewMode, dkSortConfig]);
+    }, [daekyungBaseStockAverages, baseAnalyzedInventoryMap, dkSearchQuery, searchTerm, dkFilterItem, dkFilterMaterial, dkFilterSize, dkFilterProcurement, dkViewMode, dkSortConfig]);
 
 
     const daekyungStats = useMemo(() => {
@@ -5567,15 +5565,19 @@ if (displayList.length === 0) {
                                             <div className="relative flex-1 max-w-md">
                                                 <input
                                                     type="text"
-                                                    placeholder="대경 품목코드 또는 품명 검색..."
+                                                    placeholder={searchTerm ? `글로벌 검색어 (${searchTerm}) 적용 중...` : "대경 품목코드 또는 품명 검색..."}
                                                     value={dkSearchQuery}
                                                     onChange={e => setDkSearchQuery(e.target.value)}
                                                     className="w-full bg-white border border-slate-300 rounded-lg text-slate-700 font-medium text-xs px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs"
                                                 />
-                                                {dkSearchQuery && (
+                                                {(dkSearchQuery || searchTerm) && (
                                                     <button
-                                                        onClick={() => setDkSearchQuery('')}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                                                        onClick={() => {
+                                                            setDkSearchQuery('');
+                                                            if (searchTerm) setSearchTerm('');
+                                                        }}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                                                        title="검색어 초기화"
                                                     >
                                                         ✕
                                                     </button>
@@ -5610,13 +5612,14 @@ if (displayList.length === 0) {
                                                 <button
                                                     onClick={() => {
                                                         setDkSearchQuery('');
+                                                        if (searchTerm) setSearchTerm('');
                                                         setDkFilterItem('');
                                                         setDkFilterMaterial('');
                                                         setDkFilterSize('');
                                                         setDkFilterProcurement('ORDER_NEEDED');
                                                     }}
-                                                    disabled={!dkSearchQuery && !dkFilterItem && !dkFilterMaterial && !dkFilterSize && dkFilterProcurement === 'ORDER_NEEDED'}
-                                                    className="w-full bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+                                                    disabled={!dkSearchQuery && !searchTerm && !dkFilterItem && !dkFilterMaterial && !dkFilterSize && dkFilterProcurement === 'ORDER_NEEDED'}
+                                                    className="w-full bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
                                                 >
                                                     🔄 필터 초기화
                                                 </button>
