@@ -17,6 +17,7 @@ interface InventoryDataProps {
     salesVolume?: number;
     recent30dSales?: number;
     recent60dSales?: number;
+    recent90dSales?: number;
     statusCategory?: string;
     statusLabel?: string;
     safeStock?: number | string;
@@ -51,7 +52,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
             salesFreq: Number(inventoryData.salesFreq || 0),
             salesVolume: Number(inventoryData.salesVolume || 0),
             recent30dSales: Number(inventoryData.recent30dSales || 0),
-            recent60dSales: Number(inventoryData.recent60dSales || 0),
+            recent90dSales: Number(inventoryData.recent90dSales ?? inventoryData.recent60dSales ?? 0),
             quoteCount: Number(inventoryData.quoteCount || 0),
             profitMarginRate: Number(inventoryData.profitMarginRate || 0),
         };
@@ -68,7 +69,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
             trendRatio >= 1.0 ? 100 :
             trendRatio >= 0.5 ? 80  :
             trendRatio >= 0.2 ? 50  :
-            row.recent60dSales > 0 ? 30 : 0
+            row.recent90dSales > 0 ? 30 : 0
         );
 
         const quoteDemandScore =
@@ -89,7 +90,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
 
         let bonusScore = 0;
         if (row.recent30dSales >= Math.max(10, row.salesVolume / 12 * 1.5)) bonusScore += 15;
-        else if (row.recent60dSales > 0) bonusScore += 5;
+        else if (row.recent90dSales > 0) bonusScore += 5;
 
         if (row.quoteCount >= 5) bonusScore += 10;
 

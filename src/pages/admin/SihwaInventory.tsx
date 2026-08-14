@@ -78,8 +78,8 @@ interface DaekyungStockAnalysisItem {
     healthGrade?: 'A' | 'B' | 'C' | 'D' | 'E' | 'N';
     turnoverRate?: number;
     quoteCount?: number;
-    recent60dSales?: number;
-    recent60dOrderCount?: number;
+    recent90dSales?: number;
+    recent90dOrderCount?: number;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -94,7 +94,7 @@ function calcCompositeScore(row: {
     salesFreq: number;
     salesVolume: number;
     recent30dSales: number;
-    recent60dSales: number;
+    recent90dSales: number;
     quoteCount: number;
     profitMarginRate: number;
 }): number {
@@ -110,7 +110,7 @@ function calcCompositeScore(row: {
         trendRatio >= 1.0 ? 100 :
             trendRatio >= 0.5 ? 80 :
                 trendRatio >= 0.2 ? 50 :
-                    row.recent60dSales > 0 ? 30 : 0
+                    row.recent90dSales > 0 ? 30 : 0
     );
 
     const quoteDemandScore =
@@ -131,7 +131,7 @@ function calcCompositeScore(row: {
 
     let bonusScore = 0;
     if (row.recent30dSales >= Math.max(10, row.salesVolume / 12 * 1.5)) bonusScore += 15; // 최근 30일 단기 급등
-    else if (row.recent60dSales > 0) bonusScore += 5; // 소량이라도 판매 유지 중
+    else if (row.recent90dSales > 0) bonusScore += 5; // 소량이라도 판매 유지 중
 
     if (row.quoteCount >= 5) bonusScore += 10; // 최근 견적 급증
 
@@ -282,7 +282,7 @@ export default function SihwaInventory() {
 
     const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE' | 'HEALTH_DIAGNOSIS' | 'DAEKYUNG_STOCK'>('AI_SUMMARY');
     const [dkSortConfig, setDkSortConfig] = useState<{
-        key: 'id' | 'name' | 'material' | 'size' | 'currentStock' | 'avg1m' | 'avg3m' | 'avg6m' | 'share1m' | 'share3m' | 'share6m' | 'trend' | 'shQty' | 'safeStock' | 'recommendedQty' | 'procurementReason' | 'healthGrade' | 'turnoverRate' | 'recent60dSales' | 'quoteCount' | 'recent60dOrderCount';
+        key: 'id' | 'name' | 'material' | 'size' | 'currentStock' | 'avg1m' | 'avg3m' | 'avg6m' | 'share1m' | 'share3m' | 'share6m' | 'trend' | 'shQty' | 'safeStock' | 'recommendedQty' | 'procurementReason' | 'healthGrade' | 'turnoverRate' | 'recent90dSales' | 'quoteCount' | 'recent90dOrderCount';
         direction: 'asc' | 'desc';
     }>({ key: 'id', direction: 'asc' });
     const [dkSearchQuery, setDkSearchQuery] = useState('');
@@ -333,11 +333,11 @@ export default function SihwaInventory() {
     const [submittingConfirm, setSubmittingConfirm] = useState(false);
 
     const [sortConfig, setSortConfig] = useState<{
-        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank' | 'quoteCount' | 'recent60dOrderCount',
+        key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank' | 'quoteCount' | 'recent90dOrderCount',
         direction: 'asc' | 'desc'
     }>({ key: 'deficit', direction: 'desc' });
 
-    const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank' | 'quoteCount' | 'recent60dOrderCount') => {
+    const handleSort = (key: 'id' | 'salesFreq' | 'salesVolume' | 'deficit' | 'shQty' | 'ysQty' | 'pendingOrderQty' | 'recentPurchasePrice' | 'turnoverRate' | 'daysOnHand' | 'safeStock' | 'healthGrade' | 'statusRank' | 'quoteCount' | 'recent90dOrderCount') => {
         setSortConfig(prev => ({
             key,
             direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
@@ -802,7 +802,7 @@ export default function SihwaInventory() {
         recent90dSales: number;
         recent180dSales: number;
         quoteCount: number;
-        recent60dOrderCount: number;
+        recent90dOrderCount: number;
         daekyungDirectRatio: number;
         profitMarginRate: number;
         compositeScore: number;
@@ -830,7 +830,7 @@ export default function SihwaInventory() {
         surgeReason?: string;
     }
 
-    // Dynamically calculate Real-Time Sales History combining static base ERP data and real-time orders
+    // Dynamically calculate Real-Time Sales History combining static base ERP data, real-time orders, and inventory outgoing changes
     const liveSalesHistory = useMemo(() => {
         const base = JSON.parse(JSON.stringify(salesHistory)) as Record<string, { salesVolume: number, salesFreq: number }>;
 
@@ -859,8 +859,23 @@ export default function SihwaInventory() {
             });
         });
 
+        // Include outgoing shipments (inventory diff < 0) from inventory history into total sales/order volume
+        (historyData.inventoryHistory || []).forEach(snap => {
+            if (!snap.diff) return;
+            snap.diff.forEach(d => {
+                if (d.change < 0) {
+                    const absChg = Math.abs(d.change);
+                    if (!base[d.id]) {
+                        base[d.id] = { salesVolume: 0, salesFreq: 0 };
+                    }
+                    base[d.id].salesVolume += absChg;
+                    base[d.id].salesFreq += 1;
+                }
+            });
+        });
+
         return base;
-    }, [orders]);
+    }, [orders, historyData.inventoryHistory]);
 
     const userMap = useMemo(() => {
         const map = new Map<string, typeof users[0]>();
@@ -1042,13 +1057,13 @@ export default function SihwaInventory() {
             });
         });
 
-        const recent60dOrderCountMap: Record<string, number> = {};
+        const recent90dOrderCountMap: Record<string, number> = {};
         orders.forEach(order => {
             if (['CANCELLED', 'WITHDRAWN'].includes(order.status) || order.isDeleted) return;
             if (order.status !== 'COMPLETED') return;
 
             const orderDate = new Date(order.createdAt).getTime();
-            if (isNaN(orderDate) || orderDate < sixtyDaysAgo) return;
+            if (isNaN(orderDate) || orderDate < ninetyDaysAgo) return;
 
             const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
             if (customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf')) return;
@@ -1061,8 +1076,21 @@ export default function SihwaInventory() {
                 if (!id) return;
                 const qty = Number(item.quantity ?? item.qty ?? 0);
                 if (qty <= 0) return;
-                recent60dOrderCountMap[id] = (recent60dOrderCountMap[id] || 0) + 1;
+                recent90dOrderCountMap[id] = (recent90dOrderCountMap[id] || 0) + 1;
             });
+        });
+
+        // Also add outgoing diff events (shipments) from inventory history in recent 90 days
+        historyData.inventoryHistory.forEach((snap: InventoryHistorySnapshot) => {
+            const snapDate = new Date(snap.date).getTime();
+            if (isNaN(snapDate) || snapDate < ninetyDaysAgo) return;
+            if (snap.diff) {
+                snap.diff.forEach((d: InventoryDiffItem) => {
+                    if (d.change < 0) {
+                        recent90dOrderCountMap[d.id] = (recent90dOrderCountMap[d.id] || 0) + 1;
+                    }
+                });
+            }
         });
 
         inventory.forEach((item: Product) => {
@@ -1100,9 +1128,9 @@ export default function SihwaInventory() {
 
             // Calculate Daekyung Direct Ratio (estimated from total sales vs sihwa drops)
             // If total sales is 100, but Sihwa dropped by 20, 80 were direct dropped (80%).
-            const total60dSales = salesData.salesVolume; // Actually, salesVolume is all-time from orders. We'll approximate.
-            const daekyungDirectRatio = (total60dSales > 0 && total60dSales > recentSales.recent60d)
-                ? parseFloat((((total60dSales - recentSales.recent60d) / total60dSales) * 100).toFixed(1))
+            const total90dSales = salesData.salesVolume; // Actually, salesVolume is all-time from orders. We'll approximate.
+            const daekyungDirectRatio = (total90dSales > 0 && total90dSales > recentSales.recent90d)
+                ? parseFloat((((total90dSales - recentSales.recent90d) / total90dSales) * 100).toFixed(1))
                 : 0;
 
             // Populate items (if it has stock or sales data, we analyze it)
@@ -1127,7 +1155,7 @@ export default function SihwaInventory() {
                     recent90dSales: recentSales.recent90d,
                     recent180dSales: recentSales.recent180d,
                     quoteCount: quoteCountMap[item.id] || 0,
-                    recent60dOrderCount: recent60dOrderCountMap[item.id] || 0,
+                    recent90dOrderCount: recent90dOrderCountMap[item.id] || 0,
                     daekyungDirectRatio,
                     profitMarginRate,
                     compositeScore: 0,
@@ -1212,7 +1240,7 @@ export default function SihwaInventory() {
                         recent90dSales: recentSales.recent90d,
                         recent180dSales: recentSales.recent180d,
                         quoteCount: quoteCountMap[id] || 0,
-                        recent60dOrderCount: recent60dOrderCountMap[id] || 0,
+                        recent90dOrderCount: recent90dOrderCountMap[id] || 0,
                         daekyungDirectRatio,
                         profitMarginRate,
                         compositeScore: 0,
@@ -1254,7 +1282,7 @@ export default function SihwaInventory() {
                 salesFreq: row.salesFreq,
                 salesVolume: row.salesVolume,
                 recent30dSales: row.recent30dSales,
-                recent60dSales: row.recent60dSales,
+                recent90dSales: row.recent90dSales,
                 quoteCount: row.quoteCount,
                 profitMarginRate: row.profitMarginRate,
             });
@@ -1273,8 +1301,8 @@ export default function SihwaInventory() {
             // 대경 재고 정보 사전 조회 (안전재고 연동용)
             const dkStock = daekyungStockMap.get(row.product.id) || { currentStock: row.ysQty, avg3m: row.ysQty, avg6m: row.ysQty };
 
-            // 시화의 실제 평균 출고량 추정 (최근 60일 시화 출고량 기준)
-            const sihwaDailySales = row.recent60dSales > 0 ? (row.recent60dSales / 40) : (dailyAvgSales * 0.2); // 출고 없으면 연간의 20%만 잡음
+            // 시화의 실제 평균 출고량 추정 (최근 90일 시화 출고량 기준 - 영업일 60일)
+            const sihwaDailySales = row.recent90dSales > 0 ? (row.recent90dSales / 60) : (dailyAvgSales * 0.2); // 출고 없으면 연간의 20%만 잡음
 
             const cvEstimate = row.salesFreq >= 100 ? 0.20 : row.salesFreq >= 50 ? 0.30 : row.salesFreq >= 20 ? 0.40 : 0.50;
             // 안전재고(버퍼)는 시화 실판매량 기준으로 계산
@@ -1290,7 +1318,7 @@ export default function SihwaInventory() {
             safeStock = Math.min(safeStock, absoluteMax);
 
             // 3. 주문 횟수(Freq) 및 최근 출고 건수 기반 저빈도 품목 제한 (사례 2 수정)
-            const isLowFreqItem = (row.salesFreq < 12 && row.quoteCount < 2) || (row.recent60dOrderCount <= 2 && row.recent60dSales <= 30);
+            const isLowFreqItem = (row.salesFreq < 12 && row.quoteCount < 2) || (row.recent90dOrderCount <= 2 && row.recent90dSales <= 30);
             if (isLowFreqItem) {
                 const avgOrderSize = row.salesFreq > 0 ? Math.ceil(row.salesVolume / row.salesFreq) : 10;
                 safeStock = Math.min(safeStock, Math.max(10, Math.min(20, avgOrderSize))); // 저빈도 품목은 최대 20개 이하 Capping
@@ -1300,7 +1328,7 @@ export default function SihwaInventory() {
             }
 
             // 3.5. 대경 직발주 비중이 압도적으로 높고 시화 출고가 없는 경우
-            const isMostlyDropShipped = row.recent60dOrderCount > 0 && row.recent60dSales === 0;
+            const isMostlyDropShipped = row.recent90dOrderCount > 0 && row.recent90dSales === 0;
 
             if (isMostlyDropShipped) {
                 safeStock = safeStock > 0 ? Math.round(safeStock / 10) * 10 : 0;
@@ -1318,14 +1346,14 @@ export default function SihwaInventory() {
                 safeStock = Math.min(safeStock, maxSihwaBuffer);
             }
 
-            // 4.5. 최근 60일 실적(트렌드) 기반 동적 페널티
-            if (row.salesVolume > 0 && row.recent60dSales === 0 && row.quoteCount === 0 && row.recent60dOrderCount === 0) {
+            // 4.5. 최근 90일 실적(트렌드) 기반 동적 페널티
+            if (row.salesVolume > 0 && row.recent90dSales === 0 && row.quoteCount === 0 && row.recent90dOrderCount === 0) {
                 if ((row.salesFreq >= 30 && row.salesVolume >= 100) || row.ysQty >= 500) {
                     safeStock = Math.round((safeStock * 0.4) / 10) * 10; // 60% 삭감
                 } else {
                     safeStock = Math.round((safeStock * 0.2) / 10) * 10; // 80% 삭감
                 }
-            } else if (row.salesVolume > 0 && row.recent60dSales <= Math.ceil((row.salesVolume / 12) * 0.5) && row.quoteCount === 0) {
+            } else if (row.salesVolume > 0 && row.recent90dSales <= Math.ceil((row.salesVolume / 12) * 0.5) && row.quoteCount === 0) {
                 safeStock = Math.round((safeStock * 0.5) / 10) * 10; // 50% 삭감
             }
 
@@ -1334,8 +1362,8 @@ export default function SihwaInventory() {
             const sizeNum = parseInt(sizeStr.replace(/[^0-9]/g, ''), 10);
             const isLargeSize = !isNaN(sizeNum) && sizeNum >= 300;
 
-            if (!isMostlyDropShipped && row.salesFreq > 0 && !isLargeSize && !isLowFreqItem && (row.quoteCount >= 2 || row.recent60dOrderCount >= 3)) {
-                const trendDemand = Math.max(10, Math.ceil((row.recent60dSales > 0 ? row.recent60dSales : (row.salesVolume / 6)) * 1.2));
+            if (!isMostlyDropShipped && row.salesFreq > 0 && !isLargeSize && !isLowFreqItem && (row.quoteCount >= 2 || row.recent90dOrderCount >= 3)) {
+                const trendDemand = Math.max(10, Math.ceil((row.recent90dSales > 0 ? row.recent90dSales : (row.salesVolume / 6)) * 1.2));
                 safeStock = Math.max(safeStock, Math.round(trendDemand / 10) * 10);
             }
 
@@ -1382,7 +1410,7 @@ export default function SihwaInventory() {
                 && safeStock > 0
                 && row.shQty > safeStock
                 && (
-                    row.recent60dSales === 0 ||
+                    row.recent90dSales === 0 ||
                     row.recent30dSales === 0 ||
                     row.shQty > Math.max(safeStock * 1.5, safeStock + Math.ceil(sihwaDailySales * 90))
                 )
@@ -1411,8 +1439,8 @@ export default function SihwaInventory() {
                 statusCategory = 'SAFE';
                 statusLabel = '🟡 미발주 대상 (D/N등급)';
             } else if (safeStock > 0) {
-                const isLowDemandCGrade = healthGrade === 'C' && row.quoteCount === 0 && row.recent60dOrderCount === 0 && row.salesFreq < 10;
-                const isRecentZeroSales = row.recent60dSales === 0 && healthGrade !== 'A' && healthGrade !== 'B';
+                const isLowDemandCGrade = healthGrade === 'C' && row.quoteCount === 0 && row.recent90dOrderCount === 0 && row.salesFreq < 10;
+                const isRecentZeroSales = row.recent90dSales === 0 && healthGrade !== 'A' && healthGrade !== 'B';
                 const shouldSkipWarning = isLowDemandCGrade || isRecentZeroSales;
 
                 if (effectiveStock <= 0) {
@@ -1486,13 +1514,13 @@ export default function SihwaInventory() {
             const maxDemand3m = Math.round(Math.max(row.recent30dSales, avgDemand3m * 1.6));
 
             // 자사·공급처 동시결품: 최근 주문/판매 이력이 있는 경우만 인정 (주문건수 필수)
-            const hasRecentOrderDemand = (row.recent60dSales > 0 || row.recent60dOrderCount > 0 || row.recent30dSales > 0);
+            const hasRecentOrderDemand = (row.recent90dSales > 0 || row.recent90dOrderCount > 0 || row.recent30dSales > 0);
             const isDoubleStockoutWithDemand = row.shQty === 0 && row.ysQty === 0 && hasRecentOrderDemand;
 
-            // 출고 급상승: 시화 현재고가 안전재고보다 작은 경우 (shQty < safeStock) 필수 전제 + 최근 1달/60일 수요 급증 품목
+            // 출고 급상승: 시화 현재고가 안전재고보다 작은 경우 (shQty < safeStock) 필수 전제 + 최근 1달/90일 수요 급증 품목
             const isSurgingDemand = !isDoubleStockoutWithDemand && (row.shQty < safeStock) && (
                 (row.recent30dSales > 0 && row.recent30dSales >= Math.max(1, Math.round((row.salesVolume / 12) * 1.2))) ||
-                (row.recent60dOrderCount >= 3 && row.recent60dSales >= 5) ||
+                (row.recent90dOrderCount >= 3 && row.recent60dSales >= 5) ||
                 (row.recent60dSales > Math.ceil(row.salesVolume / 6))
             );
 
@@ -1602,7 +1630,7 @@ export default function SihwaInventory() {
                 case 'daysOnHand': return (a.daysOnHand - b.daysOnHand) * dir;
                 case 'safeStock': return (a.safeStock - b.safeStock) * dir;
                 case 'quoteCount': return (a.quoteCount - b.quoteCount) * dir;
-                case 'recent60dOrderCount': return (a.recent60dOrderCount - b.recent60dOrderCount) * dir;
+                case 'recent90dOrderCount': return (a.recent90dOrderCount - b.recent90dOrderCount) * dir;
                 default: return 0; // Fallback
             }
         });
@@ -1632,8 +1660,8 @@ export default function SihwaInventory() {
             const healthGrade = sihwaRow?.healthGrade ?? 'N';
             const turnoverRate = sihwaRow?.turnoverRate ?? 0;
             const quoteCount = sihwaRow?.quoteCount ?? 0;
-            const recent60dSales = sihwaRow?.recent60dSales ?? 0;
-            const recent60dOrderCount = sihwaRow?.recent60dOrderCount ?? 0;
+            const recent90dSales = sihwaRow?.recent90dSales ?? 0;
+            const recent90dOrderCount = sihwaRow?.recent90dOrderCount ?? 0;
             const procurementCategory = sihwaRow?.procurementCategory ?? 'STABLE';
             const procurementReason = sihwaRow?.procurementReason || (
                 r.currentStock === 0 
@@ -1655,8 +1683,8 @@ export default function SihwaInventory() {
                 healthGrade,
                 turnoverRate,
                 quoteCount,
-                recent60dSales,
-                recent60dOrderCount,
+                recent90dSales,
+                recent90dOrderCount,
             };
         });
 
@@ -1807,20 +1835,20 @@ export default function SihwaInventory() {
                     const sihwaB = baseAnalyzedInventoryMap.get(b.id);
                     return ((sihwaA?.turnoverRate || 0) - (sihwaB?.turnoverRate || 0)) * dir;
                 }
-                case 'recent60dSales': {
+                case 'recent90dSales': {
                     const sihwaA = baseAnalyzedInventoryMap.get(a.id);
                     const sihwaB = baseAnalyzedInventoryMap.get(b.id);
-                    return ((sihwaA?.recent60dSales || 0) - (sihwaB?.recent60dSales || 0)) * dir;
+                    return ((sihwaA?.recent90dSales || 0) - (sihwaB?.recent90dSales || 0)) * dir;
                 }
                 case 'quoteCount': {
                     const sihwaA = baseAnalyzedInventoryMap.get(a.id);
                     const sihwaB = baseAnalyzedInventoryMap.get(b.id);
                     return ((sihwaA?.quoteCount || 0) - (sihwaB?.quoteCount || 0)) * dir;
                 }
-                case 'recent60dOrderCount': {
+                case 'recent90dOrderCount': {
                     const sihwaA = baseAnalyzedInventoryMap.get(a.id);
                     const sihwaB = baseAnalyzedInventoryMap.get(b.id);
-                    return ((sihwaA?.recent60dOrderCount || 0) - (sihwaB?.recent60dOrderCount || 0)) * dir;
+                    return ((sihwaA?.recent90dOrderCount || 0) - (sihwaB?.recent90dOrderCount || 0)) * dir;
                 }
                 case 'currentStock': return (a.currentStock - b.currentStock) * dir;
                 case 'avg1m': return (a.avg1m - b.avg1m) * dir;
@@ -3348,7 +3376,7 @@ export default function SihwaInventory() {
                                                                                 <span className="text-rose-600">권장발주량 {row.recommendedQty}개</span> (결품 {row.deficit}개)
                                                                             </div>
                                                                             <div className="text-xs text-slate-500 pl-5">
-                                                                                등급: <strong className={`font-black ${row.healthGrade === 'A' ? 'text-emerald-600' : row.healthGrade === 'B' ? 'text-blue-600' : row.healthGrade === 'C' ? 'text-amber-500' : 'text-rose-500'}`}>{row.healthGrade}급</strong> | 최근 판매: <strong className="text-indigo-600">{row.recent60dSales}개(60일)</strong> / 연 총 {row.salesVolume}개
+                                                                                등급: <strong className={`font-black ${row.healthGrade === 'A' ? 'text-emerald-600' : row.healthGrade === 'B' ? 'text-blue-600' : row.healthGrade === 'C' ? 'text-amber-500' : 'text-rose-500'}`}>{row.healthGrade}급</strong> | 최근 판매: <strong className="text-indigo-600">{row.recent90dSales}개(90일)</strong> / 연 총 {row.salesVolume}개
                                                                             </div>
                                                                             <div className="text-[11px] text-slate-400 pl-5 mt-0.5">
                                                                                 목표 재고 {row.safeStock}개 대비 현재 {row.shQty}개 보유 중 (ROP: {row.reorderPoint}개)
@@ -3534,7 +3562,7 @@ export default function SihwaInventory() {
                                                                                     <div className="text-xs font-bold text-emerald-600 flex flex-col gap-0.5">
                                                                                         <span className="flex items-center gap-1">🟢 대경 평균재고 충분 (3개월 평균: {(daekyungStockMap.get(row.product.id)?.avg3m ?? row.ysQty)}개) → 이송 조달 추천</span>
                                                                                         <span className="text-[11px] text-slate-500 font-normal">
-                                                                                            평균 재고가 시화 필요량({row.recommendedQty || Math.ceil((row.recent60dSales > 0 ? row.recent60dSales / 40 : row.salesVolume / 250 * 0.2) * 40)}개)보다 많아 발주 불필요
+                                                                                            평균 재고가 시화 필요량({row.recommendedQty || Math.ceil((row.recent90dSales > 0 ? row.recent90dSales / 60 : row.salesVolume / 250 * 0.2) * 40)}개)보다 많아 발주 불필요
                                                                                         </span>
                                                                                     </div>
                                                                                 ) : (
@@ -3982,14 +4010,14 @@ export default function SihwaInventory() {
                                                 </th>
                                                 <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200 transition" onClick={() => handleSort('turnoverRate')}>회전율 {sortConfig.key === 'turnoverRate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                                 <th className="px-4 py-3 text-center">
-                                                    최근 실적(60일)
+                                                    최근 실적(90일)
                                                     <div className="flex items-center justify-center gap-2 mt-1 text-[10px] font-bold">
                                                         <span className={`cursor-pointer transition ${sortConfig.key === 'quoteCount' ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-600'}`} onClick={() => handleSort('quoteCount')}>
                                                             견적순 {sortConfig.key === 'quoteCount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                                         </span>
                                                         <span className="text-slate-300">|</span>
-                                                        <span className={`cursor-pointer transition ${sortConfig.key === 'recent60dOrderCount' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'}`} onClick={() => handleSort('recent60dOrderCount')}>
-                                                            발주순 {sortConfig.key === 'recent60dOrderCount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        <span className={`cursor-pointer transition ${sortConfig.key === 'recent90dOrderCount' ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'}`} onClick={() => handleSort('recent90dOrderCount')}>
+                                                            발주순 {sortConfig.key === 'recent90dOrderCount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                                         </span>
                                                     </div>
                                                 </th>
@@ -4154,12 +4182,12 @@ if (displayList.length === 0) {
                                                             <td className="px-4 py-2 text-center text-slate-600">
                                                                 <div className="flex flex-col items-center gap-1">
                                                                     <span className="font-black text-slate-800 text-[12px]">
-                                                                        {row.recent60dSales.toLocaleString()}<span className="text-[10px] text-slate-500 font-bold ml-0.5 mr-1">개 /</span>{row.recent60dOrderCount.toLocaleString()}<span className="text-[10px] text-slate-500 font-bold ml-0.5">회출고</span>
+                                                                        {row.recent90dSales.toLocaleString()}<span className="text-[10px] text-slate-500 font-bold ml-0.5 mr-1">개 /</span>{row.recent90dOrderCount.toLocaleString()}<span className="text-[10px] text-slate-500 font-bold ml-0.5">회출고</span>
                                                                     </span>
                                                                     <div className="flex items-center gap-1 text-[10px] bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 shadow-sm">
                                                                         <span className="text-slate-500 font-bold">견적</span><span className="font-black text-indigo-600">{row.quoteCount.toLocaleString()}</span><span className="text-slate-400">건</span>
                                                                         <span className="w-px h-2.5 bg-slate-300 mx-0.5"></span>
-                                                                        <span className="text-slate-500 font-bold">발주</span><span className="font-black text-emerald-600">{row.recent60dOrderCount.toLocaleString()}</span><span className="text-slate-400">건</span>
+                                                                        <span className="text-slate-500 font-bold">발주</span><span className="font-black text-emerald-600">{row.recent90dOrderCount.toLocaleString()}</span><span className="text-slate-400">건</span>
                                                                     </div>
                                                                 </div>
                                                             </td>
@@ -4578,7 +4606,7 @@ if (displayList.length === 0) {
                                                                                         {row.daysOnHand > 180 ? '장기 체화 (잔여 180일 초과)' : `목표재고(${row.safeStock}개) 대비 과잉`}
                                                                                     </div>
                                                                                     <div className="text-[10px] text-slate-500">
-                                                                                        최근 판매: <strong className="text-indigo-600">{row.recent60dSales}개(60일)</strong> / 연 총 {row.salesVolume}개
+                                                                                        최근 판매: <strong className="text-indigo-600">{row.recent90dSales}개(90일)</strong> / 연 총 {row.salesVolume}개
                                                                                     </div>
                                                                                 </div>
                                                                             </td>
@@ -5614,14 +5642,14 @@ if (displayList.length === 0) {
                                                                     회전율 {dkSortConfig.key === 'turnoverRate' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                                 </th>
                                                                 <th className="px-4 py-3 text-center">
-                                                                    최근 실적(60일)
+                                                                    최근 실적(90일)
                                                                     <div className="flex items-center justify-center gap-2 mt-1 text-[10px] font-bold">
                                                                         <span className={`cursor-pointer transition ${dkSortConfig.key === 'quoteCount' ? 'text-indigo-600 font-black' : 'text-slate-400 hover:text-indigo-600'}`} onClick={() => setDkSortConfig(prev => ({ key: 'quoteCount', direction: prev.key === 'quoteCount' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
                                                                             견적순 {dkSortConfig.key === 'quoteCount' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                                         </span>
                                                                         <span className="text-slate-300">|</span>
-                                                                        <span className={`cursor-pointer transition ${dkSortConfig.key === 'recent60dOrderCount' ? 'text-emerald-600 font-black' : 'text-slate-400 hover:text-emerald-600'}`} onClick={() => setDkSortConfig(prev => ({ key: 'recent60dOrderCount', direction: prev.key === 'recent60dOrderCount' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                                            발주순 {dkSortConfig.key === 'recent60dOrderCount' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                                        <span className={`cursor-pointer transition ${dkSortConfig.key === 'recent90dOrderCount' ? 'text-emerald-600 font-black' : 'text-slate-400 hover:text-emerald-600'}`} onClick={() => setDkSortConfig(prev => ({ key: 'recent90dOrderCount', direction: prev.key === 'recent90dOrderCount' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                                            발주순 {dkSortConfig.key === 'recent90dOrderCount' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                                         </span>
                                                                     </div>
                                                                 </th>
@@ -5720,9 +5748,9 @@ if (displayList.length === 0) {
                                                                         <td className="px-4 py-2.5 text-center text-slate-600">
                                                                             <div className="flex flex-col items-center gap-1">
                                                                                 <span className="font-black text-slate-800 text-[12px]">
-                                                                                    {(sihwaRow?.recent60dSales ?? row.recent60dSales ?? 0).toLocaleString()}
+                                                                                    {(sihwaRow?.recent90dSales ?? row.recent90dSales ?? 0).toLocaleString()}
                                                                                     <span className="text-[10px] text-slate-500 font-bold ml-0.5 mr-1">개 /</span>
-                                                                                    {(sihwaRow?.recent60dOrderCount ?? row.recent60dOrderCount ?? 0).toLocaleString()}
+                                                                                    {(sihwaRow?.recent90dOrderCount ?? row.recent90dOrderCount ?? 0).toLocaleString()}
                                                                                     <span className="text-[10px] text-slate-500 font-bold ml-0.5">회출고</span>
                                                                                 </span>
                                                                                 <div className="flex items-center gap-1 text-[10px] bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 shadow-sm">
@@ -5731,7 +5759,7 @@ if (displayList.length === 0) {
                                                                                     <span className="text-slate-400">건</span>
                                                                                     <span className="w-px h-2.5 bg-slate-300 mx-0.5"></span>
                                                                                     <span className="text-slate-500 font-bold">발주</span>
-                                                                                    <span className="font-black text-emerald-600">{(sihwaRow?.recent60dOrderCount ?? row.recent60dOrderCount ?? 0).toLocaleString()}</span>
+                                                                                    <span className="font-black text-emerald-600">{(sihwaRow?.recent90dOrderCount ?? row.recent90dOrderCount ?? 0).toLocaleString()}</span>
                                                                                     <span className="text-slate-400">건</span>
                                                                                 </div>
                                                                             </div>
