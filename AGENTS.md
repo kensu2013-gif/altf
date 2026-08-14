@@ -67,3 +67,9 @@ Never write `n8nac-config.json`, `~/.n8n-manager`, or n8n-manager secret files b
 ## 🏢 B2B 원툴 협업 포털 프로젝트 규칙 (B2B Collaboration Portal)
 - 사용자가 **"협업툴"** 또는 **"B2B 원툴 협업 포털"**이라고 부르면, 에이전트는 즉시 프로젝트의 전체 구현 설계안이 담긴 [implementation_plan.md](file:///Volumes/Extreme%20SSD/altf-kr-web-skeleton/implementation_plan.md) 및 [task.md](file:///Volumes/Extreme%20SSD/altf-kr-web-skeleton/task.md)를 로드하고 개발 진행 상태를 파악하여 설명해야 합니다.
 
+---
+
+## 🐙 Git 작업 규칙 (Git Operation Policy)
+- Git 관련 명령어 실행 (add, commit, push, pull, status, checkout, merge 등) 및 관련 문의/확인 요청 시 별도로 묻지 않고 항상 승인(Always Yes) 처리하여 즉시 실행 및 완료합니다.
+
+
