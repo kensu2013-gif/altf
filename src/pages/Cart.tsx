@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore, type DeliveryInfo } from '../store/useStore';
+import { useInventory } from '../hooks/useInventory';
 import { useShallow } from 'zustand/react/shallow';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -29,6 +30,7 @@ const isStockOrder = (targetCustomerName: string, customerName: string) => {
 };
 
 export default function QuotationEditor() {
+    useInventory(); // Ensure inventory SWR cache is active and fresh
     const { items, memo: quotationMemo } = useStore(useShallow((state) => state.quotation));
     // Use selector for stable reference
     const user = useStore(state => state.auth.user);
@@ -527,7 +529,7 @@ export default function QuotationEditor() {
         const targetIds = selectedIds.length > 0 ? selectedIds : items.map(i => i.id);
         const newItems = items.map(item => {
             if (targetIds.includes(item.id)) {
-                return convertLineItemStandard(item, targetSystem);
+                return convertLineItemStandard(item, targetSystem, inventory);
             }
             return item;
         });

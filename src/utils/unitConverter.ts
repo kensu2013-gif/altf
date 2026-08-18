@@ -1,5 +1,5 @@
-import type { LineItem } from '../types';
-import { formatProductId } from '../lib/productUtils';
+import type { LineItem, Product } from '../types';
+import { formatProductId, findMatchingProduct } from '../lib/productUtils';
 
 // JIS (A) -> ANSI (Inch) Mapping Table
 export const A_TO_INCH_MAP: Record<string, string> = {
@@ -143,10 +143,12 @@ export function convertMaterial(rawMaterial: string, targetSystem?: 'ANSI' | 'JI
 
 /**
  * Converts a LineItem's size, material, and product ID between ANSI and JIS systems.
+ * If inventoryList is provided, re-matches item against inventory to update stock, status, location, maker, etc.
  */
 export function convertLineItemStandard<T extends LineItem>(
     item: T,
-    targetSystem?: 'ANSI' | 'JIS'
+    targetSystem?: 'ANSI' | 'JIS',
+    inventoryList?: Product[]
 ): T {
     // Determine system based on size and material if not provided
     const isCurrentJis = isJisSize(item.size) || item.material.toUpperCase().startsWith('STS');
@@ -162,11 +164,37 @@ export function convertLineItemStandard<T extends LineItem>(
         newMaterial
     );
 
-    return {
+    const updatedItem: T = {
         ...item,
         size: newSize,
         material: newMaterial,
         productId: newProductId,
         itemId: newProductId
     };
+
+    if (inventoryList && inventoryList.length > 0) {
+        const match = findMatchingProduct(updatedItem, inventoryList);
+        if (match) {
+            updatedItem.productId = match.id;
+            updatedItem.currentStock = match.currentStock;
+            updatedItem.stockStatus = match.stockStatus;
+            updatedItem.location = match.location;
+            updatedItem.maker = match.maker;
+            updatedItem.locationStock = match.locationStock;
+            updatedItem.marking_wait_qty = match.marking_wait_qty || 0;
+            if (match.base_price || match.unitPrice) {
+                updatedItem.base_price = match.base_price ?? match.unitPrice;
+            }
+        } else {
+            updatedItem.productId = null;
+            updatedItem.currentStock = undefined;
+            updatedItem.stockStatus = undefined;
+            updatedItem.location = undefined;
+            updatedItem.maker = undefined;
+            updatedItem.locationStock = undefined;
+            updatedItem.marking_wait_qty = 0;
+        }
+    }
+
+    return updatedItem;
 }

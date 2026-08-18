@@ -239,7 +239,7 @@ export const QuoteItemRow = React.memo(({
                     <button
                         type="button"
                         onClick={() => {
-                            const converted = convertLineItemStandard(item);
+                            const converted = convertLineItemStandard(item, undefined, inventory);
                             onItemChange(index, 'size', converted.size);
                             onItemChange(index, 'material', converted.material);
                         }}

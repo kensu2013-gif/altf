@@ -808,12 +808,12 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             const hasCheckedSome = prev.some(item => item.isSelected);
             return prev.map(item => {
                 if (!hasCheckedSome || item.isSelected) {
-                    return convertLineItemStandard(item, targetSystem);
+                    return convertLineItemStandard(item, targetSystem, inventory);
                 }
                 return item;
             });
         });
-    }, []);
+    }, [inventory]);
 
     const handleDownload = () => {
         const calculatedTotal = selectedItems.reduce((sum, item) => sum + item.amount, 0);
