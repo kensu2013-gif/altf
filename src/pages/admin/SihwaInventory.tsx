@@ -28,6 +28,7 @@ import { COMPETITOR_DATA, getStrategicGrade, type StrategicGrade } from '../../.
 import { ItemIntelligenceCard } from './components/ItemIntelligenceCard';
 import { SearchableMultiSelect } from '../../components/ui/SearchableMultiSelect';
 import { matchesSmartSearch } from '../../utils/searchUtils';
+import { getCustomerRegion } from '../../utils/regionUtils';
 
 const salesHistory = salesHistoryRaw as Record<string, { salesVolume: number, salesFreq: number }>;
 
@@ -1104,11 +1105,17 @@ export default function SihwaInventory() {
             const customerStr = (quote.customerName || quote.customerInfo?.companyName || quote.customerInfo?.contactName || quoteUser?.companyName || '').toLowerCase().replace(/\s+/g, '');
             if (customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf')) return;
 
-            quote.items.forEach(item => {
-                const id = item.productId || (item as { item_id?: string }).item_id;
-                if (!id) return;
-                quoteCountMap[id] = (quoteCountMap[id] || 0) + 1;
-            });
+            const custAddr = (quote.customerInfo?.address || quoteUser?.address || '').trim();
+            const regInfo = getCustomerRegion(custAddr);
+
+            // 시화 거점은 중부권(SIHWA) 및 미분류(UNASSIGNED) 우선 매칭
+            if (regInfo.region === 'SIHWA' || regInfo.region === 'UNASSIGNED') {
+                quote.items.forEach(item => {
+                    const id = item.productId || (item as { item_id?: string }).item_id;
+                    if (!id) return;
+                    quoteCountMap[id] = (quoteCountMap[id] || 0) + 1;
+                });
+            }
         });
 
         const activeOrderCountMap: Record<string, number> = {};
@@ -1122,16 +1129,21 @@ export default function SihwaInventory() {
             const customerStr = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
             if (customerStr.includes('재고') || customerStr.includes('서울') || customerStr.includes('시화') || customerStr.includes('알트에프') || customerStr.includes('altf')) return;
 
-            const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
-            if (!items) return;
+            const custAddr = (order.payload?.customer?.address || '').trim();
+            const regInfo = getCustomerRegion(custAddr);
 
-            items.forEach((item: Partial<LineItem> & { item_id?: string; qty?: number }) => {
-                const id = item.productId || item.item_id;
-                if (!id) return;
-                const qty = Number(item.quantity ?? item.qty ?? 0);
-                if (qty <= 0) return;
-                activeOrderCountMap[id] = (activeOrderCountMap[id] || 0) + 1;
-            });
+            if (regInfo.region === 'SIHWA' || regInfo.region === 'UNASSIGNED') {
+                const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
+                if (!items) return;
+
+                items.forEach((item: Partial<LineItem> & { item_id?: string; qty?: number }) => {
+                    const id = item.productId || item.item_id;
+                    if (!id) return;
+                    const qty = Number(item.quantity ?? item.qty ?? 0);
+                    if (qty <= 0) return;
+                    activeOrderCountMap[id] = (activeOrderCountMap[id] || 0) + 1;
+                });
+            }
         });
 
         // Also add outgoing diff events (shipments) from inventory history in active performance period
@@ -1604,6 +1616,10 @@ export default function SihwaInventory() {
 
             let procurementCategory: 'DOUBLE_STOCKOUT' | 'SURGING_DEMAND' | 'SIHWA_UNMET' | 'EXCESS' | 'STABLE' = 'STABLE';
             let procurementReason = "";
+
+            const busanQty = row.product.locationStock?.['부산'] || 0;
+            const canInterTransfer = row.shQty < safeStock && busanQty > 0;
+
             if (isDoubleStockoutWithDemand) {
                 procurementCategory = 'DOUBLE_STOCKOUT';
                 procurementReason = "🚨 자사·공급처 동시 결품 (최근 주문/견적 수요 존재) - 기회손실 방지 최우선 긴급 수급 필요";
@@ -1613,7 +1629,12 @@ export default function SihwaInventory() {
                 procurementReason = `🔥 최근 주문/출고 급상승 (${surgingQty}개) - ${recommendedQty > 0 ? `${recommendedQty}개 선발주 권장` : '결품 예방 모니터링'}`;
             } else if (row.shQty < safeStock && recommendedQty > 0) {
                 procurementCategory = 'SIHWA_UNMET';
-                procurementReason = `⚠️ 시화재고(${row.shQty}개)가 적정 안전재고(${safeStock}개) 미달 - ${recommendedQty}개 선발주 권장`;
+                if (canInterTransfer) {
+                    const transferQty = Math.min(finalDeficit, busanQty);
+                    procurementReason = `🚛 부산창고 이송 권장 (${transferQty}개 보유) - 신규 매입 대신 부산창고에서 재고 이송 가능`;
+                } else {
+                    procurementReason = `⚠️ 시화재고(${row.shQty}개)가 적정 안전재고(${safeStock}개) 미달 - ${recommendedQty}개 선발주 권장`;
+                }
             } else if (isExcessStock) {
                 procurementCategory = 'EXCESS';
                 procurementReason = `📉 직전 수요 대비 과잉재고 (${row.shQty}개 보유) - 추가 발주 보류 및 소진/할인 검토`;

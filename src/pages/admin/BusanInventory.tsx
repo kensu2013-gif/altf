@@ -27,6 +27,7 @@ import { COMPETITOR_DATA, getStrategicGrade, type StrategicGrade } from '../../.
 import { ItemIntelligenceCard } from './components/ItemIntelligenceCard';
 import { SearchableMultiSelect } from '../../components/ui/SearchableMultiSelect';
 import { matchesSmartSearch } from '../../utils/searchUtils';
+import { getCustomerRegion } from '../../utils/regionUtils';
 
 const salesHistory = salesHistoryRaw as Record<string, { salesVolume: number, salesFreq: number }>;
 
@@ -50,6 +51,8 @@ const WORKING_DAYS = 250;      // 연간 영업일수
 const LEAD_TIME = 5;           // 리드타임 (대경 → 부산, 영업일 기준)
 const Z_VALUE = 1.645;         // 목표 서비스율 95% (데이터 충분하면 2.33 = 99%로 상향)
 
+export type DkProcurementFilterType = 'ALL' | 'ORDER_NEEDED' | 'RECOMMENDED' | 'DOUBLE_STOCKOUT' | 'SURGING_DEMAND' | 'SURGING_MONITORING' | 'SURGING_RECOMMENDED' | 'SIHWA_UNMET' | 'EXCESS' | 'STABLE';
+
 interface DaekyungStockAnalysisItem {
     id: string;
     name: string;
@@ -57,11 +60,27 @@ interface DaekyungStockAnalysisItem {
     size?: string;
     thickness?: string;
     currentStock: number;
+    avg1m: number;
     avg3m: number;
     avg6m: number;
+    share1m: number;
     share3m: number;
     share6m: number;
     trend: number;
+    shQty: number;
+    safeStock: number;
+    recommendedQty: number;
+    procurementCategory?: 'DOUBLE_STOCKOUT' | 'SURGING_DEMAND' | 'SIHWA_UNMET' | 'EXCESS' | 'STABLE';
+    procurementReason: string;
+    isDoubleStockoutWithDemand: boolean;
+    isSurgingDemand: boolean;
+    isExcessStock?: boolean;
+    isDeadStock?: boolean;
+    healthGrade?: 'A' | 'B' | 'C' | 'D' | 'E' | 'N';
+    turnoverRate?: number;
+    quoteCount?: number;
+    recent90dSales?: number;
+    recent90dOrderCount?: number;
 }
 
 
@@ -280,7 +299,6 @@ export default function BusanInventory() {
         return map;
     }, [users]);
 
-    // 경인/수도권(경기, 서울, 인천, 시흥, 시화 등) 업체 여부 판별
     const isKyunggiCompany = useCallback((
         userId: string,
         orderOrQuote?: {
@@ -290,20 +308,9 @@ export default function BusanInventory() {
         }
     ) => {
         const u = userMap.get(userId);
-        if (u && u.address) {
-            const addr = u.address.toLowerCase().replace(/\s+/g, '');
-            if (addr.includes('경기') || addr.includes('서울') || addr.includes('인천') || addr.includes('시흥') || addr.includes('시화') || addr.includes('김포') || addr.includes('부천') || addr.includes('안산')) {
-                return true;
-            }
-        }
-        if (orderOrQuote) {
-            const addrSource = orderOrQuote.customerAddress || orderOrQuote.buyerInfo?.address || orderOrQuote.customerInfo?.address || '';
-            const addr = addrSource.toLowerCase().replace(/\s+/g, '');
-            if (addr.includes('경기') || addr.includes('서울') || addr.includes('인천') || addr.includes('시흥') || addr.includes('시화') || addr.includes('김포') || addr.includes('부천') || addr.includes('안산')) {
-                return true;
-            }
-        }
-        return false;
+        const addrSource = u?.address || orderOrQuote?.customerAddress || orderOrQuote?.buyerInfo?.address || orderOrQuote?.customerInfo?.address || '';
+        const regInfo = getCustomerRegion(addrSource);
+        return regInfo.region === 'SIHWA';
     }, [userMap]);
 
     const [historyData, setHistoryData] = useState<{
@@ -324,13 +331,16 @@ export default function BusanInventory() {
 
     const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE' | 'HEALTH_DIAGNOSIS' | 'DAEKYUNG_STOCK'>('AI_SUMMARY');
     const [dkSortConfig, setDkSortConfig] = useState<{
-        key: 'id' | 'name' | 'material' | 'size' | 'currentStock' | 'avg3m' | 'avg6m' | 'share3m' | 'share6m' | 'trend';
+        key: 'id' | 'name' | 'material' | 'size' | 'currentStock' | 'avg1m' | 'avg3m' | 'avg6m' | 'share1m' | 'share3m' | 'share6m' | 'trend' | 'shQty' | 'safeStock' | 'recommendedQty' | 'procurementReason' | 'healthGrade' | 'turnoverRate' | 'quoteCount' | 'recent90dOrderCount';
         direction: 'asc' | 'desc';
-    }>({ key: 'currentStock', direction: 'desc' });
+    }>({ key: 'id', direction: 'asc' });
     const [dkSearchQuery, setDkSearchQuery] = useState('');
     const [dkFilterItem, setDkFilterItem] = useState('');
     const [dkFilterMaterial, setDkFilterMaterial] = useState('');
     const [dkFilterSize, setDkFilterSize] = useState('');
+    const [dkFilterProcurement, setDkFilterProcurement] = useState<DkProcurementFilterType>('ORDER_NEEDED');
+    const [dkFilterHealthGrade, setDkFilterHealthGrade] = useState<string>('ALL');
+    const [selectedDkIds, setSelectedDkIds] = useState<Set<string>>(new Set());
     const [dkViewMode, setDkViewMode] = useState<'ITEM' | 'MATERIAL'>('ITEM');
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
         'CRITICAL': true,
@@ -845,6 +855,11 @@ export default function BusanInventory() {
         quoteCount: number;
         recentOrderCount: number;
         recent60dOrderCount: number;
+        recent90dOrderCount?: number;
+        isDoubleStockoutWithDemand?: boolean;
+        isSurgingDemand?: boolean;
+        procurementCategory?: 'DOUBLE_STOCKOUT' | 'SURGING_DEMAND' | 'SIHWA_UNMET' | 'EXCESS' | 'STABLE';
+        procurementReason?: string;
         daekyungDirectRatio: number;
         profitMarginRate: number;
         compositeScore: number;
@@ -965,6 +980,10 @@ export default function BusanInventory() {
                 }
             }
 
+            const stocks1m = dailyStocks.slice(0, 30);
+            const sum1m = stocks1m.reduce((s, val) => s + val, 0);
+            const avg1m = stocks1m.length > 0 ? parseFloat((sum1m / stocks1m.length).toFixed(1)) : ysQty;
+
             const stocks3m = dailyStocks.slice(0, 90);
             const sum3m = stocks3m.reduce((s, val) => s + val, 0);
             const avg3m = stocks3m.length > 0 ? parseFloat((sum3m / stocks3m.length).toFixed(1)) : ysQty;
@@ -980,21 +999,25 @@ export default function BusanInventory() {
                 size: item.size || '',
                 thickness: item.thickness || '',
                 currentStock: ysQty,
+                avg1m,
                 avg3m,
                 avg6m,
             };
         });
 
+        const total1m = rawResults.reduce((s, r) => s + r.avg1m, 0);
         const total3m = rawResults.reduce((s, r) => s + r.avg3m, 0);
         const total6m = rawResults.reduce((s, r) => s + r.avg6m, 0);
 
         return rawResults.map(r => {
+            const share1m = total1m > 0 ? parseFloat(((r.avg1m / total1m) * 100).toFixed(2)) : 0;
             const share3m = total3m > 0 ? parseFloat(((r.avg3m / total3m) * 100).toFixed(2)) : 0;
             const share6m = total6m > 0 ? parseFloat(((r.avg6m / total6m) * 100).toFixed(2)) : 0;
             const trend = r.avg6m > 0 ? parseFloat((((r.avg3m - r.avg6m) / r.avg6m) * 100).toFixed(1)) : (r.avg3m > 0 ? 100 : 0);
 
             return {
                 ...r,
+                share1m,
                 share3m,
                 share6m,
                 trend,
@@ -1664,6 +1687,31 @@ export default function BusanInventory() {
                 }
             }
 
+            const sihwaQty = row.product.locationStock?.['시화'] || row.product.locationStock?.['서울'] || 0;
+            const canInterTransferSihwa = row.shQty < safeStock && sihwaQty > 0;
+
+            let procurementCategory: 'DOUBLE_STOCKOUT' | 'SURGING_DEMAND' | 'SIHWA_UNMET' | 'EXCESS' | 'STABLE' = 'STABLE';
+            let procurementReason = "";
+
+            if (row.shQty === 0 && row.ysQty === 0 && (row.recent90dSales > 0 || row.recent60dOrderCount > 0)) {
+                procurementCategory = 'DOUBLE_STOCKOUT';
+                procurementReason = "🚨 자사·공급처 동시 결품 (최근 주문/견적 수요 존재) - 긴급 수급 필요";
+            } else if (row.shQty < safeStock && recommendedQty > 0) {
+                procurementCategory = 'SIHWA_UNMET';
+                if (canInterTransferSihwa) {
+                    const transferQty = Math.min(finalDeficit, sihwaQty);
+                    procurementReason = `🚛 시화창고 이송 권장 (${transferQty}개 보유) - 신규 매입 대신 시화창고에서 재고 이송 가능`;
+                } else {
+                    procurementReason = `⚠️ 부산재고(${row.shQty}개)가 적정 안전재고(${safeStock}개) 미달 - ${recommendedQty}개 선발주 권장`;
+                }
+            } else if (isExcessStock) {
+                procurementCategory = 'EXCESS';
+                procurementReason = `📉 직전 수요 대비 과잉재고 (${row.shQty}개 보유) - 추가 발주 보류 및 소진 검토`;
+            } else {
+                procurementCategory = 'STABLE';
+                procurementReason = "✅ 수급 및 재고 상태 안정적";
+            }
+
             return {
                 ...row,
                 compositeScore,
@@ -1682,6 +1730,9 @@ export default function BusanInventory() {
                 isDeadStock,
                 isExcessStock,
                 canTransfer,
+                procurementCategory,
+                procurementReason,
+                recent90dOrderCount: row.recent60dOrderCount,
             };
         });
 
@@ -1750,108 +1801,141 @@ export default function BusanInventory() {
         return { names, materials, sizes, thicknesses };
     }, [inventory]);
 
-    // ── 대경재고(양산) 필터링 옵션 추출 ──
-    const daekyungFilterOptions = useMemo(() => {
-        const targetProducts = inventory.filter((item: Product) => {
-            const isMakerDaekyung = item.maker === '대경' || item.maker1 === '대경';
-            let hasYsLoc = false;
-            if (item.locationStock) {
-                hasYsLoc = item.locationStock['양산'] !== undefined || item.locationStock['대경'] !== undefined;
-            } else {
-                hasYsLoc = (item.location || '').includes('양산') || (item.location || '').includes('대경');
-            }
-            return isMakerDaekyung && hasYsLoc;
-        });
-
-        const names = Array.from(new Set(targetProducts.map(p => p.name).filter(Boolean))).sort();
-        const materials = Array.from(new Set(targetProducts.map(p => p.material).filter(Boolean))).sort();
-        const sizes = Array.from(new Set(targetProducts.map(p => p.size).filter(Boolean))).sort();
-
-        return { names, materials, sizes };
-    }, [inventory]);
-
 
 
     const daekyungStockAverages = useMemo(() => {
-        let filtered = daekyungBaseStockAverages;
+        let items: DaekyungStockAnalysisItem[] = daekyungBaseStockAverages.map(r => {
+            const busanRow = baseAnalyzedInventoryMap.get(r.id);
+            const shQty = busanRow?.shQty ?? 0;
+            const safeStock = busanRow?.safeStock ?? 0;
+            const recommendedQty = busanRow?.recommendedQty ?? 0;
+            const isDoubleStockoutWithDemand = busanRow?.isDoubleStockoutWithDemand ?? false;
+            const isSurgingDemand = busanRow?.isSurgingDemand ?? false;
+            const isExcessStock = busanRow?.isExcessStock ?? false;
+            const isDeadStock = busanRow?.isDeadStock ?? false;
+            const healthGrade = busanRow?.healthGrade ?? 'N';
+            const turnoverRate = busanRow?.turnoverRate ?? 0;
+            const quoteCount = busanRow?.quoteCount ?? 0;
+            const recent90dSales = busanRow?.recent90dSales ?? 0;
+            const recent90dOrderCount = busanRow?.recent90dOrderCount ?? 0;
+            const procurementCategory = busanRow?.procurementCategory ?? 'STABLE';
+            const procurementReason = busanRow?.procurementReason || (
+                r.currentStock === 0 
+                    ? "🚨 대경 본사 재고 0개 (장기 수급 차질 우려)" 
+                    : "✅ 수급 및 재고 상태 안정적"
+            );
 
-        // 필터/검색 활성화 여부 확인
-        const isFilterActive = !!(
-            dkSearchQuery.trim() ||
-            dkFilterItem ||
-            dkFilterMaterial ||
-            dkFilterSize
-        );
+            return {
+                ...r,
+                shQty,
+                safeStock,
+                recommendedQty,
+                procurementCategory,
+                procurementReason,
+                isDoubleStockoutWithDemand,
+                isSurgingDemand,
+                isExcessStock,
+                isDeadStock,
+                healthGrade,
+                turnoverRate,
+                quoteCount,
+                recent90dSales,
+                recent90dOrderCount,
+            };
+        });
 
-        // 기본 상태에서는 부산 재고의 건강도 등급이 A, B인 것만 필터링하여 보여줌
-        if (!isFilterActive) {
-            filtered = filtered.filter(r => {
-                const sihwaRow = baseAnalyzedInventoryMap.get(r.id);
-                if (!sihwaRow) return false;
-                return sihwaRow.healthGrade === 'A' || sihwaRow.healthGrade === 'B';
-            });
-        }
+        const effectiveQuery = (dkSearchQuery || searchTerm || '').trim();
 
-        if (dkSearchQuery) {
-            filtered = filtered.filter(r => matchesSmartSearch(r, dkSearchQuery));
+        if (effectiveQuery) {
+            items = items.filter(r => matchesSmartSearch(r, effectiveQuery));
         }
         if (dkFilterItem) {
-            filtered = filtered.filter(r => r.name === dkFilterItem);
+            items = items.filter(r => (r.name || '').trim() === dkFilterItem.trim());
         }
         if (dkFilterMaterial) {
-            filtered = filtered.filter(r => r.material === dkFilterMaterial);
+            items = items.filter(r => (r.material || '').trim() === dkFilterMaterial.trim());
         }
         if (dkFilterSize) {
-            filtered = filtered.filter(r => r.size === dkFilterSize);
+            items = items.filter(r => (r.size || '').trim() === dkFilterSize.trim());
+        }
+        if (dkFilterHealthGrade && dkFilterHealthGrade !== 'ALL') {
+            items = items.filter(r => (r.healthGrade || 'N') === dkFilterHealthGrade);
+        }
+
+        const isSearchOrSpecificFiltered = !!(effectiveQuery || dkFilterItem || dkFilterMaterial || dkFilterSize);
+
+        if (dkFilterProcurement !== 'ALL' && !isSearchOrSpecificFiltered) {
+            items = items.filter(r => {
+                const cat = r.procurementCategory;
+                const recQty = r.recommendedQty || 0;
+
+                if (dkFilterProcurement === 'ORDER_NEEDED') {
+                    return recQty > 0 || cat === 'DOUBLE_STOCKOUT' || cat === 'SURGING_DEMAND' || cat === 'SIHWA_UNMET';
+                }
+                if (dkFilterProcurement === 'RECOMMENDED') {
+                    return recQty > 0;
+                }
+                if (dkFilterProcurement === 'DOUBLE_STOCKOUT') {
+                    return r.isDoubleStockoutWithDemand === true;
+                }
+                if (dkFilterProcurement === 'SURGING_DEMAND') {
+                    return r.isSurgingDemand === true || cat === 'SURGING_DEMAND';
+                }
+                if (dkFilterProcurement === 'SURGING_MONITORING') {
+                    return (r.isSurgingDemand === true || cat === 'SURGING_DEMAND') && (recQty <= 0 || r.procurementReason.includes('모니터링') || r.shQty >= r.safeStock);
+                }
+                if (dkFilterProcurement === 'SURGING_RECOMMENDED') {
+                    return (r.isSurgingDemand === true || cat === 'SURGING_DEMAND') && recQty > 0;
+                }
+                if (dkFilterProcurement === 'SIHWA_UNMET') {
+                    return cat === 'SIHWA_UNMET' || (r.shQty < r.safeStock && recQty > 0);
+                }
+                if (dkFilterProcurement === 'EXCESS') {
+                    return cat === 'EXCESS' || r.isExcessStock === true;
+                }
+                if (dkFilterProcurement === 'STABLE') {
+                    return cat === 'STABLE';
+                }
+                return true;
+            });
         }
 
         let finalResults: DaekyungStockAnalysisItem[] = [];
         if (dkViewMode === 'ITEM') {
-            finalResults = filtered;
+            finalResults = items;
         } else {
-            // Group by Material
-            const materialGroups: Record<string, {
-                material: string;
-                currentStock: number;
-                avg3m: number;
-                avg6m: number;
-                share3m: number;
-                share6m: number;
-            }> = {};
+            const materialGroups: Record<string, DaekyungStockAnalysisItem> = {};
 
-            filtered.forEach(r => {
+            items.forEach(r => {
                 const mat = r.material || '미지정';
                 if (!materialGroups[mat]) {
                     materialGroups[mat] = {
-                        material: mat,
+                        ...r,
+                        id: `MAT-${mat}`,
+                        name: `${mat} 재질 종합`,
                         currentStock: 0,
+                        avg1m: 0,
                         avg3m: 0,
                         avg6m: 0,
+                        share1m: 0,
                         share3m: 0,
                         share6m: 0,
+                        shQty: 0,
+                        safeStock: 0,
+                        recommendedQty: 0,
+                        procurementReason: `${mat} 재질 통합 수급 상태`
                     };
                 }
                 materialGroups[mat].currentStock += r.currentStock;
+                materialGroups[mat].avg1m += r.avg1m || 0;
                 materialGroups[mat].avg3m += r.avg3m;
                 materialGroups[mat].avg6m += r.avg6m;
-                materialGroups[mat].share3m += r.share3m;
-                materialGroups[mat].share6m += r.share6m;
+                materialGroups[mat].shQty += r.shQty;
+                materialGroups[mat].safeStock += r.safeStock;
+                materialGroups[mat].recommendedQty += r.recommendedQty;
             });
 
-            finalResults = Object.values(materialGroups).map(g => {
-                const trend = g.avg6m > 0 ? parseFloat((((g.avg3m - g.avg6m) / g.avg6m) * 100).toFixed(1)) : (g.avg3m > 0 ? 100 : 0);
-                return {
-                    id: g.material,
-                    name: g.material,
-                    material: g.material,
-                    currentStock: g.currentStock,
-                    avg3m: parseFloat(g.avg3m.toFixed(1)),
-                    avg6m: parseFloat(g.avg6m.toFixed(1)),
-                    share3m: parseFloat(g.share3m.toFixed(2)),
-                    share6m: parseFloat(g.share6m.toFixed(2)),
-                    trend,
-                };
-            });
+            finalResults = Object.values(materialGroups);
         }
 
         return finalResults.sort((a, b) => {
@@ -1862,24 +1946,36 @@ export default function BusanInventory() {
                 case 'material': return (a.material || '').localeCompare(b.material || '') * dir;
                 case 'size': return (a.size || '').localeCompare(b.size || '') * dir;
                 case 'currentStock': return (a.currentStock - b.currentStock) * dir;
+                case 'avg1m': return ((a.avg1m || 0) - (b.avg1m || 0)) * dir;
                 case 'avg3m': return (a.avg3m - b.avg3m) * dir;
                 case 'avg6m': return (a.avg6m - b.avg6m) * dir;
+                case 'share1m': return ((a.share1m || 0) - (b.share1m || 0)) * dir;
                 case 'share3m': return (a.share3m - b.share3m) * dir;
                 case 'share6m': return (a.share6m - b.share6m) * dir;
                 case 'trend': return (a.trend - b.trend) * dir;
+                case 'shQty': return (a.shQty - b.shQty) * dir;
+                case 'safeStock': return (a.safeStock - b.safeStock) * dir;
+                case 'recommendedQty': return (a.recommendedQty - b.recommendedQty) * dir;
+                case 'procurementReason': return a.procurementReason.localeCompare(b.procurementReason) * dir;
+                case 'healthGrade': return ((a.healthGrade || 'N').localeCompare(b.healthGrade || 'N')) * dir;
+                case 'turnoverRate': return ((a.turnoverRate || 0) - (b.turnoverRate || 0)) * dir;
+                case 'quoteCount': return ((a.quoteCount || 0) - (b.quoteCount || 0)) * dir;
+                case 'recent90dOrderCount': return ((a.recent90dOrderCount || 0) - (b.recent90dOrderCount || 0)) * dir;
                 default: return 0;
             }
         });
-    }, [daekyungBaseStockAverages, baseAnalyzedInventoryMap, dkSearchQuery, dkFilterItem, dkFilterMaterial, dkFilterSize, dkViewMode, dkSortConfig]);
+    }, [daekyungBaseStockAverages, baseAnalyzedInventoryMap, dkSearchQuery, searchTerm, dkFilterItem, dkFilterMaterial, dkFilterSize, dkFilterHealthGrade, dkFilterProcurement, dkViewMode, dkSortConfig]);
 
     const daekyungStats = useMemo(() => {
         const totalCurrentStock = daekyungStockAverages.reduce((sum, item) => sum + item.currentStock, 0);
+        const totalAvg1m = daekyungStockAverages.reduce((sum, item) => sum + (item.avg1m || 0), 0);
         const totalAvg3m = daekyungStockAverages.reduce((sum, item) => sum + item.avg3m, 0);
         const totalAvg6m = daekyungStockAverages.reduce((sum, item) => sum + item.avg6m, 0);
 
         return {
             totalItems: daekyungStockAverages.length,
             totalCurrentStock,
+            totalAvg1m: parseFloat(totalAvg1m.toFixed(1)),
             totalAvg3m: parseFloat(totalAvg3m.toFixed(1)),
             totalAvg6m: parseFloat(totalAvg6m.toFixed(1)),
         };
@@ -5294,42 +5390,51 @@ if (displayList.length === 0) {
                             {activeTab === 'DAEKYUNG_STOCK' && (
                                 <div className="space-y-6 p-4 md:p-0 pb-8 animate-in fade-in duration-300">
                                     {/* ── 1. 대경재고 요약 카드 ── */}
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                        <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4 shadow-xs">
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                        <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-3.5 shadow-xs">
                                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                                                🏭 분석 대상 대경 {dkViewMode === 'ITEM' ? '품목' : '재질'}
+                                                🏭 분석 대상 {dkViewMode === 'ITEM' ? '품목' : '재질'}
                                             </div>
-                                            <div className="text-2xl font-black text-slate-800">
+                                            <div className="text-xl font-black text-slate-800">
                                                 {daekyungStats.totalItems} <span className="text-xs text-slate-500 font-bold">{dkViewMode === 'ITEM' ? '개 품목' : '개 재질'}</span>
                                             </div>
-                                            <div className="text-[9px] text-slate-400 mt-1 font-medium">양산 하치장 보유 & 메이커 '대경' 기준</div>
+                                            <div className="text-[9px] text-slate-400 mt-1 font-medium">양산 창고 & 메이커 '대경'</div>
                                         </div>
-                                        <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4 shadow-xs">
+                                        <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-3.5 shadow-xs">
                                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                                                 📦 현재 재고 합계
                                             </div>
-                                            <div className="text-2xl font-black text-teal-600 font-mono">
+                                            <div className="text-xl font-black text-teal-600 font-mono">
                                                 {daekyungStats.totalCurrentStock.toLocaleString()} <span className="text-xs text-slate-500 font-bold">개</span>
                                             </div>
-                                            <div className="text-[9px] text-slate-400 mt-1 font-medium">현재 양산 창고 실시간 재고량</div>
+                                            <div className="text-[9px] text-slate-400 mt-1 font-medium">양산 창고 실시간 재고량</div>
                                         </div>
-                                        <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 shadow-xs">
-                                            <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">
-                                                📈 3개월 평균 보유량 합계
+                                        <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-3.5 shadow-xs">
+                                            <div className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1">
+                                                ⚡ 1개월 평균 보유량
                                             </div>
-                                            <div className="text-2xl font-black text-indigo-600 font-mono">
+                                            <div className="text-xl font-black text-blue-600 font-mono">
+                                                {daekyungStats.totalAvg1m.toLocaleString()} <span className="text-xs text-slate-500 font-bold">개</span>
+                                            </div>
+                                            <div className="text-[9px] text-blue-400 mt-1 font-medium">최근 30일 일별 재고 산술평균</div>
+                                        </div>
+                                        <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-3.5 shadow-xs">
+                                            <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">
+                                                📈 3개월 평균 보유량
+                                            </div>
+                                            <div className="text-xl font-black text-indigo-600 font-mono">
                                                 {daekyungStats.totalAvg3m.toLocaleString()} <span className="text-xs text-slate-500 font-bold">개</span>
                                             </div>
-                                            <div className="text-[9px] text-indigo-400 mt-1 font-medium">최근 90일 일별 재고의 산술평균</div>
+                                            <div className="text-[9px] text-indigo-400 mt-1 font-medium">최근 90일 일별 재고 산술평균</div>
                                         </div>
-                                        <div className="bg-violet-50/50 border border-violet-100 rounded-2xl p-4 shadow-xs">
+                                        <div className="bg-violet-50/50 border border-violet-100 rounded-2xl p-3.5 shadow-xs">
                                             <div className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-1">
-                                                📊 6개월 평균 보유량 합계
+                                                📊 6개월 평균 보유량
                                             </div>
-                                            <div className="text-2xl font-black text-violet-600 font-mono">
+                                            <div className="text-xl font-black text-violet-600 font-mono">
                                                 {daekyungStats.totalAvg6m.toLocaleString()} <span className="text-xs text-slate-500 font-bold">개</span>
                                             </div>
-                                            <div className="text-[9px] text-violet-400 mt-1 font-medium">최근 180일 일별 재고의 산술평균</div>
+                                            <div className="text-[9px] text-violet-400 mt-1 font-medium">최근 180일 일별 재고 산술평균</div>
                                         </div>
                                     </div>
 
@@ -5340,8 +5445,8 @@ if (displayList.length === 0) {
                                                 💡 대경재고(양산) 평균 보유 분석 안내
                                             </h4>
                                             <p className="text-[11px] text-slate-300 leading-relaxed">
-                                                데이터 갱신은 불특정일에 진행되므로 일별 단순 변동량보다는 <strong>3개월(90일) 및 6개월(180일) 평균 재고 보유량</strong>을 확인하는 것이 안정적인 재고 흐름 파악에 합당합니다.
-                                                각 품목이 전체 대경 재고에서 차지하는 <strong>상대적 비중(Relative Share)</strong>을 비교 분석하여 앞으로 우리가 상시 보유해야 할 상대적 품목을 파악해 보세요.
+                                                데이터 갱신은 불특정일에 진행되므로 일별 단기 변동량 파악을 위한 <strong>1개월(30일) 평균 재고</strong>와 중장기 흐름을 위한 <strong>3개월/6개월 평균 재고</strong>를 조합하여 파악하는 것이 합당합니다.
+                                                각 품목이 전체 대경 재고에서 차지하는 <strong>상대적 비중(Relative Share)</strong>을 비교 분석하여 앞으로 상시 보유해야 할 품목을 관리를 진행하세요.
                                             </p>
                                         </div>
                                     </div>
@@ -5364,7 +5469,7 @@ if (displayList.length === 0) {
                                                 <button
                                                     onClick={() => {
                                                         setDkViewMode('MATERIAL');
-                                                        if (!['material', 'currentStock', 'avg3m', 'avg6m', 'share3m', 'share6m', 'trend'].includes(dkSortConfig.key)) {
+                                                        if (!['material', 'currentStock', 'avg1m', 'avg3m', 'avg6m', 'share1m', 'share3m', 'share6m', 'trend'].includes(dkSortConfig.key)) {
                                                             setDkSortConfig({ key: 'material', direction: 'desc' });
                                                         }
                                                     }}
@@ -5382,15 +5487,19 @@ if (displayList.length === 0) {
                                             <div className="relative flex-1 max-w-md">
                                                 <input
                                                     type="text"
-                                                    placeholder="대경 품목코드 또는 품명 검색..."
+                                                    placeholder={searchTerm ? `글로벌 검색어 (${searchTerm}) 적용 중...` : "대경 품목코드 또는 품명 검색..."}
                                                     value={dkSearchQuery}
                                                     onChange={e => setDkSearchQuery(e.target.value)}
                                                     className="w-full bg-white border border-slate-300 rounded-lg text-slate-700 font-medium text-xs px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs"
                                                 />
-                                                {dkSearchQuery && (
+                                                {(dkSearchQuery || searchTerm) && (
                                                     <button
-                                                        onClick={() => setDkSearchQuery('')}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                                                        onClick={() => {
+                                                            setDkSearchQuery('');
+                                                            if (searchTerm) setSearchTerm('');
+                                                        }}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                                                        title="검색어 초기화"
                                                     >
                                                         ✕
                                                     </button>
@@ -5400,61 +5509,58 @@ if (displayList.length === 0) {
 
                                         {/* 드롭다운 필터 */}
                                         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                                            <div className="flex flex-col gap-1">
-                                                <label htmlFor="dk-item-filter" className="text-[10px] font-bold text-slate-500">품목 필터</label>
+                                            <div className="flex flex-col gap-1 sm:col-span-2">
+                                                <label htmlFor="dk-procurement-filter" className="text-[10px] font-bold text-slate-500">조달 상태 필터</label>
                                                 <select
-                                                    id="dk-item-filter"
-                                                    value={dkFilterItem}
-                                                    onChange={e => setDkFilterItem(e.target.value)}
-                                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                                    id="dk-procurement-filter"
+                                                    value={dkFilterProcurement}
+                                                    onChange={e => setDkFilterProcurement(e.target.value as DkProcurementFilterType)}
+                                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer"
                                                 >
-                                                    <option value="">전체 품목</option>
-                                                    {daekyungFilterOptions.names.map(name => (
-                                                        <option key={name} value={name}>{name}</option>
-                                                    ))}
+                                                    <option value="ALL">전체 조달 상태</option>
+                                                    <option value="ORDER_NEEDED">발주 필요 (종합)</option>
+                                                    <option value="RECOMMENDED">AI 발주 추천</option>
+                                                    <option value="DOUBLE_STOCKOUT">🚨 자사·공급처 동시 결품 (이중 품절)</option>
+                                                    <option value="SURGING_DEMAND">🔥 최근 주문/출고 급상승 (전체)</option>
+                                                    <option value="SURGING_MONITORING">🛡️ 최근 주문/출고 급상승 - 결품 예방 모니터링</option>
+                                                    <option value="SURGING_RECOMMENDED">📦 최근 주문/출고 급상승 - 선발주 권장</option>
+                                                    <option value="SIHWA_UNMET">⚠️ 부산재고 미달 (선발주 권장)</option>
+                                                    <option value="EXCESS">📉 직전수요 대비 과잉재고</option>
+                                                    <option value="STABLE">✅ 수급 및 재고 상태 안정적</option>
                                                 </select>
                                             </div>
 
-                                            <div className="flex flex-col gap-1">
-                                                <label htmlFor="dk-material-filter" className="text-[10px] font-bold text-slate-500">재질 필터</label>
+                                            <div className="flex flex-col gap-1 sm:col-span-1">
+                                                <label htmlFor="dk-health-grade-filter" className="text-[10px] font-bold text-slate-500">건전성 등급 필터</label>
                                                 <select
-                                                    id="dk-material-filter"
-                                                    value={dkFilterMaterial}
-                                                    onChange={e => setDkFilterMaterial(e.target.value)}
-                                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                                    id="dk-health-grade-filter"
+                                                    value={dkFilterHealthGrade}
+                                                    onChange={e => setDkFilterHealthGrade(e.target.value)}
+                                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer"
                                                 >
-                                                    <option value="">전체 재질</option>
-                                                    {daekyungFilterOptions.materials.map(mat => (
-                                                        <option key={mat} value={mat}>{mat}</option>
-                                                    ))}
+                                                    <option value="ALL">전체 등급 (A~N급)</option>
+                                                    <option value="A">💚 A급 (최우수 / 핵심)</option>
+                                                    <option value="B">💙 B급 (양호 / 안정)</option>
+                                                    <option value="C">💛 C급 (보통 / 관망)</option>
+                                                    <option value="D">🧡 D급 (주의 / 과잉)</option>
+                                                    <option value="E">❤️ E급 (악성 / 처분)</option>
+                                                    <option value="N">⚪ N급 (평가제외 / 데이터없음)</option>
                                                 </select>
                                             </div>
 
-                                            <div className="flex flex-col gap-1">
-                                                <label htmlFor="dk-size-filter" className="text-[10px] font-bold text-slate-500">사이즈 필터</label>
-                                                <select
-                                                    id="dk-size-filter"
-                                                    value={dkFilterSize}
-                                                    onChange={e => setDkFilterSize(e.target.value)}
-                                                    className="bg-white border border-slate-300 rounded-lg text-xs p-2 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                                >
-                                                    <option value="">전체 사이즈</option>
-                                                    {daekyungFilterOptions.sizes.map(size => (
-                                                        <option key={size} value={size}>{size}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-
-                                            <div className="flex items-end">
+                                            <div className="flex items-end sm:col-span-1">
                                                 <button
                                                     onClick={() => {
                                                         setDkSearchQuery('');
+                                                        if (searchTerm) setSearchTerm('');
                                                         setDkFilterItem('');
                                                         setDkFilterMaterial('');
                                                         setDkFilterSize('');
+                                                        setDkFilterProcurement('ORDER_NEEDED');
+                                                        setDkFilterHealthGrade('ALL');
                                                     }}
-                                                    disabled={!dkSearchQuery && !dkFilterItem && !dkFilterMaterial && !dkFilterSize}
-                                                    className="w-full bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+                                                    disabled={!dkSearchQuery && !searchTerm && !dkFilterItem && !dkFilterMaterial && !dkFilterSize && dkFilterProcurement === 'ORDER_NEEDED' && dkFilterHealthGrade === 'ALL'}
+                                                    className="w-full bg-slate-200 hover:bg-slate-300 disabled:opacity-50 disabled:hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
                                                 >
                                                     🔄 필터 초기화
                                                 </button>
@@ -5463,7 +5569,7 @@ if (displayList.length === 0) {
                                     </div>
 
                                     {/* ── 4. 상세 품목 분석 테이블 ── */}
-                                    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+                                    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden relative">
                                         <div className="px-5 py-3.5 bg-slate-50/70 border-b border-slate-200/60 flex items-center justify-between">
                                             <div className="text-xs font-black text-slate-600">
                                                 {dkViewMode === 'ITEM' ? '품목별 평균 보유량 및 상대 비중 목록' : '재질별 집계 평균 보유량 및 상대 비중 목록'}
@@ -5476,20 +5582,34 @@ if (displayList.length === 0) {
                                             <table className="w-full text-xs text-left whitespace-nowrap">
                                                 <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100 sticky top-0 z-10 shadow-sm">
                                                     <tr>
+                                                        {dkViewMode === 'ITEM' && (
+                                                            <th className="px-3 py-3 w-10 text-center">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    title="전체 품목 선택"
+                                                                    checked={daekyungStockAverages.length > 0 && daekyungStockAverages.every(r => selectedDkIds.has(r.id))}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) setSelectedDkIds(new Set(daekyungStockAverages.map(r => r.id)));
+                                                                        else setSelectedDkIds(new Set());
+                                                                    }}
+                                                                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                                />
+                                                            </th>
+                                                        )}
                                                         <th className="px-4 py-3 text-center">순위</th>
                                                         {dkViewMode === 'ITEM' ? (
                                                             <>
                                                                 <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'id', direction: prev.key === 'id' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
                                                                     품목코드 {dkSortConfig.key === 'id' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                                 </th>
-                                                                <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'name', direction: prev.key === 'name' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                                    품목명 {dkSortConfig.key === 'name' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                                <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-100 transition group relative" onClick={() => setDkSortConfig(prev => ({ key: 'healthGrade', direction: prev.key === 'healthGrade' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                                    등급 <span className="text-[10px] text-slate-400">ⓘ</span> {dkSortConfig.key === 'healthGrade' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                                 </th>
-                                                                <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'size', direction: prev.key === 'size' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                                    사이즈 {dkSortConfig.key === 'size' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                                <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'turnoverRate', direction: prev.key === 'turnoverRate' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                                    회전율 {dkSortConfig.key === 'turnoverRate' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                                 </th>
-                                                                <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'material', direction: prev.key === 'material' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                                    재질 {dkSortConfig.key === 'material' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                                <th className="px-4 py-3 text-center">
+                                                                    최근 실적(90일)
                                                                 </th>
                                                             </>
                                                         ) : (
@@ -5503,36 +5623,93 @@ if (displayList.length === 0) {
                                                         <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'avg3m', direction: prev.key === 'avg3m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
                                                             3개월 평균 보유 {dkSortConfig.key === 'avg3m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                         </th>
-                                                        <th className="px-4 py-3 text-right">부산 안전재고량</th>
-                                                        <th className="px-4 py-3 text-left">수급 상태</th>
+                                                        <th className="px-4 py-3 text-right font-black text-teal-700 bg-teal-50/50 cursor-pointer hover:bg-teal-100/50 transition" onClick={() => setDkSortConfig(prev => ({ key: 'shQty', direction: prev.key === 'shQty' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                            부산 현재고 {dkSortConfig.key === 'shQty' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        </th>
+                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'safeStock', direction: prev.key === 'safeStock' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                            부산 안전재고량 {dkSortConfig.key === 'safeStock' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        </th>
+                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'recommendedQty', direction: prev.key === 'recommendedQty' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                            1~3개월 권장구매 {dkSortConfig.key === 'recommendedQty' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        </th>
+                                                        <th className="px-4 py-3 text-left cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'procurementReason', direction: prev.key === 'procurementReason' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                            🎯 수급 진단 & 데이터 근거 {dkSortConfig.key === 'procurementReason' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        </th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
                                                     {daekyungStockAverages.map((row, index) => {
                                                         const busanRow = baseAnalyzedInventoryMap.get(row.id);
-                                                        const safeStockVal = busanRow?.safeStock ?? 0;
-                                                        const isStockout = row.currentStock === 0;
+                                                        const isSelected = selectedDkIds.has(row.id);
 
                                                         return (
-                                                            <tr key={row.id} className="hover:bg-slate-50/60 transition">
+                                                            <tr key={row.id} className={`hover:bg-slate-50/80 transition cursor-pointer ${isSelected ? 'bg-indigo-50/50' : ''}`}>
+                                                                {dkViewMode === 'ITEM' && (
+                                                                    <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            title={`${row.id} 선택`}
+                                                                            checked={isSelected}
+                                                                            onChange={(e) => {
+                                                                                setSelectedDkIds(prev => {
+                                                                                    const next = new Set(prev);
+                                                                                    if (e.target.checked) next.add(row.id);
+                                                                                    else next.delete(row.id);
+                                                                                    return next;
+                                                                                });
+                                                                            }}
+                                                                            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                                        />
+                                                                    </td>
+                                                                )}
                                                                 <td className="px-4 py-2.5 text-center text-[10px] text-slate-400 font-bold">
                                                                     {index + 1}
                                                                 </td>
                                                                 {dkViewMode === 'ITEM' ? (
                                                                     <>
                                                                         <td className="px-4 py-2.5">
-                                                                            <span className="font-mono font-bold text-slate-800 tracking-tight">
+                                                                            <span className="font-mono font-bold text-slate-800 hover:text-indigo-600 transition-colors">
                                                                                 {row.id}
                                                                             </span>
                                                                         </td>
-                                                                        <td className="px-4 py-2.5 text-slate-500 font-medium">
-                                                                            {row.name}
+                                                                        <td className="px-4 py-2.5 text-center">
+                                                                            <span className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-black ${
+                                                                                (busanRow?.healthGrade || row.healthGrade) === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                                                (busanRow?.healthGrade || row.healthGrade) === 'B' ? 'bg-blue-100 text-blue-700' :
+                                                                                (busanRow?.healthGrade || row.healthGrade) === 'C' ? 'bg-amber-100 text-amber-700' :
+                                                                                (busanRow?.healthGrade || row.healthGrade) === 'D' ? 'bg-orange-100 text-orange-700' :
+                                                                                (busanRow?.healthGrade || row.healthGrade) === 'E' ? 'bg-rose-100 text-rose-700' :
+                                                                                'bg-slate-100 text-slate-500'
+                                                                            }`} title="종합 건전성 등급">
+                                                                                {(busanRow?.healthGrade || row.healthGrade || 'N')}급
+                                                                            </span>
                                                                         </td>
-                                                                        <td className="px-4 py-2.5 text-slate-500 font-medium">
-                                                                            {row.size}
+                                                                        <td className="px-4 py-2.5 text-center">
+                                                                            {(busanRow?.healthGrade || row.healthGrade) && (busanRow?.healthGrade || row.healthGrade) !== 'N' ? (
+                                                                                <div className="flex flex-col items-center">
+                                                                                    <span className={`text-[10px] font-black px-1.5 rounded ${
+                                                                                        (busanRow?.healthGrade || row.healthGrade) === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                                                                                        (busanRow?.healthGrade || row.healthGrade) === 'B' ? 'bg-amber-100 text-amber-700' :
+                                                                                        (busanRow?.healthGrade || row.healthGrade) === 'C' ? 'bg-blue-100 text-blue-600' :
+                                                                                        'bg-rose-100 text-rose-500'
+                                                                                    }`}>
+                                                                                        {(busanRow?.healthGrade || row.healthGrade)}급
+                                                                                    </span>
+                                                                                    <span className="text-[10px] font-mono text-slate-400 mt-0.5">
+                                                                                        {(busanRow?.turnoverRate ?? row.turnoverRate ?? 0) > 0 ? `${(busanRow?.turnoverRate ?? row.turnoverRate)}x` : ''}
+                                                                                    </span>
+                                                                                </div>
+                                                                            ) : <span className="text-slate-200">—</span>}
                                                                         </td>
-                                                                        <td className="px-4 py-2.5 text-slate-500 font-medium">
-                                                                            {row.material}
+                                                                        <td className="px-4 py-2.5 text-center text-slate-600">
+                                                                            <div className="flex flex-col items-center gap-1">
+                                                                                <span className="font-black text-slate-800 text-[12px]">
+                                                                                    {(busanRow?.recent90dSales ?? row.recent90dSales ?? 0).toLocaleString()}
+                                                                                    <span className="text-[10px] text-slate-500 font-bold ml-0.5 mr-1">개 /</span>
+                                                                                    {(busanRow?.recent90dOrderCount ?? row.recent90dOrderCount ?? 0).toLocaleString()}
+                                                                                    <span className="text-[10px] text-slate-500 font-bold ml-0.5">회출고</span>
+                                                                                </span>
+                                                                            </div>
                                                                         </td>
                                                                     </>
                                                                 ) : (
@@ -5540,18 +5717,30 @@ if (displayList.length === 0) {
                                                                         {row.material}
                                                                     </td>
                                                                 )}
-                                                                <td className={`px-4 py-2.5 text-right font-black font-mono ${isStockout ? 'text-rose-600 bg-rose-50/40' : 'text-slate-700'}`}>
+                                                                <td className={`px-4 py-2.5 text-right font-black font-mono ${row.currentStock === 0 ? 'text-rose-600 bg-rose-50/40' : 'text-slate-700'}`}>
                                                                     {row.currentStock.toLocaleString()}개
                                                                 </td>
-                                                                <td className="px-4 py-2.5 text-right font-black text-indigo-600 font-mono">
+                                                                <td className="px-4 py-2.5 text-right font-bold text-indigo-600 font-mono">
                                                                     {row.avg3m.toLocaleString()}개
                                                                 </td>
-                                                                <td className="px-4 py-2.5 text-right font-bold text-slate-700 font-mono">
-                                                                    {safeStockVal}개
+                                                                <td className="px-4 py-2.5 text-right font-black font-mono text-teal-700 bg-teal-50/30">
+                                                                    {row.shQty.toLocaleString()}개
                                                                 </td>
-                                                                <td className="px-4 py-2.5 text-left text-xs">
-                                                                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${isStockout ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
-                                                                        {isStockout ? '🚨 대경 결품 (수급 유의)' : '✅ 대경 정상 수급'}
+                                                                <td className="px-4 py-2.5 text-right font-bold text-slate-700 font-mono">
+                                                                    {row.safeStock.toLocaleString()}개
+                                                                </td>
+                                                                <td className="px-4 py-2.5 text-right font-black font-mono text-indigo-700">
+                                                                    {row.recommendedQty > 0 ? `${row.recommendedQty.toLocaleString()}개` : '—'}
+                                                                </td>
+                                                                <td className="px-4 py-2.5 text-left text-xs font-bold text-slate-700">
+                                                                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                                                        row.procurementReason.includes('🚨') ? 'bg-rose-100 text-rose-700 border border-rose-200' :
+                                                                        row.procurementReason.includes('🚛') ? 'bg-indigo-100 text-indigo-800 border border-indigo-200 shadow-xs' :
+                                                                        row.procurementReason.includes('⚠️') ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                                                        row.procurementReason.includes('📉') ? 'bg-slate-100 text-slate-600 border border-slate-200' :
+                                                                        'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                                                    }`}>
+                                                                        {row.procurementReason}
                                                                     </span>
                                                                 </td>
                                                             </tr>
@@ -5559,8 +5748,8 @@ if (displayList.length === 0) {
                                                     })}
                                                     {daekyungStockAverages.length === 0 && (
                                                         <tr>
-                                                            <td colSpan={dkViewMode === 'ITEM' ? 11 : 8} className="px-4 py-16 text-center text-slate-400 font-medium">
-                                                                조건에 부합하는 대경재고 데이터가 없거나 분석 중입니다.
+                                                            <td colSpan={dkViewMode === 'ITEM' ? 12 : 8} className="px-4 py-16 text-center text-slate-400 font-medium">
+                                                                조건에 해당하는 대경재고 품목이 없습니다.
                                                             </td>
                                                         </tr>
                                                     )}
