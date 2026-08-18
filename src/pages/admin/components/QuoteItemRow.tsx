@@ -4,6 +4,7 @@ import type { LineItem, Product } from '../../../types';
 import type { CustomPriceRecord } from '../../../store/useStore';
 import { findMatchingProduct, formatThickness } from '../../../lib/productUtils';
 import { formatCurrency } from '../../../lib/utils'; // Adjust path if needed
+import { convertLineItemStandard } from '../../../utils/unitConverter';
 
 interface QuoteItem extends LineItem {
     userUnitPrice?: number;
@@ -232,9 +233,21 @@ export const QuoteItemRow = React.memo(({
                         title="Material"
                         onChange={(e) => onItemChange(index, 'material', e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className="w-36 px-1 py-1.5 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
+                        className="w-32 px-1 py-1.5 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
                         placeholder="Mat"
                     />
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const converted = convertLineItemStandard(item);
+                            onItemChange(index, 'size', converted.size);
+                            onItemChange(index, 'material', converted.material);
+                        }}
+                        className="px-1.5 py-1 text-[11px] font-extrabold bg-slate-100 hover:bg-teal-100 hover:text-teal-700 text-slate-600 rounded border border-slate-200 transition-colors shrink-0 shadow-xs"
+                        title="이 항목 ANSI ↔ JIS 빠르게 변환"
+                    >
+                        ⇄
+                    </button>
                 </div>
             </td>
             <td className="px-2 py-2 text-center align-middle font-mono text-sm text-slate-600">

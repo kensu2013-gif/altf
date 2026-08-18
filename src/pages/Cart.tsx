@@ -5,8 +5,9 @@ import { useShallow } from 'zustand/react/shallow';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { formatCurrency } from '../lib/utils';
-import { Trash2, Send, Plus, Minus, Search, RotateCcw, Printer, ArrowRight, User, X } from 'lucide-react';
+import { Trash2, Send, Plus, Minus, Search, RotateCcw, Printer, ArrowRight, User, X, RefreshCw } from 'lucide-react';
 import type { LineItem } from '../types';
+import { convertLineItemStandard } from '../utils/unitConverter';
 import { PreviewModal } from '../components/ui/PreviewModal';
 import type { DocumentPayload, DocumentItem, DocumentType } from '../types/document';
 import { renderDocumentHTML } from '../lib/documentTemplate';
@@ -31,11 +32,12 @@ export default function QuotationEditor() {
     const { items, memo: quotationMemo } = useStore(useShallow((state) => state.quotation));
     // Use selector for stable reference
     const user = useStore(state => state.auth.user);
-    const { updateItem, removeItem, inventory, clearQuotation, incrementNewOrderCount, setQuotationMemo, uploadFile, pullDraftQuotation, uploadState, resetUpload, orders, setOrders } = useStore(useShallow((state) => ({
+    const { updateItem, removeItem, inventory, clearQuotation, setQuotationItems, incrementNewOrderCount, setQuotationMemo, uploadFile, pullDraftQuotation, uploadState, resetUpload, orders, setOrders } = useStore(useShallow((state) => ({
         updateItem: state.updateItem,
         removeItem: state.removeItem,
         inventory: state.inventory,
         clearQuotation: state.clearQuotation,
+        setQuotationItems: state.setQuotationItems,
         incrementNewOrderCount: state.incrementNewOrderCount,
         setQuotationMemo: state.setQuotationMemo,
         uploadFile: state.uploadFile,
@@ -520,6 +522,18 @@ export default function QuotationEditor() {
         setPreviewContent(html);
     };
 
+    const handleConvertStandard = (targetSystem?: 'ANSI' | 'JIS') => {
+        if (items.length === 0) return;
+        const targetIds = selectedIds.length > 0 ? selectedIds : items.map(i => i.id);
+        const newItems = items.map(item => {
+            if (targetIds.includes(item.id)) {
+                return convertLineItemStandard(item, targetSystem);
+            }
+            return item;
+        });
+        setQuotationItems(newItems);
+    };
+
     const handleSendOrder = async (overridePayload?: DocumentPayload): Promise<boolean> => {
         const payloadToUse = overridePayload || currentPayload;
         if (!payloadToUse || !savedDeliveryInfo) return false;
@@ -664,6 +678,15 @@ export default function QuotationEditor() {
                                 transition={{ delay: 0.2 }}
                                 className="flex items-center gap-3"
                             >
+                                <Button
+                                    variant="outline"
+                                    onClick={() => handleConvertStandard()}
+                                    className="gap-2 bg-teal-50 border-teal-200 text-teal-700 hover:bg-teal-100 hover:border-teal-300 shadow-sm font-bold text-sm"
+                                    title={selectedIds.length > 0 ? `선택된 ${selectedIds.length}개 항목 ANSI ↔ JIS 변환` : "전체 항목 ANSI ↔ JIS 변환"}
+                                >
+                                    <RefreshCw className="w-4 h-4 text-teal-600" />
+                                    ANSI ↔ JIS 변환 {selectedIds.length > 0 && `(${selectedIds.length})`}
+                                </Button>
                                 <Button variant="outline" onClick={handleClearAll} className="gap-2 bg-white/50 backdrop-blur-sm border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 shadow-sm font-bold">
                                     <RotateCcw className="w-4 h-4" />
                                     초기화
@@ -715,66 +738,66 @@ export default function QuotationEditor() {
                                                     />
                                                 </div>
                                             </th>
-                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center w-[40px]">
+                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center w-10">
                                                 <div className="flex flex-col items-center justify-center leading-tight">
                                                     <span className="text-sm font-extrabold text-slate-800">No.</span>
                                                 </div>
                                             </th>
-                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-[130px]">
+                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-32.5">
                                                 <div className="flex flex-col items-center justify-center leading-tight">
                                                     <span className="text-sm font-extrabold text-slate-800">품명</span>
                                                     <span className="text-[11px] font-bold text-slate-400">ITEM</span>
                                                 </div>
                                             </th>
-                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-[80px]">
+                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-20">
                                                 <div className="flex flex-col items-center justify-center leading-tight">
                                                     <span className="text-sm font-extrabold text-slate-800">두께</span>
                                                     <span className="text-[11px] font-bold text-slate-400">THICKNESS</span>
                                                 </div>
                                             </th>
-                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-[120px]">
+                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-30">
                                                 <div className="flex flex-col items-center justify-center leading-tight">
                                                     <span className="text-sm font-extrabold text-slate-800">규격</span>
                                                     <span className="text-[11px] font-bold text-slate-400">SIZE</span>
                                                 </div>
                                             </th>
-                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-[120px]">
+                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-30">
                                                 <div className="flex flex-col items-center justify-center leading-tight">
                                                     <span className="text-sm font-extrabold text-slate-800">재질</span>
                                                     <span className="text-[11px] font-bold text-slate-400">MATERIAL</span>
                                                 </div>
                                             </th>
-                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-[90px]">
+                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-22.5">
                                                 <div className="flex flex-col items-center justify-center leading-tight">
                                                     <span className="text-sm font-extrabold text-slate-800">재고</span>
                                                     <span className="text-[11px] font-bold text-slate-400">STOCK</span>
                                                 </div>
                                             </th>
-                                            <th className="px-1 py-3 border-r border-slate-300/60 text-center min-w-[140px]">
+                                            <th className="px-1 py-3 border-r border-slate-300/60 text-center min-w-35">
                                                 <div className="flex flex-col items-center justify-center leading-tight">
                                                     <span className="text-sm font-extrabold text-slate-800">상태</span>
                                                     <span className="text-[11px] font-bold text-slate-400">STAT</span>
                                                 </div>
                                             </th>
-                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-[120px]">
+                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-30">
                                                 <div className="flex flex-col items-center justify-center leading-tight">
                                                     <span className="text-sm font-extrabold text-slate-800">위치/제조사</span>
                                                     <span className="text-[11px] font-bold text-slate-400">LOC/MAKER</span>
                                                 </div>
                                             </th>
-                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-[100px]">
+                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-25">
                                                 <div className="flex flex-col items-center justify-center leading-tight">
                                                     <span className="text-sm font-extrabold text-slate-800">주문수량</span>
                                                     <span className="text-[11px] font-bold text-slate-400">QTY</span>
                                                 </div>
                                             </th>
-                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-[120px]">
+                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-30">
                                                 <div className="flex flex-col items-center justify-center leading-tight">
                                                     <span className="text-sm font-extrabold text-slate-800">출고단가</span>
                                                     <span className="text-[11px] font-bold text-slate-400">PRICE</span>
                                                 </div>
                                             </th>
-                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-[120px]">
+                                            <th className="px-1 py-3 border-r border-slate-200/60 text-center min-w-30">
                                                 <div className="flex flex-col items-center justify-center leading-tight">
                                                     <span className="text-sm font-extrabold text-slate-800">합계</span>
                                                     <span className="text-[11px] font-bold text-slate-400">AMOUNT</span>
@@ -1143,7 +1166,7 @@ export default function QuotationEditor() {
                         </motion.div>
 
                         <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-white/50 p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-100 flex items-center justify-between">
-                            <div className="max-w-[1400px] mx-auto w-full flex items-center justify-end gap-3 px-4">
+                            <div className="max-w-350 mx-auto w-full flex items-center justify-end gap-3 px-4">
                                 {selectedIds.length > 0 && (
                                     <Button
                                         variant="outline"
@@ -1154,11 +1177,11 @@ export default function QuotationEditor() {
                                         선택 ({selectedIds.length}) 삭제
                                     </Button>
                                 )}
-                                <Button variant="outline" onClick={() => handleDocAction('QUOTATION')} className="gap-2 w-[160px] h-12 text-base justify-center font-bold bg-white border-slate-200 shadow-sm hover:bg-slate-50">
+                                <Button variant="outline" onClick={() => handleDocAction('QUOTATION')} className="gap-2 w-40 h-12 text-base justify-center font-bold bg-white border-slate-200 shadow-sm hover:bg-slate-50">
                                     <Printer className="w-5 h-5" />
                                     견적서 출력
                                 </Button>
-                                <Button ref={submitButtonRef} onClick={() => handleDocAction('ORDER')} className="gap-2 bg-[#000F0F] hover:bg-teal-900 text-white shadow-lg shadow-teal-900/20 w-[200px] h-12 text-base justify-center font-bold transition-all hover:scale-[1.02]">
+                                <Button ref={submitButtonRef} onClick={() => handleDocAction('ORDER')} className="gap-2 bg-[#000F0F] hover:bg-teal-900 text-white shadow-lg shadow-teal-900/20 w-50 h-12 text-base justify-center font-bold transition-all hover:scale-[1.02]">
                                     <Send className="w-5 h-5" />
                                     주문서 제출하기
                                 </Button>

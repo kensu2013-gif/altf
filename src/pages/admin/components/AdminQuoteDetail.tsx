@@ -1,6 +1,6 @@
 
 import type { Quotation, LineItem, Order } from '../../../types';
-import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User, Image } from 'lucide-react';
+import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User, Image, RefreshCw } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { formatCurrency } from '../../../lib/utils';
 import { useState, useCallback, useMemo, useEffect } from 'react';
@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom';
 import { useStore, type DeliveryInfo, type CustomPriceRecord } from '../../../store/useStore';
 import { calculateCustomerGrade } from '../../../lib/customerUtils';
 import { renderDocumentHTML } from '../../../lib/documentTemplate';
+import { convertLineItemStandard } from '../../../utils/unitConverter';
 
 import type { DocumentPayload, DocumentItem } from '../../../types/document';
 import { OrderSubmissionOverlay } from '../../../components/ui/OrderSubmissionOverlay';
@@ -802,6 +803,18 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         setItems(prev => prev.map(item => ({ ...item, isSelected })));
     }, []);
 
+    const handleConvertStandard = useCallback((targetSystem?: 'ANSI' | 'JIS') => {
+        setItems(prev => {
+            const hasCheckedSome = prev.some(item => item.isSelected);
+            return prev.map(item => {
+                if (!hasCheckedSome || item.isSelected) {
+                    return convertLineItemStandard(item, targetSystem);
+                }
+                return item;
+            });
+        });
+    }, []);
+
     const handleDownload = () => {
         const calculatedTotal = selectedItems.reduce((sum, item) => sum + item.amount, 0);
         const totalWithCharges = calculatedTotal + charges.reduce((sum, c) => sum + c.amount, 0);
@@ -1324,10 +1337,21 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
                         {/* Quote Items Table (Negotiation) */}
                         <div className="bg-white rounded-xl border border-slate-200">
-                            <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                                <Package className="w-4 h-4 text-teal-600" />
-                                견적 품목 및 단가 조정 (Negotiation)
-                            </h3>
+                            <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-slate-50/50 rounded-t-xl">
+                                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                    <Package className="w-4 h-4 text-teal-600" />
+                                    견적 품목 및 단가 조정 (Negotiation)
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={() => handleConvertStandard()}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-lg text-xs font-bold transition-all shadow-xs"
+                                    title={selectedItems.length > 0 ? `선택된 ${selectedItems.length}개 품목 ANSI ↔ JIS 변환` : "전체 품목 ANSI ↔ JIS 변환"}
+                                >
+                                    <RefreshCw className="w-3.5 h-3.5 text-teal-600" />
+                                    <span>ANSI ↔ JIS 변환 {selectedItems.length > 0 && `(${selectedItems.length})`}</span>
+                                </button>
+                            </div>
                             <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-sm custom-scrollbar">
                                 <table className="w-full text-sm text-left min-w-[1000px]">
                                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-sm font-bold uppercase">

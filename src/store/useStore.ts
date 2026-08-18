@@ -76,6 +76,7 @@ export interface AppState {
     updateItem: (itemId: string, updates: Partial<LineItem>) => void;
     removeItem: (itemId: string) => void;
     clearQuotation: () => void;
+    setQuotationItems: (items: LineItem[]) => void;
     setQuotationMemo: (memo: string) => void;
     loadQuotation: (items: (QuoteImportItem | LineItem)[]) => void;
     syncDraftQuotation: () => Promise<void>;
@@ -822,6 +823,10 @@ export const useStore = create<AppState>()(
             },
             clearQuotation: () => {
                 set((state) => ({ quotation: { ...state.quotation, items: [], memo: '' } }));
+                get().syncDraftQuotation();
+            },
+            setQuotationItems: (items) => {
+                set((state) => ({ quotation: { ...state.quotation, items } }));
                 get().syncDraftQuotation();
             },
             setQuotationMemo: (memo) => {

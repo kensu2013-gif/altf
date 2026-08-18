@@ -324,6 +324,36 @@ async function loadData() {
                 await saveData();
             }
 
+            // Seed kensu2000@naver.com user if not exists or approved
+            const kensuUserEmail = 'kensu2000@naver.com';
+            const existingKensu = db.users.find(u => u.email === kensuUserEmail);
+            if (!existingKensu) {
+                const newKensuUser = {
+                    id: crypto.randomUUID(),
+                    email: kensuUserEmail,
+                    password: '1234',
+                    companyName: 'AltF Partner (kensu2000)',
+                    bizNo: '000-00-00000',
+                    contactName: 'kensu2000',
+                    phone: '010-0000-0000',
+                    address: 'Seoul, Korea',
+                    role: 'CUSTOMER',
+                    createdAt: new Date().toISOString(),
+                    agreedToTerms: true,
+                    agreedToPrivacy: true,
+                    agreedToMarketing: true,
+                    consentDate: new Date().toISOString(),
+                    status: 'APPROVED'
+                };
+                db.users.push(newKensuUser);
+                console.log(`[API] Seeded User: ${kensuUserEmail}`);
+                await saveData();
+            } else if (existingKensu.status !== 'APPROVED') {
+                existingKensu.status = 'APPROVED';
+                console.log(`[API] Approved User: ${kensuUserEmail}`);
+                await saveData();
+            }
+
             // June 19 self-healing block removed
         } else {
             // Seed Initial Admin if file doesn't exist
