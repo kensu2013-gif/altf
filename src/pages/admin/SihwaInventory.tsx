@@ -840,6 +840,7 @@ export default function SihwaInventory() {
         recent90dSales: number;
         recent180dSales: number;
         recent365dSales: number;
+        ytdSales?: number;
         quoteCount: number;
         recentOrderCount: number;
         recent90dOrderCount: number;
@@ -1050,7 +1051,9 @@ export default function SihwaInventory() {
 
         const activeOrderCutoff = performancePeriod === '60D' ? sixtyDaysAgo : performancePeriod === '1Y' ? oneYearAgo : ninetyDaysAgo;
 
-        const recentSalesMap: Record<string, { recent7d: number, recent30d: number, recent60d: number, recent90d: number, recent180d: number, recent365d: number }> = {};
+        const currentYearStart = new Date(new Date().getFullYear(), 0, 1).getTime();
+
+        const recentSalesMap: Record<string, { recent7d: number, recent30d: number, recent60d: number, recent90d: number, recent180d: number, recent365d: number, ytdSales: number }> = {};
         historyData.inventoryHistory.forEach((snap: InventoryHistorySnapshot) => {
             const snapDate = new Date(snap.date).getTime();
             if (isNaN(snapDate)) return;
@@ -1060,13 +1063,17 @@ export default function SihwaInventory() {
             const isWithin90d = snapDate >= ninetyDaysAgo;
             const isWithin180d = snapDate >= oneEightyDaysAgo;
             const isWithin365d = snapDate >= oneYearAgo;
+            const isWithinYtd = snapDate >= currentYearStart;
 
             if (isWithin365d && snap.diff) {
                 snap.diff.forEach((d: InventoryDiffItem) => {
                     if (d.change < 0) {
                         const absChg = Math.abs(d.change);
-                        if (!recentSalesMap[d.id]) recentSalesMap[d.id] = { recent7d: 0, recent30d: 0, recent60d: 0, recent90d: 0, recent180d: 0, recent365d: 0 };
+                        if (!recentSalesMap[d.id]) recentSalesMap[d.id] = { recent7d: 0, recent30d: 0, recent60d: 0, recent90d: 0, recent180d: 0, recent365d: 0, ytdSales: 0 };
                         recentSalesMap[d.id].recent365d += absChg;
+                        if (isWithinYtd) {
+                            recentSalesMap[d.id].ytdSales += absChg;
+                        }
                         if (isWithin180d) {
                             recentSalesMap[d.id].recent180d += absChg;
                         }
@@ -1202,6 +1209,7 @@ export default function SihwaInventory() {
                     recent90dSales: recentSales.recent90d,
                     recent180dSales: recentSales.recent180d,
                     recent365dSales: recentSales.recent365d || 0,
+                    ytdSales: recentSales.ytdSales || 0,
                     quoteCount: quoteCountMap[item.id] || 0,
                     recentOrderCount: activeOrderCountMap[item.id] || 0,
                     recent90dOrderCount: activeOrderCountMap[item.id] || 0,
@@ -1289,6 +1297,7 @@ export default function SihwaInventory() {
                         recent90dSales: recentSales.recent90d,
                         recent180dSales: recentSales.recent180d,
                         recent365dSales: recentSales.recent365d || 0,
+                        ytdSales: recentSales.ytdSales || 0,
                         quoteCount: quoteCountMap[id] || 0,
                         recentOrderCount: activeOrderCountMap[id] || 0,
                         recent90dOrderCount: activeOrderCountMap[id] || 0,
@@ -1458,6 +1467,13 @@ export default function SihwaInventory() {
             // ★ 최종 안전재고 상한선(Cap) 재적용 (가중치 승수 적용 후 오버플로우 방지)
             const finalAbsoluteCap = Math.max(300, Math.min(1000, Math.ceil(sihwaDailySales * 45)));
             safeStock = Math.min(safeStock, finalAbsoluteCap);
+
+            // ★ 사용자 기준 필터링: 연간(1년/365일) 판매량 < 30개 미만 OR 올해(YTD) 판매량 < 10개 미만 인 품목은 안전재고 미보유 (safeStock = 0)
+            const annualSalesVal = Math.max(row.recent365dSales || 0, row.salesVolume || 0);
+            const ytdSalesVal = row.ytdSales || 0;
+            if (annualSalesVal < 30 || ytdSalesVal < 10) {
+                safeStock = 0;
+            }
 
             // 악성재고: E급만
             const isDeadStock = healthGrade === 'E';
