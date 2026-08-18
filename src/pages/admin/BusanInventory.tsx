@@ -71,64 +71,86 @@ interface DaekyungStockAnalysisItem {
 // ══════════════════════════════════════════════════════════════
 
 /**
- * 복합 건전성 점수 산출
- * - 판매빈도 25% + 최근트렌드 25% + 견적문의 20% + 판매량규모 15% + 이익률 15%
+ * 다중 기간(연간/올해 전체 vs 최근 90일 재고보유 기준) 복합 건전성 점수 산출
+ * - 연간 베이스(판매량+빈도) 35% + 최근 90일 실적(판매량+출고건수) 35% + 견적수요 15% + 마진율 15%
+ * - 소수량 단기 착시 방지 (Sales Volume Floor 적용)
  */
 function calcCompositeScore(row: {
     salesFreq: number;
     salesVolume: number;
     recent30dSales: number;
-    recent60dSales: number;
+    recent60dSales?: number;
+    recent90dSales?: number;
     quoteCount: number;
     profitMarginRate: number;
+    recent90dOrderCount?: number;
 }): number {
-    const salesFreqScore =
-        row.salesFreq >= 30 ? 100 :
-            row.salesFreq >= 10 ? 70 :
-                row.salesFreq >= 5 ? 40 :
-                    row.salesFreq >= 1 ? 15 : 0;
+    // 1. 연간 베이스 점수 (Volume + Frequency)
+    const annualVolumeScore =
+        row.salesVolume >= 300 ? 100 :
+            row.salesVolume >= 100 ? 80 :
+                row.salesVolume >= 30 ? 55 :
+                    row.salesVolume >= 10 ? 30 : 0;
 
-    const monthlyExpected = row.salesVolume / 12;
-    const trendRatio = monthlyExpected > 0 ? (row.recent30dSales / monthlyExpected) : 0;
-    const recentTrendScore = Math.min(100,
-        trendRatio >= 1.0 ? 100 :
-            trendRatio >= 0.5 ? 80 :
-                trendRatio >= 0.2 ? 50 :
-                    row.recent60dSales > 0 ? 30 : 0
-    );
+    const annualFreqScore =
+        row.salesFreq >= 20 ? 100 :
+            row.salesFreq >= 10 ? 75 :
+                row.salesFreq >= 5 ? 50 :
+                    row.salesFreq >= 2 ? 25 : 0;
 
+    const annualBaseScore = annualVolumeScore * 0.6 + annualFreqScore * 0.4;
+
+    // 2. 최근 90일(재고 보유 기간) 실적 점수
+    const recent90dSales = row.recent90dSales || (row.recent60dSales ? Math.round(row.recent60dSales * 1.5) : row.recent30dSales * 3) || 0;
+    const recent90dOrders = row.recent90dOrderCount || (row.recent30dSales > 0 ? 1 : 0);
+
+    const r90VolumeScore =
+        recent90dSales >= 100 ? 100 :
+            recent90dSales >= 50 ? 85 :
+                recent90dSales >= 20 ? 70 :
+                    recent90dSales >= 10 ? 50 :
+                        recent90dSales >= 3 ? 30 : 0;
+
+    const r90FreqScore =
+        recent90dOrders >= 10 ? 100 :
+            recent90dOrders >= 5 ? 80 :
+                recent90dOrders >= 3 ? 60 :
+                    recent90dOrders >= 1 ? 30 : 0;
+
+    const recent90dPerformanceScore = r90VolumeScore * 0.6 + r90FreqScore * 0.4;
+
+    // 3. 견적 수요 점수
     const quoteDemandScore =
-        row.quoteCount >= 3 ? 100 :
-            row.quoteCount >= 1 ? 60 : 0;
+        row.quoteCount >= 5 ? 100 :
+            row.quoteCount >= 3 ? 80 :
+                row.quoteCount >= 1 ? 50 : 0;
 
-    const salesVolumeScore =
-        row.salesVolume >= 500 ? 100 :
-            row.salesVolume >= 200 ? 75 :
-                row.salesVolume >= 50 ? 50 :
-                    row.salesVolume >= 10 ? 25 : 0;
-
+    // 4. 이익률 점수
     const profitScore =
         row.profitMarginRate >= 30 ? 100 :
             row.profitMarginRate >= 20 ? 75 :
                 row.profitMarginRate >= 10 ? 50 :
                     row.profitMarginRate >= 0 ? 25 : 0;
 
-    let bonusScore = 0;
-    if (row.recent30dSales >= Math.max(10, row.salesVolume / 12 * 1.5)) bonusScore += 15; // 최근 30일 단기 급등
-    else if (row.recent60dSales > 0) bonusScore += 5; // 소량이라도 판매 유지 중
-
-    if (row.quoteCount >= 5) bonusScore += 10; // 최근 견적 급증
-
-    const finalScore = Math.round(
-        salesFreqScore * 0.25 +
-        recentTrendScore * 0.25 +
-        quoteDemandScore * 0.20 +
-        salesVolumeScore * 0.15 +
-        profitScore * 0.15 +
-        bonusScore
+    let baseCalculatedScore = Math.round(
+        annualBaseScore * 0.35 +
+        recent90dPerformanceScore * 0.35 +
+        quoteDemandScore * 0.15 +
+        profitScore * 0.15
     );
 
-    return Math.min(100, finalScore);
+    // ★ 안전 가드 (Safety Floor & Cap Guards):
+    // A. 90일 실제 출고 50개 이상 또는 (90일 20개 이상 & 연간 100개 이상 주력규격): 무조건 A급 보장 (Score >= 72)
+    if (recent90dSales >= 50 || (recent90dSales >= 20 && row.salesVolume >= 100 && recent90dOrders >= 3)) {
+        baseCalculatedScore = Math.max(72, baseCalculatedScore);
+    }
+
+    // B. 소량 품목 산출착시 방지 캡: 최근 90일 출고가 15개 미만이고 연간 50개 미만인 품목은 상한선 64점 (Max B급)
+    if (recent90dSales < 15 && row.salesVolume < 50 && recent90dOrders < 5) {
+        baseCalculatedScore = Math.min(64, baseCalculatedScore);
+    }
+
+    return Math.min(100, Math.max(0, baseCalculatedScore));
 }
 
 /**

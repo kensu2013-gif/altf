@@ -304,7 +304,7 @@ export const QuoteItemRow = React.memo(({
                         const waitStock = product?.marking_wait_qty ?? item.marking_wait_qty ?? 0;
 
                         return (
-                            <div className="flex flex-col items-center text-xs rounded border p-1.5 w-auto min-w-[85px] mx-auto space-y-0.5 transition-colors duration-300 bg-slate-50 border-slate-100">
+                            <div className="flex flex-col items-center text-xs rounded border p-1.5 w-auto min-w-21.25 mx-auto space-y-0.5 transition-colors duration-300 bg-slate-50 border-slate-100">
                                 <div className="flex justify-between w-full gap-2 whitespace-nowrap">
                                     <span className="text-slate-500">양산:</span>
                                     <span className="font-bold text-slate-800">{ysStock.toLocaleString()}</span>

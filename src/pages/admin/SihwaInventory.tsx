@@ -17,7 +17,8 @@ import {
     Filter,
     X,
     RefreshCw,
-    Pin
+    Pin,
+    Trash2
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
@@ -38,11 +39,9 @@ const formatCur = (num: number) => new Intl.NumberFormat('ko-KR').format(num);
 const calculateSellingPrice = (id: string, basePrice: number): number => {
     const upperId = id.toUpperCase();
     if (upperId.startsWith('CAP') || upperId.endsWith('-W')) {
-        return Math.round((basePrice * 35 / 100) / 10) * 10;
-    } else if (upperId.endsWith('-S')) {
-        return Math.round((basePrice * 65 / 100) / 10) * 10;
+        return Math.round((basePrice * 1.05) / 10) * 10;
     }
-    return basePrice;
+    return Math.round((basePrice * 1.10) / 10) * 10;
 };
 
 // ── 재고 회전율 기준 상수 ──────────────────────────────
@@ -83,12 +82,13 @@ interface DaekyungStockAnalysisItem {
 }
 
 // ══════════════════════════════════════════════════════════════
-// ★ 새 등급 시스템: 5개 지표 복합 점수 (100점 만점)
+// ★ 다중 기간 건전성 등급 산출 로직 (연간/올해 + 최근 90일 재고보유 윈도우 연계)
 // ══════════════════════════════════════════════════════════════
 
 /**
- * 복합 건전성 점수 산출
- * - 판매빈도 25% + 최근트렌드 25% + 견적문의 20% + 판매량규모 15% + 이익률 15%
+ * 다중 기간(연간/올해 전체 vs 최근 90일 재고보유 기준) 복합 건전성 점수 산출
+ * - 연간 베이스(판매량+빈도) 35% + 최근 90일 실적(판매량+출고건수) 35% + 견적수요 15% + 마진율 15%
+ * - 소수량 단기 착시 방지 (Sales Volume Floor 적용)
  */
 function calcCompositeScore(row: {
     salesFreq: number;
@@ -97,54 +97,74 @@ function calcCompositeScore(row: {
     recent90dSales: number;
     quoteCount: number;
     profitMarginRate: number;
+    recent90dOrderCount?: number;
 }): number {
-    const salesFreqScore =
-        row.salesFreq >= 30 ? 100 :
-            row.salesFreq >= 10 ? 70 :
-                row.salesFreq >= 5 ? 40 :
-                    row.salesFreq >= 1 ? 15 : 0;
+    // 1. 연간 베이스 점수 (Volume + Frequency)
+    const annualVolumeScore =
+        row.salesVolume >= 300 ? 100 :
+            row.salesVolume >= 100 ? 80 :
+                row.salesVolume >= 30 ? 55 :
+                    row.salesVolume >= 10 ? 30 : 0;
 
-    const monthlyExpected = row.salesVolume / 12;
-    const trendRatio = monthlyExpected > 0 ? (row.recent30dSales / monthlyExpected) : 0;
-    const recentTrendScore = Math.min(100,
-        trendRatio >= 1.0 ? 100 :
-            trendRatio >= 0.5 ? 80 :
-                trendRatio >= 0.2 ? 50 :
-                    row.recent90dSales > 0 ? 30 : 0
-    );
+    const annualFreqScore =
+        row.salesFreq >= 20 ? 100 :
+            row.salesFreq >= 10 ? 75 :
+                row.salesFreq >= 5 ? 50 :
+                    row.salesFreq >= 2 ? 25 : 0;
 
+    const annualBaseScore = annualVolumeScore * 0.6 + annualFreqScore * 0.4;
+
+    // 2. 최근 90일(재고 보유 기간) 실적 점수
+    const recent90dSales = row.recent90dSales || 0;
+    const recent90dOrders = row.recent90dOrderCount || (row.recent30dSales > 0 ? 1 : 0);
+
+    const r90VolumeScore =
+        recent90dSales >= 100 ? 100 :
+            recent90dSales >= 50 ? 85 :
+                recent90dSales >= 20 ? 70 :
+                    recent90dSales >= 10 ? 50 :
+                        recent90dSales >= 3 ? 30 : 0;
+
+    const r90FreqScore =
+        recent90dOrders >= 10 ? 100 :
+            recent90dOrders >= 5 ? 80 :
+                recent90dOrders >= 3 ? 60 :
+                    recent90dOrders >= 1 ? 30 : 0;
+
+    const recent90dPerformanceScore = r90VolumeScore * 0.6 + r90FreqScore * 0.4;
+
+    // 3. 견적 수요 점수
     const quoteDemandScore =
-        row.quoteCount >= 3 ? 100 :
-            row.quoteCount >= 1 ? 60 : 0;
+        row.quoteCount >= 5 ? 100 :
+            row.quoteCount >= 3 ? 80 :
+                row.quoteCount >= 1 ? 50 : 0;
 
-    const salesVolumeScore =
-        row.salesVolume >= 500 ? 100 :
-            row.salesVolume >= 200 ? 75 :
-                row.salesVolume >= 50 ? 50 :
-                    row.salesVolume >= 10 ? 25 : 0;
-
+    // 4. 이익률 점수
     const profitScore =
         row.profitMarginRate >= 30 ? 100 :
             row.profitMarginRate >= 20 ? 75 :
                 row.profitMarginRate >= 10 ? 50 :
                     row.profitMarginRate >= 0 ? 25 : 0;
 
-    let bonusScore = 0;
-    if (row.recent30dSales >= Math.max(10, row.salesVolume / 12 * 1.5)) bonusScore += 15; // 최근 30일 단기 급등
-    else if (row.recent90dSales > 0) bonusScore += 5; // 소량이라도 판매 유지 중
-
-    if (row.quoteCount >= 5) bonusScore += 10; // 최근 견적 급증
-
-    const finalScore = Math.round(
-        salesFreqScore * 0.25 +
-        recentTrendScore * 0.25 +
-        quoteDemandScore * 0.20 +
-        salesVolumeScore * 0.15 +
-        profitScore * 0.15 +
-        bonusScore
+    let baseCalculatedScore = Math.round(
+        annualBaseScore * 0.35 +
+        recent90dPerformanceScore * 0.35 +
+        quoteDemandScore * 0.15 +
+        profitScore * 0.15
     );
 
-    return Math.min(100, finalScore);
+    // ★ 안전 가드 (Safety Floor & Cap Guards):
+    // A. 90일 실제 출고 50개 이상 또는 (90일 20개 이상 & 연간 100개 이상 주력규격): 무조건 A급 보장 (Score >= 72)
+    if (recent90dSales >= 50 || (recent90dSales >= 20 && row.salesVolume >= 100 && recent90dOrders >= 3)) {
+        baseCalculatedScore = Math.max(72, baseCalculatedScore);
+    }
+
+    // B. 소량 품목 산출착시 방지 캡: 최근 90일 출고가 15개 미만이고 연간 50개 미만인 품목은 상한선 64점 (Max B급)
+    if (recent90dSales < 15 && row.salesVolume < 50 && recent90dOrders < 5) {
+        baseCalculatedScore = Math.min(64, baseCalculatedScore);
+    }
+
+    return Math.min(100, Math.max(0, baseCalculatedScore));
 }
 
 /**
@@ -294,6 +314,21 @@ export default function SihwaInventory() {
     const [dkFilterHealthGrade, setDkFilterHealthGrade] = useState<string>('ALL');
     const [sihwaFilterHealthGrade, setSihwaFilterHealthGrade] = useState<string>('ALL');
     const [dkViewMode, setDkViewMode] = useState<'ITEM' | 'MATERIAL'>('ITEM');
+
+    // 대경재고 일괄 발주 수량 입력 팝업 모달 상태
+    const [isDkOrderModalOpen, setIsDkOrderModalOpen] = useState(false);
+    const [dkOrderModalItems, setDkOrderModalItems] = useState<Array<{
+        id: string;
+        name: string;
+        thickness: string;
+        size: string;
+        material: string;
+        ysQty: number;
+        shQty: number;
+        recommendedQty: number;
+        orderQty: number;
+        unitPrice: number;
+    }>>([]);
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
         'CRITICAL': true,
         'SURGING': true,
@@ -1299,9 +1334,15 @@ export default function SihwaInventory() {
                 salesVolume: row.salesVolume,
                 recent30dSales: row.recent30dSales,
                 recent90dSales: row.recent90dSales,
+                recent90dOrderCount: row.recent90dOrderCount,
                 quoteCount: row.quoteCount,
                 profitMarginRate: row.profitMarginRate,
             });
+
+            // 재고 회전율 (연간 출고 환산량 / 총 보유재고)
+            const totalHoldingStock = Math.max(1, row.shQty + row.ysQty);
+            const annualizedSales = Math.max((row.recent90dSales || 0) * 4, row.salesVolume || 0);
+            const turnoverRate = parseFloat((annualizedSales / totalHoldingStock).toFixed(1));
 
             const healthGrade = getHealthGradeFromScore(
                 compositeScore,
@@ -1593,6 +1634,7 @@ export default function SihwaInventory() {
                 isSurgingDemand,
                 procurementCategory,
                 procurementReason,
+                turnoverRate
             };
             });
 
@@ -1997,35 +2039,63 @@ export default function SihwaInventory() {
         else setSelectedRegularIds(new Set());
     };
 
-    const handleCreateSelectedDaekyungOrders = () => {
+    const handleOpenDkOrderModal = () => {
         if (selectedDkIds.size === 0) return;
-        let addedCount = 0;
+        const modalList: typeof dkOrderModalItems = [];
         selectedDkIds.forEach(id => {
             const sihwaRow = baseAnalyzedInventoryMap.get(id);
             const dkRow = daekyungStockAverages.find(r => r.id === id);
-            const qty = sihwaRow?.recommendedQty && sihwaRow.recommendedQty > 0 ? sihwaRow.recommendedQty : 1;
+            const recQty = sihwaRow?.recommendedQty && sihwaRow.recommendedQty > 0
+                ? sihwaRow.recommendedQty
+                : (sihwaRow?.deficit && sihwaRow.deficit > 0 ? sihwaRow.deficit : 10);
             const price = sihwaRow?.recentPurchasePrice ?? 0;
             const name = dkRow?.name || sihwaRow?.product.name || id;
 
-            addItem({
-                id: crypto.randomUUID(),
-                productId: id,
-                name: name,
+            modalList.push({
+                id,
+                name,
                 thickness: sihwaRow?.product.thickness || '',
                 size: dkRow?.size || sihwaRow?.product.size || '',
                 material: dkRow?.material || sihwaRow?.product.material || '',
-                quantity: qty,
-                unitPrice: price,
-                amount: price * qty,
+                ysQty: dkRow?.currentStock || sihwaRow?.ysQty || 0,
+                shQty: sihwaRow?.shQty || 0,
+                recommendedQty: sihwaRow?.recommendedQty || 0,
+                orderQty: recQty,
+                unitPrice: price
+            });
+        });
+
+        setDkOrderModalItems(modalList);
+        setIsDkOrderModalOpen(true);
+    };
+
+    const handleConfirmDkOrderModalSubmit = () => {
+        let addedCount = 0;
+        dkOrderModalItems.forEach(item => {
+            if (item.orderQty <= 0) return;
+            addItem({
+                id: crypto.randomUUID(),
+                productId: item.id,
+                name: item.name || item.id,
+                thickness: item.thickness,
+                size: item.size,
+                material: item.material,
+                quantity: item.orderQty,
+                unitPrice: item.unitPrice,
+                amount: item.unitPrice * item.orderQty,
                 note: '[대경재고 분석] 일괄 발주',
                 isVerified: false
             });
             addedCount++;
         });
 
-        alert(`선택한 ${addedCount}개 품목이 발주 장바구니에 추가되었습니다. 매입/발주 페이지로 이동합니다.`);
-        setSelectedDkIds(new Set());
-        navigate('/admin/purchases');
+        if (addedCount > 0) {
+            setIsDkOrderModalOpen(false);
+            setSelectedDkIds(new Set());
+            navigate('/quote');
+        } else {
+            alert('발주 수량이 1개 이상인 품목이 없습니다.');
+        }
     };
 
     const handleCreateOrder = (selectedSet: Set<string>, listType: 'CRITICAL' | 'WARNING' | 'REGULAR') => {
@@ -2581,7 +2651,7 @@ export default function SihwaInventory() {
             isVerified: false
         });
 
-        navigate('/cart');
+        navigate('/quote');
     };
 
 
@@ -5972,12 +6042,130 @@ if (displayList.length === 0) {
                             선택 해제
                         </button>
                         <button
-                            onClick={handleCreateSelectedDaekyungOrders}
+                            onClick={handleOpenDkOrderModal}
                             className="bg-indigo-600 hover:bg-indigo-500 text-white font-black px-6 py-2.5 rounded-lg sm:rounded-full flex items-center gap-2 transition-all shadow-lg hover:shadow-indigo-500/50"
                         >
                             <ShoppingCart className="w-5 h-5" />
                             선택 품목 일괄 발주서 작성 ({selectedDkIds.size}건)
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 대경재고 선택 품목 일괄 발주 수량 확인/수정 팝업 모달 */}
+            {isDkOrderModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 text-slate-800">
+                        <div className="px-6 py-4 bg-indigo-900 text-white flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <ShoppingCart className="w-5 h-5 text-indigo-400" />
+                                <h3 className="font-extrabold text-lg">대경재고 선택 품목 일괄 발주 수량 설정 ({dkOrderModalItems.length}건)</h3>
+                            </div>
+                            <button onClick={() => setIsDkOrderModalOpen(false)} aria-label="닫기" className="text-slate-400 hover:text-white transition">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                            <div className="bg-indigo-50 border border-indigo-200 p-3.5 rounded-xl text-indigo-900 text-xs font-semibold leading-relaxed">
+                                💡 선택하신 품목들의 발주 수량을 개별 수정할 수 있습니다. 
+                                수량 조정을 완료한 후 <strong>[견적서 담기 및 견적페이지(/quote) 이동]</strong> 버튼을 누르시면, 지정한 수량이 앞단 견적 페이지로 즉시 전송됩니다.
+                            </div>
+
+                            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                                <table className="w-full text-left text-xs border-collapse">
+                                    <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                                        <tr>
+                                            <th className="p-3">품목 코드 / 규격</th>
+                                            <th className="p-3 text-right">대경재고</th>
+                                            <th className="p-3 text-right">시화재고</th>
+                                            <th className="p-3 text-right">권장수량</th>
+                                            <th className="p-3 text-center w-28">발주 수량 (입력)</th>
+                                            <th className="p-3 text-right">예상 매입단가</th>
+                                            <th className="p-3 text-right">합계금액</th>
+                                            <th className="p-3 text-center w-12">삭제</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 font-medium">
+                                        {dkOrderModalItems.map((item, idx) => (
+                                            <tr key={item.id} className="hover:bg-slate-50">
+                                                <td className="p-3 font-mono">
+                                                    <div className="font-bold text-slate-900">{item.id}</div>
+                                                    <div className="text-[10px] text-slate-400">{[item.name, item.size, item.material].filter(Boolean).join(' / ')}</div>
+                                                </td>
+                                                <td className="p-3 text-right font-mono text-slate-600">{item.ysQty}개</td>
+                                                <td className="p-3 text-right font-mono text-teal-700 font-bold">{item.shQty}개</td>
+                                                <td className="p-3 text-right font-mono text-indigo-600 font-bold">{item.recommendedQty}개</td>
+                                                <td className="p-3 text-center">
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        value={item.orderQty}
+                                                        onChange={(e) => {
+                                                            const val = Math.max(1, parseInt(e.target.value) || 1);
+                                                            setDkOrderModalItems(prev => {
+                                                                const next = [...prev];
+                                                                next[idx].orderQty = val;
+                                                                return next;
+                                                            });
+                                                        }}
+                                                        className="w-20 px-2 py-1 text-center font-extrabold font-mono border rounded-lg border-indigo-300 bg-white text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs"
+                                                    />
+                                                </td>
+                                                <td className="p-3 text-right font-mono text-slate-600">
+                                                    {item.unitPrice > 0 ? `${item.unitPrice.toLocaleString()}원` : '—'}
+                                                </td>
+                                                <td className="p-3 text-right font-mono font-bold text-indigo-700">
+                                                    {item.unitPrice > 0 ? `${(item.unitPrice * item.orderQty).toLocaleString()}원` : '—'}
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    <button
+                                                        onClick={() => {
+                                                            setDkOrderModalItems(prev => prev.filter((_, i) => i !== idx));
+                                                        }}
+                                                        className="text-slate-300 hover:text-rose-600 transition p-1"
+                                                        title="품목 제외"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {dkOrderModalItems.length === 0 && (
+                                            <tr>
+                                                <td colSpan={8} className="p-8 text-center text-slate-400">
+                                                    선택된 발주 품목이 없습니다.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+                            <div className="text-xs text-slate-600">
+                                선택 품목 총 <strong className="text-indigo-600 text-sm font-black">{dkOrderModalItems.length}</strong>개 | 
+                                총 수량 <strong className="text-indigo-600 text-sm font-black">{dkOrderModalItems.reduce((s, i) => s + i.orderQty, 0)}</strong>개 | 
+                                예상 금액 <strong className="text-emerald-600 text-sm font-black">{dkOrderModalItems.reduce((s, i) => s + (i.unitPrice * i.orderQty), 0).toLocaleString()}</strong>원
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setIsDkOrderModalOpen(false)}
+                                    className="px-4 py-2 border border-slate-300 hover:bg-slate-100 rounded-lg text-slate-700 font-bold text-xs transition"
+                                >
+                                    취소
+                                </button>
+                                <button
+                                    onClick={handleConfirmDkOrderModalSubmit}
+                                    disabled={dkOrderModalItems.length === 0}
+                                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-extrabold rounded-lg text-xs flex items-center gap-1.5 shadow-md transition cursor-pointer"
+                                >
+                                    <ShoppingCart className="w-4 h-4" />
+                                    견적서 담기 및 견적페이지(/quote) 이동
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
