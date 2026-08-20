@@ -81,6 +81,8 @@ interface DaekyungStockAnalysisItem {
     quoteCount?: number;
     recent90dSales?: number;
     recent90dOrderCount?: number;
+    pendingOrderQty?: number;
+    pendingOrderDetails?: { poNumber: string; deliveryDate?: string }[];
 }
 
 
@@ -1818,6 +1820,8 @@ export default function BusanInventory() {
             const quoteCount = busanRow?.quoteCount ?? 0;
             const recent90dSales = busanRow?.recent90dSales ?? 0;
             const recent90dOrderCount = busanRow?.recent90dOrderCount ?? 0;
+            const pendingOrderQty = busanRow?.pendingOrderQty ?? 0;
+            const pendingOrderDetails = busanRow?.pendingOrderDetails;
             const procurementCategory = busanRow?.procurementCategory ?? 'STABLE';
             const procurementReason = busanRow?.procurementReason || (
                 r.currentStock === 0 
@@ -1841,6 +1845,8 @@ export default function BusanInventory() {
                 quoteCount,
                 recent90dSales,
                 recent90dOrderCount,
+                pendingOrderQty,
+                pendingOrderDetails,
             };
         });
 
