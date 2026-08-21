@@ -72,6 +72,8 @@ export interface LineItem {
 
     // UI State
     isSelected?: boolean; // True if included in documents
+    convertedToOrder?: boolean; // True if this line item has been converted to an order
+    convertedOrderId?: string; // ID of the order this item was converted into
     tags?: string[]; // [NEW] Status tags/stickers like '재고품', '사급'
 }
 
@@ -90,7 +92,7 @@ export interface Quotation {
         fax?: string;
     };
     items: LineItem[];
-    status: 'DRAFT' | 'SUBMITTED' | 'IN_REVIEW' | 'PROCESSING' | 'PROCESSED' | 'COMPLETED';
+    status: 'DRAFT' | 'SUBMITTED' | 'IN_REVIEW' | 'PROCESSING' | 'PROCESSED' | 'COMPLETED' | 'PARTIAL_ORDERED';
     totalAmount: number;
     createdAt: string;
     memo?: string; // Inquiry/Request

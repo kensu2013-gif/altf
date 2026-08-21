@@ -182,21 +182,27 @@ export const QuoteItemRow = React.memo(({
     };
 
     return (
-        <tr className={`${isSelected ? '' : 'opacity-40 grayscale'} ${isUnlinked ? 'bg-red-50/30' : 'bg-white hover:bg-slate-50'} transition-all`}>
+        <tr className={`${item.convertedToOrder ? 'bg-blue-50/20' : (isSelected ? '' : 'opacity-40 grayscale')} ${isUnlinked ? 'bg-red-50/30' : 'bg-white hover:bg-slate-50'} transition-all`}>
             <td className="px-2 py-3 text-center align-middle">
                 <input
                     type="checkbox"
-                    checked={isSelected}
+                    checked={item.convertedToOrder ? false : isSelected}
+                    disabled={item.convertedToOrder}
                     onChange={(e) => onItemSelect?.(index, e.target.checked)}
-                    className="w-3.5 h-3.5 cursor-pointer accent-teal-600"
-                    title="품목 선택"
+                    className="w-3.5 h-3.5 cursor-pointer accent-teal-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                    title={item.convertedToOrder ? "이미 발주 완료된 품목입니다" : "품목 선택"}
                 />
             </td>
             <td className="px-1 py-3 text-center align-middle text-xs font-bold text-slate-500">
                 {index + 1}
             </td>
             <td className="px-4 py-3 text-left align-middle">
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 flex-wrap">
+                    {item.convertedToOrder && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200 shrink-0">
+                            발주 완료
+                        </span>
+                    )}
                     <input
                         type="text"
                         value={item.name}

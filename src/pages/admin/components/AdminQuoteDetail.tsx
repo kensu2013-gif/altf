@@ -800,7 +800,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     }, []);
 
     const handleSelectAll = useCallback((isSelected: boolean) => {
-        setItems(prev => prev.map(item => ({ ...item, isSelected })));
+        setItems(prev => prev.map(item => item.convertedToOrder ? item : { ...item, isSelected }));
     }, []);
 
     const handleConvertStandard = useCallback((targetSystem?: 'ANSI' | 'JIS') => {
@@ -1066,11 +1066,19 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     };
 
     const handleConvertOrder = () => {
+        // Filter items that are selected and not yet converted to order
+        const convertableItems = items.filter(item => item.isSelected !== false && !item.convertedToOrder);
+
+        if (convertableItems.length === 0) {
+            alert('발주서로 전환할 품목을 선택해 주세요. (이미 발주 완료된 품목은 제외됩니다.)');
+            return;
+        }
+
         // Construct Order Payload from Quote
         const now = new Date();
         const docNo = `O-${now.toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
 
-        const docItems: DocumentItem[] = items.map((item, idx) => {
+        const docItems: DocumentItem[] = convertableItems.map((item, idx) => {
             const product = getProductInfo(item.productId);
             return {
                 no: idx + 1,
@@ -1092,6 +1100,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 rate: item.discountRate // Carry over negotiated rate
             };
         });
+
+        const convertableTotal = convertableItems.reduce((sum, item) => sum + item.amount, 0);
 
         const payload: DocumentPayload = {
             document_type: 'ORDER',
@@ -1122,7 +1132,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             },
             items: docItems,
             totals: {
-                total_amount: totalWithCharges, // Use confirmed price
+                total_amount: convertableTotal, // Price for selected items only
                 currency: 'KRW',
                 additional_charges: charges // Carry over charges
             }
@@ -1359,7 +1369,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             <th className="px-2 py-3 w-[2%] text-center">
                                                 <input
                                                     type="checkbox"
-                                                    checked={items.length > 0 && selectedItems.length === items.length}
+                                                    checked={items.filter(i => !i.convertedToOrder).length > 0 && items.filter(i => !i.convertedToOrder).every(i => i.isSelected !== false)}
                                                     onChange={(e) => handleSelectAll(e.target.checked)}
                                                     className="w-3.5 h-3.5 cursor-pointer accent-teal-600"
                                                     title="전체 선택/해제"

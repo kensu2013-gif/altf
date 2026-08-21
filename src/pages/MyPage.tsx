@@ -283,8 +283,22 @@ export default function MyPage() {
         window.location.reload();
     };
 
-    const handleInitiateOrder = (quote: QuotationRecord) => {
-        setPendingQuoteForOrder(quote);
+    const handleInitiateOrder = (quote: QuotationRecord, selectedItems?: LineItem[]) => {
+        const itemsToUse = selectedItems && selectedItems.length > 0
+            ? selectedItems
+            : quote.items.filter(item => item.isSelected !== false && !item.convertedToOrder);
+
+        if (itemsToUse.length === 0) {
+            alert('발주서로 전환할 품목을 선택해 주세요. (이미 발주 완료된 품목은 제외됩니다.)');
+            return;
+        }
+
+        const quoteForOrder = {
+            ...quote,
+            items: itemsToUse
+        };
+
+        setPendingQuoteForOrder(quoteForOrder);
         setPreviewPayload(null);
         setIsDeliveryModalOpen(true);
     };
@@ -388,7 +402,7 @@ export default function MyPage() {
 
     const handleViewAnswer = (quote: QuotationRecord) => {
 
-        if (!['PROCESSED', 'processed', 'COMPLETED', 'completed'].includes(quote.status)) return;
+        if (!['PROCESSED', 'processed', 'COMPLETED', 'completed', 'PARTIAL_ORDERED'].includes(quote.status)) return;
 
         const docNo = `Q-ANS-${quote.id.slice(0, 8)}`;
 
@@ -443,13 +457,7 @@ export default function MyPage() {
             },
             items: docItems,
             totals: {
-                total_amount: quote.totalAmount, // View Quote uses original amount? Or confirmed? Usually Quote view shows what was sent.
-                // Actually if Admin Confirmed Price, we should probably show it? 
-                // But Quote Record has totalAmount. Let's stick to Record's totalAmount for Quote View, 
-                // but Order uses Confirmed Price.
-                // Wait, if Admin changed price, quote.totalAmount deals with it? 
-                // AdminQuoteDetail updates state. If saved, it updates DB quote.totalAmount.
-                // So quote.totalAmount SHOULD be correct.
+                total_amount: quote.totalAmount,
                 currency: 'KRW',
                 additional_charges: quote.adminResponse?.additionalCharges
             }
@@ -458,7 +466,7 @@ export default function MyPage() {
         const html = renderDocumentHTML(payload);
 
         // Pass onOrder handler if processed or completed (allow re-order)
-        const onOrderHandler = ['PROCESSED', 'processed', 'COMPLETED', 'completed'].includes(quote.status)
+        const onOrderHandler = ['PROCESSED', 'processed', 'COMPLETED', 'completed', 'PARTIAL_ORDERED'].includes(quote.status)
             ? () => handleInitiateOrder(quote)
             : undefined;
 
@@ -546,6 +554,7 @@ export default function MyPage() {
             SUBMITTED: 'bg-yellow-100 text-yellow-800 border-yellow-200',
             PROCESSING: 'bg-blue-100 text-blue-800 border-blue-200',
             PROCESSED: 'bg-teal-100 text-teal-800 border-teal-200',
+            PARTIAL_ORDERED: 'bg-amber-100 text-amber-800 border-amber-200',
             COMPLETED: 'bg-green-100 text-green-800 border-green-200',
             HOLD: 'bg-orange-100 text-orange-800 border-orange-200',
             WITHDRAW: 'bg-rose-100 text-rose-800 border-rose-200',
@@ -560,6 +569,7 @@ export default function MyPage() {
             SUBMITTED: '견적확인중',
             PROCESSING: '답변작성중',
             PROCESSED: '답변 완료',
+            PARTIAL_ORDERED: '부분 발주 완료',
             COMPLETED: '주문 접수',
             CANCELED: '취소됨',
             processing: '답변작성중',
@@ -674,7 +684,7 @@ export default function MyPage() {
                                                                 </div>
                                                             </div>
                                                             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                                                                {quote.status === 'PROCESSED' || quote.status === 'COMPLETED' ? (
+                                                                {['PROCESSED', 'processed', 'COMPLETED', 'completed', 'PARTIAL_ORDERED'].includes(quote.status) ? (
                                                                     <Button size="sm" onClick={() => handleViewAnswer(quote)} className="flex-1 sm:flex-none gap-1 bg-yellow-400 text-slate-900 hover:bg-yellow-500 shadow-md shadow-yellow-500/20 font-bold border border-yellow-500/50">
                                                                         <FileText className="w-3 h-3" />
                                                                         답변서 보기
@@ -1018,15 +1028,31 @@ function ProfileField({ label, value, onSave }: { label: string, value: string, 
     );
 }
 
-function DetailModal({ record, isOrder, onClose, onOrder }: { record: QuotationRecord | OrderRecord, isOrder: boolean, onClose: () => void, onOrder?: () => void }) {
+function DetailModal({ record, isOrder, onClose, onOrder }: { record: QuotationRecord | OrderRecord, isOrder: boolean, onClose: () => void, onOrder?: (selectedItems?: LineItem[]) => void }) {
     const user = useStore(state => state.auth.user);
     const [previewContent, setPreviewContent] = useState<string | null>(null);
     const [previewDocType, setPreviewDocType] = useState<DocumentType>('QUOTATION');
 
+    // Local items selection state for Quote
+    const [itemsState, setItemsState] = useState<LineItem[]>(() => {
+        if (!record || isOrder) return [];
+        return record.items.map(item => ({
+            ...item,
+            isSelected: item.convertedToOrder ? false : (item.isSelected !== false)
+        }));
+    });
+
     if (!record) return null;
     const docType: DocumentType = isOrder ? 'ORDER' : 'QUOTATION';
     const quotation = !isOrder ? (record as QuotationRecord) : null;
-    const isProcessed = !isOrder && record.status === 'PROCESSED';
+    const isProcessed = !isOrder && (record.status === 'PROCESSED' || record.status === 'PARTIAL_ORDERED');
+
+    const availableItems = itemsState.filter(i => !i.convertedToOrder);
+    const isAllAvailableSelected = availableItems.length > 0 && availableItems.every(i => i.isSelected !== false);
+
+    const toggleSelectAll = (checked: boolean) => {
+        setItemsState(prev => prev.map(item => item.convertedToOrder ? item : { ...item, isSelected: checked }));
+    };
 
     const formatCurrency = (amount: number) => new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(amount);
 
@@ -1127,6 +1153,17 @@ function DetailModal({ record, isOrder, onClose, onOrder }: { record: QuotationR
                         <table className="w-full text-sm text-left">
                             <thead className="text-xs text-slate-500 uppercase bg-slate-50/80 sticky top-0 backdrop-blur-sm border-b border-slate-200">
                                 <tr>
+                                    {!isOrder && (
+                                        <th className="px-2 py-3 font-bold w-10 text-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={isAllAvailableSelected}
+                                                onChange={(e) => toggleSelectAll(e.target.checked)}
+                                                className="w-3.5 h-3.5 cursor-pointer accent-teal-600"
+                                                title="전체 선택/해제"
+                                            />
+                                        </th>
+                                    )}
                                     <th className="px-4 py-3 font-bold w-12 text-center">No</th>
                                     <th className="px-4 py-3 font-bold">품명 (Item)</th>
                                     <th className="px-4 py-3 font-bold text-center">두께 (Thick)</th>
@@ -1137,21 +1174,48 @@ function DetailModal({ record, isOrder, onClose, onOrder }: { record: QuotationR
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {record.items.map((item, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-50/50">
-                                        <td className="px-4 py-3 text-center text-slate-400 font-mono text-xs">{(item as MixedLineItem).no || idx + 1}</td>
-                                        <td className="px-4 py-3 font-bold text-slate-800">{(item as MixedLineItem).item_name || item.name}</td>
-                                        <td className="px-4 py-3 text-center text-slate-600">{item.thickness}</td>
-                                        <td className="px-4 py-3 text-center text-slate-600 font-medium">{item.size}</td>
-                                        <td className="px-4 py-3 text-center text-slate-600">{item.material}</td>
-                                        <td className="px-4 py-3 text-right font-bold text-slate-900">{(item as MixedLineItem).qty || item.quantity}</td>
-                                        <td className="px-4 py-3 text-right font-mono text-slate-600">{formatCurrency((item as MixedLineItem).unit_price || item.unitPrice)}</td>
-                                    </tr>
-                                ))}
+                                {(isOrder ? record.items : itemsState).map((item, idx) => {
+                                    const mixed = item as MixedLineItem;
+                                    const isConverted = !isOrder && item.convertedToOrder;
+                                    return (
+                                        <tr key={idx} className={`hover:bg-slate-50/50 ${isConverted ? 'bg-blue-50/20' : (!isOrder && item.isSelected === false ? 'opacity-40 grayscale' : '')}`}>
+                                            {!isOrder && (
+                                                <td className="px-2 py-3 text-center align-middle">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isConverted ? false : item.isSelected !== false}
+                                                        disabled={isConverted}
+                                                        onChange={() => {
+                                                            setItemsState(prev => prev.map((it, i) => i === idx ? { ...it, isSelected: !it.isSelected } : it));
+                                                        }}
+                                                        className="w-3.5 h-3.5 cursor-pointer accent-teal-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                        title={isConverted ? "이미 발주 완료된 품목입니다" : "품목 선택"}
+                                                    />
+                                                </td>
+                                            )}
+                                            <td className="px-4 py-3 text-center text-slate-400 font-mono text-xs">{mixed.no || idx + 1}</td>
+                                            <td className="px-4 py-3 font-bold text-slate-800">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    {isConverted && (
+                                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                                                            발주 완료
+                                                        </span>
+                                                    )}
+                                                    <span>{mixed.item_name || item.name}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-center text-slate-600">{item.thickness}</td>
+                                            <td className="px-4 py-3 text-center text-slate-600 font-medium">{item.size}</td>
+                                            <td className="px-4 py-3 text-center text-slate-600">{item.material}</td>
+                                            <td className="px-4 py-3 text-right font-bold text-slate-900">{mixed.qty || item.quantity}</td>
+                                            <td className="px-4 py-3 text-right font-mono text-slate-600">{formatCurrency(mixed.unit_price || item.unitPrice)}</td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                             <tfoot className="bg-slate-50/80 border-t border-slate-200 font-bold text-slate-900">
                                 <tr>
-                                    <td colSpan={5} className="px-4 py-3 text-right text-xs font-normal text-slate-500">
+                                    <td colSpan={!isOrder ? 6 : 5} className="px-4 py-3 text-right text-xs font-normal text-slate-500">
                                         {quotation?.adminResponse?.additionalCharges?.map((charge, idx) => (
                                             <div key={idx} className="flex justify-end gap-4 mb-1">
                                                 <span>{charge.name}</span>
@@ -1217,8 +1281,18 @@ function DetailModal({ record, isOrder, onClose, onOrder }: { record: QuotationR
                                 닫기
                             </Button>
                             {isProcessed && onOrder && (
-                                <Button onClick={onOrder} className="bg-teal-600 hover:bg-teal-700 text-white min-w-[120px] shadow-lg shadow-teal-500/20">
-                                    견적대로 주문하기
+                                <Button
+                                    onClick={() => {
+                                        const selectedItems = itemsState.filter(i => !i.convertedToOrder && i.isSelected !== false);
+                                        if (selectedItems.length === 0) {
+                                            alert('발주서로 전환할 품목을 선택해 주세요. (이미 발주 완료된 품목은 제외됩니다.)');
+                                            return;
+                                        }
+                                        onOrder(selectedItems);
+                                    }}
+                                    className="bg-teal-600 hover:bg-teal-700 text-white min-w-[120px] shadow-lg shadow-teal-500/20"
+                                >
+                                    선택 품목 발주서 전환
                                 </Button>
                             )}
                         </div>

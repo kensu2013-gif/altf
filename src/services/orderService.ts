@@ -155,17 +155,60 @@ export const OrderService = {
                 id: apiId
             });
 
-            // Update linked quote status to COMPLETED if it exists
+            // Update linked quote item status & overall status if it exists
             if (apiPayload.linkedQuoteId) {
-                store.getState().updateQuotation(apiPayload.linkedQuoteId, { status: 'COMPLETED' });
-                try {
-                    await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${apiPayload.linkedQuoteId}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ status: 'COMPLETED' })
+                const targetQuote = store.getState().quotations.find(q => q.id === apiPayload.linkedQuoteId);
+                if (targetQuote) {
+                    const orderedItemIds = new Set(apiPayload.items.map(i => i.productId || i.id));
+                    const updatedItems = targetQuote.items.map(item => {
+                        const itemKey = item.productId || item.id;
+                        const isOrderedInThisBatch = orderedItemIds.has(itemKey) || apiPayload.items.some(i =>
+                            i.name === item.name &&
+                            i.thickness === item.thickness &&
+                            i.size === item.size &&
+                            i.material === item.material
+                        );
+                        if (isOrderedInThisBatch || item.convertedToOrder) {
+                            return {
+                                ...item,
+                                convertedToOrder: true,
+                                convertedOrderId: isOrderedInThisBatch ? apiId : item.convertedOrderId
+                            };
+                        }
+                        return item;
                     });
-                } catch (err) {
-                    console.error('Failed to update quote status on server:', err);
+
+                    const allConverted = updatedItems.every(i => i.convertedToOrder);
+                    const newStatus = allConverted ? 'COMPLETED' : 'PARTIAL_ORDERED';
+
+                    store.getState().updateQuotation(apiPayload.linkedQuoteId, {
+                        items: updatedItems,
+                        status: newStatus
+                    });
+
+                    try {
+                        await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${apiPayload.linkedQuoteId}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                items: updatedItems,
+                                status: newStatus
+                            })
+                        });
+                    } catch (err) {
+                        console.error('Failed to update quote status on server:', err);
+                    }
+                } else {
+                    store.getState().updateQuotation(apiPayload.linkedQuoteId, { status: 'COMPLETED' });
+                    try {
+                        await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${apiPayload.linkedQuoteId}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: 'COMPLETED' })
+                        });
+                    } catch (err) {
+                        console.error('Failed to update quote status on server:', err);
+                    }
                 }
             }
 

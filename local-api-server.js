@@ -2595,20 +2595,26 @@ const server = http.createServer(async (req, res) => {
                     return;
                 }
 
-                // 일반 관리자/매니저 권한 체크 (상태 변경 등은 MASTER, admin, manager, MANAGER 모두 가능해야 함)
-                if (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER') {
+                const targetQuoteIndex = db.quotations.findIndex(q => q.id === id);
+                if (targetQuoteIndex === -1) {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Quotation not found' }));
+                    return;
+                }
+
+                const targetQuote = db.quotations[targetQuoteIndex];
+                const isAdmin = ['MASTER', 'admin', 'manager', 'MANAGER'].includes(session.role);
+                const isOwner = targetQuote.userId === session.userId || targetQuote.customerNumber === session.userId;
+
+                if (!isAdmin && !isOwner) {
                     res.writeHead(403, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Forbidden' }));
                     return;
                 }
 
                 const updatedQuote = await updateDb(() => {
-                    const index = db.quotations.findIndex(q => q.id === id);
-                    if (index !== -1) {
-                        db.quotations[index] = { ...db.quotations[index], ...updates };
-                        return db.quotations[index];
-                    }
-                    return null;
+                    db.quotations[targetQuoteIndex] = { ...db.quotations[targetQuoteIndex], ...updates };
+                    return db.quotations[targetQuoteIndex];
                 });
 
                 if (updatedQuote) {

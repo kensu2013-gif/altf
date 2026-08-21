@@ -576,6 +576,7 @@ function StatusSelect({ status, onChange }: { status: string; onChange: (val: st
         SUBMITTED: 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200',
         PROCESSING: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200',
         PROCESSED: 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200',
+        PARTIAL_ORDERED: 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200',
         COMPLETED: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200',
         DRAFT: 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200',
     };
@@ -592,6 +593,7 @@ function StatusSelect({ status, onChange }: { status: string; onChange: (val: st
                 <option value="SUBMITTED">접수 (Submitted)</option>
                 <option value="PROCESSING">응답대기 (Processing)</option>
                 <option value="PROCESSED">답변완료 (Processed)</option>
+                <option value="PARTIAL_ORDERED">부분 발주 (Partial)</option>
                 <option value="COMPLETED">주문접수 (Completed)</option>
             </select>
             {/* Simple CSS Chevron */}
