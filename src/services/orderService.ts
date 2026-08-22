@@ -1,5 +1,5 @@
 import type { DocumentPayload } from '../types/document';
-import type { LineItem } from '../types';
+import type { LineItem, Quotation } from '../types';
 
 // Mock types
 export interface OrderRecord {
@@ -157,12 +157,12 @@ export const OrderService = {
 
             // Update linked quote item status & overall status if it exists
             if (apiPayload.linkedQuoteId) {
-                const targetQuote = store.getState().quotations.find(q => q.id === apiPayload.linkedQuoteId);
+                const targetQuote = store.getState().quotes.find((q: Quotation) => q.id === apiPayload.linkedQuoteId);
                 if (targetQuote) {
-                    const orderedItemIds = new Set(apiPayload.items.map(i => i.productId || i.id));
-                    const updatedItems = targetQuote.items.map(item => {
+                    const orderedItemIds = new Set(apiPayload.items.map((i: LineItem) => i.productId || i.id));
+                    const updatedItems = targetQuote.items.map((item: LineItem) => {
                         const itemKey = item.productId || item.id;
-                        const isOrderedInThisBatch = orderedItemIds.has(itemKey) || apiPayload.items.some(i =>
+                        const isOrderedInThisBatch = orderedItemIds.has(itemKey) || apiPayload.items.some((i: LineItem) =>
                             i.name === item.name &&
                             i.thickness === item.thickness &&
                             i.size === item.size &&
@@ -178,7 +178,7 @@ export const OrderService = {
                         return item;
                     });
 
-                    const allConverted = updatedItems.every(i => i.convertedToOrder);
+                    const allConverted = updatedItems.every((i: LineItem) => i.convertedToOrder);
                     const newStatus = allConverted ? 'COMPLETED' : 'PARTIAL_ORDERED';
 
                     store.getState().updateQuotation(apiPayload.linkedQuoteId, {

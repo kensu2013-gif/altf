@@ -602,7 +602,7 @@ export default function MyPage() {
     return (
         <CalmPageShell>
             <PageTransition>
-                <div className="max-w-[1240px] mx-auto px-6 py-12 relative min-h-[800px]">
+                <div className="max-w-310 mx-auto px-6 py-12 relative min-h-200">
                     {/* Header */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
                         <div>
