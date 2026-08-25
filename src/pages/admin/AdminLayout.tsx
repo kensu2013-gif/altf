@@ -129,6 +129,7 @@ export default function AdminLayout() {
         { label: '시화재고 관리', path: '/admin/sihwainventory', emoji: '🏭' },
         { label: '부산재고 관리', path: '/admin/busaninventory', emoji: '⚓' },
         { label: '재고 관리', path: '/admin/inventory', emoji: '📦' },
+        { label: 'AI 경영 리포트', path: '/admin/ai-reports', emoji: '🤖', masterOnly: true },
         { label: '설정', path: '/admin/settings', emoji: '⚙️' },
     ];
 
@@ -167,13 +168,14 @@ export default function AdminLayout() {
                 {/* Nav */}
                 <nav className="flex-1 py-6 px-2 space-y-1">
                     {NAV_ITEMS.filter(item => {
+                        if ('masterOnly' in item && item.masterOnly && user?.role !== 'MASTER') return false;
                         if (user?.role === 'MANAGER') {
                             const baseAllowed = ['/admin/orders', '/admin/pending', '/admin/quotes', '/admin/pilot-split-po'];
                             if (user.permissions?.viewCrm && item.path === '/admin/customers') return true;
                             if (user.permissions?.viewSihwa && (item.path === '/admin/sihwainventory' || item.path === '/admin/busaninventory')) return true;
                             return baseAllowed.includes(item.path);
                         }
-                        // MASTER or admin sees everything
+                        // MASTER or admin sees everything (masterOnly items already excluded above for non-MASTER)
                         return true;
                     }).map((item) => (
                         <NavLink

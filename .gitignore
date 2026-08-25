@@ -34,4 +34,16 @@ n8nac-skills.cmd
 
 # Scratch backups and temp files
 scratch_backup.zip
+scratch/
+*.bak
+diff*.txt
+*.xlsx
+inspect_*.js
+check-*.js
+check_*.js
+test-*.js
+test_*.js
+scratch_*.js
+history*.json
+raw_prod_inventory*.json
 ._*

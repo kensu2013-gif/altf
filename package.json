@@ -13,6 +13,7 @@
     "update-inventory": "node scripts/update-inventory.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.120.0",
     "@aws-sdk/client-s3": "^3.994.0",
     "@aws-sdk/s3-request-presigner": "^3.1013.0",
     "aromanize": "^0.1.5",
