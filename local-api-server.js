@@ -9,6 +9,9 @@ const PORT = process.env.PORT || 3001;
 
 // --- Persistence Setup ---
 import { loadDbFromS3, saveDbToS3, uploadFileToS3, getInventoryFromS3, getPresignedUrlToS3, getPreviousDbVersion, s3Client, BUCKET_NAME } from './s3-db.js';
+import { aggregateAllTrends, getPeriodRange } from './report-aggregation.js';
+import { generateAiReport } from './ai-report-generator.js';
+import { buildCustomerMatchIndex, matchCustomerToCrmFast } from './customer-matching.js';
 
 import multer from 'multer';
 
@@ -18,6 +21,13 @@ const uploadMiddleware = multer({
     limits: { fileSize: 20 * 1024 * 1024 } // 20MB limit
 }).single('file');
 
+const DEFAULT_AI_REPORT_SCHEDULE = () => ({
+    weekly: { lastGeneratedAt: null, lastPeriodKey: null, failedAttempts: 0 },
+    monthly: { lastGeneratedAt: null, lastPeriodKey: null, failedAttempts: 0 },
+    quarterly: { lastGeneratedAt: null, lastPeriodKey: null, failedAttempts: 0 },
+    semiannual: { lastGeneratedAt: null, lastPeriodKey: null, failedAttempts: 0 },
+});
+
 let db = {
     users: [],
     quotations: [],
@@ -26,6 +36,8 @@ let db = {
     inventoryHistory: [],
     customers: [],
     crmEvents: [],
+    aiReports: [],
+    aiReportSchedule: DEFAULT_AI_REPORT_SCHEDULE(),
     lastSnapshotDate: null,
     lastSnapshot: null,
     currentSnapshot: null,
@@ -57,7 +69,9 @@ async function loadData() {
             db.daekyungHistory = json.daekyungHistory || [];
             db.customers = json.customers || [];
             db.crmEvents = json.crmEvents || [];
-            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.loginLogs.length} logs, ${db.inventoryHistory.length} history, ${db.crmEvents.length} crm events, Snapshot Date: ${db.lastSnapshotDate}`);
+            db.aiReports = json.aiReports || [];
+            db.aiReportSchedule = json.aiReportSchedule || DEFAULT_AI_REPORT_SCHEDULE();
+            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.loginLogs.length} logs, ${db.inventoryHistory.length} history, ${db.crmEvents.length} crm events, ${db.aiReports.length} ai reports, Snapshot Date: ${db.lastSnapshotDate}`);
             
             // Seed Customers if empty
             if (db.customers.length === 0) {
@@ -490,6 +504,82 @@ setInterval(() => {
         }
     }
 }, 60 * 1000); // Check every minute
+
+// --- AI Business Report Scheduler (weekly/monthly/quarterly/semiannual, MASTER only) ---
+const AI_REPORT_PERIODS = ['weekly', 'monthly', 'quarterly', 'semiannual'];
+const AI_REPORT_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 시간당 체크 — 트리거일이 지나가도 최대 1시간 내 감지
+const AI_REPORT_MAX_FAILED_ATTEMPTS = 5;
+
+function isAiReportTriggerDay(period, kstNow) {
+    // kstNow는 Date.now()+9h로 보정된 값이므로, 서버 로컬 타임존과 무관하게 정확한 KST 달력값을 얻으려면
+    // 반드시 UTC getter를 사용해야 한다(로컬 getter를 쓰면 서버가 UTC가 아닌 타임존일 때 어긋남).
+    const day = kstNow.getUTCDay();      // 0=일 ... 1=월
+    const date = kstNow.getUTCDate();
+    const month = kstNow.getUTCMonth();  // 0-indexed
+    switch (period) {
+        case 'weekly': return day === 1;                                  // 매주 월요일
+        case 'monthly': return date === 1;                                // 매월 1일
+        case 'quarterly': return date === 1 && [0, 3, 6, 9].includes(month);   // 1/4/7/10월 1일
+        case 'semiannual': return date === 1 && [0, 6].includes(month);        // 1/7월 1일
+        default: return false;
+    }
+}
+
+async function checkAndGenerateAiReports() {
+    const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000); // 기존 프론트 KST 보정 패턴과 동일
+    for (const period of AI_REPORT_PERIODS) {
+        try {
+            const { periodKey, rangeStart, rangeEnd } = getPeriodRange(period, kstNow);
+            const sched = db.aiReportSchedule?.[period] || {};
+            if (sched.lastPeriodKey === periodKey) continue; // 이미 생성됨(재시작해도 중복 방지)
+            if (!isAiReportTriggerDay(period, kstNow)) continue; // 아직 트리거일 아님
+
+            console.log(`[AI Report] Generating ${period} report for ${periodKey}...`);
+            const metrics = await aggregateAllTrends(db, period, kstNow);
+
+            let patch;
+            try {
+                const aiResult = await generateAiReport(period, metrics);
+                patch = { status: 'SUCCESS', ...aiResult };
+            } catch (aiErr) {
+                console.error(`[AI Report] Claude API call failed for ${period}/${periodKey}:`, aiErr);
+                patch = { status: 'FAILED', errorMessage: String(aiErr?.message || aiErr) };
+            }
+
+            await updateDb(() => {
+                db.aiReports = db.aiReports || [];
+                db.aiReports.unshift({
+                    id: `rpt_${period}_${periodKey}_${crypto.randomUUID()}`,
+                    period,
+                    periodKey,
+                    rangeStart,
+                    rangeEnd,
+                    generatedAt: new Date().toISOString(),
+                    metrics,
+                    ...patch,
+                });
+                if (db.aiReports.length > 200) db.aiReports.length = 200; // 무한 증가 방지
+
+                db.aiReportSchedule = db.aiReportSchedule || DEFAULT_AI_REPORT_SCHEDULE();
+                const s = db.aiReportSchedule[period] || { failedAttempts: 0 };
+                if (patch.status === 'SUCCESS') {
+                    db.aiReportSchedule[period] = { lastGeneratedAt: new Date().toISOString(), lastPeriodKey: periodKey, failedAttempts: 0 };
+                } else {
+                    s.failedAttempts = (s.failedAttempts || 0) + 1;
+                    // 연속 실패 시 해당 주기는 포기(무한 재시도로 API 비용/에러 로그 낭비 방지) — 수동 트리거로만 복구 가능
+                    if (s.failedAttempts >= AI_REPORT_MAX_FAILED_ATTEMPTS) s.lastPeriodKey = periodKey;
+                    db.aiReportSchedule[period] = s;
+                }
+            });
+        } catch (err) {
+            console.error(`[AI Report] Unexpected error while processing ${period}:`, err);
+        }
+    }
+}
+
+// 부팅 30초 후 1회(재시작 중 놓친 기간을 즉시 캐치업) + 이후 매시간 체크
+setTimeout(() => { checkAndGenerateAiReports().catch(e => console.error('[AI Report] Catch-up run failed:', e)); }, 30 * 1000);
+setInterval(() => { checkAndGenerateAiReports().catch(e => console.error('[AI Report] Scheduled run failed:', e)); }, AI_REPORT_CHECK_INTERVAL_MS);
 
 // --- Global Memory Cache ---
 let inventoryCache = {
@@ -2919,6 +3009,71 @@ const server = http.createServer(async (req, res) => {
         }
         return;
     }
+
+    // GET /api/admin/ai-reports?period=weekly&limit=20
+    if (req.method === 'GET' && url.pathname === '/api/admin/ai-reports') {
+        const session = getAuthenticatedSession(req);
+        if (!session || session.role !== 'MASTER') {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Forbidden: MASTER role required' }));
+            return;
+        }
+        const period = url.searchParams.get('period');
+        const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+        let list = db.aiReports || [];
+        if (period) list = list.filter(r => r.period === period);
+        sendJsonResponse(req, res, 200, { reports: list.slice(0, limit) });
+        return;
+    }
+
+    // POST /api/admin/ai-reports/generate — 운영/디버깅용 수동 트리거 (자동 생성이 기본이며 이건 백필용)
+    if (req.method === 'POST' && url.pathname === '/api/admin/ai-reports/generate') {
+        const session = getAuthenticatedSession(req);
+        if (!session || session.role !== 'MASTER') {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Forbidden: MASTER role required' }));
+            return;
+        }
+        let body = '';
+        req.on('data', c => body += c.toString());
+        req.on('end', async () => {
+            try {
+                const { period } = JSON.parse(body || '{}');
+                if (!AI_REPORT_PERIODS.includes(period)) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Invalid period' }));
+                    return;
+                }
+                const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+                const metrics = await aggregateAllTrends(db, period, kstNow);
+                const aiResult = await generateAiReport(period, metrics);
+                const report = await updateDb(() => {
+                    db.aiReports = db.aiReports || [];
+                    const rpt = {
+                        id: `rpt_${period}_${metrics.periodKey}_${crypto.randomUUID()}`,
+                        period,
+                        periodKey: metrics.periodKey,
+                        rangeStart: metrics.rangeStart,
+                        rangeEnd: metrics.rangeEnd,
+                        generatedAt: new Date().toISOString(),
+                        status: 'SUCCESS',
+                        metrics,
+                        ...aiResult,
+                    };
+                    db.aiReports.unshift(rpt);
+                    if (db.aiReports.length > 200) db.aiReports.length = 200;
+                    return rpt;
+                });
+                sendJsonResponse(req, res, 200, { report });
+            } catch (e) {
+                console.error('[AI Report] Manual generate failed:', e);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Server Error', detail: String(e?.message || e) }));
+            }
+        });
+        return;
+    }
+
     res.end();
 });
 
@@ -2983,54 +3138,6 @@ function resolveOrderDate(o) {
     return new Date();
 }
 
-function stripCorp(name) {
-    if (!name) return '';
-    return name.replace(/\(주\)|주식회사/g, '')
-               .replace(/[^a-zA-Z0-9가-힣]/g, '')
-               .trim();
-}
-
-function matchCustomerToCrmFast(order, bizNoMap, exactNameMap, cleanNameMap) {
-    let bizNo = '';
-    if (order.payload?.customer?.business_no) bizNo = order.payload.customer.business_no;
-    else if (order.customerInfo?.bizNo) bizNo = order.customerInfo.bizNo;
-    else if (order.customerBizNo) bizNo = order.customerBizNo;
-    bizNo = (bizNo || '').replace(/[^0-9]/g, '');
-
-    if (bizNo && bizNo.length >= 5) {
-        const matched = bizNoMap.get(bizNo);
-        if (matched) return matched;
-    }
-
-    let rawName = '';
-    if (order.poEndCustomer) rawName = order.poEndCustomer;
-    else if (order.payload?.customer?.company_name) rawName = order.payload.customer.company_name;
-    else if (order.customerInfo?.companyName) rawName = order.customerInfo.companyName;
-    else if (order.customerInfo?.company_name) rawName = order.customerInfo.company_name;
-    else if (order.customerName) rawName = order.customerName;
-
-    const lowerName = (rawName || '').trim().toLowerCase();
-    if (lowerName) {
-        const exactMatch = exactNameMap.get(lowerName);
-        if (exactMatch) return exactMatch;
-    }
-
-    const cleanOrderName = stripCorp(order.customerName || rawName);
-    if (!cleanOrderName) return undefined;
-
-    const cleanExact = cleanNameMap.get(cleanOrderName);
-    if (cleanExact) return cleanExact;
-
-    // Partial match fallback — O(N) but only reached when all map lookups miss
-    if (cleanOrderName.length > 1) {
-        for (const [key, c] of cleanNameMap) {
-            if (key && key.includes(cleanOrderName)) return c;
-        }
-    }
-
-    return undefined;
-}
-
 function enrichCustomersWithGrade(customers, orders) {
     const now = new Date();
     const cutoffDate = new Date();
@@ -3038,24 +3145,7 @@ function enrichCustomersWithGrade(customers, orders) {
     const cutoffTime = cutoffDate.getTime();
 
     // Pre-build lookup maps once — avoids O(N) scan inside per-order matching
-    const bizNoMap = new Map();
-    const exactNameMap = new Map();
-    const cleanNameMap = new Map();
-    const simplifiedNameMap = new Map();
-
-    (customers || []).forEach(c => {
-        const bizNo = (c.businessNumber || '').replace(/[^0-9]/g, '');
-        if (bizNo && bizNo.length >= 5) bizNoMap.set(bizNo, c);
-
-        const name = (c.companyName || '').trim().toLowerCase();
-        if (name) exactNameMap.set(name, c);
-
-        const clean = stripCorp(c.companyName);
-        if (clean && !cleanNameMap.has(clean)) cleanNameMap.set(clean, c);
-
-        const simplified = (c.companyName || '').replace(/[\s()주식회사]/g, '').toLowerCase();
-        if (simplified && !simplifiedNameMap.has(simplified)) simplifiedNameMap.set(simplified, c);
-    });
+    const { bizNoMap, exactNameMap, cleanNameMap, simplifiedNameMap } = buildCustomerMatchIndex(customers);
 
     // Assign each order to matching customer(s) once — O(M) instead of O(N×M)
     const INTERNAL_KEYWORDS = ['서울재고', '시화재고', '알트에프', 'altf', '재고입고', 'stock'];
