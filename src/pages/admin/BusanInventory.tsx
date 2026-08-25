@@ -854,6 +854,12 @@ export default function BusanInventory() {
         recent90dSales: number;
         recent180dSales: number;
         recent365dSales: number;
+        recent7dFreq?: number;
+        recent30dFreq?: number;
+        recent60dFreq?: number;
+        recent90dFreq?: number;
+        recent180dFreq?: number;
+        recent365dFreq?: number;
         quoteCount: number;
         recentOrderCount: number;
         recent60dOrderCount: number;
@@ -1048,7 +1054,10 @@ export default function BusanInventory() {
 
         const activeOrderCutoff = performancePeriod === '60D' ? sixtyDaysAgo : performancePeriod === '1Y' ? oneYearAgo : ninetyDaysAgo;
 
-        const recentSalesMap: Record<string, { recent7d: number, recent30d: number, recent60d: number, recent90d: number, recent180d: number, recent365d: number }> = {};
+        const recentSalesMap: Record<string, { 
+            recent7d: number, recent30d: number, recent60d: number, recent90d: number, recent180d: number, recent365d: number,
+            recent7dFreq: number, recent30dFreq: number, recent60dFreq: number, recent90dFreq: number, recent180dFreq: number, recent365dFreq: number
+        }> = {};
         historyData.inventoryHistory.forEach((snap: InventoryHistorySnapshot) => {
             const snapDate = new Date(snap.date).getTime();
             if (isNaN(snapDate)) return;
@@ -1063,22 +1072,31 @@ export default function BusanInventory() {
                 snap.diff.forEach((d: InventoryDiffItem) => {
                     if (d.change < 0) {
                         const absChg = Math.abs(d.change);
-                        if (!recentSalesMap[d.id]) recentSalesMap[d.id] = { recent7d: 0, recent30d: 0, recent60d: 0, recent90d: 0, recent180d: 0, recent365d: 0 };
+                        if (!recentSalesMap[d.id]) recentSalesMap[d.id] = { 
+                            recent7d: 0, recent30d: 0, recent60d: 0, recent90d: 0, recent180d: 0, recent365d: 0,
+                            recent7dFreq: 0, recent30dFreq: 0, recent60dFreq: 0, recent90dFreq: 0, recent180dFreq: 0, recent365dFreq: 0
+                        };
                         recentSalesMap[d.id].recent365d += absChg;
+                        recentSalesMap[d.id].recent365dFreq += 1;
                         if (isWithin180d) {
                             recentSalesMap[d.id].recent180d += absChg;
+                            recentSalesMap[d.id].recent180dFreq += 1;
                         }
                         if (isWithin90d) {
                             recentSalesMap[d.id].recent90d += absChg;
+                            recentSalesMap[d.id].recent90dFreq += 1;
                         }
                         if (isWithin60d) {
                             recentSalesMap[d.id].recent60d += absChg;
+                            recentSalesMap[d.id].recent60dFreq += 1;
                         }
                         if (isWithin30d) {
                             recentSalesMap[d.id].recent30d += absChg;
+                            recentSalesMap[d.id].recent30dFreq += 1;
                         }
                         if (isWithin7d) {
                             recentSalesMap[d.id].recent7d += absChg;
+                            recentSalesMap[d.id].recent7dFreq += 1;
                         }
                     }
                 });
@@ -1264,6 +1282,12 @@ export default function BusanInventory() {
                     recent90dSales: recentSales.recent90d,
                     recent180dSales: recentSales.recent180d,
                     recent365dSales: recentSales.recent365d || 0,
+                    recent7dFreq: recentSales.recent7dFreq || 0,
+                    recent30dFreq: recentSales.recent30dFreq || 0,
+                    recent60dFreq: recentSales.recent60dFreq || 0,
+                    recent90dFreq: recentSales.recent90dFreq || 0,
+                    recent180dFreq: recentSales.recent180dFreq || 0,
+                    recent365dFreq: recentSales.recent365dFreq || 0,
                     quoteCount: quoteCountMap[item.id] || 0,
                     recentOrderCount: activeOrderCountMap[item.id] || 0,
                     recent60dOrderCount: activeOrderCountMap[item.id] || 0,
@@ -1399,6 +1423,12 @@ export default function BusanInventory() {
                         recent90dSales: recentSales.recent90d,
                         recent180dSales: recentSales.recent180d,
                         recent365dSales: recentSales.recent365d || 0,
+                        recent7dFreq: recentSales.recent7dFreq || 0,
+                        recent30dFreq: recentSales.recent30dFreq || 0,
+                        recent60dFreq: recentSales.recent60dFreq || 0,
+                        recent90dFreq: recentSales.recent90dFreq || 0,
+                        recent180dFreq: recentSales.recent180dFreq || 0,
+                        recent365dFreq: recentSales.recent365dFreq || 0,
                         quoteCount: quoteCountMap[id] || 0,
                         recentOrderCount: activeOrderCountMap[id] || 0,
                         recent60dOrderCount: activeOrderCountMap[id] || 0,
@@ -3936,6 +3966,11 @@ export default function BusanInventory() {
                                                                       topPeriod === '90D' ? 'recent90dSales' :
                                                                       topPeriod === '180D' ? 'recent180dSales' :
                                                                       'recent30dSales';
+                                                        const freqField = topPeriod === '7D' ? 'recent7dFreq' :
+                                                                          topPeriod === '60D' ? 'recent60dFreq' :
+                                                                          topPeriod === '90D' ? 'recent90dFreq' :
+                                                                          topPeriod === '180D' ? 'recent180dFreq' :
+                                                                          'recent30dFreq';
 
                                                         const topItems = [...analyzedInventory]
                                                             .filter(item => (item[field] as number) > 0 && !item.product.id.startsWith('STUBEND') && item.sellingPrice > 0)
@@ -3959,7 +3994,7 @@ export default function BusanInventory() {
                                                                 </div>
                                                                 <div className="flex flex-col items-end shrink-0 pl-1">
                                                                     <div className="flex items-center gap-1 justify-end">
-                                                                        <span className="text-[9px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-bold">{item.salesFreq.toLocaleString()}회발생</span>
+                                                                        <span className="text-[9px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-bold">{((item[freqField] as number) || 0).toLocaleString()}회발생</span>
                                                                         <span className="font-black text-slate-700 text-sm drop-shadow-sm">{(item[field] as number).toLocaleString()} <span className="font-normal text-[10px] text-slate-400">개</span></span>
                                                                     </div>
                                                                     <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-20" title={`기간누적매출 ${formatCur((item[field] as number) * item.sellingPrice)}원`}>
