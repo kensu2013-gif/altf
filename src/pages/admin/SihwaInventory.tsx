@@ -637,13 +637,19 @@ export default function SihwaInventory() {
         return activeOrders.filter(order => {
             const displayCustomer = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase();
             const normalizedCustomer = displayCustomer.replace(/\s+/g, '');
-            return normalizedCustomer.includes('재고') ||
+            const isStockCustomer = normalizedCustomer.includes('재고') ||
                 normalizedCustomer.includes('서울') ||
                 normalizedCustomer.includes('시화') ||
                 normalizedCustomer.includes('에스제이엔브이') ||
                 normalizedCustomer.includes('sjnv') ||
                 normalizedCustomer.includes('알트에프') ||
                 normalizedCustomer.includes('altf');
+
+            if (isStockCustomer) return true;
+
+            // 일반 고객 주문이지만 품목 중 시화재고로 전환/지정된 품목이 있는 경우 포함
+            const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
+            return items?.some(item => item.stockTargetLocation === 'SIHWA' || (item.tags && item.tags.includes('시화입고예정')) || item.isStockItem);
         });
     }, [activeOrders]);
 
@@ -1307,9 +1313,30 @@ export default function SihwaInventory() {
 
         // Add Pending Order quantities bounded for Sihwa
         sihwaOrders.filter(o => o.status !== 'COMPLETED').forEach(order => {
+            const displayCustomer = (order.poEndCustomer || order.payload?.customer?.company_name || order.payload?.customer?.contact_name || order.customerName || '').toLowerCase();
+            const normalizedCustomer = displayCustomer.replace(/\s+/g, '');
+            const isBaseStockOrder = normalizedCustomer.includes('재고') ||
+                normalizedCustomer.includes('서울') ||
+                normalizedCustomer.includes('시화') ||
+                normalizedCustomer.includes('에스제이엔브이') ||
+                normalizedCustomer.includes('sjnv') ||
+                normalizedCustomer.includes('알트에프') ||
+                normalizedCustomer.includes('altf');
+
             const items = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
             items.forEach(item => {
                 if (item.transactionIssued) return;
+
+                // 재고 주문이 아닌 일반 고객 주문인 경우, '시화재고'로 지정된 품목만 입고예정으로 인정
+                if (!isBaseStockOrder) {
+                    const isSihwaStockItem = item.stockTargetLocation === 'SIHWA' || (item.tags && item.tags.includes('시화입고예정')) || item.isStockItem;
+                    if (!isSihwaStockItem) return;
+                } else {
+                    // 재고 주문인데 특정 고객사로 할당된 품목은 시화재고 입고예정에서 제외
+                    if (item.stockTargetLocation === 'NONE' || item.allocatedCustomerName) {
+                        return;
+                    }
+                }
 
                 const nameLower = (item.name || (item as { item_name?: string }).item_name || '').toLowerCase().trim();
                 const isDcOrFreight = nameLower === 'd/c' || nameLower === 'dc' || nameLower.includes('운임') || nameLower.includes('배송') || nameLower.includes('freight') || nameLower.includes('shipping') || nameLower.includes('discount') || nameLower.includes('할인');
@@ -6289,7 +6316,7 @@ if (displayList.length === 0) {
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[88vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 text-slate-800">
                         {/* 모달 헤더 */}
-                        <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0 shadow-sm">
+                        <div className="px-6 py-4 bg-linear-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0 shadow-sm">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-emerald-500/20 border border-emerald-400/30 rounded-xl text-emerald-400">
                                     <ShoppingCart className="w-5 h-5" />
@@ -6516,7 +6543,7 @@ if (displayList.length === 0) {
                                 <button
                                     onClick={handleConfirmBatchOrderModalSubmit}
                                     disabled={batchOrderModalItems.length === 0}
-                                    className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-slate-300 disabled:to-slate-400 text-white font-extrabold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition cursor-pointer"
+                                    className="px-6 py-2.5 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-slate-300 disabled:to-slate-400 text-white font-extrabold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition cursor-pointer"
                                 >
                                     <ShoppingCart className="w-4 h-4" />
                                     <span>장바구니 담기 및 발주서 작성 (/cart)</span>

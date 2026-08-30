@@ -2,14 +2,17 @@ import { useMemo, useState, useEffect, Fragment, useDeferredValue } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
-import type { User, Order, SplitDelivery } from '../../types';
-import { FileText, PackageX, Calendar, Search, Filter, MessageSquare, Send, X, Trash2, ChevronDown, ChevronUp, Download, Check, AlertTriangle } from 'lucide-react';
+import type { User, Order, SplitDelivery, LineItem } from '../../types';
+import { FileText, PackageX, Calendar, Search, Filter, MessageSquare, Send, X, Trash2, ChevronDown, ChevronUp, Download, Check, AlertTriangle, ArrowLeftRight, Boxes, Building2 } from 'lucide-react';
 import { CalmPageShell } from '../../components/ui/CalmPageShell';
 import { PageTransition } from '../../components/ui/PageTransition';
 import { ManagerMultiSelect } from '../../components/ui/ManagerMultiSelect';
 import { AdminOrderDetail } from './components/AdminOrderDetail';
 
-const isStockOrder = (targetCustomerName: string, customerName: string) => {
+const isStockOrder = (targetCustomerName: string, customerName: string, item?: Partial<PendingItem> | Partial<import('../../types').LineItem>) => {
+    if (item?.isStockItem || item?.stockTargetLocation === 'SIHWA' || item?.stockTargetLocation === 'SEOUL') {
+        return true;
+    }
     const displayCustomer = (targetCustomerName || customerName || '').toLowerCase();
     const normalizedCustomer = displayCustomer.replace(/\s+/g, '');
     return normalizedCustomer.includes('서울재고') ||
@@ -39,6 +42,9 @@ interface PendingItem {
     isCompleted?: boolean;
     supplierName?: string;
     splitDeliveries?: SplitDelivery[]; // [NEW] 실서버 분할정보 추가
+    stockTargetLocation?: 'SIHWA' | 'SEOUL' | 'NONE';
+    isStockItem?: boolean;
+    allocatedCustomerName?: string;
 }
 
 interface PendingOrderGroup {
@@ -88,6 +94,15 @@ export default function PendingOrders() {
     const [showOnlyDuplicates, setShowOnlyDuplicates] = useState<boolean>(false);
     const [selectedOrderDetailOrder, setSelectedOrderDetailOrder] = useState<Order | null>(null);
     const [detailInitialMode, setDetailInitialMode] = useState<'CUSTOMER' | 'SUPPLIER'>('SUPPLIER');
+
+    // Reallocation Modal State
+    const [reallocatingItem, setReallocatingItem] = useState<{
+        orderId: string;
+        item: PendingItem;
+    } | null>(null);
+    const [reallocMode, setReallocMode] = useState<'TO_SIHWA' | 'TO_SEOUL' | 'TO_CUSTOMER'>('TO_SIHWA');
+    const [reallocCustomerName, setReallocCustomerName] = useState('');
+    const [reallocQty, setReallocQty] = useState<number>(0);
 
     // Grouping Mode
     const [groupBy, setGroupBy] = useState<'ORDER' | 'SUPPLIER'>('ORDER');
@@ -235,12 +250,21 @@ export default function PendingOrders() {
                     const isPending = includeCompleted || !matchedIsCompleted;
 
                     if (isPending) {
+                        let finalTargetCustomer = targetCustomer;
+                        if (poItem.stockTargetLocation === 'SIHWA') {
+                            finalTargetCustomer = '시화재고 (재고전환)';
+                        } else if (poItem.stockTargetLocation === 'SEOUL') {
+                            finalTargetCustomer = '서울재고 (재고전환)';
+                        } else if (poItem.allocatedCustomerName) {
+                            finalTargetCustomer = poItem.allocatedCustomerName;
+                        }
+
                         list.push({
                             orderId: order.id,
                             poNumber: matchedPoNumber,
                             poDate: poDateFormatted,
                             customerName: order.customerName || '',
-                            targetCustomerName: targetCustomer,
+                            targetCustomerName: finalTargetCustomer,
                             itemId: poItem.id,
                             itemName: poItem.name,
                             thickness: poItem.thickness || '',
@@ -254,7 +278,10 @@ export default function PendingOrders() {
                             tags: poItem.tags || [],
                             isCompleted: matchedIsCompleted,
                             supplierName: matchedSupplierName,
-                            splitDeliveries: order.splitDeliveries
+                            splitDeliveries: order.splitDeliveries,
+                            stockTargetLocation: poItem.stockTargetLocation,
+                            isStockItem: poItem.isStockItem,
+                            allocatedCustomerName: poItem.allocatedCustomerName
                         });
                     }
                 });
@@ -445,7 +472,7 @@ export default function PendingOrders() {
         let stockCount = 0;
 
         itemsList.forEach(item => {
-            const isStock = isStockOrder(item.targetCustomerName, item.customerName);
+            const isStock = isStockOrder(item.targetCustomerName, item.customerName, item);
             allCount++;
             if (isStock) {
                 stockCount++;
@@ -459,7 +486,7 @@ export default function PendingOrders() {
     const allStockItems = useMemo(() => {
         const itemsList = getPendingItems(orders);
         return itemsList.filter(item => {
-            return isStockOrder(item.targetCustomerName, item.customerName);
+            return isStockOrder(item.targetCustomerName, item.customerName, item);
         });
     }, [orders, getPendingItems]);
 
@@ -593,6 +620,122 @@ export default function PendingOrders() {
     }, [filteredStockItems]);
 
     // Handlers
+    const handleOpenReallocateModal = (orderId: string, item: PendingItem) => {
+        setReallocatingItem({ orderId, item });
+        setReallocQty(item.quantity);
+        const isCurrentStock = isStockOrder(item.targetCustomerName, item.customerName, item);
+        if (isCurrentStock) {
+            setReallocMode('TO_CUSTOMER');
+            setReallocCustomerName(item.customerName && !item.customerName.includes('재고') ? item.customerName : '');
+        } else {
+            setReallocMode('TO_SIHWA');
+            setReallocCustomerName('');
+        }
+    };
+
+    const handleExecuteReallocation = async () => {
+        if (!reallocatingItem || reallocQty <= 0) return;
+        const { orderId, item } = reallocatingItem;
+        const targetOrder = orders.find(o => o.id === orderId);
+        if (!targetOrder) return;
+
+        if (reallocMode === 'TO_CUSTOMER' && !reallocCustomerName.trim()) {
+            alert('할당할 고객사명을 입력해 주세요.');
+            return;
+        }
+
+        const targetQty = Math.min(reallocQty, item.quantity);
+        const isPartialSplit = targetQty < item.quantity;
+        const newTags = [...(item.tags || [])];
+
+        const getUpdatedItemProps = () => {
+            if (reallocMode === 'TO_SIHWA') {
+                const filteredTags = newTags.filter(t => !t.includes('재고') && !t.includes('입고예정'));
+                return {
+                    stockTargetLocation: 'SIHWA' as const,
+                    isStockItem: true,
+                    allocatedCustomerName: undefined,
+                    tags: Array.from(new Set([...filteredTags, '재고품', '시화입고예정']))
+                };
+            } else if (reallocMode === 'TO_SEOUL') {
+                const filteredTags = newTags.filter(t => !t.includes('재고') && !t.includes('입고예정'));
+                return {
+                    stockTargetLocation: 'SEOUL' as const,
+                    isStockItem: true,
+                    allocatedCustomerName: undefined,
+                    tags: Array.from(new Set([...filteredTags, '재고품', '서울입고예정']))
+                };
+            } else {
+                const filteredTags = newTags.filter(t => !t.includes('재고') && !t.includes('입고예정'));
+                return {
+                    stockTargetLocation: 'NONE' as const,
+                    isStockItem: false,
+                    allocatedCustomerName: reallocCustomerName.trim(),
+                    tags: filteredTags
+                };
+            }
+        };
+
+        const updatedProps = getUpdatedItemProps();
+
+        // 1. Update po_items
+        const currentPoItems = targetOrder.po_items && targetOrder.po_items.length > 0 ? [...targetOrder.po_items] : [...targetOrder.items];
+        let nextPoItems: LineItem[] = [];
+
+        if (isPartialSplit) {
+            // Split item into two
+            const remainingQty = item.quantity - targetQty;
+            currentPoItems.forEach(pi => {
+                if (pi.id === item.itemId) {
+                    nextPoItems.push({
+                        ...pi,
+                        quantity: remainingQty,
+                        qty: remainingQty
+                    });
+                    const splitId = `SPLIT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                    nextPoItems.push({
+                        ...pi,
+                        id: splitId,
+                        parentId: pi.id,
+                        isSplit: true,
+                        quantity: targetQty,
+                        qty: targetQty,
+                        ...updatedProps
+                    });
+                } else {
+                    nextPoItems.push(pi);
+                }
+            });
+        } else {
+            nextPoItems = currentPoItems.map(pi => {
+                if (pi.id === item.itemId) {
+                    return {
+                        ...pi,
+                        ...updatedProps
+                    };
+                }
+                return pi;
+            });
+        }
+
+        // 2. Update items if needed
+        const nextItems = targetOrder.items.map(it => {
+            if (it.id === item.itemId && !isPartialSplit) {
+                return { ...it, ...updatedProps };
+            }
+            return it;
+        });
+
+        await updateOrder(orderId, {
+            po_items: nextPoItems,
+            items: nextItems
+        });
+
+        const targetLabel = reallocMode === 'TO_SIHWA' ? '시화재고 (입고예정)' : reallocMode === 'TO_SEOUL' ? '서울재고 (입고예정)' : `고객사 [${reallocCustomerName}]`;
+        alert(`품목이 ${targetLabel}(으)로 성공적으로 전환되었습니다.`);
+        setReallocatingItem(null);
+    };
+
     const handleUpdateManagersForCustomer = async (targetCustomerName: string, managers: { id: string; name: string }[]) => {
         const matchingGroups = pendingOrderGroups.filter(g => g.targetCustomerName === targetCustomerName);
         for (const group of matchingGroups) {
@@ -821,7 +964,7 @@ export default function PendingOrders() {
 
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-3 mb-4 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-teal-500/20 focus-within:border-teal-500 transition-all flex-1 min-w-[200px]">
+                <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-teal-500/20 focus-within:border-teal-500 transition-all flex-1 min-w-50">
                     <Search className="w-4 h-4 text-slate-400 mr-2" />
                     <input
                         type="text"
@@ -939,12 +1082,12 @@ export default function PendingOrders() {
                                 <table className="w-full min-w-250 text-left">
                                     <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 whitespace-nowrap sticky top-0 z-10">
                                         <tr>
-                                            <th scope="col" className="px-5 py-3 font-bold w-[13%] min-w-[120px]">고객명 (Customer)</th>
-                                        <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-[160px]">발주번호 / 납기일자</th>
-                                        <th scope="col" className="px-5 py-3 font-bold w-[40%] text-right pr-12">품목 정보 (Item Spec)</th>
-                                        <th scope="col" className="px-5 py-3 font-bold text-center w-[10%]">수량</th>
-                                        <th scope="col" className="px-5 py-3 font-bold w-[25%] text-center">코멘트 (의견/일정 공유)</th>
-                                    </tr>
+                                            <th scope="col" className="px-5 py-3 font-bold w-[13%] min-w-30">고객명 (Customer)</th>
+                                            <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-40">발주번호 / 납기일자</th>
+                                            <th scope="col" className="px-5 py-3 font-bold w-[40%] text-right pr-12">품목 정보 (Item Spec)</th>
+                                            <th scope="col" className="px-5 py-3 font-bold text-center w-[10%]">수량</th>
+                                            <th scope="col" className="px-5 py-3 font-bold w-[25%] text-center">코멘트 (의견/일정 공유)</th>
+                                        </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {pendingOrderGroups.length === 0 ? (
@@ -1067,6 +1210,18 @@ export default function PendingOrders() {
                                                                             <span className="text-slate-900 bg-teal-50 px-1.5 py-0.5 rounded leading-tight font-mono text-xs font-bold border border-teal-200/50">
                                                                                 {[item.itemName, item.thickness, item.size, item.material].filter(Boolean).join('-')}
                                                                             </span>
+
+                                                                            {/* Reallocation Button */}
+                                                                            {user?.role && ['MASTER', 'MANAGER', 'admin'].includes(user.role) && (
+                                                                                <button
+                                                                                    onClick={() => handleOpenReallocateModal(group.orderId, item)}
+                                                                                    className="text-[10px] px-2 py-0.5 rounded-md border font-bold flex items-center gap-1 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 shadow-2xs transition-colors shrink-0"
+                                                                                    title="재고 ↔ 발주 양방향 용도 전환/할당"
+                                                                                >
+                                                                                    <ArrowLeftRight className="w-3 h-3" />
+                                                                                    용도전환
+                                                                                </button>
+                                                                            )}
                                                                         </div>
 
                                                                         {/* Tag Editor (Master/Manager) */}
@@ -1109,7 +1264,7 @@ export default function PendingOrders() {
                                                                 <td className={`px-5 py-4 ${!isFirstRow ? 'border-t border-slate-100/50' : ''}`}>
                                                                     <div className="flex flex-col gap-2">
                                                                         {item.comments && item.comments.length > 0 && (
-                                                                            <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
+                                                                            <div className="flex flex-col gap-1 max-h-30 overflow-y-auto pr-2 custom-scrollbar">
                                                                                 {item.comments.map((comment, idx) => (
                                                                                     <div key={idx} className="bg-slate-50 rounded-lg p-2 border border-slate-100 text-xs shadow-sm">
                                                                                         <div className="flex justify-between items-center mb-1">
@@ -1148,7 +1303,7 @@ export default function PendingOrders() {
                                                                                     value={newComment}
                                                                                     onChange={(e) => setNewComment(e.target.value)}
                                                                                     placeholder="담당자 의견, 배차 정보 등..."
-                                                                                    className="w-full text-xs p-2 border border-slate-200 rounded outline-none focus:border-teal-400 resize-none h-[60px]"
+                                                                                    className="w-full text-xs p-2 border border-slate-200 rounded outline-none focus:border-teal-400 resize-none h-15"
                                                                                 />
                                                                                 <div className="flex justify-end gap-1">
                                                                                     <button
@@ -1188,8 +1343,8 @@ export default function PendingOrders() {
                                 <table className="w-full min-w-[1000px] text-left">
                                     <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 whitespace-nowrap sticky top-0 z-10">
                                         <tr>
-                                            <th scope="col" className="px-5 py-3 font-bold w-[18%] min-w-[120px]">매입처 (Supplier)</th>
-                                            <th scope="col" className="px-5 py-3 font-bold w-[18%] min-w-[180px]">고객사 / 발주번호</th>
+                                            <th scope="col" className="px-5 py-3 font-bold w-[18%] min-w-30">매입처 (Supplier)</th>
+                                            <th scope="col" className="px-5 py-3 font-bold w-[18%] min-w-45">고객사 / 발주번호</th>
                                             <th scope="col" className="px-5 py-3 font-bold w-[35%] text-right pr-12">품목 정보 (Item Spec)</th>
                                             <th scope="col" className="px-5 py-3 font-bold text-center w-[12%]">수량 / 납기</th>
                                             <th scope="col" className="px-5 py-3 font-bold w-[17%] text-center">코멘트 (의견/일정 공유)</th>
@@ -1285,6 +1440,18 @@ export default function PendingOrders() {
                                                                                 <span className="text-slate-900 bg-teal-50 px-1.5 py-0.5 rounded leading-tight font-mono text-xs font-bold border border-teal-200/50">
                                                                                     {[item.itemName, item.thickness, item.size, item.material].filter(Boolean).join('-')}
                                                                                 </span>
+
+                                                                                {/* Reallocation Button */}
+                                                                                {user?.role && ['MASTER', 'MANAGER', 'admin'].includes(user.role) && (
+                                                                                    <button
+                                                                                        onClick={() => handleOpenReallocateModal(item.orderId, item)}
+                                                                                        className="text-[10px] px-2 py-0.5 rounded-md border font-bold flex items-center gap-1 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 shadow-2xs transition-colors shrink-0"
+                                                                                        title="재고 ↔ 발주 양방향 용도 전환/할당"
+                                                                                    >
+                                                                                        <ArrowLeftRight className="w-3 h-3" />
+                                                                                        용도전환
+                                                                                    </button>
+                                                                                )}
                                                                             </div>
                                                                             {user?.role && ['MASTER', 'MANAGER', 'admin'].includes(user.role) && (
                                                                                 <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1329,7 +1496,7 @@ export default function PendingOrders() {
                                                                     <td className="px-5 py-4">
                                                                         <div className="flex flex-col gap-2">
                                                                             {item.comments && item.comments.length > 0 && (
-                                                                                <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
+                                                                                <div className="flex flex-col gap-1 max-h-30 overflow-y-auto pr-2 custom-scrollbar">
                                                                                     {item.comments.map((comment, idx) => (
                                                                                         <div key={idx} className="bg-slate-50 rounded-lg p-2 border border-slate-100 text-xs shadow-sm">
                                                                                             <div className="flex justify-between items-center mb-1">
@@ -1368,7 +1535,7 @@ export default function PendingOrders() {
                                                                                         value={newComment}
                                                                                         onChange={(e) => setNewComment(e.target.value)}
                                                                                         placeholder="담당자 의견, 배차 정보 등..."
-                                                                                        className="w-full text-xs p-2 border border-slate-200 rounded outline-none focus:border-teal-400 resize-none h-[60px]"
+                                                                                        className="w-full text-xs p-2 border border-slate-200 rounded outline-none focus:border-teal-400 resize-none h-15"
                                                                                     />
                                                                                     <div className="flex justify-end gap-1">
                                                                                         <button
@@ -1409,10 +1576,10 @@ export default function PendingOrders() {
                             <table className="w-full min-w-[1000px] text-left">
                                 <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 whitespace-nowrap sticky top-0 z-10">
                                     <tr>
-                                        <th scope="col" className="px-5 py-3 font-bold w-[22%] min-w-[180px]">아이템명 / 규격 (Item Spec)</th>
-                                        <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-[100px] text-center">총 미결수량</th>
-                                        <th scope="col" className="px-5 py-3 font-bold w-[54%] min-w-[450px]">개별 발주 내역 (PO Breakdown)</th>
-                                        <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-[110px] text-center">중복 발주 상태</th>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[22%] min-w-45">아이템명 / 규격 (Item Spec)</th>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-25 text-center">총 미결수량</th>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[54%] min-w-112.5">개별 발주 내역 (PO Breakdown)</th>
+                                        <th scope="col" className="px-5 py-3 font-bold w-[12%] min-w-27.5 text-center">중복 발주 상태</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -1508,8 +1675,18 @@ export default function PendingOrders() {
                                                                                 </span>
                                                                             </div>
 
-                                                                            {/* Quantity */}
-                                                                            <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800 text-sm ml-auto">
+                                                                            {/* Quantity & Actions */}
+                                                                            <div className="flex items-center gap-2 font-mono font-bold text-slate-800 text-sm ml-auto">
+                                                                                {user?.role && ['MASTER', 'MANAGER', 'admin'].includes(user.role) && (
+                                                                                    <button
+                                                                                        onClick={() => handleOpenReallocateModal(subItem.orderId, subItem)}
+                                                                                        className="text-[10px] px-2 py-0.5 rounded-md border font-bold flex items-center gap-1 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 shadow-2xs transition-colors shrink-0"
+                                                                                        title="고객사 주문으로 할당 / 용도 전환"
+                                                                                    >
+                                                                                        <ArrowLeftRight className="w-3 h-3" />
+                                                                                        고객사할당/전환
+                                                                                    </button>
+                                                                                )}
                                                                                 <span>{subItem.quantity.toLocaleString()}개</span>
                                                                                 {user?.role === 'MASTER' && (
                                                                                     <button
@@ -1548,7 +1725,7 @@ export default function PendingOrders() {
                                                                         {/* Comments Section inside the PO Box */}
                                                                         <div className="mt-2.5 pt-2.5 border-t border-slate-200/50">
                                                                             {subItem.comments && subItem.comments.length > 0 && (
-                                                                                <div className="space-y-1.5 max-h-[100px] overflow-y-auto pr-1 mb-2 custom-scrollbar">
+                                                                                <div className="space-y-1.5 max-h-25 overflow-y-auto pr-1 mb-2 custom-scrollbar">
                                                                                     {subItem.comments.map((comment, idx) => (
                                                                                         <div key={idx} className="bg-white rounded-lg p-2 border border-slate-100 text-[11px] shadow-sm">
                                                                                             <div className="flex justify-between items-center mb-1">
@@ -1590,7 +1767,7 @@ export default function PendingOrders() {
                                                                                         value={newComment}
                                                                                         onChange={(e) => setNewComment(e.target.value)}
                                                                                         placeholder="담당자 의견, 배차 정보 등..."
-                                                                                        className="w-full text-[11px] p-2 border border-slate-200 rounded outline-none focus:border-teal-400 resize-none h-[45px]"
+                                                                                        className="w-full text-[11px] p-2 border border-slate-200 rounded outline-none focus:border-teal-400 resize-none h-11.25"
                                                                                     />
                                                                                     <div className="flex justify-end gap-1">
                                                                                         <button
@@ -1653,6 +1830,171 @@ export default function PendingOrders() {
                     onUpdate={updateOrder}
                     initialMode={detailInitialMode}
                 />
+            )}
+
+            {/* ── 양방향 재고/발주 용도전환 모달 ── */}
+            {reallocatingItem && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-150 text-slate-800">
+                        {/* Modal Header */}
+                        <div className="px-6 py-4 bg-linear-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-indigo-500/20 border border-indigo-400/30 rounded-xl text-indigo-400">
+                                    <ArrowLeftRight className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="font-extrabold text-base flex items-center gap-2">
+                                        <span>재고 ↔ 발주 양방향 용도 전환</span>
+                                    </h3>
+                                    <p className="text-xs text-slate-300 font-medium mt-0.5">
+                                        발주 품목의 용도를 시화/서울 재고 또는 특정 고객사 납품으로 재지정합니다.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setReallocatingItem(null)}
+                                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 space-y-5 bg-slate-50/50">
+                            {/* Target Item Summary */}
+                            <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1.5">
+                                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">대상 품목 정보</div>
+                                <div className="font-bold text-slate-900 text-sm font-mono flex items-center gap-2">
+                                    <Boxes className="w-4 h-4 text-teal-600 shrink-0" />
+                                    <span>{[reallocatingItem.item.itemName, reallocatingItem.item.thickness, reallocatingItem.item.size, reallocatingItem.item.material].filter(Boolean).join('-')}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-100">
+                                    <span>현재 소속: <strong className="text-indigo-700">{reallocatingItem.item.targetCustomerName}</strong></span>
+                                    <span>현재 수량: <strong className="text-slate-900 font-mono text-sm">{reallocatingItem.item.quantity.toLocaleString()}개</strong></span>
+                                </div>
+                            </div>
+
+                            {/* Destination Mode Selector */}
+                            <div className="space-y-2">
+                                <label className="block text-xs font-bold text-slate-700">전환할 대상 용도 (Destination)</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setReallocMode('TO_SIHWA')}
+                                        className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition-all ${reallocMode === 'TO_SIHWA' ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-xs ring-2 ring-indigo-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                    >
+                                        <Boxes className="w-5 h-5 text-indigo-600" />
+                                        <span>시화재고</span>
+                                        <span className="text-[9px] font-normal text-indigo-500">입고예정 등록</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setReallocMode('TO_SEOUL')}
+                                        className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition-all ${reallocMode === 'TO_SEOUL' ? 'bg-purple-50 border-purple-500 text-purple-700 shadow-xs ring-2 ring-purple-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                    >
+                                        <Boxes className="w-5 h-5 text-purple-600" />
+                                        <span>서울재고</span>
+                                        <span className="text-[9px] font-normal text-purple-500">입고예정 등록</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setReallocMode('TO_CUSTOMER')}
+                                        className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition-all ${reallocMode === 'TO_CUSTOMER' ? 'bg-teal-50 border-teal-500 text-teal-700 shadow-xs ring-2 ring-teal-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                    >
+                                        <Building2 className="w-5 h-5 text-teal-600" />
+                                        <span>고객 발주 할당</span>
+                                        <span className="text-[9px] font-normal text-teal-500">고객 납품 전용</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Customer Name Input (if TO_CUSTOMER) */}
+                            {reallocMode === 'TO_CUSTOMER' && (
+                                <div className="space-y-1.5 animate-in fade-in duration-150">
+                                    <label className="block text-xs font-bold text-slate-700">
+                                        할당할 고객사 상호명 <span className="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="예: 상진밴드, 대우건설, 성화 등"
+                                        value={reallocCustomerName}
+                                        onChange={(e) => setReallocCustomerName(e.target.value)}
+                                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Quantity Input (Split Support) */}
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs font-bold text-slate-700">전환/할당 수량</label>
+                                    <span className="text-[11px] text-slate-500">
+                                        {reallocQty < reallocatingItem.item.quantity ? (
+                                            <span className="text-amber-600 font-bold">
+                                                ✂️ {reallocQty}개 전환 + {reallocatingItem.item.quantity - reallocQty}개 기존유지 (자동 분할)
+                                            </span>
+                                        ) : (
+                                            <span className="text-emerald-600 font-bold">
+                                                전량 ({reallocatingItem.item.quantity}개) 전환
+                                            </span>
+                                        )}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={reallocatingItem.item.quantity}
+                                        value={reallocQty || ''}
+                                        onChange={(e) => setReallocQty(Math.max(1, Math.min(reallocatingItem.item.quantity, Number(e.target.value) || 0)))}
+                                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setReallocQty(reallocatingItem.item.quantity)}
+                                        className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg whitespace-nowrap transition-colors"
+                                    >
+                                        전량
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Informative Note */}
+                            <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl text-xs text-indigo-900 space-y-1">
+                                <div className="font-bold flex items-center gap-1.5">
+                                    <Check className="w-3.5 h-3.5 text-indigo-600" />
+                                    연동 안내
+                                </div>
+                                <p className="text-[11px] text-indigo-700 leading-relaxed">
+                                    {reallocMode === 'TO_SIHWA'
+                                        ? '• 시화재고로 전환 시, 시화재고관리 화면의 [입고예정] 수량에 즉시 반영되어 부족(발주필요) 목록에서 자동 해소됩니다.'
+                                        : reallocMode === 'TO_SEOUL'
+                                        ? '• 서울재고로 전환 시, 서울재고 미결 탭에 입고예정 재고로 정렬됩니다.'
+                                        : '• 고객사로 할당 시, 본사 재고 입고예정에서 차감되고 해당 고객사의 납품 미결 목록으로 정상 귀속됩니다.'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setReallocatingItem(null)}
+                                className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            >
+                                취소
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleExecuteReallocation}
+                                className="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors flex items-center gap-2"
+                            >
+                                <ArrowLeftRight className="w-4 h-4" />
+                                전환 적용하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </CalmPageShell>
     );

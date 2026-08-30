@@ -17,7 +17,8 @@ import {
     Filter,
     X,
     RefreshCw,
-    Pin
+    Pin,
+    Trash2
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
@@ -1731,7 +1732,7 @@ export default function BusanInventory() {
         });
 
         return processedList;
-    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, historyData, liveSalesHistory, quotes, orders, userMap, isKyunggiCompany, daekyungStockMap]);
+    }, [inventory, sihwaOrders, inventoryMap, recentSeoulPurchaseInfoMap, historyData, liveSalesHistory, quotes, orders, userMap, isKyunggiCompany, daekyungStockMap, performancePeriod]);
 
     const baseAnalyzedInventoryMap = useMemo(() => {
         const map = new Map<string, typeof baseAnalyzedInventory[0]>();
@@ -5900,7 +5901,7 @@ if (displayList.length === 0) {
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[88vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 text-slate-800">
                         {/* 모달 헤더 */}
-                        <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0 shadow-sm">
+                        <div className="px-6 py-4 bg-linear-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0 shadow-sm">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-emerald-500/20 border border-emerald-400/30 rounded-xl text-emerald-400">
                                     <ShoppingCart className="w-5 h-5" />
@@ -6127,7 +6128,7 @@ if (displayList.length === 0) {
                                 <button
                                     onClick={handleConfirmBatchOrderModalSubmit}
                                     disabled={batchOrderModalItems.length === 0}
-                                    className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-slate-300 disabled:to-slate-400 text-white font-extrabold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition cursor-pointer"
+                                    className="px-6 py-2.5 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-slate-300 disabled:to-slate-400 text-white font-extrabold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition cursor-pointer"
                                 >
                                     <ShoppingCart className="w-4 h-4" />
                                     <span>장바구니 담기 및 발주서 작성 (/cart)</span>
