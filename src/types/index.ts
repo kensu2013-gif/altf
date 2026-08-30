@@ -75,7 +75,7 @@ export interface LineItem {
     convertedToOrder?: boolean; // True if this line item has been converted to an order
     convertedOrderId?: string; // ID of the order this item was converted into
     tags?: string[]; // [NEW] Status tags/stickers like '재고품', '사급'
-    stockTargetLocation?: 'SIHWA' | 'SEOUL' | 'NONE'; // [NEW] Stock target destination
+    stockTargetLocation?: 'SIHWA' | 'BUSAN' | 'NONE'; // [NEW] Stock target destination
     isStockItem?: boolean; // [NEW] True if explicitly marked as stock replenishment
     allocatedCustomerName?: string; // [NEW] Customer name if allocated from stock to customer
 }

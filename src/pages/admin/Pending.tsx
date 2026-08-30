@@ -10,13 +10,13 @@ import { ManagerMultiSelect } from '../../components/ui/ManagerMultiSelect';
 import { AdminOrderDetail } from './components/AdminOrderDetail';
 
 const isStockOrder = (targetCustomerName: string, customerName: string, item?: Partial<PendingItem> | Partial<import('../../types').LineItem>) => {
-    if (item?.isStockItem || item?.stockTargetLocation === 'SIHWA' || item?.stockTargetLocation === 'SEOUL') {
+    if (item?.isStockItem || item?.stockTargetLocation === 'SIHWA' || item?.stockTargetLocation === 'BUSAN') {
         return true;
     }
     const displayCustomer = (targetCustomerName || customerName || '').toLowerCase();
     const normalizedCustomer = displayCustomer.replace(/\s+/g, '');
-    return normalizedCustomer.includes('서울재고') ||
-        normalizedCustomer.includes('시화재고') ||
+    return normalizedCustomer.includes('시화재고') ||
+        normalizedCustomer.includes('부산재고') ||
         normalizedCustomer.includes('알트에프재고') ||
         normalizedCustomer.includes('알트에프') ||
         normalizedCustomer.includes('altf');
@@ -42,7 +42,7 @@ interface PendingItem {
     isCompleted?: boolean;
     supplierName?: string;
     splitDeliveries?: SplitDelivery[]; // [NEW] 실서버 분할정보 추가
-    stockTargetLocation?: 'SIHWA' | 'SEOUL' | 'NONE';
+    stockTargetLocation?: 'SIHWA' | 'BUSAN' | 'NONE';
     isStockItem?: boolean;
     allocatedCustomerName?: string;
 }
@@ -100,7 +100,7 @@ export default function PendingOrders() {
         orderId: string;
         item: PendingItem;
     } | null>(null);
-    const [reallocMode, setReallocMode] = useState<'TO_SIHWA' | 'TO_SEOUL' | 'TO_CUSTOMER'>('TO_SIHWA');
+    const [reallocMode, setReallocMode] = useState<'TO_SIHWA' | 'TO_BUSAN' | 'TO_CUSTOMER'>('TO_SIHWA');
     const [reallocCustomerName, setReallocCustomerName] = useState('');
     const [reallocQty, setReallocQty] = useState<number>(0);
 
@@ -253,8 +253,8 @@ export default function PendingOrders() {
                         let finalTargetCustomer = targetCustomer;
                         if (poItem.stockTargetLocation === 'SIHWA') {
                             finalTargetCustomer = '시화재고 (재고전환)';
-                        } else if (poItem.stockTargetLocation === 'SEOUL') {
-                            finalTargetCustomer = '서울재고 (재고전환)';
+                        } else if (poItem.stockTargetLocation === 'BUSAN') {
+                            finalTargetCustomer = '부산재고 (재고전환)';
                         } else if (poItem.allocatedCustomerName) {
                             finalTargetCustomer = poItem.allocatedCustomerName;
                         }
@@ -657,13 +657,13 @@ export default function PendingOrders() {
                     allocatedCustomerName: undefined,
                     tags: Array.from(new Set([...filteredTags, '재고품', '시화입고예정']))
                 };
-            } else if (reallocMode === 'TO_SEOUL') {
+            } else if (reallocMode === 'TO_BUSAN') {
                 const filteredTags = newTags.filter(t => !t.includes('재고') && !t.includes('입고예정'));
                 return {
-                    stockTargetLocation: 'SEOUL' as const,
+                    stockTargetLocation: 'BUSAN' as const,
                     isStockItem: true,
                     allocatedCustomerName: undefined,
-                    tags: Array.from(new Set([...filteredTags, '재고품', '서울입고예정']))
+                    tags: Array.from(new Set([...filteredTags, '재고품', '부산입고예정']))
                 };
             } else {
                 const filteredTags = newTags.filter(t => !t.includes('재고') && !t.includes('입고예정'));
@@ -731,7 +731,7 @@ export default function PendingOrders() {
             items: nextItems
         });
 
-        const targetLabel = reallocMode === 'TO_SIHWA' ? '시화재고 (입고예정)' : reallocMode === 'TO_SEOUL' ? '서울재고 (입고예정)' : `고객사 [${reallocCustomerName}]`;
+        const targetLabel = reallocMode === 'TO_SIHWA' ? '시화재고 (입고예정)' : reallocMode === 'TO_BUSAN' ? '부산재고 (입고예정)' : `고객사 [${reallocCustomerName}]`;
         alert(`품목이 ${targetLabel}(으)로 성공적으로 전환되었습니다.`);
         setReallocatingItem(null);
     };
@@ -1847,7 +1847,7 @@ export default function PendingOrders() {
                                         <span>재고 ↔ 발주 양방향 용도 전환</span>
                                     </h3>
                                     <p className="text-xs text-slate-300 font-medium mt-0.5">
-                                        발주 품목의 용도를 시화/서울 재고 또는 특정 고객사 납품으로 재지정합니다.
+                                        발주 품목의 용도를 시화/부산 재고 또는 특정 고객사 납품으로 재지정합니다.
                                     </p>
                                 </div>
                             </div>
@@ -1889,12 +1889,12 @@ export default function PendingOrders() {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setReallocMode('TO_SEOUL')}
-                                        className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition-all ${reallocMode === 'TO_SEOUL' ? 'bg-purple-50 border-purple-500 text-purple-700 shadow-xs ring-2 ring-purple-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                        onClick={() => setReallocMode('TO_BUSAN')}
+                                        className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition-all ${reallocMode === 'TO_BUSAN' ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-xs ring-2 ring-blue-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                                     >
-                                        <Boxes className="w-5 h-5 text-purple-600" />
-                                        <span>서울재고</span>
-                                        <span className="text-[9px] font-normal text-purple-500">입고예정 등록</span>
+                                        <Boxes className="w-5 h-5 text-blue-600" />
+                                        <span>부산재고</span>
+                                        <span className="text-[9px] font-normal text-blue-500">입고예정 등록</span>
                                     </button>
                                     <button
                                         type="button"
@@ -1968,8 +1968,8 @@ export default function PendingOrders() {
                                 <p className="text-[11px] text-indigo-700 leading-relaxed">
                                     {reallocMode === 'TO_SIHWA'
                                         ? '• 시화재고로 전환 시, 시화재고관리 화면의 [입고예정] 수량에 즉시 반영되어 부족(발주필요) 목록에서 자동 해소됩니다.'
-                                        : reallocMode === 'TO_SEOUL'
-                                        ? '• 서울재고로 전환 시, 서울재고 미결 탭에 입고예정 재고로 정렬됩니다.'
+                                        : reallocMode === 'TO_BUSAN'
+                                        ? '• 부산재고로 전환 시, 부산/대경 재고관리의 입고예정 재고로 정렬 및 반영됩니다.'
                                         : '• 고객사로 할당 시, 본사 재고 입고예정에서 차감되고 해당 고객사의 납품 미결 목록으로 정상 귀속됩니다.'}
                                 </p>
                             </div>
