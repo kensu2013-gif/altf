@@ -340,6 +340,25 @@ export default function SihwaInventory() {
         orderQty: number;
         unitPrice: number;
     }>>([]);
+
+    // 시화 재고관리 일괄/선택 발주 수량 확인/수정 팝업 모달 상태
+    const [isBatchOrderModalOpen, setIsBatchOrderModalOpen] = useState(false);
+    const [batchOrderModalTitle, setBatchOrderModalTitle] = useState('발주 품목 및 수량 확인');
+    const [batchOrderModalItems, setBatchOrderModalItems] = useState<Array<{
+        id: string;
+        name: string;
+        thickness: string;
+        size: string;
+        material: string;
+        shQty: number;
+        ysQty: number;
+        pendingOrderQty: number;
+        pendingOrderDetails?: { poNumber: string; qty: number; supplierName?: string }[];
+        recommendedQty: number;
+        orderQty: number;
+        unitPrice: number;
+        sourceType: 'CRITICAL' | 'WARNING' | 'REGULAR' | 'MANUAL' | 'GLOBAL';
+    }>>([]);
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
         'CRITICAL': true,
         'SURGING': true,
@@ -879,6 +898,7 @@ export default function SihwaInventory() {
         dailyAvgSales: number;
         reorderPoint: number;
         deficit: number;
+        recommendedQty?: number;
         suggestedCriticalQty?: number;
         effectiveStock: number;
         statusCategory: string;
@@ -2096,42 +2116,6 @@ export default function SihwaInventory() {
         };
     }, [analyzedInventory]);
 
-    const processOrderSet = (selectedSet: Set<string>, listType: 'CRITICAL' | 'WARNING' | 'REGULAR') => {
-        if (selectedSet.size === 0) return;
-
-        const listItems = listType === 'CRITICAL'
-            ? stats.critical
-            : listType === 'WARNING'
-                ? stats.warning
-                : stats.regular;
-
-        const itemsToAdd = listItems.filter(item => selectedSet.has(item.product.id) && !(item as { canTransfer?: boolean }).canTransfer);
-
-        itemsToAdd.forEach(row => {
-            const qty = 'recommendedQty' in row ? row.recommendedQty || 0 : 0;
-
-            if (qty > 0) {
-                addItem({
-                    id: crypto.randomUUID(),
-                    productId: row.product.id,
-                    name: row.product.name || '',
-                    thickness: row.product.thickness || '',
-                    size: row.product.size || '',
-                    material: row.product.material || '',
-                    quantity: qty,
-                    unitPrice: row.recentPurchasePrice > 0 ? row.recentPurchasePrice : row.sellingPrice,
-                    amount: (row.recentPurchasePrice > 0 ? row.recentPurchasePrice : row.sellingPrice) * qty,
-                    note: `[시화 발주] ${listType === 'REGULAR' ? '정기보충' : '결품보충'}`,
-                    isVerified: false
-                });
-            }
-        });
-
-        if (listType === 'CRITICAL') setSelectedCriticalIds(new Set());
-        else if (listType === 'WARNING') setSelectedWarningIds(new Set());
-        else setSelectedRegularIds(new Set());
-    };
-
     const handleOpenDkOrderModal = () => {
         if (selectedDkIds.size === 0) return;
         const modalList: typeof dkOrderModalItems = [];
@@ -2192,102 +2176,171 @@ export default function SihwaInventory() {
     };
 
     const handleCreateOrder = (selectedSet: Set<string>, listType: 'CRITICAL' | 'WARNING' | 'REGULAR') => {
+        if (selectedSet.size === 0) return;
         const listItems = listType === 'CRITICAL' ? stats.critical : listType === 'WARNING' ? stats.warning : stats.regular;
-        const selectedItemsWithPending = listItems.filter(item => selectedSet.has(item.product.id) && item.pendingOrderQty > 0);
+        const targetItems = listItems.filter(item => selectedSet.has(item.product.id) && !(item as { canTransfer?: boolean }).canTransfer);
         
-        if (selectedItemsWithPending.length > 0) {
-            const warningLines = selectedItemsWithPending.map(item => {
-                const poDetails = item.pendingOrderDetails?.map(d => `NO.${d.poNumber.slice(-8)} (${d.qty}개)`).join(', ') || '';
-                return `• ${item.product.id} (${item.product.name}): 현재 +${item.pendingOrderQty}개 대기 중 [발주내역: ${poDetails}]`;
-            });
-            
-            const proceed = window.confirm(
-                `⚠️ 중복 발주 경고\n\n선택하신 품목 중 이미 미결 입고대기(발주 완료) 중인 품목이 존재합니다:\n\n${warningLines.join('\n')}\n\n그래도 발주서 작성을 진행하시겠습니까?`
-            );
-            if (!proceed) return;
+        if (targetItems.length === 0) {
+            alert('발주 가능한 선택 품목이 없습니다.');
+            return;
         }
 
-        processOrderSet(selectedSet, listType);
-        navigate('/cart');
+        const modalList: typeof batchOrderModalItems = targetItems.map(row => {
+            const recQty = listType === 'CRITICAL'
+                ? ((row as { suggestedCriticalQty?: number }).suggestedCriticalQty || row.deficit || 10)
+                : (row.recommendedQty || row.deficit || 10);
+            const price = row.recentPurchasePrice > 0 ? row.recentPurchasePrice : row.sellingPrice;
+
+            return {
+                id: row.product.id,
+                name: row.product.name || row.product.id,
+                thickness: row.product.thickness || '',
+                size: row.product.size || '',
+                material: row.product.material || '',
+                shQty: row.shQty || 0,
+                ysQty: row.ysQty || 0,
+                pendingOrderQty: row.pendingOrderQty || 0,
+                pendingOrderDetails: row.pendingOrderDetails,
+                recommendedQty: recQty,
+                orderQty: recQty,
+                unitPrice: price,
+                sourceType: listType
+            };
+        });
+
+        const titleMap = {
+            CRITICAL: '선발주 필요 품목 발주 수량 설정',
+            WARNING: '일반 발주 필요 품목 발주 수량 설정',
+            REGULAR: '정기 발주 필요 품목 발주 수량 설정'
+        };
+
+        setBatchOrderModalTitle(titleMap[listType] || '발주 품목 및 수량 설정');
+        setBatchOrderModalItems(modalList);
+        setIsBatchOrderModalOpen(true);
     };
 
     const handleCreateGlobalOrder = () => {
-        const allSelectedItems: AnalyzedItem[] = [];
-        stats.critical.forEach(row => {
-            if (selectedCriticalIds.has(row.product.id) && row.pendingOrderQty > 0) {
-                allSelectedItems.push(row);
-            }
-        });
-        stats.warning.forEach(row => {
-            if (selectedWarningIds.has(row.product.id) && row.pendingOrderQty > 0) {
-                allSelectedItems.push(row);
-            }
-        });
-        stats.regular.forEach(row => {
-            if (selectedRegularIds.has(row.product.id) && row.pendingOrderQty > 0) {
-                allSelectedItems.push(row);
-            }
-        });
-        
-        if (allSelectedItems.length > 0) {
-            const warningLines = allSelectedItems.map(item => {
-                const poDetails = item.pendingOrderDetails?.map(d => `NO.${d.poNumber.slice(-8)} (${d.qty}개)`).join(', ') || '';
-                return `• ${item.product.id} (${item.product.name}): 현재 +${item.pendingOrderQty}개 대기 중 [발주내역: ${poDetails}]`;
+        const totalCount = selectedCriticalIds.size + selectedWarningIds.size + selectedRegularIds.size;
+        if (totalCount === 0) return;
+
+        const modalList: typeof batchOrderModalItems = [];
+        const addedIds = new Set<string>();
+
+        const appendItems = (list: AnalyzedItem[], selectedSet: Set<string>, type: 'CRITICAL' | 'WARNING' | 'REGULAR') => {
+            list.filter(item => selectedSet.has(item.product.id) && !(item as { canTransfer?: boolean }).canTransfer).forEach(row => {
+                if (addedIds.has(row.product.id)) return;
+                addedIds.add(row.product.id);
+
+                const recQty = type === 'CRITICAL'
+                    ? ((row as { suggestedCriticalQty?: number }).suggestedCriticalQty || row.deficit || 10)
+                    : (row.recommendedQty || row.deficit || 10);
+                const price = row.recentPurchasePrice > 0 ? row.recentPurchasePrice : row.sellingPrice;
+
+                modalList.push({
+                    id: row.product.id,
+                    name: row.product.name || row.product.id,
+                    thickness: row.product.thickness || '',
+                    size: row.product.size || '',
+                    material: row.product.material || '',
+                    shQty: row.shQty || 0,
+                    ysQty: row.ysQty || 0,
+                    pendingOrderQty: row.pendingOrderQty || 0,
+                    pendingOrderDetails: row.pendingOrderDetails,
+                    recommendedQty: recQty,
+                    orderQty: recQty,
+                    unitPrice: price,
+                    sourceType: type
+                });
             });
-            
-            const proceed = window.confirm(
-                `⚠️ 중복 발주 경고\n\n선택하신 품목 중 이미 미결 입고대기(발주 완료) 중인 품목이 존재합니다:\n\n${warningLines.join('\n')}\n\n그래도 발주서 작성을 진행하시겠습니까?`
-            );
-            if (!proceed) return;
+        };
+
+        appendItems(stats.critical, selectedCriticalIds, 'CRITICAL');
+        appendItems(stats.warning, selectedWarningIds, 'WARNING');
+        appendItems(stats.regular, selectedRegularIds, 'REGULAR');
+
+        if (modalList.length === 0) {
+            alert('발주 가능한 선택 품목이 없습니다.');
+            return;
         }
 
-        if (selectedCriticalIds.size > 0) processOrderSet(selectedCriticalIds, 'CRITICAL');
-        if (selectedWarningIds.size > 0) processOrderSet(selectedWarningIds, 'WARNING');
-        if (selectedRegularIds.size > 0) processOrderSet(selectedRegularIds, 'REGULAR');
-        navigate('/cart');
+        setBatchOrderModalTitle(`통합 선택 품목 일괄 발주 수량 설정 (총 ${modalList.length}건)`);
+        setBatchOrderModalItems(modalList);
+        setIsBatchOrderModalOpen(true);
     };
 
     const handleCreateManualOrder = () => {
         if (selectedAllTableIds.size === 0) return;
 
-        const selectedItemsWithPending = analyzedInventory.filter(row => selectedAllTableIds.has(row.product.id) && row.pendingOrderQty > 0);
-        
-        if (selectedItemsWithPending.length > 0) {
-            const warningLines = selectedItemsWithPending.map(item => {
-                const poDetails = item.pendingOrderDetails?.map(d => `NO.${d.poNumber.slice(-8)} (${d.qty}개)`).join(', ') || '';
-                return `• ${item.product.id} (${item.product.name}): 현재 +${item.pendingOrderQty}개 대기 중 [발주내역: ${poDetails}]`;
-            });
-            
-            const proceed = window.confirm(
-                `⚠️ 중복 발주 경고\n\n선택하신 품목 중 이미 미결 입고대기(발주 완료) 중인 품목이 존재합니다:\n\n${warningLines.join('\n')}\n\n그래도 발주서 작성을 진행하시겠습니까?`
-            );
-            if (!proceed) return;
-        }
+        const targetItems = analyzedInventory.filter(row => selectedAllTableIds.has(row.product.id));
+        if (targetItems.length === 0) return;
 
-        analyzedInventory.forEach(row => {
-            if (selectedAllTableIds.has(row.product.id)) {
-                let qty = row.safeStock - (row.shQty + row.pendingOrderQty);
-                if (qty <= 0) qty = 10;
-                else qty = Math.ceil(qty / 10) * 10;
+        const modalList: typeof batchOrderModalItems = targetItems.map(row => {
+            let qty = row.safeStock - (row.shQty + row.pendingOrderQty);
+            if (qty <= 0) qty = 10;
+            else qty = Math.ceil(qty / 10) * 10;
+            const price = row.recentPurchasePrice > 0 ? row.recentPurchasePrice : row.sellingPrice;
 
-                addItem({
-                    id: crypto.randomUUID(),
-                    productId: row.product.id,
-                    name: row.product.name || '',
-                    thickness: row.product.thickness || '',
-                    size: row.product.size || '',
-                    material: row.product.material || '',
-                    quantity: qty,
-                    unitPrice: row.recentPurchasePrice > 0 ? row.recentPurchasePrice : row.sellingPrice,
-                    amount: (row.recentPurchasePrice > 0 ? row.recentPurchasePrice : row.sellingPrice) * qty,
-                    note: `[수동 추가]`,
-                    isVerified: false
-                });
-            }
+            return {
+                id: row.product.id,
+                name: row.product.name || row.product.id,
+                thickness: row.product.thickness || '',
+                size: row.product.size || '',
+                material: row.product.material || '',
+                shQty: row.shQty || 0,
+                ysQty: row.ysQty || 0,
+                pendingOrderQty: row.pendingOrderQty || 0,
+                pendingOrderDetails: row.pendingOrderDetails,
+                recommendedQty: qty,
+                orderQty: qty,
+                unitPrice: price,
+                sourceType: 'MANUAL'
+            };
         });
 
-        setSelectedAllTableIds(new Set());
-        navigate('/cart');
+        setBatchOrderModalTitle(`수동 선택 품목 발주 수량 설정 (총 ${modalList.length}건)`);
+        setBatchOrderModalItems(modalList);
+        setIsBatchOrderModalOpen(true);
+    };
+
+    const handleConfirmBatchOrderModalSubmit = () => {
+        let addedCount = 0;
+        batchOrderModalItems.forEach(item => {
+            if (item.orderQty <= 0) return;
+
+            const noteTag = item.sourceType === 'REGULAR'
+                ? '[시화 발주] 정기보충'
+                : item.sourceType === 'CRITICAL'
+                    ? '[시화 발주] 긴급선발주'
+                    : item.sourceType === 'MANUAL'
+                        ? '[시화 발주] 수동선택'
+                        : '[시화 발주] 일반보충';
+
+            addItem({
+                id: crypto.randomUUID(),
+                productId: item.id,
+                name: item.name || '',
+                thickness: item.thickness || '',
+                size: item.size || '',
+                material: item.material || '',
+                quantity: item.orderQty,
+                unitPrice: item.unitPrice,
+                amount: item.unitPrice * item.orderQty,
+                note: noteTag,
+                isVerified: false
+            });
+            addedCount++;
+        });
+
+        if (addedCount > 0) {
+            setIsBatchOrderModalOpen(false);
+            setSelectedCriticalIds(new Set());
+            setSelectedWarningIds(new Set());
+            setSelectedRegularIds(new Set());
+            setSelectedAllTableIds(new Set());
+            navigate('/cart');
+        } else {
+            alert('발주 수량이 1개 이상인 품목이 없습니다.');
+        }
     };
 
     const totalsMap = useMemo(() => {
@@ -6227,6 +6280,249 @@ if (displayList.length === 0) {
                             <ShoppingCart className="w-5 h-5" />
                             선택 품목 일괄 발주서 작성 ({selectedDkIds.size}건)
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 시화재고 선택 품목 일괄 발주 수량 확인/수정 팝업 모달 */}
+            {isBatchOrderModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[88vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 text-slate-800">
+                        {/* 모달 헤더 */}
+                        <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0 shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-emerald-500/20 border border-emerald-400/30 rounded-xl text-emerald-400">
+                                    <ShoppingCart className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="font-extrabold text-lg flex items-center gap-2">
+                                        <span>{batchOrderModalTitle}</span>
+                                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                                            {batchOrderModalItems.length}건 선택됨
+                                        </span>
+                                    </h3>
+                                    <p className="text-xs text-slate-300 font-medium mt-0.5">
+                                        발주서로 전송하기 전에 각 품목의 주문 수량을 직접 검토하고 즉시 수정할 수 있습니다.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsBatchOrderModalOpen(false)}
+                                aria-label="닫기"
+                                className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-white/10 transition"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        {/* 모달 바디 */}
+                        <div className="p-6 overflow-y-auto flex-1 space-y-4 bg-slate-50/50">
+                            {/* 안내 및 중복발주 주의 알림 */}
+                            {(() => {
+                                const pendingItems = batchOrderModalItems.filter(i => i.pendingOrderQty > 0);
+                                return (
+                                    <div className="space-y-2">
+                                        <div className="bg-indigo-50 border border-indigo-200/80 p-3.5 rounded-xl text-indigo-950 text-xs font-medium flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-base">💡</span>
+                                                <span>
+                                                    수량을 수정한 후 하단의 <strong>[장바구니 담기 및 발주서 작성]</strong> 버튼을 누르면, 설정된 수량으로 장바구니에 담기며 발주서 작성 페이지(/cart)로 이동합니다.
+                                                </span>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    setBatchOrderModalItems(prev => prev.map(item => ({
+                                                        ...item,
+                                                        orderQty: item.recommendedQty || 10
+                                                    })));
+                                                }}
+                                                className="shrink-0 px-3 py-1.5 bg-white hover:bg-indigo-100 border border-indigo-300 rounded-lg text-indigo-700 font-bold text-xs shadow-xs transition"
+                                            >
+                                                권장수량으로 전체 복원
+                                            </button>
+                                        </div>
+
+                                        {pendingItems.length > 0 && (
+                                            <div className="bg-amber-50 border border-amber-300 p-3 rounded-xl text-amber-900 text-xs font-semibold flex items-start gap-2.5">
+                                                <span className="text-amber-600 text-sm mt-0.5">⚠️</span>
+                                                <div className="flex-1">
+                                                    <span className="font-bold text-amber-800">미결 입고 대기(중복 발주 주의) 알림: </span>
+                                                    선택하신 품목 중 {pendingItems.length}개 품목에 이미 미결 입고대기 물량이 존재합니다. (테이블 내 대기중 수량 및 PO 번호 확인 필요)
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+
+                            {/* 품목 리스트 테이블 */}
+                            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs bg-white">
+                                <table className="w-full text-left text-xs border-collapse">
+                                    <thead className="bg-slate-100/80 text-slate-600 font-bold border-b border-slate-200">
+                                        <tr>
+                                            <th className="p-3">품목 코드 / 규격</th>
+                                            <th className="p-3 text-right">시화재고</th>
+                                            <th className="p-3 text-right">대경재고</th>
+                                            <th className="p-3 text-center">입고대기</th>
+                                            <th className="p-3 text-right">권장수량</th>
+                                            <th className="p-3 text-center w-36">발주 수량 (직접수정)</th>
+                                            <th className="p-3 text-right">예상 매입단가</th>
+                                            <th className="p-3 text-right">합계금액</th>
+                                            <th className="p-3 text-center w-12">제외</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 font-medium">
+                                        {batchOrderModalItems.map((item, idx) => (
+                                            <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                                                <td className="p-3 font-mono">
+                                                    <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                                                        <span>{item.id}</span>
+                                                        {item.sourceType === 'CRITICAL' && (
+                                                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">긴급선발주</span>
+                                                        )}
+                                                        {item.sourceType === 'WARNING' && (
+                                                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">일반보충</span>
+                                                        )}
+                                                        {item.sourceType === 'REGULAR' && (
+                                                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">정기보충</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-500 font-sans mt-0.5">
+                                                        {[item.name, item.size, item.material, item.thickness].filter(Boolean).join(' · ')}
+                                                    </div>
+                                                </td>
+                                                <td className="p-3 text-right font-mono text-teal-700 font-bold">
+                                                    {item.shQty}개
+                                                </td>
+                                                <td className="p-3 text-right font-mono text-slate-600">
+                                                    {item.ysQty}개
+                                                </td>
+                                                <td className="p-3 text-center font-mono">
+                                                    {item.pendingOrderQty > 0 ? (
+                                                        <div className="inline-flex flex-col items-center">
+                                                            <span
+                                                                className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[11px] border border-amber-300"
+                                                                title={item.pendingOrderDetails?.map(d => `NO.${d.poNumber.slice(-8)} (${d.qty}개)`).join(', ') || ''}
+                                                            >
+                                                                +{item.pendingOrderQty}개
+                                                            </span>
+                                                            {item.pendingOrderDetails && item.pendingOrderDetails.length > 0 && (
+                                                                <span className="text-[9px] text-amber-600 mt-0.5 font-sans">
+                                                                    NO.{item.pendingOrderDetails[0].poNumber.slice(-6)}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-300">-</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-3 text-right font-mono font-bold text-slate-700">
+                                                    {item.recommendedQty}개
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    <div className="inline-flex items-center justify-center border border-indigo-200 rounded-lg overflow-hidden bg-white shadow-xs focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setBatchOrderModalItems(prev => {
+                                                                    const next = [...prev];
+                                                                    next[idx].orderQty = Math.max(1, next[idx].orderQty - (next[idx].orderQty > 100 ? 10 : next[idx].orderQty > 10 ? 5 : 1));
+                                                                    return next;
+                                                                });
+                                                            }}
+                                                            className="px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold border-r border-indigo-100 transition select-none"
+                                                            title="수량 감소"
+                                                        >
+                                                            -
+                                                        </button>
+                                                        <input
+                                                            type="number"
+                                                            min={1}
+                                                            value={item.orderQty}
+                                                            onFocus={(e) => e.target.select()}
+                                                            onChange={(e) => {
+                                                                const val = Math.max(1, parseInt(e.target.value) || 1);
+                                                                setBatchOrderModalItems(prev => {
+                                                                    const next = [...prev];
+                                                                    next[idx].orderQty = val;
+                                                                    return next;
+                                                                });
+                                                            }}
+                                                            className="w-16 px-1 py-1 text-center font-black font-mono bg-transparent text-indigo-900 focus:outline-none text-sm"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setBatchOrderModalItems(prev => {
+                                                                    const next = [...prev];
+                                                                    next[idx].orderQty = next[idx].orderQty + (next[idx].orderQty >= 100 ? 10 : next[idx].orderQty >= 10 ? 5 : 1);
+                                                                    return next;
+                                                                });
+                                                            }}
+                                                            className="px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold border-l border-indigo-100 transition select-none"
+                                                            title="수량 증가"
+                                                        >
+                                                            +
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                                <td className="p-3 text-right font-mono text-slate-600">
+                                                    {item.unitPrice > 0 ? `${item.unitPrice.toLocaleString()}원` : '—'}
+                                                </td>
+                                                <td className="p-3 text-right font-mono font-black text-indigo-700">
+                                                    {item.unitPrice > 0 ? `${(item.unitPrice * item.orderQty).toLocaleString()}원` : '—'}
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    <button
+                                                        onClick={() => {
+                                                            setBatchOrderModalItems(prev => prev.filter((_, i) => i !== idx));
+                                                        }}
+                                                        className="text-slate-300 hover:text-rose-600 transition p-1 rounded hover:bg-rose-50"
+                                                        title="품목 제외"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {batchOrderModalItems.length === 0 && (
+                                            <tr>
+                                                <td colSpan={9} className="p-12 text-center text-slate-400">
+                                                    선택된 발주 품목이 없습니다.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* 모달 푸터 */}
+                        <div className="px-6 py-4 bg-slate-100 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+                            <div className="text-xs text-slate-700 flex items-center gap-2 flex-wrap">
+                                <span>선택 품목 총 <strong className="text-indigo-700 text-sm font-black">{batchOrderModalItems.length}</strong>개</span>
+                                <span className="text-slate-300">|</span>
+                                <span>총 발주 수량 <strong className="text-indigo-700 text-sm font-black">{batchOrderModalItems.reduce((s, i) => s + i.orderQty, 0).toLocaleString()}</strong>개</span>
+                                <span className="text-slate-300">|</span>
+                                <span>매입예상 합계 <strong className="text-emerald-700 text-base font-black">{batchOrderModalItems.reduce((s, i) => s + (i.unitPrice * i.orderQty), 0).toLocaleString()}</strong>원</span>
+                            </div>
+                            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                                <button
+                                    onClick={() => setIsBatchOrderModalOpen(false)}
+                                    className="px-4 py-2.5 border border-slate-300 hover:bg-slate-200 rounded-xl text-slate-700 font-bold text-xs transition shadow-xs"
+                                >
+                                    취소
+                                </button>
+                                <button
+                                    onClick={handleConfirmBatchOrderModalSubmit}
+                                    disabled={batchOrderModalItems.length === 0}
+                                    className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-slate-300 disabled:to-slate-400 text-white font-extrabold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition cursor-pointer"
+                                >
+                                    <ShoppingCart className="w-4 h-4" />
+                                    <span>장바구니 담기 및 발주서 작성 (/cart)</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
