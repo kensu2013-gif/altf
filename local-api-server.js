@@ -585,6 +585,7 @@ setInterval(() => { checkAndGenerateAiReports().catch(e => console.error('[AI Re
 let inventoryCache = {
     gzippedData: null,
     rawData: null,
+    parsedData: null,
     timestamp: 0
 };
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -601,6 +602,7 @@ if (process.env.NODE_ENV !== 'production') {
                     console.log(`[API] Local inventory.json changed on disk. Invalidating memory cache...`);
                     inventoryCache.gzippedData = null;
                     inventoryCache.rawData = null;
+                    inventoryCache.parsedData = null;
                     inventoryCache.timestamp = 0;
                 }
             });
@@ -638,6 +640,40 @@ const sendJsonResponse = (req, res, statusCode, data) => {
     }
 };
 
+// Non-intrusive in-memory rate limiter for login brute-force protection
+const loginFailures = new Map(); // key -> { count, lockedUntil, firstAttempt }
+const checkLoginRateLimit = (key) => {
+    const now = Date.now();
+    const entry = loginFailures.get(key);
+    if (!entry) return true;
+    if (entry.lockedUntil && now < entry.lockedUntil) {
+        return false;
+    }
+    if (entry.lockedUntil && now >= entry.lockedUntil) {
+        loginFailures.delete(key);
+        return true;
+    }
+    return true;
+};
+const recordLoginFailure = (key) => {
+    const now = Date.now();
+    const entry = loginFailures.get(key) || { count: 0, firstAttempt: now };
+    if (now - entry.firstAttempt > 60000) {
+        entry.count = 1;
+        entry.firstAttempt = now;
+        delete entry.lockedUntil;
+    } else {
+        entry.count++;
+    }
+    if (entry.count >= 10) {
+        entry.lockedUntil = now + 30000; // 30 seconds cooldown
+    }
+    loginFailures.set(key, entry);
+};
+const clearLoginFailure = (key) => {
+    loginFailures.delete(key);
+};
+
 const getAuthenticatedSession = (req) => {
     const authHeader = req.headers['authorization'];
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -654,6 +690,20 @@ const getAuthenticatedSession = (req) => {
 };
 
 const server = http.createServer(async (req, res) => {
+    // Global body size limit protection against DoS memory exhaustion (25MB limit)
+    let receivedBytes = 0;
+    const MAX_BODY_BYTES = 25 * 1024 * 1024;
+    req.on('data', chunk => {
+        receivedBytes += chunk.length;
+        if (receivedBytes > MAX_BODY_BYTES) {
+            req.destroy();
+            if (!res.headersSent) {
+                res.writeHead(413, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Payload Too Large' }));
+            }
+        }
+    });
+
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, PATCH, DELETE');
@@ -810,6 +860,20 @@ const server = http.createServer(async (req, res) => {
             const parsed = new URL(S3Url);
             const key = decodeURIComponent(parsed.pathname.slice(1)); // remove leading slash & decode Unicode
 
+            // Security check: Block dangerous path traversal and direct database / backup access
+            const normalizedKey = key.replace(/\\/g, '/').toLowerCase();
+            if (
+                normalizedKey.startsWith('database/') ||
+                normalizedKey.includes('db.json') ||
+                normalizedKey.includes('..') ||
+                normalizedKey.endsWith('.bak') ||
+                normalizedKey.endsWith('.env')
+            ) {
+                console.warn(`[Security Alert] Blocked unauthorized download attempt for key: ${key}`);
+                res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+                return res.end(JSON.stringify({ error: '접근이 제한된 파일입니다.' }));
+            }
+
             // Generate temporary exact presigned URL
             const presignedUrl = await getPresignedUrlToS3(key);
 
@@ -867,6 +931,7 @@ const server = http.createServer(async (req, res) => {
                 console.log('[API] Invalidating memory cache...');
                 inventoryCache.gzippedData = null;
                 inventoryCache.rawData = null;
+                inventoryCache.parsedData = null;
                 inventoryCache.timestamp = 0;
             }
 
@@ -944,11 +1009,13 @@ const server = http.createServer(async (req, res) => {
                         if (!db.lastDaekyungSnapshot || Object.keys(db.lastDaekyungSnapshot).length === 0) {
                             db.lastDaekyungSnapshot = ysStockMap;
                         }
+                        return { _bypassSave: true };
                     });
                 } catch (snapErr) {
                     console.error('[API] Error updating live inventory snapshots:', snapErr);
                 }
 
+                inventoryCache.parsedData = inventoryData;
                 const rawJson = JSON.stringify(inventoryData);
                 inventoryCache.rawData = Buffer.from(rawJson, 'utf-8');
                 inventoryCache.gzippedData = await new Promise((resolve, reject) =>
@@ -1092,7 +1159,17 @@ const server = http.createServer(async (req, res) => {
         req.on('end', async () => {
             try {
                 const { email, password } = JSON.parse(body);
-                console.log(`[API] Login attempt: Email=${email}, Password=${password}`); // DEBUG LOG
+                
+                const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+                const rateLimitKey = `${clientIp}_${email || ''}`;
+                if (!checkLoginRateLimit(rateLimitKey)) {
+                    console.warn(`[Security Alert] Rate limit triggered for login attempt: ${email} from ${clientIp}`);
+                    res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ error: '로그인 시도가 너무 많습니다. 30초 후 다시 시도해주세요.' }));
+                    return;
+                }
+
+                console.log(`[API] Login attempt: Email=${email}`);
 
                 const loginResult = await updateDb(() => {
                     const user = db.users.find(u => u.email === email && u.password === password);
@@ -1125,12 +1202,14 @@ const server = http.createServer(async (req, res) => {
                 });
 
                 if (loginResult.error) {
+                    recordLoginFailure(rateLimitKey);
                     console.log(`[API] Login failed: ${loginResult.error} for ${email}`);
                     res.writeHead(loginResult.status, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: loginResult.error }));
                     return;
                 }
 
+                clearLoginFailure(rateLimitKey);
                 const { user: userWithoutPassword } = loginResult;
                 console.log(`[API] Login success: ${email}`);
 
@@ -1302,8 +1381,8 @@ const server = http.createServer(async (req, res) => {
     // GET /api/admin/active-users
     if (req.method === 'GET' && url.pathname === '/api/admin/active-users') {
         const session = getAuthenticatedSession(req);
-        if (false) {
-            res.writeHead(403);
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Forbidden' }));
             return;
         }
@@ -1323,6 +1402,13 @@ const server = http.createServer(async (req, res) => {
 
     // GET /api/admin/debug-db-status
     if (req.method === 'GET' && url.pathname === '/api/admin/debug-db-status') {
+        const session = getAuthenticatedSession(req);
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Forbidden' }));
+            return;
+        }
+
         const reload = url.searchParams.get('reload') === 'true';
         if (reload) {
             try {
@@ -1349,6 +1435,13 @@ const server = http.createServer(async (req, res) => {
 
     // GET /api/admin/debug-snapshots
     if (req.method === 'GET' && url.pathname === '/api/admin/debug-snapshots') {
+        const session = getAuthenticatedSession(req);
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Forbidden' }));
+            return;
+        }
+
         const lastSnapshotKeysCount = db.lastSnapshot ? Object.keys(db.lastSnapshot).length : 0;
         const currentSnapshotKeysCount = db.currentSnapshot ? Object.keys(db.currentSnapshot).length : 0;
         const lastDaekyungSnapshotKeysCount = db.lastDaekyungSnapshot ? Object.keys(db.lastDaekyungSnapshot).length : 0;
@@ -1406,6 +1499,13 @@ const server = http.createServer(async (req, res) => {
 
     // GET /api/admin/debug-raw-versions
     if (req.method === 'GET' && url.pathname === '/api/admin/debug-raw-versions') {
+        const session = getAuthenticatedSession(req);
+        if (!session || (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Forbidden' }));
+            return;
+        }
+
         try {
             const { ListObjectVersionsCommand, GetObjectCommand } = await import('@aws-sdk/client-s3');
             const versionsRes = await s3Client.send(new ListObjectVersionsCommand({
@@ -1579,11 +1679,17 @@ const server = http.createServer(async (req, res) => {
             return !isCompositeOrStubend && validPrefixes.some(p => nameUpper.startsWith(p));
         };
 
-        // Fetch full inventory details to strictly filter by location and maker
+        // Fetch full inventory details to strictly filter by location and maker (reuse in-memory cache for speed)
         let inventoryItems = [];
         try {
-            const inventoryData = await getInventoryFromS3();
-            inventoryItems = Array.isArray(inventoryData) ? inventoryData : (inventoryData.items || []);
+            if (inventoryCache.parsedData) {
+                const cached = inventoryCache.parsedData;
+                inventoryItems = Array.isArray(cached) ? cached : (cached.items || []);
+            } else {
+                const inventoryData = await getInventoryFromS3();
+                inventoryCache.parsedData = inventoryData;
+                inventoryItems = Array.isArray(inventoryData) ? inventoryData : (inventoryData.items || []);
+            }
         } catch (err) {
             console.error('[API] Failed to get inventory for pending calculations:', err);
         }
@@ -2222,11 +2328,10 @@ const server = http.createServer(async (req, res) => {
 
     // GET /api/users
     if (req.method === 'GET' && url.pathname === '/api/users') {
-        // Simple list, maybe filter by role later
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(db.users));
+        // Sanitize response: Never expose plaintext password to client
+        const sanitizedUsers = (db.users || []).map(({ password, ...rest }) => rest);
+        sendJsonResponse(req, res, 200, sanitizedUsers);
         return;
-
     }
 
     // POST /api/users (Create User/Manager)

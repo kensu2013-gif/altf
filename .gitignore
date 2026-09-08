@@ -46,4 +46,5 @@ test_*.js
 scratch_*.js
 history*.json
 raw_prod_inventory*.json
+backup_restore_point_*/
 ._*

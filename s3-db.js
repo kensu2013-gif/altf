@@ -242,7 +242,7 @@ export async function saveDbToS3(dbObject) {
             if (!fs.existsSync(dir)) {
                 fs.mkdirSync(dir, { recursive: true });
             }
-            fs.writeFileSync(LOCAL_DB, JSON.stringify(dbObject, null, 2), 'utf8');
+            fs.writeFileSync(LOCAL_DB, JSON.stringify(dbObject), 'utf8');
             // console.log(`[Local DB] Successfully saved database to local fallback: ${LOCAL_DB}`);
             return;
         } catch (localError) {
@@ -254,7 +254,7 @@ export async function saveDbToS3(dbObject) {
         const command = new PutObjectCommand({
             Bucket: BUCKET_NAME,
             Key: DB_KEY,
-            Body: JSON.stringify(dbObject, null, 2),
+            Body: JSON.stringify(dbObject),
             ContentType: 'application/json'
         });
         await sendWithTimeout(command, 10000);
@@ -277,7 +277,7 @@ export async function saveDbToS3(dbObject) {
                 fs.mkdirSync(dir, { recursive: true });
             }
             
-            fs.writeFileSync(LOCAL_DB, JSON.stringify(dbObject, null, 2), 'utf8');
+            fs.writeFileSync(LOCAL_DB, JSON.stringify(dbObject), 'utf8');
             console.log(`[Local DB] Successfully saved database to local fallback: ${LOCAL_DB}`);
         } catch (localError) {
             console.error('[Local DB] Critical: Failed to save to local fallback DB:', localError);
