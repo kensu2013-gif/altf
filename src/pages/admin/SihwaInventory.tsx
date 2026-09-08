@@ -30,6 +30,7 @@ import { SearchableMultiSelect } from '../../components/ui/SearchableMultiSelect
 import { matchesSmartSearch } from '../../utils/searchUtils';
 import { getCustomerRegion } from '../../utils/regionUtils';
 import { computeDaekyungStockAnalysis, type DaekyungCoverageStats } from '../../utils/daekyungStockAnalysis';
+import * as XLSX from 'xlsx';
 
 const salesHistory = salesHistoryRaw as Record<string, { salesVolume: number, salesFreq: number }>;
 
@@ -2955,6 +2956,148 @@ export default function SihwaInventory() {
         document.body.removeChild(link);
     };
 
+    const allTableDisplayList = useMemo(() => {
+        const criticalSet = new Set(stats.critical.map(i => i.product.id));
+        const warningSet = new Set(stats.warning.map(i => i.product.id));
+        const regularSet = new Set(stats.regular.map(i => i.product.id));
+
+        const getStatusRank = (row: typeof analyzedInventory[0]) => {
+            if (criticalSet.has(row.product.id)) return 1;
+            if (warningSet.has(row.product.id)) return 2;
+            if (regularSet.has(row.product.id)) return 3;
+            if (row.deficit > 0) return 4;
+            if (row.isExcessStock) return 5;
+            if (row.isDeadStock) return 6;
+            return 99;
+        };
+
+        let list = [...analyzedInventory];
+
+        if (activeTagFilters.length > 0) {
+            list = list.filter(row => {
+                const tags: string[] = [];
+                if (criticalSet.has(row.product.id)) tags.push('선발주');
+                if (warningSet.has(row.product.id)) tags.push('일반');
+                if (regularSet.has(row.product.id)) tags.push('정기발주');
+                if (row.deficit > 0) tags.push('부족');
+                if (row.isExcessStock) tags.push('과잉');
+                if (row.isDeadStock) tags.push('악성');
+
+                return activeTagFilters.some(filterTag => tags.includes(filterTag));
+            });
+        }
+
+        if (sortConfig.key === 'statusRank') {
+            const dir = sortConfig.direction === 'asc' ? 1 : -1;
+            list.sort((a, b) => {
+                const rankA = getStatusRank(a);
+                const rankB = getStatusRank(b);
+                if (rankA !== rankB) return (rankA - rankB) * dir;
+                return a.product.id.localeCompare(b.product.id);
+            });
+        }
+
+        return list;
+    }, [analyzedInventory, stats, activeTagFilters, sortConfig]);
+
+    const handleExportAllTable = () => {
+        const targetList = selectedAllTableIds.size > 0
+            ? allTableDisplayList.filter(row => selectedAllTableIds.has(row.product.id))
+            : allTableDisplayList;
+
+        if (targetList.length === 0) {
+            alert('다운로드할 재고 품목이 없습니다.');
+            return;
+        }
+
+        const criticalSet = new Set(stats.critical.map(i => i.product.id));
+        const warningSet = new Set(stats.warning.map(i => i.product.id));
+        const regularSet = new Set(stats.regular.map(i => i.product.id));
+
+        const periodLabel = performancePeriod === '60D' ? '60일' : performancePeriod === '1Y' ? '1년' : '90일';
+
+        const headers = [
+            '품목 ID',
+            '품목명',
+            '두께',
+            '사이즈',
+            '재질',
+            '상태/태그',
+            '건전성 등급',
+            '회전율',
+            `최근실적(${periodLabel})_출고량`,
+            `최근실적(${periodLabel})_출고횟수`,
+            `최근실적(${periodLabel})_견적수`,
+            `최근실적(${periodLabel})_발주수`,
+            '판매이력_판매량',
+            '판매이력_판매횟수',
+            '시화재고',
+            '적정재고',
+            '입고대기',
+            '대경재고',
+            '잔여일',
+            '보충필요량',
+            '이익률(%)',
+            '매입단가(원)'
+        ];
+
+        const rows = targetList.map(row => {
+            const tags: string[] = [];
+            if (criticalSet.has(row.product.id)) tags.push('선발주');
+            if (warningSet.has(row.product.id)) tags.push('일반');
+            if (regularSet.has(row.product.id)) tags.push('정기발주');
+            if (row.deficit > 0) tags.push('부족');
+            if (row.isExcessStock) tags.push('과잉');
+            if (row.isDeadStock) tags.push('악성');
+
+            const daysOnHandText = row.shQty === 0 ? '0일' : (row.daysOnHand === 9999 ? '∞' : `${Math.round(row.daysOnHand)}일`);
+            const deficitText = row.deficit > 0 ? `-${row.deficit}개` : '충분';
+
+            return [
+                row.product.id,
+                row.product.name || '',
+                row.product.thickness || '',
+                row.product.size || '',
+                row.product.material || '',
+                tags.join(', ') || '정상',
+                row.healthGrade ? `${row.healthGrade}급` : '-',
+                row.turnoverRate > 0 ? `${row.turnoverRate}x` : '-',
+                row.recent90dSales,
+                row.recent90dOrderCount,
+                row.quoteCount,
+                row.recent90dOrderCount,
+                row.salesVolume,
+                row.salesFreq,
+                row.shQty,
+                row.safeStock,
+                row.pendingOrderQty,
+                row.ysQty,
+                daysOnHandText,
+                deficitText,
+                row.profitMarginRate,
+                row.recentPurchasePrice
+            ];
+        });
+
+        const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, '시화재고리스트');
+
+        // Column width auto calculation
+        const colWidths = headers.map((h, i) => {
+            let maxLen = h.length * 2;
+            rows.slice(0, 100).forEach(r => {
+                const val = String(r[i] ?? '');
+                maxLen = Math.max(maxLen, val.length);
+            });
+            return { wch: Math.min(Math.max(maxLen + 2, 10), 35) };
+        });
+        worksheet['!cols'] = colWidths;
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        XLSX.writeFile(workbook, `시화재고_전체리스트_${dateStr}.xlsx`);
+    };
+
     if (user?.role === 'MANAGER' && !user?.permissions?.viewSihwa) {
         return (
             <div className="flex flex-col items-center justify-center p-20 text-center pb-40">
@@ -3324,6 +3467,18 @@ export default function SihwaInventory() {
                                 >
                                     <Download className="w-4.5 h-4.5" />
                                     AI 재고 요약 다운로드 (Excel)
+                                </button>
+                            )}
+                            {activeTab === 'ALL_TABLE' && (
+                                <button
+                                    onClick={handleExportAllTable}
+                                    className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                                    title="현재 필터 및 정렬 상태 그대로 엑셀 파일로 다운로드합니다"
+                                >
+                                    <Download className="w-4.5 h-4.5" />
+                                    {selectedAllTableIds.size > 0 
+                                        ? `선택 엑셀 다운로드 (${selectedAllTableIds.size}건)`
+                                        : `전체 리스트 엑셀 다운로드 (${allTableDisplayList.length.toLocaleString()}건)`}
                                 </button>
                             )}
                         </div>
@@ -4370,44 +4525,7 @@ export default function SihwaInventory() {
                                                 const criticalSet = new Set(stats.critical.map(i => i.product.id));
                                                 const warningSet = new Set(stats.warning.map(i => i.product.id));
                                                 const regularSet = new Set(stats.regular.map(i => i.product.id));
-
-                                                const getStatusRank = (row: typeof analyzedInventory[0]) => {
-                                                    if (criticalSet.has(row.product.id)) return 1;
-                                                    if (warningSet.has(row.product.id)) return 2;
-                                                    if (regularSet.has(row.product.id)) return 3;
-                                                    if (row.deficit > 0) return 4;
-                                                    if (row.isExcessStock) return 5;
-                                                    if (row.isDeadStock) return 6;
-                                                    return 99;
-                                                };
-
-                                                let displayList = [...analyzedInventory];
-
-                                                if (activeTagFilters.length > 0) {
-                                                    displayList = displayList.filter(row => {
-                                                        const tags: string[] = [];
-                                                        if (criticalSet.has(row.product.id)) tags.push('선발주');
-                                                        if (warningSet.has(row.product.id)) tags.push('일반');
-                                                        if (regularSet.has(row.product.id)) tags.push('정기발주');
-                                                        if (row.deficit > 0) tags.push('부족');
-                                                        if (row.isExcessStock) tags.push('과잉');
-                                                        if (row.isDeadStock) tags.push('악성');
-
-                                                        // Show row if it has AT LEAST ONE of the active filters
-                                                        return activeTagFilters.some(filterTag => tags.includes(filterTag));
-                                                    });
-                                                }
-
-                                                // Apply statusRank sorting if selected
-                                                if (sortConfig.key === 'statusRank') {
-                                                    const dir = sortConfig.direction === 'asc' ? 1 : -1;
-                                                    displayList.sort((a, b) => {
-                                                        const rankA = getStatusRank(a);
-                                                        const rankB = getStatusRank(b);
-                                                        if (rankA !== rankB) return (rankA - rankB) * dir;
-                                                        return a.product.id.localeCompare(b.product.id);
-                                                    });
-                                                }
+                                                const displayList = allTableDisplayList;
 
 if (displayList.length === 0) {
                                                      return <tr><td colSpan={12} className="py-10 text-center text-slate-400 font-medium">해당 조건에 맞는 품목이 없습니다.</td></tr>;
@@ -4570,6 +4688,14 @@ if (displayList.length === 0) {
                                                 <span className="text-slate-300 ml-2">개 품목 선택됨</span>
                                             </div>
                                             <div className="w-px h-6 bg-slate-600"></div>
+                                            <button
+                                                onClick={handleExportAllTable}
+                                                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2.5 rounded-full transition-colors shadow-lg flex items-center gap-1.5 border border-emerald-400 text-sm cursor-pointer"
+                                                title="선택된 품목들만 엑셀로 다운로드합니다"
+                                            >
+                                                <Download className="w-4 h-4" />
+                                                선택 엑셀 다운로드
+                                            </button>
                                             <button
                                                 onClick={handleCreateManualOrder}
                                                 className="bg-indigo-500 hover:bg-indigo-400 text-white font-bold px-6 py-2.5 rounded-full transition-colors shadow-lg flex items-center gap-2 border border-indigo-400"

@@ -514,14 +514,26 @@ export default function Customers() {
 
     const regions = useMemo(() => {
         const set = new Set<string>();
-        customersList.forEach(c => c.region && set.add(c.region));
-        return ['경기도', '경상도', ...Array.from(set).filter(r => r !== '경기도' && r !== '경상도')].sort();
+        customersList.forEach(c => {
+            const reg = c.region?.trim();
+            if (reg && !['경기도', '경상도', '충청도', '전라도', '강원도', '제주도', '기타', '기타/미정', '미분류'].includes(reg)) {
+                set.add(reg);
+            }
+        });
+        const standardRegions = ['경기도', '경상도', '충청도', '전라도', '강원도', '제주도'];
+        const additionalRegions = Array.from(set).sort();
+        return [...standardRegions, ...additionalRegions, '기타/미분류'];
     }, [customersList]);
 
     const filtered = useMemo(() => {
         let list = customersList;
         if (selectedRegion !== 'ALL') {
-            list = list.filter(c => c.region === selectedRegion);
+            if (selectedRegion === '기타/미분류' || selectedRegion === '기타/미정' || selectedRegion === '기타' || selectedRegion === '미분류') {
+                const knownRegions = ['경기도', '경상도', '충청도', '전라도', '강원도', '제주도'];
+                list = list.filter(c => !c.region || !c.region.trim() || !knownRegions.includes(c.region) || ['기타', '기타/미정', '미분류'].includes(c.region));
+            } else {
+                list = list.filter(c => c.region === selectedRegion);
+            }
         }
         if (searchTerm) {
             const low = searchTerm.toLowerCase();
