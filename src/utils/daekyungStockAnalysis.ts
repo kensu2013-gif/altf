@@ -2,7 +2,7 @@ import type { Product } from '../types';
 
 export interface DaekyungHistorySnapshot {
     date: string;
-    diff: { id: string; change: number }[];
+    diff: { id: string; change: number; from?: number; to?: number }[];
 }
 
 export interface DaekyungCoverageStats {
@@ -10,6 +10,7 @@ export interface DaekyungCoverageStats {
     confirmedDaysLast90: number;
     lastConfirmedDate: string | null;
     daysSinceLastConfirm: number | null;
+    analysisAnchorDate?: string;
 }
 
 export type DaekyungAnomalyType = 'SURGE' | 'DROP' | 'NONE';
@@ -27,6 +28,10 @@ export interface DaekyungAnalysisItem {
     avg6m: number;
     min1m: number;
     max1m: number;
+    min3m: number;
+    max3m: number;
+    min6m: number;
+    max6m: number;
     share1m: number;
     share3m: number;
     share6m: number;
@@ -36,6 +41,8 @@ export interface DaekyungAnalysisItem {
     changeQty1m: number;
     anomalyType: DaekyungAnomalyType;
     anomalySeverity?: DaekyungAnomalySeverity;
+    hasHistory: boolean;
+    sampleCount3m: number;
 }
 
 export interface DaekyungStockAnalysisResult {
@@ -52,7 +59,7 @@ const SURGE_SEVERE_PCT_THRESHOLD = 150;
 const SURGE_MIN_QTY_CHANGE = 10; // 절대 수량 최소치(0→소량 급등 노이즈 제외)
 
 /**
- * 대경재고(양산) 1/3/6개월 평균 보유수량 및 급감/급증 이상치를 계산한다.
+ * 대경재고(양산) 1/3/6개월 평균 보유수량 및 최대/최소 변동폭(min/max), 급감/급증 이상치를 계산한다.
  * SihwaInventory.tsx / BusanInventory.tsx의 대경재고 평균 분석 탭 공용 로직.
  */
 export function computeDaekyungStockAnalysis(
@@ -61,25 +68,32 @@ export function computeDaekyungStockAnalysis(
 ): DaekyungStockAnalysisResult {
     const history = daekyungHistory || [];
 
+    // ── 데이터 확정 커버리지 및 기준일(Smart Anchor) 결정 ──
+    const confirmedDateSet = new Set(history.map(h => h.date.split('T')[0]));
+    const sortedConfirmedDates = Array.from(confirmedDateSet).sort();
+    const lastConfirmedDate = sortedConfirmedDates.length > 0 ? sortedConfirmedDates[sortedConfirmedDates.length - 1] : null;
+
+    const todayKst = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    let daysSinceLastConfirm: number | null = null;
+
+    if (lastConfirmedDate) {
+        const lastDate = new Date(`${lastConfirmedDate}T00:00:00`);
+        const todayDate = new Date(`${todayKst}T00:00:00`);
+        daysSinceLastConfirm = Math.round((todayDate.getTime() - lastDate.getTime()) / (24 * 60 * 60 * 1000));
+    }
+
+    // 최신 확정일이 오늘로부터 30일 이상 경과한 경우, 최신 확정일을 앵커로 잡아야 최근 90일 구간 내 실제 변동 데이터가 유실되지 않음
+    const analysisAnchorDate = (lastConfirmedDate && daysSinceLastConfirm !== null && daysSinceLastConfirm > 30)
+        ? lastConfirmedDate
+        : todayKst;
+
+    const anchorDateObj = new Date(`${analysisAnchorDate}T00:00:00`);
     const dates: string[] = [];
-    const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
     for (let i = 0; i < 180; i++) {
-        const d = new Date(kstNow.getTime() - i * 24 * 60 * 60 * 1000);
+        const d = new Date(anchorDateObj.getTime() - i * 24 * 60 * 60 * 1000);
         dates.push(d.toISOString().slice(0, 10));
     }
 
-    const historyMapByDate: Record<string, Record<string, number>> = {};
-    history.forEach(h => {
-        const dateStr = h.date.split('T')[0];
-        const dateMap: Record<string, number> = {};
-        (h.diff || []).forEach(d => {
-            dateMap[d.id] = d.change;
-        });
-        historyMapByDate[dateStr] = dateMap;
-    });
-
-    // ── 데이터 확정 커버리지(불규칙 confirm 실태) ──
-    const confirmedDateSet = new Set(history.map(h => h.date.split('T')[0]));
     let confirmedDaysLast30 = 0;
     let confirmedDaysLast90 = 0;
     for (let i = 0; i < 90; i++) {
@@ -88,16 +102,19 @@ export function computeDaekyungStockAnalysis(
             if (i < 30) confirmedDaysLast30++;
         }
     }
-    const sortedConfirmedDates = Array.from(confirmedDateSet).sort();
-    const lastConfirmedDate = sortedConfirmedDates.length > 0 ? sortedConfirmedDates[sortedConfirmedDates.length - 1] : null;
-    let daysSinceLastConfirm: number | null = null;
-    if (lastConfirmedDate) {
-        const lastDate = new Date(`${lastConfirmedDate}T00:00:00`);
-        const todayDate = new Date(`${dates[0]}T00:00:00`);
-        daysSinceLastConfirm = Math.round((todayDate.getTime() - lastDate.getTime()) / (24 * 60 * 60 * 1000));
-    }
 
-    // ── 품목별 180일 일별 재고 역산 + 기간별 평균 ──
+    // 날짜별 diff 매핑
+    const historyMapByDate: Record<string, Record<string, { change: number; from?: number; to?: number }>> = {};
+    history.forEach(h => {
+        const dateStr = h.date.split('T')[0];
+        const dateMap: Record<string, { change: number; from?: number; to?: number }> = {};
+        (h.diff || []).forEach(d => {
+            dateMap[d.id] = { change: d.change, from: d.from, to: d.to };
+        });
+        historyMapByDate[dateStr] = dateMap;
+    });
+
+    // ── 품목별 180일 일별 재고 역산 + 기간별 평균/최대/최소 ──
     const rawResults = targetProducts.map((item) => {
         let ysQty = 0;
         if (item.locationStock) {
@@ -110,32 +127,69 @@ export function computeDaekyungStockAnalysis(
         }
 
         const dailyStocks: number[] = new Array(180).fill(0);
+        const observedStocks1m: number[] = [ysQty];
+        const observedStocks3m: number[] = [ysQty];
+        const observedStocks6m: number[] = [ysQty];
+        let diffCount3m = 0;
+
+        // 최신 확정일 시점의 스냅샷 to 값이 존재하면 기준 재고로 활용
         let currentStock = ysQty;
+        for (let j = 0; j < dates.length; j++) {
+            const dSnap = historyMapByDate[dates[j]]?.[item.id];
+            if (dSnap && dSnap.to !== undefined) {
+                currentStock = dSnap.to;
+                break;
+            }
+        }
 
         for (let i = 0; i < 180; i++) {
             const date = dates[i];
-            dailyStocks[i] = currentStock;
+            const diffInfo = historyMapByDate[date]?.[item.id];
 
-            const diffs = historyMapByDate[date] || {};
-            const change = diffs[item.id];
-            if (change !== undefined) {
-                currentStock = Math.max(0, currentStock - change);
+            if (diffInfo) {
+                if (diffInfo.to !== undefined) currentStock = diffInfo.to;
+                dailyStocks[i] = currentStock;
+
+                if (i < 30) {
+                    if (diffInfo.from !== undefined) observedStocks1m.push(diffInfo.from);
+                    if (diffInfo.to !== undefined) observedStocks1m.push(diffInfo.to);
+                }
+                if (i < 90) {
+                    diffCount3m++;
+                    if (diffInfo.from !== undefined) observedStocks3m.push(diffInfo.from);
+                    if (diffInfo.to !== undefined) observedStocks3m.push(diffInfo.to);
+                }
+                if (diffInfo.from !== undefined) observedStocks6m.push(diffInfo.from);
+                if (diffInfo.to !== undefined) observedStocks6m.push(diffInfo.to);
+
+                // 과거로 거슬러 올라가기: 해당 일자의 이전 재고는 (to - change) 또는 from
+                if (diffInfo.from !== undefined) {
+                    currentStock = diffInfo.from;
+                } else if (diffInfo.change !== undefined) {
+                    currentStock = Math.max(0, currentStock - diffInfo.change);
+                }
+            } else {
+                dailyStocks[i] = currentStock;
             }
         }
 
         const stocks1m = dailyStocks.slice(0, 30);
         const sum1m = stocks1m.reduce((s, val) => s + val, 0);
         const avg1m = stocks1m.length > 0 ? parseFloat((sum1m / stocks1m.length).toFixed(1)) : ysQty;
-        const min1m = stocks1m.length > 0 ? Math.min(...stocks1m) : ysQty;
-        const max1m = stocks1m.length > 0 ? Math.max(...stocks1m) : ysQty;
+        const min1m = Math.min(...stocks1m, ...observedStocks1m);
+        const max1m = Math.max(...stocks1m, ...observedStocks1m);
 
         const stocks3m = dailyStocks.slice(0, 90);
         const sum3m = stocks3m.reduce((s, val) => s + val, 0);
         const avg3m = stocks3m.length > 0 ? parseFloat((sum3m / stocks3m.length).toFixed(1)) : ysQty;
+        const min3m = Math.min(...stocks3m, ...observedStocks3m);
+        const max3m = Math.max(...stocks3m, ...observedStocks3m);
 
         const stocks6m = dailyStocks;
         const sum6m = stocks6m.reduce((s, val) => s + val, 0);
         const avg6m = stocks6m.length > 0 ? parseFloat((sum6m / stocks6m.length).toFixed(1)) : ysQty;
+        const min6m = Math.min(...stocks6m, ...observedStocks6m);
+        const max6m = Math.max(...stocks6m, ...observedStocks6m);
 
         const stocksPrev1m = dailyStocks.slice(30, 60);
         const sumPrev1m = stocksPrev1m.reduce((s, val) => s + val, 0);
@@ -145,6 +199,8 @@ export function computeDaekyungStockAnalysis(
         const changePct1m = prev1mAvg > 0
             ? parseFloat(((changeQty1m / prev1mAvg) * 100).toFixed(1))
             : (avg1m > 0 ? 100 : 0);
+
+        const hasHistory = diffCount3m > 0 || min3m !== max3m || avg3m !== ysQty;
 
         return {
             id: item.id,
@@ -158,9 +214,15 @@ export function computeDaekyungStockAnalysis(
             avg6m,
             min1m,
             max1m,
+            min3m,
+            max3m,
+            min6m,
+            max6m,
             prev1mAvg,
             changePct1m,
             changeQty1m,
+            hasHistory,
+            sampleCount3m: diffCount3m,
         };
     });
 
@@ -198,6 +260,6 @@ export function computeDaekyungStockAnalysis(
 
     return {
         items,
-        coverage: { confirmedDaysLast30, confirmedDaysLast90, lastConfirmedDate, daysSinceLastConfirm },
+        coverage: { confirmedDaysLast30, confirmedDaysLast90, lastConfirmedDate, daysSinceLastConfirm, analysisAnchorDate },
     };
 }

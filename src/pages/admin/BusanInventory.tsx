@@ -67,6 +67,10 @@ interface DaekyungStockAnalysisItem {
     avg6m: number;
     min1m?: number;
     max1m?: number;
+    min3m?: number;
+    max3m?: number;
+    min6m?: number;
+    max6m?: number;
     prev1mAvg?: number;
     changePct1m?: number;
     changeQty1m?: number;
@@ -92,6 +96,8 @@ interface DaekyungStockAnalysisItem {
     recent90dOrderCount?: number;
     pendingOrderQty?: number;
     pendingOrderDetails?: { poNumber: string; deliveryDate?: string }[];
+    hasHistory?: boolean;
+    sampleCount3m?: number;
 }
 
 
@@ -342,7 +348,7 @@ export default function BusanInventory() {
 
     const [activeTab, setActiveTab] = useState<'AI_SUMMARY' | 'TOTAL_DASHBOARD' | 'ALL_TABLE' | 'HEALTH_DIAGNOSIS' | 'DAEKYUNG_STOCK'>('AI_SUMMARY');
     const [dkSortConfig, setDkSortConfig] = useState<{
-        key: 'id' | 'name' | 'material' | 'size' | 'currentStock' | 'avg1m' | 'avg3m' | 'avg6m' | 'share1m' | 'share3m' | 'share6m' | 'trend' | 'shQty' | 'safeStock' | 'recommendedQty' | 'procurementReason' | 'healthGrade' | 'turnoverRate' | 'quoteCount' | 'recent90dOrderCount';
+        key: 'id' | 'name' | 'material' | 'size' | 'currentStock' | 'avg1m' | 'avg3m' | 'min3m' | 'max3m' | 'avg6m' | 'share1m' | 'share3m' | 'share6m' | 'trend' | 'shQty' | 'safeStock' | 'recommendedQty' | 'procurementReason' | 'healthGrade' | 'turnoverRate' | 'quoteCount' | 'recent90dOrderCount';
         direction: 'asc' | 'desc';
     }>({ key: 'id', direction: 'asc' });
     const [dkSearchQuery, setDkSearchQuery] = useState('');
@@ -478,8 +484,7 @@ export default function BusanInventory() {
             if (res.ok) {
                 const data = await res.json();
                 const ignoreDates = [
-                    '2026-04-14', '2026-04-15', '2026-04-16',
-                    '2026-06-08', '2026-06-09', '2026-06-10', '2026-06-11', '2026-06-12'
+                    '2026-04-14', '2026-04-15', '2026-04-16'
                 ];
                 if (data.inventoryHistory) {
                     const filteredHistory = data.inventoryHistory.filter((h: { date: string }) => !ignoreDates.includes(h.date));
@@ -1922,22 +1927,32 @@ export default function BusanInventory() {
                         avg1m: 0,
                         avg3m: 0,
                         avg6m: 0,
+                        min1m: 0,
+                        max1m: 0,
+                        min3m: 0,
+                        max3m: 0,
                         share1m: 0,
                         share3m: 0,
                         share6m: 0,
                         shQty: 0,
                         safeStock: 0,
                         recommendedQty: 0,
-                        procurementReason: `${mat} 재질 통합 수급 상태`
+                        procurementReason: `${mat} 재질 통합 수급 상태`,
+                        hasHistory: false
                     };
                 }
                 materialGroups[mat].currentStock += r.currentStock;
                 materialGroups[mat].avg1m += r.avg1m || 0;
                 materialGroups[mat].avg3m += r.avg3m;
                 materialGroups[mat].avg6m += r.avg6m;
+                materialGroups[mat].min1m = (materialGroups[mat].min1m || 0) + (r.min1m !== undefined ? r.min1m : r.currentStock);
+                materialGroups[mat].max1m = (materialGroups[mat].max1m || 0) + (r.max1m !== undefined ? r.max1m : r.currentStock);
+                materialGroups[mat].min3m = (materialGroups[mat].min3m || 0) + (r.min3m !== undefined ? r.min3m : r.currentStock);
+                materialGroups[mat].max3m = (materialGroups[mat].max3m || 0) + (r.max3m !== undefined ? r.max3m : r.currentStock);
                 materialGroups[mat].shQty += r.shQty;
                 materialGroups[mat].safeStock += r.safeStock;
                 materialGroups[mat].recommendedQty += r.recommendedQty;
+                if (r.hasHistory) materialGroups[mat].hasHistory = true;
             });
 
             finalResults = Object.values(materialGroups);
@@ -1953,6 +1968,8 @@ export default function BusanInventory() {
                 case 'currentStock': return (a.currentStock - b.currentStock) * dir;
                 case 'avg1m': return ((a.avg1m || 0) - (b.avg1m || 0)) * dir;
                 case 'avg3m': return (a.avg3m - b.avg3m) * dir;
+                case 'min3m': return ((a.min3m ?? a.currentStock) - (b.min3m ?? b.currentStock)) * dir;
+                case 'max3m': return ((a.max3m ?? a.currentStock) - (b.max3m ?? b.currentStock)) * dir;
                 case 'avg6m': return (a.avg6m - b.avg6m) * dir;
                 case 'share1m': return ((a.share1m || 0) - (b.share1m || 0)) * dir;
                 case 'share3m': return (a.share3m - b.share3m) * dir;
@@ -5714,8 +5731,18 @@ if (displayList.length === 0) {
                                                         <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'currentStock', direction: prev.key === 'currentStock' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
                                                             대경 현재고 {dkSortConfig.key === 'currentStock' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
                                                         </th>
-                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'avg3m', direction: prev.key === 'avg3m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            3개월 평균 보유 {dkSortConfig.key === 'avg3m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition group relative" onClick={() => setDkSortConfig(prev => ({ key: 'avg3m', direction: prev.key === 'avg3m' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                            <div className="flex flex-col items-end">
+                                                                <span>3개월 평균 보유 {dkSortConfig.key === 'avg3m' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                                                                <span className="text-[10px] text-slate-400 font-normal">[최소 ~ 최대]</span>
+                                                            </div>
+                                                            <div className="absolute right-0 bottom-full mb-2 w-72 bg-slate-800 text-white text-[11px] p-3 rounded shadow-xl hidden group-hover:block z-50 text-left font-normal whitespace-normal cursor-auto">
+                                                                <div className="font-bold mb-1 border-b border-slate-600 pb-1 text-emerald-300">📊 3개월 평균 및 최대/최소 보유량</div>
+                                                                <div className="text-slate-200 leading-relaxed">
+                                                                    최근 3개월(90일)간 확정된 일별 스냅샷 이력을 역산하여 산출한 <b>일평균 재고</b>와 관측된 <b>최소(Min) ~ 최대(Max)</b> 변동 범위입니다.<br/>
+                                                                    과거 확정 변동 기록이 없는 품목은 현재고 기준으로 표기됩니다.
+                                                                </div>
+                                                            </div>
                                                         </th>
                                                         <th className="px-4 py-3 text-right font-black text-teal-700 bg-teal-50/50 cursor-pointer hover:bg-teal-100/50 transition" onClick={() => setDkSortConfig(prev => ({ key: 'shQty', direction: prev.key === 'shQty' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
                                                             부산 현재고 {dkSortConfig.key === 'shQty' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -5814,8 +5841,25 @@ if (displayList.length === 0) {
                                                                 <td className={`px-4 py-2.5 text-right font-black font-mono ${row.currentStock === 0 ? 'text-rose-600 bg-rose-50/40' : 'text-slate-700'}`}>
                                                                     {row.currentStock.toLocaleString()}개
                                                                 </td>
-                                                                <td className="px-4 py-2.5 text-right font-bold text-indigo-600 font-mono">
-                                                                    {row.avg3m.toLocaleString()}개
+                                                                <td className="px-4 py-2.5 text-right font-mono">
+                                                                    <div className="flex flex-col items-end">
+                                                                        <span className="font-bold text-indigo-600 text-[12px]">
+                                                                            {row.avg3m.toLocaleString()}개
+                                                                        </span>
+                                                                        {row.hasHistory ? (
+                                                                            <span className="text-[10px] text-slate-500 font-medium" title={`3개월 관측치 — 최저: ${(row.min3m ?? row.currentStock).toLocaleString()}개, 최고: ${(row.max3m ?? row.currentStock).toLocaleString()}개 (관측 ${row.sampleCount3m || 0}회)`}>
+                                                                                <span className="text-slate-400">[</span>
+                                                                                <span className="font-bold text-amber-600">{(row.min3m ?? row.currentStock).toLocaleString()}</span>
+                                                                                <span className="text-slate-400 mx-0.5">~</span>
+                                                                                <span className="font-bold text-emerald-600">{(row.max3m ?? row.currentStock).toLocaleString()}</span>
+                                                                                <span className="text-slate-400">]</span>
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="text-[10px] text-slate-400 font-normal">
+                                                                                [변동없음: {row.currentStock}개]
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
                                                                 </td>
                                                                 <td className="px-4 py-2.5 text-right font-black font-mono text-teal-700 bg-teal-50/30">
                                                                     {row.shQty.toLocaleString()}개
