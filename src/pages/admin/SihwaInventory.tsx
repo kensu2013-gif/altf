@@ -97,6 +97,9 @@ interface DaekyungStockAnalysisItem {
     pendingOrderDetails?: { poNumber: string; deliveryDate?: string }[];
     hasHistory?: boolean;
     sampleCount3m?: number;
+    shMin3m?: number;
+    shMax3m?: number;
+    shHasHistory?: boolean;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1029,6 +1032,44 @@ export default function SihwaInventory() {
         return map;
     }, [daekyungBaseStockAverages]);
 
+    const sihwaStockRangeMap = useMemo(() => {
+        const map = new Map<string, { min3m: number; max3m: number; hasHistory: boolean; sampleCount: number }>();
+        const itemObserved = new Map<string, number[]>();
+
+        (historyData.inventoryHistory || []).forEach(snap => {
+            (snap.diff || []).forEach(d => {
+                if (!itemObserved.has(d.id)) itemObserved.set(d.id, []);
+                if (d.from !== undefined) itemObserved.get(d.id)!.push(d.from);
+                if (d.to !== undefined) itemObserved.get(d.id)!.push(d.to);
+            });
+        });
+
+        inventory.forEach(item => {
+            const id = item.id;
+            let curr = 0;
+            if (item.locationStock) {
+                curr = Number(item.locationStock['시화'] ?? item.locationStock['서울'] ?? 0);
+            } else if ((item.location || '').includes('시화') || (item.location || '').includes('서울')) {
+                curr = item.currentStock;
+            }
+
+            const obs = itemObserved.get(id) || [];
+            const allObs = [curr, ...obs];
+            const min3m = Math.min(...allObs);
+            const max3m = Math.max(...allObs);
+            const hasHistory = obs.length > 0 && min3m !== max3m;
+
+            map.set(id, {
+                min3m,
+                max3m,
+                hasHistory,
+                sampleCount: obs.length
+            });
+        });
+
+        return map;
+    }, [historyData.inventoryHistory, inventory]);
+
     const baseAnalyzedInventory = useMemo(() => {
         const comparisonMap: Record<string, AnalyzedItem> = {};
 
@@ -1863,6 +1904,11 @@ export default function SihwaInventory() {
                     : "✅ 수급 및 재고 상태 안정적"
             );
 
+            const shRange = sihwaStockRangeMap.get(r.id);
+            const shMin3m = shRange?.min3m ?? shQty;
+            const shMax3m = shRange?.max3m ?? shQty;
+            const shHasHistory = shRange?.hasHistory ?? false;
+
             return {
                 ...r,
                 shQty,
@@ -1881,6 +1927,9 @@ export default function SihwaInventory() {
                 recent90dOrderCount,
                 pendingOrderQty,
                 pendingOrderDetails,
+                shMin3m,
+                shMax3m,
+                shHasHistory,
             };
         });
 
@@ -1967,6 +2016,9 @@ export default function SihwaInventory() {
                 share3m: number;
                 share6m: number;
                 shQty: number;
+                shMin3m: number;
+                shMax3m: number;
+                shHasHistory: boolean;
                 safeStock: number;
                 recommendedQty: number;
                 hasHistory: boolean;
@@ -1989,6 +2041,9 @@ export default function SihwaInventory() {
                         share3m: 0,
                         share6m: 0,
                         shQty: 0,
+                        shMin3m: 0,
+                        shMax3m: 0,
+                        shHasHistory: false,
                         safeStock: 0,
                         recommendedQty: 0,
                         hasHistory: false,
@@ -2006,6 +2061,9 @@ export default function SihwaInventory() {
                 materialGroups[mat].share3m += r.share3m;
                 materialGroups[mat].share6m += r.share6m;
                 materialGroups[mat].shQty += r.shQty;
+                materialGroups[mat].shMin3m += (r.shMin3m !== undefined ? r.shMin3m : r.shQty);
+                materialGroups[mat].shMax3m += (r.shMax3m !== undefined ? r.shMax3m : r.shQty);
+                if (r.shHasHistory) materialGroups[mat].shHasHistory = true;
                 materialGroups[mat].safeStock += r.safeStock;
                 materialGroups[mat].recommendedQty += r.recommendedQty;
                 if (r.hasHistory) materialGroups[mat].hasHistory = true;
@@ -2030,6 +2088,9 @@ export default function SihwaInventory() {
                     share6m: parseFloat(g.share6m.toFixed(2)),
                     trend,
                     shQty: g.shQty,
+                    shMin3m: g.shMin3m,
+                    shMax3m: g.shMax3m,
+                    shHasHistory: g.shHasHistory,
                     safeStock: g.safeStock,
                     recommendedQty: g.recommendedQty,
                     procurementReason: g.recommendedQty > 0 ? `발주 필요 (${g.recommendedQty}개)` : '정상 수급',
@@ -6241,8 +6302,17 @@ if (displayList.length === 0) {
                                                                 </div>
                                                             </div>
                                                         </th>
-                                                        <th className="px-4 py-3 text-right font-black text-teal-700 bg-teal-50/50 cursor-pointer hover:bg-teal-100/50 transition" onClick={() => setDkSortConfig(prev => ({ key: 'shQty', direction: prev.key === 'shQty' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
-                                                            시화 현재고 {dkSortConfig.key === 'shQty' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                        <th className="px-4 py-3 text-right font-black text-teal-700 bg-teal-50/50 cursor-pointer hover:bg-teal-100/50 transition group relative" onClick={() => setDkSortConfig(prev => ({ key: 'shQty', direction: prev.key === 'shQty' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
+                                                            <div className="flex flex-col items-end">
+                                                                <span>시화 현재고 {dkSortConfig.key === 'shQty' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                                                                <span className="text-[10px] text-teal-600/70 font-normal">[최소 ~ 최대]</span>
+                                                            </div>
+                                                            <div className="absolute right-0 bottom-full mb-2 w-72 bg-slate-800 text-white text-[11px] p-3 rounded shadow-xl hidden group-hover:block z-50 text-left font-normal whitespace-normal cursor-auto">
+                                                                <div className="font-bold mb-1 border-b border-slate-600 pb-1 text-teal-300">🏢 시화 현재고 및 최근 최소/최대 보유량</div>
+                                                                <div className="text-slate-200 leading-relaxed">
+                                                                    시화 물류센터의 <b>현재 보유 재고</b>와 최근 확정 스냅샷 이력상 관측된 <b>최소(Min) ~ 최대(Max)</b> 변동 범위입니다.
+                                                                </div>
+                                                            </div>
                                                         </th>
                                                         <th className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition" onClick={() => setDkSortConfig(prev => ({ key: 'safeStock', direction: prev.key === 'safeStock' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
                                                             시화 안전재고량 {dkSortConfig.key === 'safeStock' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -6368,8 +6438,25 @@ if (displayList.length === 0) {
                                                                         )}
                                                                     </div>
                                                                 </td>
-                                                                <td className="px-4 py-2.5 text-right font-black font-mono text-teal-700 bg-teal-50/30">
-                                                                    {row.shQty.toLocaleString()}개
+                                                                <td className="px-4 py-2.5 text-right font-mono bg-teal-50/30">
+                                                                    <div className="flex flex-col items-end">
+                                                                        <span className="font-black text-teal-700 text-[12px]">
+                                                                            {row.shQty.toLocaleString()}개
+                                                                        </span>
+                                                                        {row.shHasHistory ? (
+                                                                            <span className="text-[10px] text-teal-800 font-medium" title={`시화 3개월 관측치 — 최저: ${(row.shMin3m ?? row.shQty).toLocaleString()}개, 최고: ${(row.shMax3m ?? row.shQty).toLocaleString()}개`}>
+                                                                                <span className="text-teal-600/70">[</span>
+                                                                                <span className="font-bold text-amber-700">{(row.shMin3m ?? row.shQty).toLocaleString()}</span>
+                                                                                <span className="text-teal-600/70 mx-0.5">~</span>
+                                                                                <span className="font-bold text-emerald-700">{(row.shMax3m ?? row.shQty).toLocaleString()}</span>
+                                                                                <span className="text-teal-600/70">]</span>
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="text-[10px] text-slate-400 font-normal">
+                                                                                [변동없음: {row.shQty}개]
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
                                                                 </td>
                                                                 <td className="px-4 py-2.5 text-right font-bold text-slate-700 font-mono">
                                                                     {row.safeStock}개
