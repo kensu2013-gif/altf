@@ -1,9 +1,9 @@
 
 import type { Quotation, LineItem, Order } from '../../../types';
-import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User, Image, RefreshCw } from 'lucide-react';
+import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User, Image, RefreshCw, Sliders, X } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { formatCurrency } from '../../../lib/utils';
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, startTransition } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore, type DeliveryInfo, type CustomPriceRecord } from '../../../store/useStore';
 import { calculateCustomerGrade } from '../../../lib/customerUtils';
@@ -23,6 +23,8 @@ interface AdminQuoteDetailProps {
 
 import { QuoteItemRow } from './QuoteItemRow';
 import { findMatchingProduct } from '../../../lib/productUtils';
+import { QuoteRateMatrixPanel } from './QuoteRateMatrixPanel';
+import { classifyItem } from './quoteClassification';
 
 // Helper: Get Stock Status Text
 
@@ -277,6 +279,9 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const [isSaving, setIsSaving] = useState(false);
     const [bulkDiscountRateInput, setBulkDiscountRateInput] = useState<string>('');
     const [targetDiscountRate, setTargetDiscountRate] = useState<string>('all');
+    const [splitSizeA, setSplitSizeA] = useState<number>(100);
+    const [isMatrixOpen, setIsMatrixOpen] = useState<boolean>(() => (quote.items?.length || 0) >= 20);
+    const [activeMatrixFilter, setActiveMatrixFilter] = useState<{ filterKey: string; label: string } | null>(null);
 
     // Local state for customer info
 
@@ -410,9 +415,10 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     // Initialize with quote items, enhanced with local discountRate state
     const [items, setItems] = useState<(LineItem & { userUnitPrice?: number })[]>(() =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        quote.items.map((rawItem: any) => {
+        quote.items.map((rawItem: any, rawIdx: number) => {
             const item: LineItem = {
                 ...rawItem,
+                item_no: rawItem.item_no ?? rawItem.no ?? (rawIdx + 1),
                 name: rawItem.name || rawItem.item_name || '',
                 thickness: rawItem.thickness || rawItem['item_thickness'] || '', // Fallback to item_thickness
                 size: rawItem.size || rawItem['item_size'] || '', // Fallback to item_size
@@ -490,12 +496,12 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 quantity: Number(item.quantity) || 0,
                 // Recalculate Unit Price if we applied a default rate (35/65) and we want to overwrite user's price with Admin Default
                 // "Default to 35/65" usually means the admin *starts* with this offer.
-                unitPrice: (initialRate > 0 && product)
-                    ? Math.round(Math.round(standardPrice * (1 - initialRate / 100)) / 10) * 10
+                unitPrice: ((initialRate ?? 0) > 0 && product)
+                    ? Math.round(Math.round(standardPrice * (1 - (initialRate ?? 0) / 100)) / 10) * 10
                     : (Number(item.unitPrice) || 0),
 
-                amount: (initialRate > 0 && product)
-                    ? (Math.round(Math.round(standardPrice * (1 - initialRate / 100)) / 10) * 10) * (Number(item.quantity) || 0)
+                amount: ((initialRate ?? 0) > 0 && product)
+                    ? (Math.round(Math.round(standardPrice * (1 - (initialRate ?? 0) / 100)) / 10) * 10) * (Number(item.quantity) || 0)
                     : (Number(item.amount) || 0),
 
                 marking_wait_qty: product?.marking_wait_qty || 0,
@@ -569,10 +575,164 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         };
     }, [customerStats]);
 
+    // Helper: Match target filter against item classification & rates
+    const checkItemMatchTargetRateFilter = useCallback((item: LineItem, targetFilter: string, thresholdSize: number = splitSizeA): boolean => {
+        if (targetFilter === 'all') return true;
+
+        const cls = classifyItem(item, thresholdSize);
+
+        // 1. Mat & Size Filter: e.g. "mat_size:304-s:le" or legacy "mat_size:304-s:le100"
+        if (targetFilter.startsWith('mat_size:')) {
+            const [, matKey, rawCat] = targetFilter.split(':');
+            // If -s, ensure it's not a CAP (CAP follows -W)
+            if (matKey.endsWith('-s') && cls.isCap) return false;
+            const targetCat = rawCat.startsWith('le') ? 'le' : rawCat.startsWith('gt') ? 'gt' : rawCat;
+            return cls.materialGroup.toLowerCase() === matKey.toLowerCase() &&
+                   cls.sizeCategory === targetCat;
+        }
+
+        // 1-1. Mat & Standard Filter: e.g. "mat_std:304-s:ansi"
+        if (targetFilter.startsWith('mat_std:')) {
+            const [, matKey, targetStd] = targetFilter.split(':');
+            if (matKey.endsWith('-s') && cls.isCap) return false;
+            return cls.materialGroup.toLowerCase() === matKey.toLowerCase() &&
+                   cls.standard.toLowerCase() === targetStd.toLowerCase();
+        }
+
+        // 1-2. Mat & Size & Standard Filter: e.g. "mat_size_std:304-s:le:ansi"
+        if (targetFilter.startsWith('mat_size_std:')) {
+            const [, matKey, rawCat, targetStd] = targetFilter.split(':');
+            if (matKey.endsWith('-s') && cls.isCap) return false;
+            const targetCat = rawCat.startsWith('le') ? 'le' : rawCat.startsWith('gt') ? 'gt' : rawCat;
+            return cls.materialGroup.toLowerCase() === matKey.toLowerCase() &&
+                   cls.sizeCategory === targetCat &&
+                   cls.standard.toLowerCase() === targetStd.toLowerCase();
+        }
+
+        // 1-3. Mat & Size & Specific Rate Filter: e.g. "mat_size_rate:304-s:le:40"
+        if (targetFilter.startsWith('mat_size_rate:')) {
+            const [, matKey, rawCat, rateStr] = targetFilter.split(':');
+            if (matKey.endsWith('-s') && cls.isCap) return false;
+            const targetCat = rawCat.startsWith('le') ? 'le' : rawCat.startsWith('gt') ? 'gt' : rawCat;
+            const targetRate = Number(rateStr);
+            return cls.materialGroup.toLowerCase() === matKey.toLowerCase() &&
+                   cls.sizeCategory === targetCat &&
+                   (item.discountRate ?? 0) === targetRate;
+        }
+
+        // 1-4. Mat & Specific Rate Filter: e.g. "mat_rate:304-s:40"
+        if (targetFilter.startsWith('mat_rate:')) {
+            const [, matKey, rateStr] = targetFilter.split(':');
+            if (matKey.endsWith('-s') && cls.isCap) return false;
+            const targetRate = Number(rateStr);
+            return cls.materialGroup.toLowerCase() === matKey.toLowerCase() &&
+                   (item.discountRate ?? 0) === targetRate;
+        }
+
+        // 2. Mat Filter (CAP excluded for -S): e.g. "mat:304-s"
+        if (targetFilter.startsWith('mat:')) {
+            const matKey = targetFilter.split(':')[1];
+            if (matKey.endsWith('-s') && cls.isCap) return false;
+            return cls.materialGroup.toLowerCase() === matKey.toLowerCase();
+        }
+
+        // 3. CAP Special Filters: "cap:all", "cap_size:all:le", "cap_size:all:gt", "cap_size:all:le100"
+        if (targetFilter.startsWith('cap_size_rate:')) {
+            const [, , rawCat, rateStr] = targetFilter.split(':');
+            const targetCat = rawCat.startsWith('le') ? 'le' : rawCat.startsWith('gt') ? 'gt' : rawCat;
+            const targetRate = Number(rateStr);
+            return cls.isCap && cls.sizeCategory === targetCat && (item.discountRate ?? 0) === targetRate;
+        }
+        if (targetFilter.startsWith('cap_rate:')) {
+            const [, , rateStr] = targetFilter.split(':');
+            const targetRate = Number(rateStr);
+            return cls.isCap && (item.discountRate ?? 0) === targetRate;
+        }
+        if (targetFilter.startsWith('cap_size:')) {
+            const [, , rawCat] = targetFilter.split(':');
+            const targetCat = rawCat.startsWith('le') ? 'le' : rawCat.startsWith('gt') ? 'gt' : rawCat;
+            return cls.isCap && cls.sizeCategory === targetCat;
+        }
+        if (targetFilter.startsWith('cap:')) {
+            return cls.isCap;
+        }
+
+        // Zero Rate Filter: "zero:all"
+        if (targetFilter === 'zero:all') {
+            return cls.isZeroRate;
+        }
+
+        // 4. Exact rate filter: e.g. "45" or "rate:45"
+        const numericRate = targetFilter.startsWith('rate:')
+            ? Number(targetFilter.split(':')[1])
+            : Number(targetFilter);
+
+        if (!isNaN(numericRate)) {
+            return item.discountRate === numericRate;
+        }
+
+        return true;
+    }, [splitSizeA]);
+
+    // Precomputed Set of matching item indices for activeMatrixFilter
+    // When no filter is active, returns null (instant 0ms lookup, 0 regex executions)
+    const filteredItemIndices = useMemo(() => {
+        if (!activeMatrixFilter) return null;
+        const set = new Set<number>();
+        const filterKey = activeMatrixFilter.filterKey;
+        for (let i = 0; i < items.length; i++) {
+            if (checkItemMatchTargetRateFilter(items[i], filterKey, splitSizeA)) {
+                set.add(i);
+            }
+        }
+        return set;
+    }, [items, activeMatrixFilter, splitSizeA, checkItemMatchTargetRateFilter]);
+
+    // Core Bulk Rate Application Function
+    const applyDiscountRateToItems = useCallback((targetFilter: string, newRate: number, customSplitSize?: number) => {
+        if (isNaN(newRate) || newRate < 0 || newRate > 100) return;
+        const effectiveSplitSize = customSplitSize !== undefined ? customSplitSize : splitSizeA;
+
+        setItems(prev => {
+            let hasChanges = false;
+            const newItems = prev.map(item => {
+                const product = inventory.find(p => p.id === item.productId);
+                const standardPrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0;
+                if (standardPrice === 0) return item;
+
+                // 0% 요율 품목 및 기본가 없는 품목은 절대 변경 금지 (단가 보존)
+                if ((item.discountRate ?? 0) <= 0) return item;
+
+                // 대상 필터 매칭 검사
+                if (!checkItemMatchTargetRateFilter(item, targetFilter, effectiveSplitSize)) {
+                    return item;
+                }
+
+                if (item.discountRate === newRate) return item;
+
+                hasChanges = true;
+                const newPrice = Math.round(Math.round(standardPrice * (1 - newRate / 100)) / 10) * 10;
+                return {
+                    ...item,
+                    unitPrice: newPrice,
+                    discountRate: newRate,
+                    amount: newPrice * item.quantity
+                };
+            });
+            return hasChanges ? newItems : prev;
+        });
+    }, [inventory, splitSizeA, checkItemMatchTargetRateFilter]);
+
     const handleApplyRecommendedRate = useCallback(() => {
         const val = Number(bulkDiscountRateInput);
         const hasInput = bulkDiscountRateInput.trim() !== '';
 
+        if (hasInput && !isNaN(val)) {
+            applyDiscountRateToItems(targetDiscountRate, val);
+            return;
+        }
+
+        // 입력창이 비어있는 경우: 추천 요율 적용
         setItems(prev => {
             let hasChanges = false;
             const newItems = prev.map(item => {
@@ -583,56 +743,38 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 // 0% 요율 품목은 일괄 변경에서 절대 변경하지 않고 안전하게 보존
                 if ((item.discountRate ?? 0) <= 0) return item;
 
-                if (hasInput && !isNaN(val)) {
-                    // 수동 입력 시: 선택한 대상 요율 필터 적용
-                    if (targetDiscountRate !== 'all' && item.discountRate !== Number(targetDiscountRate)) {
-                        return item;
-                    }
-                    if (item.discountRate === val) return item;
-
-                    hasChanges = true;
-                    const newPrice = Math.round(Math.round(base * (1 - val / 100)) / 10) * 10;
-                    return {
-                        ...item,
-                        discountRate: val,
-                        unitPrice: newPrice,
-                        amount: newPrice * item.quantity
-                    };
-                } else {
-                    // 입력창이 비어있는 경우: 추천 요율 적용 (기존 47%였고, targetDiscountRate가 'all' 또는 '47'일 때만)
-                    if (targetDiscountRate !== 'all' && targetDiscountRate !== '47') {
-                        return item;
-                    }
-
-                    const { recommendedRate } = recommendation;
-                    let initialRate = product?.rate_pct ?? item.discountRate ?? 0;
-                    if (initialRate === 0 && product) {
-                        const standardPrice = product.base_price ?? product.unitPrice ?? 0;
-                        if (standardPrice > 0 && product.unitPrice > 0) {
-                            initialRate = Math.round((1 - product.unitPrice / standardPrice) * 100);
-                        }
-                    }
-                    if (isQuoteAfterEffectiveDate) {
-                        if (initialRate === 65) initialRate = 47;
-                        else if (initialRate === 35) initialRate = 25;
-                    }
-
-                    const targetRate = initialRate === 47 ? recommendedRate : initialRate;
-                    if (item.discountRate === targetRate) return item;
-
-                    hasChanges = true;
-                    const newPrice = Math.round(Math.round(base * (1 - targetRate / 100)) / 10) * 10;
-                    return {
-                        ...item,
-                        discountRate: targetRate,
-                        unitPrice: newPrice,
-                        amount: newPrice * item.quantity
-                    };
+                if (!checkItemMatchTargetRateFilter(item, targetDiscountRate)) {
+                    return item;
                 }
+
+                const { recommendedRate } = recommendation;
+                let initialRate = product?.rate_pct ?? item.discountRate ?? 0;
+                if (initialRate === 0 && product) {
+                    const standardPrice = product.base_price ?? product.unitPrice ?? 0;
+                    if (standardPrice > 0 && product.unitPrice > 0) {
+                        initialRate = Math.round((1 - product.unitPrice / standardPrice) * 100);
+                    }
+                }
+                if (isQuoteAfterEffectiveDate) {
+                    if (initialRate === 65) initialRate = 47;
+                    else if (initialRate === 35) initialRate = 25;
+                }
+
+                const targetRate = initialRate === 47 ? recommendedRate : initialRate;
+                if (item.discountRate === targetRate) return item;
+
+                hasChanges = true;
+                const newPrice = Math.round(Math.round(base * (1 - targetRate / 100)) / 10) * 10;
+                return {
+                    ...item,
+                    discountRate: targetRate,
+                    unitPrice: newPrice,
+                    amount: newPrice * item.quantity
+                };
             });
             return hasChanges ? newItems : prev;
         });
-    }, [bulkDiscountRateInput, targetDiscountRate, recommendation, inventory, isQuoteAfterEffectiveDate]);
+    }, [bulkDiscountRateInput, targetDiscountRate, recommendation, inventory, isQuoteAfterEffectiveDate, applyDiscountRateToItems, checkItemMatchTargetRateFilter]);
 
     // ... (keep helper functions)
 
@@ -1352,17 +1494,80 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                     <Package className="w-4 h-4 text-teal-600" />
                                     견적 품목 및 단가 조정 (Negotiation)
                                 </h3>
-                                <button
-                                    type="button"
-                                    onClick={() => handleConvertStandard()}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-lg text-xs font-bold transition-all shadow-xs"
-                                    title={selectedItems.length > 0 ? `선택된 ${selectedItems.length}개 품목 ANSI ↔ JIS 변환` : "전체 품목 ANSI ↔ JIS 변환"}
-                                >
-                                    <RefreshCw className="w-3.5 h-3.5 text-teal-600" />
-                                    <span>ANSI ↔ JIS 변환 {selectedItems.length > 0 && `(${selectedItems.length})`}</span>
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsMatrixOpen(!isMatrixOpen)}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                                            isMatrixOpen 
+                                                ? 'bg-teal-600 text-white border-teal-700' 
+                                                : 'bg-white hover:bg-teal-50 text-teal-700 border-teal-300'
+                                        }`}
+                                        title="재질 및 100A 규격별 스마트 요율 매트릭스 패널 토글"
+                                    >
+                                        <Sliders className="w-3.5 h-3.5" />
+                                        <span>재질/규격(100A) 요율 매트릭스 {isMatrixOpen ? '접기' : '열기'}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleConvertStandard()}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-lg text-xs font-bold transition-all shadow-xs"
+                                        title={selectedItems.length > 0 ? `선택된 ${selectedItems.length}개 품목 ANSI ↔ JIS 변환` : "전체 품목 ANSI ↔ JIS 변환"}
+                                    >
+                                        <RefreshCw className="w-3.5 h-3.5 text-teal-600" />
+                                        <span>ANSI ↔ JIS 변환 {selectedItems.length > 0 && `(${selectedItems.length})`}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Smart Material & Size Matrix Panel */}
+                            <div className="p-3 bg-slate-50/30 border-b border-slate-200">
+                                <QuoteRateMatrixPanel 
+                                    items={items}
+                                    onApplyRate={applyDiscountRateToItems}
+                                    isOpen={isMatrixOpen}
+                                    onToggle={() => setIsMatrixOpen(!isMatrixOpen)}
+                                    currentSplitSize={splitSizeA}
+                                    onSplitSizeChange={setSplitSizeA}
+                                    selectedFilterKey={activeMatrixFilter?.filterKey ?? null}
+                                    onSelectFilter={(filterKey, label) => {
+                                        startTransition(() => {
+                                            if (filterKey) {
+                                                setActiveMatrixFilter({ filterKey, label });
+                                            } else {
+                                                setActiveMatrixFilter(null);
+                                            }
+                                        });
+                                    }}
+                                />
                             </div>
                             <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-sm custom-scrollbar">
+                                {activeMatrixFilter && (
+                                    <div className="flex items-center justify-between px-4 py-2.5 bg-linear-to-r from-teal-50 via-emerald-50 to-teal-50 border-b border-teal-200 text-xs font-bold text-teal-900 shadow-2xs">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-pulse shrink-0" />
+                                            <span>
+                                                선택 조건 필터링 중: <b className="text-teal-800 underline underline-offset-2">{activeMatrixFilter.label}</b>
+                                            </span>
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-teal-600 text-white font-extrabold shadow-2xs">
+                                                {filteredItemIndices?.size ?? 0}건 표시
+                                            </span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                startTransition(() => {
+                                                    setActiveMatrixFilter(null);
+                                                });
+                                            }}
+                                            className="flex items-center gap-1 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs text-[11px] font-bold cursor-pointer transition-all active:scale-95 shrink-0"
+                                            title="필터를 해제하고 전체 품목을 다시 봅니다"
+                                        >
+                                            <X className="w-3.5 h-3.5 text-slate-500" />
+                                            <span>필터 해제 (전체 품목 보기)</span>
+                                        </button>
+                                    </div>
+                                )}
                                 <table className="w-full text-sm text-left min-w-[1000px]">
                                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-sm font-bold uppercase">
                                         <tr>
@@ -1417,19 +1622,56 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             </th>
 
                                             {/* Rate (Previously Discount Rate) */}
-                                            <th className="px-2 py-3 text-center w-[12%]">
+                                            <th className="px-2 py-3 text-center w-[13%]">
                                                 <div className="flex flex-col items-center gap-1">
                                                     <span className="text-xs font-bold text-slate-600">요율 (%)</span>
-                                                    <div className="flex flex-col gap-1 w-full max-w-[90px] mx-auto">
+                                                    <div className="flex flex-col gap-1 w-full max-w-33.75 mx-auto">
                                                         <select
                                                             value={targetDiscountRate}
                                                             onChange={(e) => setTargetDiscountRate(e.target.value)}
                                                             className="w-full px-1 py-0.5 text-[10px] border border-slate-300 rounded outline-none bg-white text-slate-700 font-medium"
+                                                            title="요율 적용 대상 선택"
                                                         >
-                                                            <option value="all">전체 (0% 제외)</option>
-                                                            {availableRates.map(r => (
-                                                                <option key={r} value={r}>{r}%</option>
-                                                            ))}
+                                                            <optgroup label="기본 필터">
+                                                                <option value="all">전체 (0% 제외)</option>
+                                                            </optgroup>
+                                                            <optgroup label="재질별 전체 (CAP 자동 제외)">
+                                                                <option value="mat:304-w">304-W (용접 전체)</option>
+                                                                <option value="mat:304-s">304-S (심리스 - CAP제외)</option>
+                                                                <option value="mat:304l-w">304L-W (용접 전체)</option>
+                                                                <option value="mat:304l-s">304L-S (심리스 - CAP제외)</option>
+                                                                <option value="mat:316l-w">316L-W (용접 전체)</option>
+                                                                <option value="mat:316l-s">316L-S (심리스 전체)</option>
+                                                                <option value="mat:spg">SPG (배관용 탄소강)</option>
+                                                            </optgroup>
+                                                            <optgroup label={`재질 + ${splitSizeA}A 기준 분기`}>
+                                                                <option value="mat_size:304-s:le">304-S (≤ {splitSizeA}A 소구경)</option>
+                                                                <option value="mat_size:304-s:gt">304-S (&gt; {splitSizeA}A 대구경)</option>
+                                                                <option value="mat_size:304-w:le">304-W (≤ {splitSizeA}A 소구경)</option>
+                                                                <option value="mat_size:304-w:gt">304-W (&gt; {splitSizeA}A 대구경)</option>
+                                                                <option value="mat_size:304l-s:le">304L-S (≤ {splitSizeA}A 소구경)</option>
+                                                                <option value="mat_size:304l-s:gt">304L-S (&gt; {splitSizeA}A 대구경)</option>
+                                                                <option value="mat_size:304l-w:le">304L-W (≤ {splitSizeA}A 소구경)</option>
+                                                                <option value="mat_size:304l-w:gt">304L-W (&gt; {splitSizeA}A 대구경)</option>
+                                                                <option value="mat_size:316l-s:le">316L-S (≤ {splitSizeA}A 소구경)</option>
+                                                                <option value="mat_size:316l-s:gt">316L-S (&gt; {splitSizeA}A 대구경)</option>
+                                                                <option value="mat_size:316l-w:le">316L-W (≤ {splitSizeA}A 소구경)</option>
+                                                                <option value="mat_size:316l-w:gt">316L-W (&gt; {splitSizeA}A 대구경)</option>
+                                                                <option value="mat_size:spg:le">SPG (≤ {splitSizeA}A 소구경)</option>
+                                                                <option value="mat_size:spg:gt">SPG (&gt; {splitSizeA}A 대구경)</option>
+                                                            </optgroup>
+                                                            <optgroup label="CAP 특수 품목군 (-W 연동군)">
+                                                                <option value="cap:all">CAP 전체 (-W 연동군)</option>
+                                                                <option value="cap_size:all:le">CAP (≤ {splitSizeA}A 이하)</option>
+                                                                <option value="cap_size:all:gt">CAP (&gt; {splitSizeA}A 초과)</option>
+                                                            </optgroup>
+                                                            {availableRates.length > 0 && (
+                                                                <optgroup label="기존 요율 수치별">
+                                                                    {availableRates.map(r => (
+                                                                        <option key={r} value={String(r)}>{r}% 품목만</option>
+                                                                    ))}
+                                                                </optgroup>
+                                                            )}
                                                         </select>
                                                         <input
                                                             type="number"
@@ -1441,34 +1683,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                                 if (e.key === 'Enter') {
                                                                     const val = Number(bulkDiscountRateInput);
                                                                     if (!isNaN(val) && bulkDiscountRateInput.trim() !== '') {
-                                                                        setItems(prev => {
-                                                                            let hasChanges = false;
-                                                                            const newItems = prev.map(item => {
-                                                                                const product = getProductInfo(item.productId);
-                                                                                const standardPrice = product?.base_price ?? item.base_price ?? product?.unitPrice ?? item.unitPrice ?? 0;
-                                                                                if (standardPrice === 0) return item;
-
-                                                                                // 0% 요율 품목 보호
-                                                                                if ((item.discountRate ?? 0) <= 0) return item;
-
-                                                                                // 변경 대상 필터링
-                                                                                if (targetDiscountRate !== 'all' && item.discountRate !== Number(targetDiscountRate)) {
-                                                                                    return item;
-                                                                                }
-
-                                                                                if (item.discountRate === val) return item;
-
-                                                                                hasChanges = true;
-                                                                                const newPrice = Math.round(Math.round(standardPrice * (1 - val / 100)) / 10) * 10;
-                                                                                return {
-                                                                                    ...item,
-                                                                                    unitPrice: newPrice,
-                                                                                    discountRate: val,
-                                                                                    amount: newPrice * item.quantity
-                                                                                };
-                                                                            });
-                                                                            return hasChanges ? newItems : prev;
-                                                                        });
+                                                                        applyDiscountRateToItems(targetDiscountRate, val);
                                                                     }
                                                                 }
                                                             }}
@@ -1480,7 +1695,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                                 <span>추천:</span>
                                                                 <span className="text-teal-600 font-extrabold">{recommendation.recommendedRate}%</span>
                                                             </div>
-                                                            <span className="text-slate-400 text-[8px] whitespace-normal text-center scale-90 leading-tight max-w-[120px]" title={recommendation.reason}>
+                                                            <span className="text-slate-400 text-[8px] whitespace-normal text-center scale-90 leading-tight max-w-30" title={recommendation.reason}>
                                                                 {recommendation.reason}
                                                             </span>
                                                             <button
@@ -1506,22 +1721,27 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {items.map((item, idx) => (
-                                            <QuoteItemRow
-                                                key={idx}
-                                                index={idx}
-                                                item={item}
-                                                inventory={inventory}
-                                                onItemChange={handleItemChange}
-                                                onPriceChange={handlePriceChange}
-                                                onSupplierRateChange={handleSupplierRateChange}
-                                                onDiscountRateChange={handleDiscountRateChange}
-                                                isSelected={item.isSelected}
-                                                onItemSelect={handleItemSelect}
-                                                customPriceRecord={customPrices[[item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim()]}
-                                                onApplyCustomPrice={(record) => handleApplyCustomPrice(idx, record)}
-                                            />
-                                        ))}
+                                        {items.map((item, idx) => {
+                                            if (filteredItemIndices && !filteredItemIndices.has(idx)) {
+                                                return null;
+                                            }
+                                            return (
+                                                <QuoteItemRow
+                                                    key={item.id || idx}
+                                                    index={idx}
+                                                    item={item}
+                                                    inventory={inventory}
+                                                    onItemChange={handleItemChange}
+                                                    onPriceChange={handlePriceChange}
+                                                    onSupplierRateChange={handleSupplierRateChange}
+                                                    onDiscountRateChange={handleDiscountRateChange}
+                                                    isSelected={item.isSelected}
+                                                    onItemSelect={handleItemSelect}
+                                                    customPriceRecord={customPrices[[item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim()]}
+                                                    onApplyCustomPrice={(record) => handleApplyCustomPrice(idx, record)}
+                                                />
+                                            );
+                                        })}
                                     </tbody>
                                     <tfoot className="bg-slate-50 border-t border-slate-200">
                                         <tr>
@@ -1869,6 +2089,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
                                         await updateQuotation(quote.id, updatePayload); // Local Update & API Fetch
                                         setAdminAttachmentFiles([]); // 첨부파일 비우기
+                                        setActiveMatrixFilter(null); // 필터 원위치 리셋
                                         alert('수정사항이 저장되었습니다.');
                                     } catch (error) {
                                         console.error(error);

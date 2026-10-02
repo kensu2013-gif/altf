@@ -65,6 +65,8 @@ export interface LineItem {
     comments?: { author: string; timestamp: string; content: string; authorId?: string }[]; // [NEW] Chat/Comments per item
 
     // Legacy Fields (Snake Case)
+    item_no?: number | string;
+    no?: number | string;
     item_name?: string;
     item_id?: string;
     unit_price?: number;

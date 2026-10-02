@@ -5,6 +5,7 @@ import type { CustomPriceRecord } from '../../../store/useStore';
 import { findMatchingProduct, formatThickness } from '../../../lib/productUtils';
 import { formatCurrency } from '../../../lib/utils'; // Adjust path if needed
 import { convertLineItemStandard } from '../../../utils/unitConverter';
+import { getMaterialVisualProps, loadUserRateConfig } from './quoteClassification';
 
 interface QuoteItem extends LineItem {
     userUnitPrice?: number;
@@ -100,6 +101,7 @@ export const QuoteItemRow = React.memo(({
     }
 
     const isUnlinked = !product;
+    const matVisual = getMaterialVisualProps(item.material, loadUserRateConfig());
     const basePrice = (item.base_price && item.base_price > 0) ? item.base_price : (product?.base_price ?? product?.unitPrice ?? 0);
     const supplierRate = item.supplierRate ?? 0;
     const costPrice = Math.round((basePrice * (100 - supplierRate) / 100) / 10) * 10;
@@ -194,7 +196,7 @@ export const QuoteItemRow = React.memo(({
                 />
             </td>
             <td className="px-1 py-3 text-center align-middle text-xs font-bold text-slate-500">
-                {index + 1}
+                {item.item_no ?? item.no ?? (index + 1)}
             </td>
             <td className="px-4 py-3 text-left align-middle">
                 <div className="flex items-center gap-1 flex-wrap">
@@ -239,7 +241,7 @@ export const QuoteItemRow = React.memo(({
                         title="Material"
                         onChange={(e) => onItemChange(index, 'material', e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className="w-32 px-1 py-1.5 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
+                        className={`w-32 px-1 py-1.5 text-center rounded border outline-none text-xs font-bold transition-all shadow-2xs ${matVisual.borderClass} ${matVisual.bgLight} ${matVisual.suffixClass || matVisual.textClass} focus:border-teal-500`}
                         placeholder="Mat"
                     />
                     <button
@@ -264,7 +266,7 @@ export const QuoteItemRow = React.memo(({
                             <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded mt-1">부산: {bsStock}</span>
                         )}
                         {customPriceRecord && (
-                            <div className="flex flex-col items-center mt-1 border border-slate-200 bg-slate-50 rounded p-1.5 text-[10px] w-full max-w-[100px] shadow-sm">
+                            <div className="flex flex-col items-center mt-1 border border-slate-200 bg-slate-50 rounded p-1.5 text-[10px] w-full max-w-25 shadow-sm">
                         <span className="text-slate-700 font-bold mb-1 whitespace-nowrap border-b border-slate-200 w-full text-center pb-0.5">📋 과거 실적확인</span>
                         <div className="flex justify-between w-full mb-0.5" title={`판매: ${formatCurrency(customPriceRecord.salesPrice)}`}>
                                     <span className="text-[9px]">판매:</span> 
