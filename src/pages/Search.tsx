@@ -683,47 +683,70 @@ export default function Search() {
     };
 
     const pollResults = async (sessionId: string) => {
-        let attempts = 0;
-        const maxAttempts = 120; // 2 minutes (1s * 120)
+        const FIRST_RESPONSE_TIMEOUT_SEC = 180; // 첫 응답 최대 대기 시간: 3분 (180초)
+        const STREAM_SILENCE_TIMEOUT_SEC = 5;    // 첫 응답 수신 후, 추가 데이터 침묵 제한: 5초
+
+        let waitTimeForFirstResponse = 0;
         let lastItemCount = 0;
         let silenceTimer = 0;
 
         const interval = setInterval(async () => {
-            attempts++;
             try {
                 const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/quote/session/${sessionId}`);
                 if (res.ok) {
                     const data = await res.json();
                     const currentCount = data.items ? data.items.length : 0;
 
-                    if (currentCount > lastItemCount) {
-                        // New items arrived!
-                        lastItemCount = currentCount;
-                        silenceTimer = 0; // Reset silence timer
-                        setNotification(`${currentCount}개 항목 발견... 분석 중`);
-                    } else if (currentCount === lastItemCount && currentCount > 0) {
-                        // No new items, but we have some. Increment silence timer.
-                        silenceTimer++;
-                        setNotification(`${currentCount}개 항목 발견... (${5 - silenceTimer}초 후 완료)`);
-                    }
+                    // 1. 첫 응답이 아직 오지 않은 상태 (0개 항목)
+                    if (currentCount === 0) {
+                        waitTimeForFirstResponse++;
+                        // 10초마다 또는 시작 시점에 진행 상황 표시
+                        setNotification(`AI 도면/견적서 분석 중... (${waitTimeForFirstResponse}초 경과 / 최대 3분)`);
 
-                    // Condition: We have items AND 5 seconds of silence
-                    if (currentCount > 0 && silenceTimer >= 5) {
+                        if (waitTimeForFirstResponse >= FIRST_RESPONSE_TIMEOUT_SEC) {
+                            clearInterval(interval);
+                            setUploadStatus('IDLE');
+                            setNotification('분석 응답 시간이 초과되었습니다 (3분). 네트워크 상태나 파일을 확인해주세요.');
+                            return;
+                        }
+                    } 
+                    // 2. 첫 응답이 도착했거나 추가 데이터가 스트리밍 유입되는 상태 (> 0개 항목)
+                    else {
+                        if (currentCount > lastItemCount) {
+                            // 새로운 항목이 추가 유입됨: 텀 타이머 리셋
+                            lastItemCount = currentCount;
+                            silenceTimer = 0;
+                            setNotification(`${currentCount}개 항목 발견... 추가 항목 분석 중`);
+                        } else {
+                            // 추가 데이터 없이 텀이 생김: 침묵 타이머 증가
+                            silenceTimer++;
+                            setNotification(`${currentCount}개 항목 발견... (${STREAM_SILENCE_TIMEOUT_SEC - silenceTimer}초 후 완료)`);
+                        }
+
+                        // 첫 응답 이후 5초 동안 새로운 항목이 없으면 정상 수신 완료 처리
+                        if (silenceTimer >= STREAM_SILENCE_TIMEOUT_SEC) {
+                            clearInterval(interval);
+                            setNotification(`총 ${currentCount}개 항목 분석 완료!`);
+                            processMatchedItems(data.items);
+                            return;
+                        }
+                    }
+                } else {
+                    // 세션이 아직 생성 전(404 등)일 때도 첫 응답 대기 시간 카운트
+                    waitTimeForFirstResponse++;
+                    setNotification(`AI 도면/견적서 분석 중... (${waitTimeForFirstResponse}초 경과 / 최대 3분)`);
+
+                    if (waitTimeForFirstResponse >= FIRST_RESPONSE_TIMEOUT_SEC) {
                         clearInterval(interval);
-                        processMatchedItems(data.items);
+                        setUploadStatus('IDLE');
+                        setNotification('분석 응답 시간이 초과되었습니다 (3분).');
                         return;
                     }
                 }
             } catch (e) {
                 console.error("Polling error", e);
             }
-
-            if (attempts >= maxAttempts) {
-                clearInterval(interval);
-                setUploadStatus('IDLE');
-                setNotification('분석 시간이 초과되었습니다 (관리자에 문의하세요.).');
-            }
-        }, 1000); // Poll every 1 second
+        }, 1000); // 1초마다 폴링
     };
 
     const processMatchedItems = (items: MockImportedItem[]) => {
