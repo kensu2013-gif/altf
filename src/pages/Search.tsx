@@ -664,26 +664,28 @@ export default function Search() {
             formData.append('user_name', user.contactName || '');
         }
 
+        // 3. Start Polling Immediately so timer starts right away
+        pollResults(sessionId);
+
         try {
-            // 3. Send to Make.com Webhook
+            // 4. Send to Make.com Webhook
             const response = await fetch('https://hook.us2.make.com/f1555ljwq6oovx8ug7ghux3y9mmfsx8m', {
                 method: 'POST',
                 body: formData
             });
 
-            if (!response.ok) throw new Error('Upload Failed');
-
-            // 4. Start Polling
-            pollResults(sessionId);
+            if (!response.ok) {
+                console.warn('Make.com Webhook responded with status:', response.status);
+            }
         } catch (error) {
             console.error(error);
             setUploadStatus('IDLE');
-            setNotification('업로드 중 오류가 발생했습니다.');
+            setNotification('업로드 전송 중 오류가 발생했습니다. 네트워크를 확인해주세요.');
         }
     };
 
     const pollResults = async (sessionId: string) => {
-        const FIRST_RESPONSE_TIMEOUT_SEC = 180; // 첫 응답 최대 대기 시간: 3분 (180초)
+        const FIRST_RESPONSE_TIMEOUT_SEC = 300; // 첫 응답 최대 대기 시간: 5분 (300초) - Make.com/AI 지연 완벽 대응
         const STREAM_SILENCE_TIMEOUT_SEC = 5;    // 첫 응답 수신 후, 추가 데이터 침묵 제한: 5초
 
         let waitTimeForFirstResponse = 0;
@@ -700,13 +702,12 @@ export default function Search() {
                     // 1. 첫 응답이 아직 오지 않은 상태 (0개 항목)
                     if (currentCount === 0) {
                         waitTimeForFirstResponse++;
-                        // 10초마다 또는 시작 시점에 진행 상황 표시
-                        setNotification(`AI 도면/견적서 분석 중... (${waitTimeForFirstResponse}초 경과 / 최대 3분)`);
+                        setNotification(`AI 도면/견적서 분석 중... (${waitTimeForFirstResponse}초 경과 / 최대 5분)`);
 
                         if (waitTimeForFirstResponse >= FIRST_RESPONSE_TIMEOUT_SEC) {
                             clearInterval(interval);
                             setUploadStatus('IDLE');
-                            setNotification('분석 응답 시간이 초과되었습니다 (3분). 네트워크 상태나 파일을 확인해주세요.');
+                            setNotification('분석 응답 시간이 초과되었습니다 (5분). 네트워크 상태나 파일을 확인해주세요.');
                             return;
                         }
                     } 
@@ -734,12 +735,12 @@ export default function Search() {
                 } else {
                     // 세션이 아직 생성 전(404 등)일 때도 첫 응답 대기 시간 카운트
                     waitTimeForFirstResponse++;
-                    setNotification(`AI 도면/견적서 분석 중... (${waitTimeForFirstResponse}초 경과 / 최대 3분)`);
+                    setNotification(`AI 도면/견적서 분석 중... (${waitTimeForFirstResponse}초 경과 / 최대 5분)`);
 
                     if (waitTimeForFirstResponse >= FIRST_RESPONSE_TIMEOUT_SEC) {
                         clearInterval(interval);
                         setUploadStatus('IDLE');
-                        setNotification('분석 응답 시간이 초과되었습니다 (3분).');
+                        setNotification('분석 응답 시간이 초과되었습니다 (5분).');
                         return;
                     }
                 }
