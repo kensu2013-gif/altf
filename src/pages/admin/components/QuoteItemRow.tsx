@@ -231,7 +231,7 @@ export const QuoteItemRow = React.memo(({
                         title="Thickness"
                         onChange={(e) => onItemChange(index, 'thickness', e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className="w-[54px] px-1 py-1 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
+                        className="w-13.5 px-1 py-1 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
                         placeholder="T"
                     />
                     <span className="text-slate-300 select-none">-</span>
@@ -241,7 +241,7 @@ export const QuoteItemRow = React.memo(({
                         title="Size"
                         onChange={(e) => onItemChange(index, 'size', e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className="w-[68px] px-1 py-1 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
+                        className="w-17 px-1 py-1 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
                         placeholder="Size"
                     />
                     <span className="text-slate-300 select-none">-</span>
@@ -251,7 +251,7 @@ export const QuoteItemRow = React.memo(({
                         title="Material"
                         onChange={(e) => onItemChange(index, 'material', e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className={`w-[86px] px-1 py-1 text-center rounded border outline-none text-xs font-bold transition-all shadow-2xs ${matVisual.borderClass} ${matVisual.bgLight} ${matVisual.suffixClass || matVisual.textClass} focus:border-teal-500`}
+                        className={`w-21.5 px-1 py-1 text-center rounded border outline-none text-xs font-bold transition-all shadow-2xs ${matVisual.borderClass} ${matVisual.bgLight} ${matVisual.suffixClass || matVisual.textClass} focus:border-teal-500`}
                         placeholder="Mat"
                     />
                     <button

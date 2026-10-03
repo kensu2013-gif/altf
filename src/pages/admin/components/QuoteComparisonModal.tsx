@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, ArrowRight, Check, AlertTriangle, ExternalLink, Copy, CheckSquare, Square } from 'lucide-react';
-import { SimilarityMatchCandidate, NormalizedItem } from '../../../utils/quoteSimilarityCore';
+import { X, Check, AlertTriangle, ExternalLink, CheckSquare, Square } from 'lucide-react';
+import type { SimilarityMatchCandidate } from '../../../utils/quoteSimilarityCore';
 
 interface QuoteComparisonModalProps {
     isOpen: boolean;

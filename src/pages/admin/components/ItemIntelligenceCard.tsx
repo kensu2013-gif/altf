@@ -285,7 +285,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
 
     return (
         <div className="fixed inset-0 z-150 flex justify-end bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
-            <div className="w-[800px] max-w-[90vw] h-full bg-slate-50 shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300" onClick={e => e.stopPropagation()}>
+            <div className="w-200 max-w-[90vw] h-full bg-slate-50 shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300" onClick={e => e.stopPropagation()}>
                 
                 {/* Header */}
                 <div className="bg-white px-6 py-5 border-b border-slate-200 flex justify-between items-start shrink-0 relative overflow-hidden">
@@ -570,7 +570,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                     <option value={0}>전체 기간</option>
                                 </select>
                                 <select 
-                                    className="text-xs border border-slate-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[200px]"
+                                    className="text-xs border border-slate-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-50"
                                     value={historyCompany}
                                     onChange={(e) => setHistoryCompany(e.target.value)}
                                     aria-label="조회 업체"

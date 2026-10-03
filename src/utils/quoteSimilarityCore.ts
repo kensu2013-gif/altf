@@ -2,12 +2,12 @@
  * 견적 및 발주 유사도 평가 코어 엔진 (Quote & Order Similarity Core Engine)
  */
 
-import { LineItem, Quotation, Order } from '../types';
+import type { LineItem } from '../types';
 import { 
     ITEM_NAME_ALIASES, 
     NON_ITEM_KEYWORDS, 
     INCH_TO_A_MAP, 
-    SimilarityThresholds, 
+    type SimilarityThresholds, 
     DEFAULT_SIMILARITY_THRESHOLDS 
 } from './quoteSimilarityConfig';
 
@@ -395,7 +395,7 @@ export function compareTwoNormalizedDocuments(
     // [SAME_PROJECT] 다른 고객, S >= 75, (순서 >= 60 또는 희귀품목 3개 이상 일치), 90일 이내
     else if (!isSameCustomer && totalScore >= thresholds.SAME_PROJECT_MIN_SCORE && (seqScore >= thresholds.SAME_PROJECT_MIN_SEQ || rareItemsMatchedCount >= thresholds.SAME_PROJECT_MIN_RARE_ITEMS) && diffDays <= thresholds.SAME_PROJECT_MAX_DAYS) {
         similarityType = 'SAME_PROJECT';
-        rationale.push(`타 거래처(${docB.customerName})와 동일 프로젝트 의심 (${totalScore}점)`);
+        rationale.push(`타 거래처(${docB.customerName})와 유사 프로젝트 의심 (${totalScore}점)`);
         if (rareItemsMatchedCount >= 3) rationale.push(`희귀 품목 ${rareItemsMatchedCount}종 일치`);
         if (seqScore >= 60) rationale.push(`BOM 순서 일치도 ${seqScore}%`);
     }

@@ -111,6 +111,7 @@ export interface Quotation {
     source?: 'WEB' | 'EMAIL' | 'PHONE' | 'FAX' | 'KAKAO' | 'VISIT';
     relatedId?: string;
     relationType?: 'DUPLICATE' | 'SAME_PROJECT' | 'SHORTAGE' | 'REPEAT';
+    linkedQuoteId?: string; // Link to original or revision Quote if originated from one
     similarity?: {
         topType: 'DUPLICATE' | 'SAME_PROJECT' | 'SHORTAGE' | 'REPEAT' | 'NONE';
         topScore: number;
@@ -239,6 +240,8 @@ export interface Order {
             email?: string;
             address?: string;
             memo?: string;
+            business_no?: string;
+            biz_no?: string;
         };
         [key: string]: unknown;
     };

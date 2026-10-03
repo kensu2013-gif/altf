@@ -1,6 +1,6 @@
 import React from 'react';
-import { X, ExternalLink, Columns, AlertTriangle, RefreshCw, Copy, Check } from 'lucide-react';
-import { SimilarityMatchCandidate } from '../../../utils/quoteSimilarityCore';
+import { X, ExternalLink, Columns, Copy, Check } from 'lucide-react';
+import type { SimilarityMatchCandidate } from '../../../utils/quoteSimilarityCore';
 
 interface QuoteSimilarityDrawerProps {
     isOpen: boolean;
@@ -40,7 +40,7 @@ export const QuoteSimilarityDrawer: React.FC<QuoteSimilarityDrawerProps> = ({
     };
 
     return (
-        <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[460px] bg-white shadow-2xl border-l border-slate-200 flex flex-col animate-slideLeft">
+        <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-115 bg-white shadow-2xl border-l border-slate-200 flex flex-col animate-slideLeft">
             {/* Header */}
             <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
                 <div>
@@ -95,7 +95,7 @@ export const QuoteSimilarityDrawer: React.FC<QuoteSimilarityDrawerProps> = ({
                                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${badgeColor}`}>
                                                 {badgeTitle}
                                             </span>
-                                            <span className="text-xs font-bold text-slate-800 truncate max-w-[180px]">
+                                            <span className="text-xs font-bold text-slate-800 truncate max-w-45">
                                                 {c.customerName || '무명 고객사'}
                                             </span>
                                         </div>

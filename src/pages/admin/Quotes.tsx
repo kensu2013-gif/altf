@@ -1,6 +1,9 @@
-import { useState, useEffect, useDeferredValue } from 'react';
+import { useState, useEffect, useDeferredValue, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { FileText, Calendar, Download, Trash2, ArchiveRestore, Search, Image } from 'lucide-react';
 import { AdminQuoteDetail } from './components/AdminQuoteDetail';
+import { QuoteSimilarityDrawer } from './components/QuoteSimilarityDrawer';
+import { QuoteComparisonModal } from './components/QuoteComparisonModal';
 import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { formatCurrency } from '../../lib/utils';
@@ -11,8 +14,17 @@ import type { Quotation } from '../../types';
 import type { DocumentPayload } from '../../types/document';
 import { renderDocumentHTML } from '../../lib/documentTemplate';
 import { PreviewModal } from '../../components/ui/PreviewModal';
+import {
+    normalizeLineItem,
+    compareTwoNormalizedDocuments,
+    stripCorp,
+    type SimilarityMatchCandidate,
+    type NormalizedItem,
+    type SimilarityType
+} from '../../utils/quoteSimilarityCore';
 
 export default function AdminQuotes() {
+    const [searchParams] = useSearchParams();
     const { quotes, users, updateQuotation, trashQuotation, restoreQuotation, permanentDeleteQuotation, setQuotes, fetchUsers } = useStore(useShallow((state) => ({
         quotes: state.quotes,
         users: state.users,
@@ -26,9 +38,15 @@ export default function AdminQuotes() {
     const { inventory } = useInventory();
     const [selectedQuote, setSelectedQuote] = useState<typeof quotes[0] | null>(null);
     const [filterStatus, setFilterStatus] = useState<string>('all');
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState(() => searchParams.get('quoteId') || '');
     const deferredSearchQuery = useDeferredValue(searchQuery);
     const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+
+    // 유사도 서랍(Drawer) 및 정밀 비교 모달 상태
+    const [drawerQuoteId, setDrawerQuoteId] = useState<string | null>(null);
+    const [activeDrawerCandidate, setActiveDrawerCandidate] = useState<SimilarityMatchCandidate | null>(null);
+    const [comparisonCandidate, setComparisonCandidate] = useState<SimilarityMatchCandidate | null>(null);
+    const [dismissedTargetIds, setDismissedTargetIds] = useState<Set<string>>(new Set());
 
     const user = useStore((state) => state.auth.user);
     const userRole = user?.role as string;
@@ -71,6 +89,137 @@ export default function AdminQuotes() {
         return () => window.removeEventListener('focus', fetchQuotes);
     }, [setQuotes, user, fetchUsers]);
 
+    const [lastOpenedQuoteId, setLastOpenedQuoteId] = useState<string | null>(null);
+
+    // Handle incoming URL query parameter (?quoteId=...) for direct search & open
+    const urlQuoteId = searchParams.get('quoteId');
+    if (urlQuoteId && urlQuoteId !== lastOpenedQuoteId) {
+        const found = quotes.find(q => q.id === urlQuoteId || q.customerNumber === urlQuoteId);
+        if (found) {
+            setLastOpenedQuoteId(urlQuoteId);
+            setSelectedQuote(found);
+            if (searchQuery !== urlQuoteId) setSearchQuery(urlQuoteId);
+            if (filterStatus !== 'all') setFilterStatus('all');
+        }
+    }
+
+    // 전체 견적 대상 초고속 역색인 유사도 평가 엔진
+    const similarityMap = useMemo(() => {
+        interface NormDoc {
+            id: string;
+            type: 'QUOTATION';
+            docNo: string;
+            customerName: string;
+            corpName: string;
+            bizNo?: string;
+            createdAt: string;
+            items: NormalizedItem[];
+            itemKeySet: Set<string>;
+            parentQuoteId?: string;
+        }
+
+        const normDocs: NormDoc[] = [];
+        const itemKeyToDocIndices = new Map<string, number[]>();
+        const corpToDocIndices = new Map<string, number[]>();
+        const idfDocFreq = new Map<string, number>();
+
+        quotes.forEach((q) => {
+            if (q.isDeleted) return;
+            const normItems = (q.items || []).map(normalizeLineItem).filter(i => !i.isNonItem && i.l1Key.length > 5);
+            if (normItems.length === 0) return;
+
+            const custName = q.customerName || q.customerInfo?.companyName || '';
+            const corp = stripCorp(custName);
+            const bizNo = q.customerInfo?.bizNo || '';
+            const itemKeySet = new Set(normItems.map(it => it.l1Key));
+
+            const docIdx = normDocs.length;
+            const doc: NormDoc = {
+                id: q.id,
+                type: 'QUOTATION',
+                docNo: q.id,
+                customerName: custName,
+                corpName: corp,
+                bizNo,
+                createdAt: q.createdAt || '2026-01-01',
+                items: normItems,
+                itemKeySet,
+                parentQuoteId: q.linkedQuoteId || q.relatedId
+            };
+            normDocs.push(doc);
+
+            itemKeySet.forEach(k => {
+                idfDocFreq.set(k, (idfDocFreq.get(k) || 0) + 1);
+                const list = itemKeyToDocIndices.get(k);
+                if (list) list.push(docIdx);
+                else itemKeyToDocIndices.set(k, [docIdx]);
+            });
+
+            if (corp) {
+                const cList = corpToDocIndices.get(corp);
+                if (cList) cList.push(docIdx);
+                else corpToDocIndices.set(corp, [docIdx]);
+            }
+        });
+
+        const N = Math.max(1, normDocs.length);
+        const idfMap = new Map<string, number>();
+        idfDocFreq.forEach((count, key) => {
+            idfMap.set(key, Math.log((N - count + 0.5) / (count + 0.5) + 1));
+        });
+
+        const map = new Map<string, { topType: SimilarityType; topScore: number; topMatch: SimilarityMatchCandidate; candidates: SimilarityMatchCandidate[] }>();
+
+        normDocs.forEach((docA, idxA) => {
+            const candidateIndices = new Set<number>();
+
+            docA.itemKeySet.forEach(k => {
+                const matches = itemKeyToDocIndices.get(k);
+                if (matches) {
+                    matches.forEach(idxB => {
+                        if (idxB !== idxA) candidateIndices.add(idxB);
+                    });
+                }
+            });
+
+            if (docA.corpName) {
+                const corpMatches = corpToDocIndices.get(docA.corpName);
+                if (corpMatches) {
+                    corpMatches.forEach(idxB => {
+                        if (idxB !== idxA) candidateIndices.add(idxB);
+                    });
+                }
+            }
+
+            const matches: SimilarityMatchCandidate[] = [];
+            candidateIndices.forEach(idxB => {
+                const docB = normDocs[idxB];
+                if (!docB) return;
+                if (docB.id === docA.parentQuoteId || docB.parentQuoteId === docA.id) return;
+
+                const res = compareTwoNormalizedDocuments(docA, docB, idfMap);
+                if (res && res.totalScore >= 60) {
+                    matches.push(res);
+                }
+            });
+
+            if (matches.length > 0) {
+                matches.sort((a, b) => b.totalScore - a.totalScore);
+                const top3 = matches.slice(0, 3);
+                map.set(docA.id, {
+                    topType: top3[0].similarityType,
+                    topScore: top3[0].totalScore,
+                    topMatch: top3[0],
+                    candidates: top3
+                });
+            }
+        });
+
+        return map;
+    }, [quotes]);
+
+    const activeDrawerData = drawerQuoteId ? similarityMap.get(drawerQuoteId) : null;
+
     const quoteCounts = quotes.reduce((acc, q) => {
         if (q.isDeleted) {
             acc.TRASH = (acc.TRASH || 0) + 1;
@@ -98,6 +247,8 @@ export default function AdminQuotes() {
         // Search Match
         if (deferredSearchQuery.trim()) {
             const query = deferredSearchQuery.toLowerCase();
+            const quoteId = q.id?.toLowerCase() || '';
+            const customerNumber = q.customerNumber?.toLowerCase() || '';
             const customerName = q.customerName?.toLowerCase() || '';
             const companyName = q.customerInfo?.companyName?.toLowerCase() || '';
             const contactName = q.customerInfo?.contactName?.toLowerCase() || '';
@@ -106,7 +257,9 @@ export default function AdminQuotes() {
             const userCompany = quoteUser?.companyName?.toLowerCase() || '';
             const userContact = quoteUser?.contactName?.toLowerCase() || '';
 
-            if (!customerName.includes(query) &&
+            if (!quoteId.includes(query) &&
+                !customerNumber.includes(query) &&
+                !customerName.includes(query) &&
                 !companyName.includes(query) &&
                 !contactName.includes(query) &&
                 !userCompany.includes(query) &&
@@ -380,6 +533,8 @@ export default function AdminQuotes() {
                                 return false;
                             };
 
+                            const simInfo = similarityMap.get(quote.id);
+
                             return (
                                 <div key={quote.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:shadow-md transition-all">
                                     <div className="flex items-start gap-4">
@@ -387,7 +542,7 @@ export default function AdminQuotes() {
                                             <FileText className="w-6 h-6" />
                                         </div>
                                         <div>
-                                            <div className="flex items-center gap-2 mb-1">
+                                            <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                 <span className="font-bold text-slate-800 text-lg">
                                                     {displayCompany}
                                                     {displayContact && <span className="text-base text-slate-500 font-medium ml-1">({displayContact})</span>}
@@ -398,23 +553,36 @@ export default function AdminQuotes() {
                                                         {quote.source}
                                                     </span>
                                                 )}
-                                                {quote.similarity && quote.similarity.topType !== 'NONE' && (
-                                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border shadow-2xs ml-0.5 ${
-                                                        quote.similarity.topType === 'SAME_PROJECT' ? 'bg-amber-50 text-amber-800 border-amber-300' :
-                                                        quote.similarity.topType === 'SHORTAGE' ? 'bg-blue-50 text-blue-800 border-blue-300' :
-                                                        quote.similarity.topType === 'DUPLICATE' ? 'bg-purple-50 text-purple-800 border-purple-300' :
-                                                        'bg-slate-100 text-slate-700 border-slate-300'
-                                                    }`} title={`유사도 ${quote.similarity.topScore}점 (${quote.similarity.relatedDocNo || ''})`}>
-                                                        {quote.similarity.topType === 'SAME_PROJECT' ? '⚠️ 동일프로젝트' :
-                                                         quote.similarity.topType === 'SHORTAGE' ? '🔗 Shortage' :
-                                                         quote.similarity.topType === 'DUPLICATE' ? '중복접수' : '반복발주'}
-                                                    </span>
-                                                )}
                                                 {isModified && <span className="text-[10px] font-normal text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded ml-1 border border-teal-100">수정됨</span>}
                                                 {checkQuoteStockInsufficiency(quote) && (
                                                     <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full ml-1 animate-pulse flex items-center gap-1 shadow-sm">
                                                         ⚠️ 재고 부족
                                                     </span>
+                                                )}
+                                                {simInfo && simInfo.topType !== 'NONE' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setDrawerQuoteId(quote.id);
+                                                            setActiveDrawerCandidate(simInfo.topMatch);
+                                                        }}
+                                                        className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-2xs ml-1 inline-flex items-center gap-1 cursor-pointer transition-all hover:scale-105 active:scale-95 shrink-0 whitespace-nowrap ${
+                                                            simInfo.topType === 'SAME_PROJECT' ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100' :
+                                                            simInfo.topType === 'SHORTAGE' ? 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100' :
+                                                            simInfo.topType === 'DUPLICATE' ? 'bg-purple-50 text-purple-800 border-purple-300 hover:bg-purple-100' :
+                                                            'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                                                        }`}
+                                                        title={`클릭하여 유사 내역 서랍 열기 (유사도 ${simInfo.topScore}점 / 대상: ${simInfo.topMatch.targetDocNo})`}
+                                                    >
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse shrink-0" />
+                                                        <span>
+                                                            {simInfo.topType === 'SAME_PROJECT' ? `⚠️ 동일 프로젝트 (${simInfo.topScore}점)` :
+                                                             simInfo.topType === 'SHORTAGE' ? `🔗 Shortage (${simInfo.topScore}점)` :
+                                                             simInfo.topType === 'DUPLICATE' ? `중복 접수 (${simInfo.topScore}점)` :
+                                                             `반복 발주 (${simInfo.topScore}점)`}
+                                                        </span>
+                                                    </button>
                                                 )}
                                             </div>
                                             <div className={`text-sm font-bold ${isModified ? 'text-teal-700' : 'text-indigo-700'} mb-1 flex items-center gap-1.5`}>
@@ -439,8 +607,8 @@ export default function AdminQuotes() {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-6 pl-14 md:pl-0">
-                                        <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-6 pl-14 md:pl-0 flex-wrap md:flex-nowrap">
+                                        <div className="flex items-center gap-3 flex-wrap">
                                             {(quote.attachments && quote.attachments.length > 0) && (
                                                 <div className="flex gap-2">
                                                     {quote.attachments.map((file, i) => (
@@ -552,6 +720,36 @@ export default function AdminQuotes() {
                     }}
                 />
             )}
+
+            {/* 유사 견적/발주 서랍 패널 */}
+            {activeDrawerData && (
+                <QuoteSimilarityDrawer
+                    isOpen={!!drawerQuoteId}
+                    onClose={() => {
+                        setDrawerQuoteId(null);
+                        setActiveDrawerCandidate(null);
+                    }}
+                    candidates={activeDrawerData.candidates.filter(c => !dismissedTargetIds.has(c.targetId))}
+                    selectedCandidate={activeDrawerCandidate}
+                    onSelectCandidate={setActiveDrawerCandidate}
+                    onOpenComparisonModal={(cand) => {
+                        setComparisonCandidate(cand);
+                    }}
+                    onDismissMatch={(targetId) => {
+                        setDismissedTargetIds(prev => new Set([...prev, targetId]));
+                        if (activeDrawerCandidate?.targetId === targetId) {
+                            setActiveDrawerCandidate(null);
+                        }
+                    }}
+                />
+            )}
+
+            {/* 정밀 비교 모달 (Side-by-side Visual Diff) */}
+            <QuoteComparisonModal
+                isOpen={!!comparisonCandidate}
+                onClose={() => setComparisonCandidate(null)}
+                candidate={comparisonCandidate}
+            />
 
             {previewHtml && (
                 <PreviewModal

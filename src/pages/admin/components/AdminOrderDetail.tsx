@@ -10,7 +10,7 @@ import { QuoteRateMatrixPanel } from './QuoteRateMatrixPanel';
 import { checkItemMatchTargetRateFilter, getMaterialVisualProps, loadUserRateConfig } from './quoteClassification';
 import { QuoteSimilarityDrawer } from './QuoteSimilarityDrawer';
 import { QuoteComparisonModal } from './QuoteComparisonModal';
-import { normalizeLineItem, compareTwoNormalizedDocuments, type SimilarityMatchCandidate } from '../../../utils/quoteSimilarityCore';
+import { normalizeLineItem, compareTwoNormalizedDocuments, type SimilarityMatchCandidate, type NormalizedItem } from '../../../utils/quoteSimilarityCore';
 
 import { formatCurrency } from '../../../lib/utils';
 import { calculateCustomerGrade } from '../../../lib/customerUtils';
@@ -407,15 +407,15 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
         // 1. IDF 사전 구성
         const idfDocFreq = new Map<string, number>();
-        const normalizedDocs: { id: string; type: 'QUOTATION' | 'ORDER'; docNo: string; customerName: string; bizNo?: string; createdAt: string; items: any[]; itemKeySet: Set<string>; parentQuoteId?: string }[] = [];
+        const normalizedDocs: { id: string; type: 'QUOTATION' | 'ORDER'; docNo: string; customerName: string; bizNo?: string; createdAt: string; items: NormalizedItem[]; itemKeySet: Set<string>; parentQuoteId?: string }[] = [];
 
         allOrders.forEach(o => {
-            if (o.id === order.id || (o as any).isDeleted) return;
+            if (o.id === order.id || o.isDeleted) return;
             const normItems = ((o.po_items && o.po_items.length > 0) ? o.po_items : o.items || []).map(normalizeLineItem).filter(i => !i.isNonItem && i.l1Key.length > 5);
             if (normItems.length === 0) return;
 
-            const custName = o.poEndCustomer || o.customerName || (o.payload?.customer as any)?.company_name || '';
-            const bizNo = (o.payload?.customer as any)?.business_no || '';
+            const custName = o.poEndCustomer || o.customerName || o.payload?.customer?.company_name || '';
+            const bizNo = o.payload?.customer?.business_no || o.payload?.customer?.biz_no || '';
             const doc = {
                 id: o.id,
                 type: 'ORDER' as const,
@@ -440,13 +440,13 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         });
 
         // 2. 현재 발주 문서 정규화
-        const currentCustName = poEndCustomer || order.customerName || (order.payload?.customer as any)?.company_name || '';
+        const currentCustName = poEndCustomer || order.customerName || order.payload?.customer?.company_name || '';
         const currentDoc = {
             id: order.id,
             type: 'ORDER' as const,
             docNo: order.id,
             customerName: currentCustName,
-            bizNo: (order.payload?.customer as any)?.business_no || '',
+            bizNo: order.payload?.customer?.business_no || order.payload?.customer?.biz_no || '',
             createdAt: order.createdAt || new Date().toISOString(),
             items: activeItems.map(normalizeLineItem)
         };
@@ -477,7 +477,7 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     const topOrderSimilarityCandidate = orderSimilaritySummary.candidates[0] || null;
 
     // 과거 발주건의 매입처(vendorName) 및 매입율(supplierRate) 승계
-    const handleApplySupplierRatesFromComparison = useCallback((_priceMap: Map<number, { unitPrice: number; discountRate?: number }>) => {
+    const handleApplySupplierRatesFromComparison = useCallback(() => {
         if (!orderComparisonCandidate) return;
         setPoItems(prev => prev.map((item, idx) => {
             const match = orderComparisonCandidate.itemMatchMap.get(idx);
@@ -2957,7 +2957,7 @@ if (deliveryNoteFiles.length > 0) {
                                                             불러오기 <span className="text-[8px]">▼</span>
                                                         </button>
                                                         {showPresetDropdown && (
-                                                            <div className="absolute right-0 top-full mt-1 w-[320px] bg-white border border-slate-200 rounded-md shadow-xl z-50 max-h-[300px] overflow-y-auto">
+                                                            <div className="absolute right-0 top-full mt-1 w-[320px] bg-white border border-slate-200 rounded-md shadow-xl z-50 max-h-75 overflow-y-auto">
                                                                 {availablePresets.length === 0 ? (
                                                                     <div className="p-3 text-sm text-slate-500 text-center">저장된 내역이 없습니다.</div>
                                                                 ) : (
@@ -3684,7 +3684,7 @@ if (deliveryNoteFiles.length > 0) {
                                                                                 const bsStock = product ? aggStock['부산'] : 0;
 
                                                                             return (
-                                                                                <div className="flex flex-col items-center text-xs w-auto min-w-[75px] mx-auto px-1 space-y-0.5">
+                                                                                <div className="flex flex-col items-center text-xs w-auto min-w-18.75 mx-auto px-1 space-y-0.5">
                                                                                     <div className="flex justify-between w-full gap-2 whitespace-nowrap">
                                                                                         <span className="text-slate-500 font-normal">양산:</span>
                                                                                         <span className="font-bold text-slate-800">{ysStock.toLocaleString()}</span>
@@ -4427,6 +4427,8 @@ if (deliveryNoteFiles.length > 0) {
                         </div>
                     </div>
                 </div>
+            )}
+
             {/* L2: 발주 유사도/Shortage 서랍 패널 */}
             <QuoteSimilarityDrawer
                 isOpen={isOrderSimilarityDrawerOpen}

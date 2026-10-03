@@ -27,7 +27,7 @@ import { QuoteRateMatrixPanel } from './QuoteRateMatrixPanel';
 import { classifyItem } from './quoteClassification';
 import { QuoteSimilarityDrawer } from './QuoteSimilarityDrawer';
 import { QuoteComparisonModal } from './QuoteComparisonModal';
-import { normalizeLineItem, compareTwoNormalizedDocuments, type SimilarityMatchCandidate } from '../../../utils/quoteSimilarityCore';
+import { normalizeLineItem, compareTwoNormalizedDocuments, type SimilarityMatchCandidate, type NormalizedItem } from '../../../utils/quoteSimilarityCore';
 
 // Helper: Get Stock Status Text
 
@@ -549,10 +549,10 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
         // 1. IDF 사전 구성 (전체 quotes 기준)
         const idfDocFreq = new Map<string, number>();
-        const normalizedDocs: { id: string; type: 'QUOTATION' | 'ORDER'; docNo: string; customerName: string; bizNo?: string; createdAt: string; items: any[]; itemKeySet: Set<string>; parentQuoteId?: string }[] = [];
+        const normalizedDocs: { id: string; type: 'QUOTATION' | 'ORDER'; docNo: string; customerName: string; bizNo?: string; createdAt: string; items: NormalizedItem[]; itemKeySet: Set<string>; parentQuoteId?: string }[] = [];
 
         allQuotes.forEach(q => {
-            if (q.id === quote.id || (q as any).isDeleted) return;
+            if (q.id === quote.id || q.isDeleted) return;
             const normItems = (q.items || []).map(normalizeLineItem).filter(i => !i.isNonItem && i.l1Key.length > 5);
             if (normItems.length === 0) return;
 
@@ -567,7 +567,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 createdAt: q.createdAt || '2026-01-01',
                 items: normItems,
                 itemKeySet: new Set(normItems.map(it => it.l1Key)),
-                parentQuoteId: q.linkedQuoteId
+                parentQuoteId: q.linkedQuoteId || q.relatedId
             };
             normalizedDocs.push(doc);
             doc.itemKeySet.forEach(k => {
@@ -596,7 +596,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         const candidates: SimilarityMatchCandidate[] = [];
         normalizedDocs.forEach(targetDoc => {
             if (dismissedTargetIds.has(targetDoc.id)) return;
-            if (targetDoc.id === quote.linkedQuoteId || targetDoc.parentQuoteId === quote.id) return; // 계보 제외
+            if (targetDoc.id === (quote.linkedQuoteId || quote.relatedId) || targetDoc.parentQuoteId === quote.id) return; // 계보 제외
 
             const match = compareTwoNormalizedDocuments(currentDoc, targetDoc, idfMap);
             if (match && match.totalScore >= 60) {
@@ -613,7 +613,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             topScore: topMatch?.totalScore ?? 0,
             candidates: top3
         };
-    }, [items, allQuotes, quote.id, quote.linkedQuoteId, quote.createdAt, customerInfo.companyName, customerInfo.bizNo, dismissedTargetIds]);
+    }, [items, allQuotes, quote.id, quote.customerName, quote.linkedQuoteId, quote.relatedId, quote.createdAt, customerInfo.companyName, customerInfo.bizNo, dismissedTargetIds]);
 
     const topSimilarityCandidate = similaritySummary.candidates[0] || null;
 

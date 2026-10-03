@@ -1,5 +1,5 @@
 import { useState, useEffect, useDeferredValue } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { calculateCustomerGrade } from '../lib/customerUtils';
@@ -17,6 +17,7 @@ import { useInventoryIndex } from '../hooks/useInventoryIndex';
 
 export default function AdminPage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { orders, updateOrder, trashOrder, restoreOrder, permanentDeleteOrder, setOrders, inventory, users, fetchUsers } = useStore(useShallow((state) => ({
         orders: state.orders,
         updateOrder: state.updateOrder,
@@ -118,10 +119,23 @@ export default function AdminPage() {
         setShowAllExpanded(false);
     };
 
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState(() => searchParams.get('orderId') || '');
     const deferredSearchQuery = useDeferredValue(searchQuery); // Defers heavy filtering
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [detailInitialMode, setDetailInitialMode] = useState<'CUSTOMER' | 'SUPPLIER'>('CUSTOMER');
+    const [lastOpenedOrderId, setLastOpenedOrderId] = useState<string | null>(null);
+
+    // Handle incoming URL query parameter (?orderId=...) for direct search & open
+    const urlOrderId = searchParams.get('orderId');
+    if (urlOrderId && urlOrderId !== lastOpenedOrderId) {
+        const found = orders.find(o => o.id === urlOrderId || o.poNumber === urlOrderId);
+        if (found) {
+            setLastOpenedOrderId(urlOrderId);
+            setSelectedOrder(found);
+            if (searchQuery !== urlOrderId) setSearchQuery(urlOrderId);
+            if (filterStatus !== 'all') setFilterStatus('all');
+        }
+    }
 
     // Derived Data
     const orderCounts = orders.reduce((acc, order) => {
@@ -154,13 +168,15 @@ export default function AdminPage() {
         // Search Match
         if (deferredSearchQuery.trim()) {
             const query = deferredSearchQuery.toLowerCase();
+            const orderId = order.id?.toLowerCase() || '';
             const customerName = order.customerName?.toLowerCase() || '';
             const poEndCustomer = order.poEndCustomer?.toLowerCase() || '';
             const poCompany = order.payload?.customer?.company_name?.toLowerCase() || '';
             const poContact = order.payload?.customer?.contact_name?.toLowerCase() || '';
             const poNumber = order.poNumber?.toLowerCase() || '';
 
-            if (!customerName.includes(query) &&
+            if (!orderId.includes(query) &&
+                !customerName.includes(query) &&
                 !poEndCustomer.includes(query) &&
                 !poCompany.includes(query) &&
                 !poContact.includes(query) &&
@@ -363,7 +379,7 @@ export default function AdminPage() {
                             <FilterButton active={filterStatus === 'SHIPPED'} onClick={() => handleFilterChange('SHIPPED')} label="배송중" count={orderCounts.SHIPPED} />
                             <FilterButton active={filterStatus === 'COMPLETED'} onClick={() => handleFilterChange('COMPLETED')} label="완료" count={orderCounts.COMPLETED} />
                             <FilterButton active={filterStatus === 'CANCELLED'} onClick={() => handleFilterChange('CANCELLED')} label="취소" count={orderCounts.CANCELLED} />
-                            <div className="w-[1px] h-4 bg-slate-200 mx-1" />
+                            <div className="w-px h-4 bg-slate-200 mx-1" />
                             <button
                                 onClick={() => handleFilterChange('TRASH')}
                                 className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${filterStatus === 'TRASH' ? 'bg-red-50 text-red-600 shadow-sm ring-1 ring-red-200' : 'text-slate-400 hover:text-red-500'}`}
@@ -420,10 +436,10 @@ export default function AdminPage() {
                                     <tr>
                                         <th scope="col" className="px-6 py-3 font-bold w-[5%] text-center min-w-15">No.</th>
                                         <th scope="col" className="px-6 py-3 font-bold w-[20%] min-w-37.5">주문 품목 (Items)</th>
-                                        <th scope="col" className="px-6 py-3 font-bold w-[20%] min-w-[180px]">고객 / 주문일시 (Customer)</th>
-                                        <th scope="col" className="px-6 py-3 font-bold text-right w-[15%] min-w-[120px] whitespace-nowrap">주문금액 (Sales)</th>
-                                        <th scope="col" className="px-6 py-3 font-bold text-right w-[15%] min-w-[120px] whitespace-nowrap">매입금액 (Buying)</th>
-                                        <th scope="col" className="px-6 py-3 font-bold text-center w-[12%] min-w-[120px]">상태 (Status)</th>
+                                        <th scope="col" className="px-6 py-3 font-bold w-[20%] min-w-45">고객 / 주문일시 (Customer)</th>
+                                        <th scope="col" className="px-6 py-3 font-bold text-right w-[15%] min-w-30 whitespace-nowrap">주문금액 (Sales)</th>
+                                        <th scope="col" className="px-6 py-3 font-bold text-right w-[15%] min-w-30 whitespace-nowrap">매입금액 (Buying)</th>
+                                        <th scope="col" className="px-6 py-3 font-bold text-center w-[12%] min-w-30">상태 (Status)</th>
                                         <th scope="col" className="px-6 py-3 font-bold text-center w-[13%] min-w-37.5">관리 (Manage)</th>
                                     </tr>
                                 </thead>
