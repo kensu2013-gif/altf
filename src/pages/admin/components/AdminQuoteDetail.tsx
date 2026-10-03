@@ -1324,10 +1324,44 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         <>
             <div className="fixed inset-0 z-100 flex justify-end pointer-events-none">
                 <div className="w-full xl:max-w-[95%] h-full bg-white shadow-2xl pointer-events-auto flex flex-col animate-in slide-in-from-right duration-300">
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                    <div className="space-y-6">
-                        {/* Customer Info Edit Section */}
-                        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                    {/* Modal Top Fixed Header */}
+                    <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 bg-slate-50 shrink-0 select-none">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                                <FileText className="w-4 h-4 text-teal-600" />
+                                <span className="font-bold text-slate-900 text-sm sm:text-base">견적 상세 관리</span>
+                            </div>
+                            <span className="text-xs font-mono font-bold bg-white text-slate-600 px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
+                                #{quote.id}
+                            </span>
+                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border shadow-2xs ${
+                                quote.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                quote.status === 'PROCESSED' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                quote.status === 'IN_REVIEW' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}>
+                                {quote.status === 'COMPLETED' ? '완료' : quote.status === 'PROCESSED' ? '견적발송' : quote.status === 'IN_REVIEW' ? '확인중' : '접수'}
+                            </span>
+                            {customerInfo.companyName && (
+                                <span className="hidden sm:inline-block text-xs font-bold text-slate-500 truncate max-w-50">
+                                    {customerInfo.companyName}
+                                </span>
+                            )}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={_onClose}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer shrink-0"
+                            title="닫기 (Close)"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 space-y-4 sm:space-y-6 custom-scrollbar">
+                        <div className="space-y-4 sm:space-y-6">
+                            {/* Customer Info Edit Section */}
+                            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-sm">
                             <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <User className="w-4 h-4 text-teal-600" />
@@ -1489,12 +1523,13 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
                         {/* Quote Items Table (Negotiation) */}
                         <div className="bg-white rounded-xl border border-slate-200">
-                            <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-slate-50/50 rounded-t-xl">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 border-b border-slate-200 bg-slate-50/50 rounded-t-xl">
                                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                                    <Package className="w-4 h-4 text-teal-600" />
-                                    견적 품목 및 단가 조정 (Negotiation)
+                                    <Package className="w-4 h-4 text-teal-600 shrink-0" />
+                                    <span>견적 품목 및 단가 조정</span>
+                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(negotiation)</span>
                                 </h3>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <button
                                         type="button"
                                         onClick={() => setIsMatrixOpen(!isMatrixOpen)}
@@ -1511,7 +1546,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                     <button
                                         type="button"
                                         onClick={() => handleConvertStandard()}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-lg text-xs font-bold transition-all shadow-xs"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
                                         title={selectedItems.length > 0 ? `선택된 ${selectedItems.length}개 품목 ANSI ↔ JIS 변환` : "전체 품목 ANSI ↔ JIS 변환"}
                                     >
                                         <RefreshCw className="w-3.5 h-3.5 text-teal-600" />
@@ -1541,7 +1576,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                     }}
                                 />
                             </div>
-                            <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-sm custom-scrollbar">
+                            <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-sm custom-scrollbar touch-pan-x">
                                 {activeMatrixFilter && (
                                     <div className="flex items-center justify-between px-4 py-2.5 bg-linear-to-r from-teal-50 via-emerald-50 to-teal-50 border-b border-teal-200 text-xs font-bold text-teal-900 shadow-2xs">
                                         <div className="flex items-center gap-2 flex-wrap">
@@ -1568,10 +1603,10 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         </button>
                                     </div>
                                 )}
-                                <table className="w-full text-sm text-left min-w-[1000px]">
-                                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-sm font-bold uppercase">
+                                <table className="w-full text-sm text-left min-w-[980px]">
+                                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase select-none">
                                         <tr>
-                                            <th className="px-2 py-3 w-[2%] text-center">
+                                            <th className="px-2 py-3 w-[2%] text-center align-bottom pb-3">
                                                 <input
                                                     type="checkbox"
                                                     checked={items.filter(i => !i.convertedToOrder).length > 0 && items.filter(i => !i.convertedToOrder).every(i => i.isSelected !== false)}
@@ -1580,20 +1615,43 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                     title="전체 선택/해제"
                                                 />
                                             </th>
-                                            <th className="px-2 py-3 w-[3%] text-center text-slate-400 font-normal">No.</th>
-                                            <th className="px-4 py-3 w-[23%] text-left">품목명 / 규격 (Item/Spec)</th>
-                                            <th className="px-2 py-3 text-center w-[6%] whitespace-nowrap">현재고</th>
-                                            <th className="px-2 py-3 text-center w-[4%]">수량</th>
+                                            <th className="px-2 py-3 w-[3%] text-center align-bottom pb-3">
+                                                <span className="text-slate-400 font-normal">No.</span>
+                                            </th>
+                                            <th className="px-4 py-3 w-[23%] text-left align-bottom pb-2.5">
+                                                <div className="flex flex-col items-start leading-tight">
+                                                    <span className="text-slate-700 font-bold">품목명 / 규격</span>
+                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(item / spec)</span>
+                                                </div>
+                                            </th>
+                                            <th className="px-2 py-3 text-center w-[6%] whitespace-nowrap align-bottom pb-2.5">
+                                                <div className="flex flex-col items-center leading-tight">
+                                                    <span className="text-slate-700 font-bold">현재고</span>
+                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(stock)</span>
+                                                </div>
+                                            </th>
+                                            <th className="px-2 py-3 text-center w-[4%] align-bottom pb-2.5">
+                                                <div className="flex flex-col items-center leading-tight">
+                                                    <span className="text-slate-700 font-bold">수량</span>
+                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(qty)</span>
+                                                </div>
+                                            </th>
 
                                             {/* Reference / Base Price Column */}
-                                            <th className="px-2 py-3 text-right text-slate-500 w-[7%]">
-                                                기준단가 (Base)
+                                            <th className="px-2 py-3 text-right text-slate-600 w-[7%] align-bottom pb-2.5">
+                                                <div className="flex flex-col items-end leading-tight">
+                                                    <span className="text-slate-700 font-bold">기준단가</span>
+                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(base)</span>
+                                                </div>
                                             </th>
 
                                             {/* Supplier Rate (Cost Factor) */}
-                                            <th className="px-1 py-3 text-center w-[5%]">
-                                                <div className="flex flex-col items-center gap-1">
-                                                    <span className="text-xs font-bold text-indigo-700">매입율 (%)</span>
+                                            <th className="px-1 py-3 text-center w-[5%] align-bottom pb-2">
+                                                <div className="flex flex-col items-center gap-1.5">
+                                                    <div className="flex flex-col items-center leading-tight">
+                                                        <span className="text-xs font-bold text-indigo-700">매입률 (%)</span>
+                                                        <span className="text-[10px] text-indigo-400 font-normal lowercase tracking-tight">(cost rate)</span>
+                                                    </div>
                                                     <div className="flex items-center justify-center gap-1 w-full">
                                                         <input
                                                             type="number"
@@ -1617,19 +1675,25 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             </th>
 
                                             {/* Cost Price */}
-                                            <th className="px-2 py-3 text-right text-xs font-bold w-[7%]">
-                                                매입단가 (Cost)
+                                            <th className="px-2 py-3 text-right text-xs font-bold w-[7%] align-bottom pb-2.5">
+                                                <div className="flex flex-col items-end leading-tight">
+                                                    <span className="text-slate-700 font-bold">매입단가</span>
+                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(cost)</span>
+                                                </div>
                                             </th>
 
                                             {/* Rate (Previously Discount Rate) */}
-                                            <th className="px-2 py-3 text-center w-[13%]">
-                                                <div className="flex flex-col items-center gap-1">
-                                                    <span className="text-xs font-bold text-slate-600">요율 (%)</span>
+                                            <th className="px-2 py-3 text-center w-[13%] align-bottom pb-2">
+                                                <div className="flex flex-col items-center gap-1.5">
+                                                    <div className="flex flex-col items-center leading-tight">
+                                                        <span className="text-xs font-bold text-slate-700">요율 (%)</span>
+                                                        <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(rate)</span>
+                                                    </div>
                                                     <div className="flex flex-col gap-1 w-full max-w-33.75 mx-auto">
                                                         <select
                                                             value={targetDiscountRate}
                                                             onChange={(e) => setTargetDiscountRate(e.target.value)}
-                                                            className="w-full px-1 py-0.5 text-[10px] border border-slate-300 rounded outline-none bg-white text-slate-700 font-medium"
+                                                            className="w-full px-1 py-0.5 text-[10px] border border-slate-300 rounded outline-none bg-white text-slate-700 font-medium cursor-pointer"
                                                             title="요율 적용 대상 선택"
                                                         >
                                                             <optgroup label="기본 필터">
@@ -1690,33 +1754,44 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                         />
                                                     </div>
                                                     {recommendation.recommendedRate !== undefined && (
-                                                        <div className="mt-1 flex flex-col items-center gap-0.5">
-                                                            <div className="flex items-center gap-1 text-[10px] text-teal-800 font-bold bg-teal-50 border border-teal-200/50 rounded px-1.5 py-0.5 shadow-sm whitespace-nowrap">
-                                                                <span>추천:</span>
-                                                                <span className="text-teal-600 font-extrabold">{recommendation.recommendedRate}%</span>
-                                                            </div>
-                                                            <span className="text-slate-400 text-[8px] whitespace-normal text-center scale-90 leading-tight max-w-30" title={recommendation.reason}>
-                                                                {recommendation.reason}
-                                                            </span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={handleApplyRecommendedRate}
-                                                                className="mt-0.5 bg-teal-600 hover:bg-teal-700 text-white font-bold px-1.5 py-0.5 rounded text-[8px] transition-all whitespace-nowrap cursor-pointer active:scale-95 shadow-sm"
-                                                            >
-                                                                일괄 적용
-                                                            </button>
-                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleApplyRecommendedRate}
+                                                            title={recommendation.reason ? `${recommendation.reason} (클릭 시 추천 요율 일괄 적용)` : '클릭 시 추천 요율 일괄 적용'}
+                                                            className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-teal-800 font-bold bg-teal-50 hover:bg-teal-100 border border-teal-200/80 rounded px-1.5 py-0.5 shadow-2xs whitespace-nowrap cursor-pointer transition-colors active:scale-95"
+                                                        >
+                                                            <span>추천:</span>
+                                                            <span className="text-teal-600 font-extrabold">{recommendation.recommendedRate}%</span>
+                                                        </button>
                                                     )}
                                                 </div>
                                             </th>
 
-                                            <th className="px-2 py-3 text-right text-slate-400 w-[7%]">견적금액 (User)</th>
-                                            <th className="px-2 py-3 text-right w-[9%]">수정 견적단가</th>
-                                            <th className="px-2 py-3 text-right w-[9%]">합계 (VAT별도)</th>
+                                            <th className="px-2 py-3 text-right w-[7%] align-bottom pb-2.5">
+                                                <div className="flex flex-col items-end leading-tight">
+                                                    <span className="text-slate-600 font-bold">견적금액</span>
+                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(user)</span>
+                                                </div>
+                                            </th>
+                                            <th className="px-2 py-3 text-right w-[9%] align-bottom pb-2.5">
+                                                <div className="flex flex-col items-end leading-tight">
+                                                    <span className="text-slate-700 font-bold">수정 견적단가</span>
+                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(unit price)</span>
+                                                </div>
+                                            </th>
+                                            <th className="px-2 py-3 text-right w-[9%] align-bottom pb-2.5">
+                                                <div className="flex flex-col items-end leading-tight">
+                                                    <span className="text-slate-700 font-bold">합계 (VAT별도)</span>
+                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(subtotal)</span>
+                                                </div>
+                                            </th>
 
                                             {/* Profit - Moved to End */}
-                                            <th className="px-2 py-3 text-right text-green-600 whitespace-nowrap w-[7%]">
-                                                이익 (Profit)
+                                            <th className="px-2 py-3 text-right text-emerald-600 whitespace-nowrap w-[7%] align-bottom pb-2.5">
+                                                <div className="flex flex-col items-end leading-tight">
+                                                    <span className="font-bold">이익</span>
+                                                    <span className="text-[10px] text-emerald-500 font-normal lowercase tracking-tight">(profit)</span>
+                                                </div>
                                             </th>
                                         </tr>
                                     </thead>
@@ -2002,16 +2077,16 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 </div>
 
                     {/* Footer Actions */}
-                    <div className="p-6 border-t border-slate-200 bg-white flex items-center justify-between gap-3">
+                    <div className="p-3 sm:p-4 md:p-6 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
                         <Button
                             variant="ghost"
                             onClick={handleDownload}
-                            className="text-slate-400 hover:text-teal-600"
+                            className="text-slate-500 hover:text-teal-600 justify-center"
                         >
                             <Download className="w-4 h-4 mr-2" /> PDF 다운로드
                         </Button>
 
-                        <div className="flex gap-3">
+                        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
                             {/* Start Processing (Only if SUBMITTED) */}
                             {quote.status === 'SUBMITTED' && (
                                 <Button variant="outline" onClick={async () => {
