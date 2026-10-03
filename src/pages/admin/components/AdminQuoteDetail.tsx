@@ -1,9 +1,9 @@
 
 import type { Quotation, LineItem, Order } from '../../../types';
-import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User, Image, RefreshCw, Sliders, X } from 'lucide-react';
+import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User, Image, RefreshCw, Sliders, X, ChevronDown } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { formatCurrency } from '../../../lib/utils';
-import { useState, useCallback, useMemo, useEffect, startTransition } from 'react';
+import { useState, useCallback, useMemo, useEffect, startTransition, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore, type DeliveryInfo, type CustomPriceRecord } from '../../../store/useStore';
 import { calculateCustomerGrade } from '../../../lib/customerUtils';
@@ -25,6 +25,9 @@ import { QuoteItemRow } from './QuoteItemRow';
 import { findMatchingProduct } from '../../../lib/productUtils';
 import { QuoteRateMatrixPanel } from './QuoteRateMatrixPanel';
 import { classifyItem } from './quoteClassification';
+import { QuoteSimilarityDrawer } from './QuoteSimilarityDrawer';
+import { QuoteComparisonModal } from './QuoteComparisonModal';
+import { normalizeLineItem, compareTwoNormalizedDocuments, type SimilarityMatchCandidate } from '../../../utils/quoteSimilarityCore';
 
 // Helper: Get Stock Status Text
 
@@ -279,6 +282,21 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const [isSaving, setIsSaving] = useState(false);
     const [bulkDiscountRateInput, setBulkDiscountRateInput] = useState<string>('');
     const [targetDiscountRate, setTargetDiscountRate] = useState<string>('all');
+    const [isRateMenuOpen, setIsRateMenuOpen] = useState<boolean>(false);
+    const rateMenuRef = useRef<HTMLDivElement>(null);
+
+    // Close rate popover menu on click outside
+    useEffect(() => {
+        if (!isRateMenuOpen) return;
+        const handleClickOutside = (event: MouseEvent) => {
+            if (rateMenuRef.current && !rateMenuRef.current.contains(event.target as Node)) {
+                setIsRateMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isRateMenuOpen]);
+
     const [splitSizeA, setSplitSizeA] = useState<number>(100);
     const [isMatrixOpen, setIsMatrixOpen] = useState<boolean>(() => (quote.items?.length || 0) >= 20);
     const [activeMatrixFilter, setActiveMatrixFilter] = useState<{ filterKey: string; label: string } | null>(null);
@@ -517,6 +535,105 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         return Array.from(new Set(rates)).sort((a, b) => b - a);
     }, [items]);
 
+    // -------------------------------------------------------------
+    // ALTF 유사도 평가 엔진 (Quote & Order Similarity Engine)
+    // -------------------------------------------------------------
+    const allQuotes = useStore((state) => state.quotes);
+    const [isSimilarityDrawerOpen, setIsSimilarityDrawerOpen] = useState(false);
+    const [activeSimilarityCandidate, setActiveSimilarityCandidate] = useState<SimilarityMatchCandidate | null>(null);
+    const [comparisonCandidate, setComparisonCandidate] = useState<SimilarityMatchCandidate | null>(null);
+    const [dismissedTargetIds, setDismissedTargetIds] = useState<Set<string>>(new Set());
+
+    const similaritySummary = useMemo(() => {
+        if (!items || items.length === 0) return { topType: 'NONE' as const, topScore: 0, candidates: [] };
+
+        // 1. IDF 사전 구성 (전체 quotes 기준)
+        const idfDocFreq = new Map<string, number>();
+        const normalizedDocs: { id: string; type: 'QUOTATION' | 'ORDER'; docNo: string; customerName: string; bizNo?: string; createdAt: string; items: any[]; itemKeySet: Set<string>; parentQuoteId?: string }[] = [];
+
+        allQuotes.forEach(q => {
+            if (q.id === quote.id || (q as any).isDeleted) return;
+            const normItems = (q.items || []).map(normalizeLineItem).filter(i => !i.isNonItem && i.l1Key.length > 5);
+            if (normItems.length === 0) return;
+
+            const custName = q.customerName || q.customerInfo?.companyName || '';
+            const bizNo = q.customerInfo?.bizNo || '';
+            const doc = {
+                id: q.id,
+                type: 'QUOTATION' as const,
+                docNo: q.id,
+                customerName: custName,
+                bizNo,
+                createdAt: q.createdAt || '2026-01-01',
+                items: normItems,
+                itemKeySet: new Set(normItems.map(it => it.l1Key)),
+                parentQuoteId: q.linkedQuoteId
+            };
+            normalizedDocs.push(doc);
+            doc.itemKeySet.forEach(k => {
+                idfDocFreq.set(k, (idfDocFreq.get(k) || 0) + 1);
+            });
+        });
+
+        const N = Math.max(1, normalizedDocs.length);
+        const idfMap = new Map<string, number>();
+        idfDocFreq.forEach((count, key) => {
+            idfMap.set(key, Math.log((N - count + 0.5) / (count + 0.5) + 1));
+        });
+
+        // 2. 현재 견적 문서 정규화
+        const currentDoc = {
+            id: quote.id,
+            type: 'QUOTATION' as const,
+            docNo: quote.id,
+            customerName: customerInfo.companyName || quote.customerName || '',
+            bizNo: customerInfo.bizNo || '',
+            createdAt: quote.createdAt || new Date().toISOString(),
+            items: items.map(normalizeLineItem)
+        };
+
+        // 3. 비교 및 후보군 수집
+        const candidates: SimilarityMatchCandidate[] = [];
+        normalizedDocs.forEach(targetDoc => {
+            if (dismissedTargetIds.has(targetDoc.id)) return;
+            if (targetDoc.id === quote.linkedQuoteId || targetDoc.parentQuoteId === quote.id) return; // 계보 제외
+
+            const match = compareTwoNormalizedDocuments(currentDoc, targetDoc, idfMap);
+            if (match && match.totalScore >= 60) {
+                candidates.push(match);
+            }
+        });
+
+        candidates.sort((a, b) => b.totalScore - a.totalScore);
+        const top3 = candidates.slice(0, 3);
+        const topMatch = top3[0];
+
+        return {
+            topType: topMatch?.similarityType ?? 'NONE',
+            topScore: topMatch?.totalScore ?? 0,
+            candidates: top3
+        };
+    }, [items, allQuotes, quote.id, quote.linkedQuoteId, quote.createdAt, customerInfo.companyName, customerInfo.bizNo, dismissedTargetIds]);
+
+    const topSimilarityCandidate = similaritySummary.candidates[0] || null;
+
+    const handleApplyPricesFromComparison = useCallback((priceMap: Map<number, { unitPrice: number; discountRate?: number }>) => {
+        setItems(prev => prev.map((item, idx) => {
+            const matchedPrice = priceMap.get(idx);
+            if (matchedPrice) {
+                const newPrice = matchedPrice.unitPrice;
+                const newRate = matchedPrice.discountRate ?? item.discountRate;
+                return {
+                    ...item,
+                    unitPrice: newPrice,
+                    discountRate: newRate,
+                    amount: newPrice * item.quantity
+                };
+            }
+            return item;
+        }));
+    }, []);
+
     const [orders, setOrders] = useState<Order[]>([]);
 
     useEffect(() => {
@@ -652,6 +769,15 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             const [, , rawCat] = targetFilter.split(':');
             const targetCat = rawCat.startsWith('le') ? 'le' : rawCat.startsWith('gt') ? 'gt' : rawCat;
             return cls.isCap && cls.sizeCategory === targetCat;
+        }
+        if (targetFilter.startsWith('cap_size_std:')) {
+            const [, , rawCat, targetStd] = targetFilter.split(':');
+            const targetCat = rawCat.startsWith('le') ? 'le' : rawCat.startsWith('gt') ? 'gt' : rawCat;
+            return cls.isCap && cls.sizeCategory === targetCat && cls.standard.toLowerCase() === targetStd.toLowerCase();
+        }
+        if (targetFilter.startsWith('cap_std:')) {
+            const [, , targetStd] = targetFilter.split(':');
+            return cls.isCap && cls.standard.toLowerCase() === targetStd.toLowerCase();
         }
         if (targetFilter.startsWith('cap:')) {
             return cls.isCap;
@@ -791,7 +917,11 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             // Use inventory from closure (stable enough) or pass in if needed, but inventory changes are rare
             const product = inventory.find(p => p.id === item.productId);
 
-            const standardPrice = product?.base_price ?? product?.unitPrice ?? 0;
+            const standardPrice = (product?.base_price && product.base_price > 0)
+                ? product.base_price
+                : ((item.base_price && item.base_price > 0)
+                    ? item.base_price
+                    : (product?.unitPrice ?? item.unitPrice ?? 0));
             let newRate = 0;
             if (standardPrice > 0) {
                 newRate = Math.round((1 - newPrice / standardPrice) * 100);
@@ -1524,11 +1654,34 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                         {/* Quote Items Table (Negotiation) */}
                         <div className="bg-white rounded-xl border border-slate-200">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 border-b border-slate-200 bg-slate-50/50 rounded-t-xl">
-                                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                                    <Package className="w-4 h-4 text-teal-600 shrink-0" />
-                                    <span>견적 품목 및 단가 조정</span>
-                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(negotiation)</span>
-                                </h3>
+                                <div className="flex items-center gap-2.5 flex-wrap">
+                                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                        <Package className="w-4 h-4 text-teal-600 shrink-0" />
+                                        <span>견적 품목 및 단가 조정</span>
+                                        <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(negotiation)</span>
+                                    </h3>
+                                    {topSimilarityCandidate && topSimilarityCandidate.similarityType !== 'NONE' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsSimilarityDrawerOpen(true)}
+                                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black border shadow-2xs transition-all cursor-pointer ${
+                                                topSimilarityCandidate.similarityType === 'SAME_PROJECT' ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100' :
+                                                topSimilarityCandidate.similarityType === 'SHORTAGE' ? 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100' :
+                                                topSimilarityCandidate.similarityType === 'DUPLICATE' ? 'bg-purple-50 text-purple-800 border-purple-300 hover:bg-purple-100' :
+                                                'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                                            }`}
+                                            title="클릭하여 유사 견적 및 상세 분석 서랍을 엽니다."
+                                        >
+                                            <span className="w-2 h-2 rounded-full bg-current animate-pulse shrink-0" />
+                                            <span>
+                                                {topSimilarityCandidate.similarityType === 'SAME_PROJECT' ? `⚠️ 동일 프로젝트 (${topSimilarityCandidate.totalScore}점)` :
+                                                 topSimilarityCandidate.similarityType === 'SHORTAGE' ? `🔗 Shortage 감지 (${topSimilarityCandidate.totalScore}점)` :
+                                                 topSimilarityCandidate.similarityType === 'DUPLICATE' ? `중복 의심 (${topSimilarityCandidate.totalScore}점)` :
+                                                 `반복 발주 (${topSimilarityCandidate.totalScore}점)`}
+                                            </span>
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <button
                                         type="button"
@@ -1541,7 +1694,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         title="재질 및 100A 규격별 스마트 요율 매트릭스 패널 토글"
                                     >
                                         <Sliders className="w-3.5 h-3.5" />
-                                        <span>재질/규격(100A) 요율 매트릭스 {isMatrixOpen ? '접기' : '열기'}</span>
+                                        <span>재질/규격요율 매트릭스 {isMatrixOpen ? '접기' : '열기'}</span>
                                     </button>
                                     <button
                                         type="button"
@@ -1603,10 +1756,24 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         </button>
                                     </div>
                                 )}
-                                <table className="w-full text-sm text-left min-w-[980px]">
+                                <table className="w-full text-sm text-left table-fixed min-w-332.5">
+                                    <colgroup>
+                                        <col className="w-9.5" />   {/* 1. 체크박스 */}
+                                        <col className="w-11" />   {/* 2. No. */}
+                                        <col className="w-90" />  {/* 3. 품목명 / 규격 */}
+                                        <col className="w-24" />   {/* 4. 현재고 */}
+                                        <col className="w-16.5" />   {/* 5. 수량 */}
+                                        <col className="w-19.5" />   {/* 6. 매입률 (%) */}
+                                        <col className="w-22" />   {/* 7. 매입단가 */}
+                                        <col className="w-31" />  {/* 8. 요율 (%) */}
+                                        <col className="w-22" />   {/* 9. 견적금액 */}
+                                        <col className="w-24.5" />   {/* 10. 수정 견적단가 */}
+                                        <col className="w-25.5" />  {/* 11. 합계 */}
+                                        <col className="w-22.5" />   {/* 12. 이익 */}
+                                    </colgroup>
                                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase select-none">
-                                        <tr>
-                                            <th className="px-2 py-3 w-[2%] text-center align-bottom pb-3">
+                                        <tr className="divide-x divide-slate-100/60">
+                                            <th className="px-1 py-3 text-center align-bottom pb-3">
                                                 <input
                                                     type="checkbox"
                                                     checked={items.filter(i => !i.convertedToOrder).length > 0 && items.filter(i => !i.convertedToOrder).every(i => i.isSelected !== false)}
@@ -1615,48 +1782,41 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                     title="전체 선택/해제"
                                                 />
                                             </th>
-                                            <th className="px-2 py-3 w-[3%] text-center align-bottom pb-3">
-                                                <span className="text-slate-400 font-normal">No.</span>
+                                            <th className="px-1 py-3 text-center align-bottom pb-3">
+                                                <span className="text-slate-400 font-normal text-[14px]">No.</span>
                                             </th>
-                                            <th className="px-4 py-3 w-[23%] text-left align-bottom pb-2.5">
-                                                <div className="flex flex-col items-start leading-tight">
-                                                    <span className="text-slate-700 font-bold">품목명 / 규격</span>
-                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(item / spec)</span>
+                                            <th className="px-2 py-3 text-center align-bottom pb-2.5">
+                                                <div className="flex flex-col items-center justify-center leading-tight">
+                                                    <span className="text-slate-700 font-bold text-[14px]">품목명 / 규격</span>
+                                                    <span className="text-[11px] text-slate-400 font-normal lowercase tracking-tight">(item / spec)</span>
                                                 </div>
                                             </th>
-                                            <th className="px-2 py-3 text-center w-[6%] whitespace-nowrap align-bottom pb-2.5">
+                                            <th className="px-1 py-3 text-center whitespace-nowrap align-bottom pb-2.5">
                                                 <div className="flex flex-col items-center leading-tight">
-                                                    <span className="text-slate-700 font-bold">현재고</span>
-                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(stock)</span>
+                                                    <span className="text-slate-700 font-bold text-[14px]">현재고</span>
+                                                    <span className="text-[11px] text-slate-400 font-normal lowercase tracking-tight">(stock)</span>
                                                 </div>
                                             </th>
-                                            <th className="px-2 py-3 text-center w-[4%] align-bottom pb-2.5">
+                                            <th className="px-1 py-3 text-center align-bottom pb-2.5">
                                                 <div className="flex flex-col items-center leading-tight">
-                                                    <span className="text-slate-700 font-bold">수량</span>
-                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(qty)</span>
+                                                    <span className="text-slate-700 font-bold text-[14px]">수량</span>
+                                                    <span className="text-[11px] text-slate-400 font-normal lowercase tracking-tight">(qty)</span>
                                                 </div>
                                             </th>
 
-                                            {/* Reference / Base Price Column */}
-                                            <th className="px-2 py-3 text-right text-slate-600 w-[7%] align-bottom pb-2.5">
-                                                <div className="flex flex-col items-end leading-tight">
-                                                    <span className="text-slate-700 font-bold">기준단가</span>
-                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(base)</span>
-                                                </div>
-                                            </th>
 
                                             {/* Supplier Rate (Cost Factor) */}
-                                            <th className="px-1 py-3 text-center w-[5%] align-bottom pb-2">
+                                            <th className="px-1 py-3 text-center align-bottom pb-2">
                                                 <div className="flex flex-col items-center gap-1.5">
                                                     <div className="flex flex-col items-center leading-tight">
-                                                        <span className="text-xs font-bold text-indigo-700">매입률 (%)</span>
-                                                        <span className="text-[10px] text-indigo-400 font-normal lowercase tracking-tight">(cost rate)</span>
+                                                        <span className="text-[14px] font-bold text-indigo-700">매입률 (%)</span>
+                                                        <span className="text-[11px] text-indigo-400 font-normal lowercase tracking-tight">(cost rate)</span>
                                                     </div>
                                                     <div className="flex items-center justify-center gap-1 w-full">
                                                         <input
                                                             type="number"
                                                             placeholder="일괄"
-                                                            className="w-16 px-1 py-0.5 text-center text-xs border border-indigo-200 rounded focus:border-indigo-500 outline-none text-indigo-700 bg-indigo-50/50"
+                                                            className="w-15 px-1 py-0.5 text-center text-xs border border-indigo-200 rounded focus:border-indigo-500 outline-none text-indigo-700 bg-indigo-50/50"
                                                             onKeyDown={(e) => {
                                                                 if (e.key === 'Enter') {
                                                                     const val = Number(e.currentTarget.value);
@@ -1675,122 +1835,203 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             </th>
 
                                             {/* Cost Price */}
-                                            <th className="px-2 py-3 text-right text-xs font-bold w-[7%] align-bottom pb-2.5">
-                                                <div className="flex flex-col items-end leading-tight">
-                                                    <span className="text-slate-700 font-bold">매입단가</span>
-                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(cost)</span>
+                                            <th className="px-2 py-3 text-center align-bottom pb-2.5">
+                                                <div className="flex flex-col items-center justify-center leading-tight">
+                                                    <span className="text-slate-700 font-bold text-[14px]">매입단가</span>
+                                                    <span className="text-[11px] text-slate-400 font-normal lowercase tracking-tight">(cost)</span>
                                                 </div>
                                             </th>
 
                                             {/* Rate (Previously Discount Rate) */}
-                                            <th className="px-2 py-3 text-center w-[13%] align-bottom pb-2">
-                                                <div className="flex flex-col items-center gap-1.5">
-                                                    <div className="flex flex-col items-center leading-tight">
-                                                        <span className="text-xs font-bold text-slate-700">요율 (%)</span>
-                                                        <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(rate)</span>
-                                                    </div>
-                                                    <div className="flex flex-col gap-1 w-full max-w-33.75 mx-auto">
-                                                        <select
-                                                            value={targetDiscountRate}
-                                                            onChange={(e) => setTargetDiscountRate(e.target.value)}
-                                                            className="w-full px-1 py-0.5 text-[10px] border border-slate-300 rounded outline-none bg-white text-slate-700 font-medium cursor-pointer"
-                                                            title="요율 적용 대상 선택"
-                                                        >
-                                                            <optgroup label="기본 필터">
-                                                                <option value="all">전체 (0% 제외)</option>
-                                                            </optgroup>
-                                                            <optgroup label="재질별 전체 (CAP 자동 제외)">
-                                                                <option value="mat:304-w">304-W (용접 전체)</option>
-                                                                <option value="mat:304-s">304-S (심리스 - CAP제외)</option>
-                                                                <option value="mat:304l-w">304L-W (용접 전체)</option>
-                                                                <option value="mat:304l-s">304L-S (심리스 - CAP제외)</option>
-                                                                <option value="mat:316l-w">316L-W (용접 전체)</option>
-                                                                <option value="mat:316l-s">316L-S (심리스 전체)</option>
-                                                                <option value="mat:spg">SPG (배관용 탄소강)</option>
-                                                            </optgroup>
-                                                            <optgroup label={`재질 + ${splitSizeA}A 기준 분기`}>
-                                                                <option value="mat_size:304-s:le">304-S (≤ {splitSizeA}A 소구경)</option>
-                                                                <option value="mat_size:304-s:gt">304-S (&gt; {splitSizeA}A 대구경)</option>
-                                                                <option value="mat_size:304-w:le">304-W (≤ {splitSizeA}A 소구경)</option>
-                                                                <option value="mat_size:304-w:gt">304-W (&gt; {splitSizeA}A 대구경)</option>
-                                                                <option value="mat_size:304l-s:le">304L-S (≤ {splitSizeA}A 소구경)</option>
-                                                                <option value="mat_size:304l-s:gt">304L-S (&gt; {splitSizeA}A 대구경)</option>
-                                                                <option value="mat_size:304l-w:le">304L-W (≤ {splitSizeA}A 소구경)</option>
-                                                                <option value="mat_size:304l-w:gt">304L-W (&gt; {splitSizeA}A 대구경)</option>
-                                                                <option value="mat_size:316l-s:le">316L-S (≤ {splitSizeA}A 소구경)</option>
-                                                                <option value="mat_size:316l-s:gt">316L-S (&gt; {splitSizeA}A 대구경)</option>
-                                                                <option value="mat_size:316l-w:le">316L-W (≤ {splitSizeA}A 소구경)</option>
-                                                                <option value="mat_size:316l-w:gt">316L-W (&gt; {splitSizeA}A 대구경)</option>
-                                                                <option value="mat_size:spg:le">SPG (≤ {splitSizeA}A 소구경)</option>
-                                                                <option value="mat_size:spg:gt">SPG (&gt; {splitSizeA}A 대구경)</option>
-                                                            </optgroup>
-                                                            <optgroup label="CAP 특수 품목군 (-W 연동군)">
-                                                                <option value="cap:all">CAP 전체 (-W 연동군)</option>
-                                                                <option value="cap_size:all:le">CAP (≤ {splitSizeA}A 이하)</option>
-                                                                <option value="cap_size:all:gt">CAP (&gt; {splitSizeA}A 초과)</option>
-                                                            </optgroup>
-                                                            {availableRates.length > 0 && (
-                                                                <optgroup label="기존 요율 수치별">
-                                                                    {availableRates.map(r => (
-                                                                        <option key={r} value={String(r)}>{r}% 품목만</option>
-                                                                    ))}
-                                                                </optgroup>
-                                                            )}
-                                                        </select>
-                                                        <input
-                                                            type="number"
-                                                            placeholder="일괄"
-                                                            value={bulkDiscountRateInput}
-                                                            onChange={(e) => setBulkDiscountRateInput(e.target.value)}
-                                                            className="w-full px-1 py-0.5 text-center text-xs border border-slate-300 rounded focus:border-teal-500 outline-none"
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter') {
-                                                                    const val = Number(bulkDiscountRateInput);
-                                                                    if (!isNaN(val) && bulkDiscountRateInput.trim() !== '') {
-                                                                        applyDiscountRateToItems(targetDiscountRate, val);
-                                                                    }
-                                                                }
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    {recommendation.recommendedRate !== undefined && (
+                                            <th className="px-1.5 py-3 text-center align-bottom pb-2.5 relative">
+                                                <div className="flex flex-col items-center justify-center leading-tight">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <span className="text-[14px] font-bold text-slate-700">요율 (%)</span>
                                                         <button
                                                             type="button"
-                                                            onClick={handleApplyRecommendedRate}
-                                                            title={recommendation.reason ? `${recommendation.reason} (클릭 시 추천 요율 일괄 적용)` : '클릭 시 추천 요율 일괄 적용'}
-                                                            className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-teal-800 font-bold bg-teal-50 hover:bg-teal-100 border border-teal-200/80 rounded px-1.5 py-0.5 shadow-2xs whitespace-nowrap cursor-pointer transition-colors active:scale-95"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setIsRateMenuOpen(prev => !prev);
+                                                            }}
+                                                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold rounded border transition-all cursor-pointer shadow-2xs ${
+                                                                isRateMenuOpen
+                                                                    ? 'bg-teal-600 text-white border-teal-700'
+                                                                    : 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100 hover:border-teal-300'
+                                                            }`}
+                                                            title="일괄적용 및 추천 요율 메뉴 열기"
                                                         >
-                                                            <span>추천:</span>
-                                                            <span className="text-teal-600 font-extrabold">{recommendation.recommendedRate}%</span>
+                                                            <span>일괄</span>
+                                                            <ChevronDown className={`w-2.5 h-2.5 transition-transform duration-200 ${isRateMenuOpen ? 'rotate-180' : ''}`} />
                                                         </button>
-                                                    )}
+                                                    </div>
+                                                    <span className="text-[11px] text-slate-400 font-normal lowercase tracking-tight">(rate)</span>
                                                 </div>
+
+                                                {/* Collapsible Popover: 일괄적용 및 추천 요율 */}
+                                                {isRateMenuOpen && (
+                                                    <div
+                                                        ref={rateMenuRef}
+                                                        className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-64 bg-white rounded-lg shadow-xl border border-slate-200 p-3 text-left z-50 animate-in fade-in zoom-in-95 duration-100"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+                                                            <span className="text-xs font-bold text-slate-800">요율 일괄 설정 & 추천</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setIsRateMenuOpen(false)}
+                                                                className="p-0.5 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100 cursor-pointer"
+                                                                title="닫기"
+                                                            >
+                                                                <X className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+
+                                                        {/* 1. 대상 선택 */}
+                                                        <div className="mb-2.5">
+                                                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                                                적용 대상
+                                                            </label>
+                                                            <select
+                                                                value={targetDiscountRate}
+                                                                onChange={(e) => setTargetDiscountRate(e.target.value)}
+                                                                className="w-full px-2 py-1 text-xs border border-slate-300 rounded outline-none bg-white text-slate-700 font-medium cursor-pointer focus:border-teal-500"
+                                                                title="요율 적용 대상 선택"
+                                                            >
+                                                                <optgroup label="기본 필터">
+                                                                    <option value="all">전체 (0% 제외)</option>
+                                                                </optgroup>
+                                                                <optgroup label="재질별 전체 (CAP 자동 제외)">
+                                                                    <option value="mat:304-w">304-W (용접 전체)</option>
+                                                                    <option value="mat:304-s">304-S (심리스 - CAP제외)</option>
+                                                                    <option value="mat:304l-w">304L-W (용접 전체)</option>
+                                                                    <option value="mat:304l-s">304L-S (심리스 - CAP제외)</option>
+                                                                    <option value="mat:316l-w">316L-W (용접 전체)</option>
+                                                                    <option value="mat:316l-s">316L-S (심리스 전체)</option>
+                                                                    <option value="mat:spg">SPG (배관용 탄소강)</option>
+                                                                </optgroup>
+                                                                <optgroup label={`재질 + ${splitSizeA}A 기준 분기`}>
+                                                                    <option value="mat_size:304-s:le">304-S (≤ {splitSizeA}A 소구경)</option>
+                                                                    <option value="mat_size:304-s:gt">304-S (&gt; {splitSizeA}A 대구경)</option>
+                                                                    <option value="mat_size:304-w:le">304-W (≤ {splitSizeA}A 소구경)</option>
+                                                                    <option value="mat_size:304-w:gt">304-W (&gt; {splitSizeA}A 대구경)</option>
+                                                                    <option value="mat_size:304l-s:le">304L-S (≤ {splitSizeA}A 소구경)</option>
+                                                                    <option value="mat_size:304l-s:gt">304L-S (&gt; {splitSizeA}A 대구경)</option>
+                                                                    <option value="mat_size:304l-w:le">304L-W (≤ {splitSizeA}A 소구경)</option>
+                                                                    <option value="mat_size:304l-w:gt">304L-W (&gt; {splitSizeA}A 대구경)</option>
+                                                                    <option value="mat_size:316l-s:le">316L-S (≤ {splitSizeA}A 소구경)</option>
+                                                                    <option value="mat_size:316l-s:gt">316L-S (&gt; {splitSizeA}A 대구경)</option>
+                                                                    <option value="mat_size:316l-w:le">316L-W (≤ {splitSizeA}A 소구경)</option>
+                                                                    <option value="mat_size:316l-w:gt">316L-W (&gt; {splitSizeA}A 대구경)</option>
+                                                                    <option value="mat_size:spg:le">SPG (≤ {splitSizeA}A 소구경)</option>
+                                                                    <option value="mat_size:spg:gt">SPG (&gt; {splitSizeA}A 대구경)</option>
+                                                                </optgroup>
+                                                                <optgroup label="CAP 특수 품목군 (-W 연동군)">
+                                                                    <option value="cap:all">CAP 전체 (-W 연동군)</option>
+                                                                    <option value="cap_size:all:le">CAP (≤ {splitSizeA}A 이하)</option>
+                                                                    <option value="cap_size:all:gt">CAP (&gt; {splitSizeA}A 초과)</option>
+                                                                </optgroup>
+                                                                {availableRates.length > 0 && (
+                                                                    <optgroup label="기존 요율 수치별">
+                                                                        {availableRates.map(r => (
+                                                                            <option key={r} value={String(r)}>{r}% 품목만</option>
+                                                                        ))}
+                                                                    </optgroup>
+                                                                )}
+                                                            </select>
+                                                        </div>
+
+                                                        {/* 2. 일괄 변경 입력 & 버튼 */}
+                                                        <div className="mb-2.5">
+                                                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                                                일괄 변경할 요율 (%)
+                                                            </label>
+                                                            <div className="flex gap-1.5">
+                                                                <input
+                                                                    type="number"
+                                                                    placeholder="예: 47"
+                                                                    value={bulkDiscountRateInput}
+                                                                    onChange={(e) => setBulkDiscountRateInput(e.target.value)}
+                                                                    className="flex-1 px-2 py-1 text-xs border border-slate-300 rounded focus:border-teal-500 outline-none"
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            const val = Number(bulkDiscountRateInput);
+                                                                            if (!isNaN(val) && bulkDiscountRateInput.trim() !== '') {
+                                                                                applyDiscountRateToItems(targetDiscountRate, val);
+                                                                                setIsRateMenuOpen(false);
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const val = Number(bulkDiscountRateInput);
+                                                                        if (!isNaN(val) && bulkDiscountRateInput.trim() !== '') {
+                                                                            applyDiscountRateToItems(targetDiscountRate, val);
+                                                                            setIsRateMenuOpen(false);
+                                                                        }
+                                                                    }}
+                                                                    className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded cursor-pointer transition-colors active:scale-95 shrink-0"
+                                                                >
+                                                                    적용
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* 3. 추천 요율 버튼 */}
+                                                        {recommendation.recommendedRate !== undefined && (
+                                                            <div className="pt-2 border-t border-slate-100 flex flex-col gap-1">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-[11px] text-slate-500 font-medium">고객 등급 추천:</span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            handleApplyRecommendedRate();
+                                                                            setIsRateMenuOpen(false);
+                                                                        }}
+                                                                        title={recommendation.reason ? `${recommendation.reason} (클릭 시 추천 요율 일괄 적용)` : '클릭 시 추천 요율 일괄 적용'}
+                                                                        className="inline-flex items-center gap-1 text-xs text-teal-800 font-bold bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded px-2 py-0.5 shadow-2xs whitespace-nowrap cursor-pointer transition-colors active:scale-95"
+                                                                    >
+                                                                        <span>추천</span>
+                                                                        <span className="text-teal-600 font-extrabold">{recommendation.recommendedRate}%</span>
+                                                                        <span className="text-[10px] text-teal-600 font-normal">적용</span>
+                                                                    </button>
+                                                                </div>
+                                                                {recommendation.reason && (
+                                                                    <p className="text-[10px] text-slate-400 leading-tight">
+                                                                        {recommendation.reason}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </th>
 
-                                            <th className="px-2 py-3 text-right w-[7%] align-bottom pb-2.5">
-                                                <div className="flex flex-col items-end leading-tight">
-                                                    <span className="text-slate-600 font-bold">견적금액</span>
-                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(user)</span>
+                                            <th className="px-2 py-3 text-center align-bottom pb-2.5">
+                                                <div className="flex flex-col items-center justify-center leading-tight">
+                                                    <span className="text-slate-600 font-bold text-[14px]">견적금액</span>
+                                                    <span className="text-[11px] text-slate-400 font-normal lowercase tracking-tight">(user)</span>
                                                 </div>
                                             </th>
-                                            <th className="px-2 py-3 text-right w-[9%] align-bottom pb-2.5">
-                                                <div className="flex flex-col items-end leading-tight">
-                                                    <span className="text-slate-700 font-bold">수정 견적단가</span>
-                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(unit price)</span>
+                                            <th className="px-2 py-3 text-center align-bottom pb-2.5">
+                                                <div className="flex flex-col items-center justify-center leading-tight">
+                                                    <span className="text-slate-700 font-bold text-[14px]">수정 견적단가</span>
+                                                    <span className="text-[11px] text-slate-400 font-normal lowercase tracking-tight">(unit price)</span>
                                                 </div>
                                             </th>
-                                            <th className="px-2 py-3 text-right w-[9%] align-bottom pb-2.5">
-                                                <div className="flex flex-col items-end leading-tight">
-                                                    <span className="text-slate-700 font-bold">합계 (VAT별도)</span>
-                                                    <span className="text-[10px] text-slate-400 font-normal lowercase tracking-tight">(subtotal)</span>
+                                            <th className="px-2 py-3 text-center align-bottom pb-2.5">
+                                                <div className="flex flex-col items-center justify-center leading-tight">
+                                                    <span className="text-slate-700 font-bold text-[14px]">합계 (VAT별도)</span>
+                                                    <span className="text-[11px] text-slate-400 font-normal lowercase tracking-tight">(subtotal)</span>
                                                 </div>
                                             </th>
 
                                             {/* Profit - Moved to End */}
-                                            <th className="px-2 py-3 text-right text-emerald-600 whitespace-nowrap w-[7%] align-bottom pb-2.5">
-                                                <div className="flex flex-col items-end leading-tight">
-                                                    <span className="font-bold">이익</span>
-                                                    <span className="text-[10px] text-emerald-500 font-normal lowercase tracking-tight">(profit)</span>
+                                            <th className="px-2 py-3 text-center text-emerald-600 whitespace-nowrap align-bottom pb-2.5">
+                                                <div className="flex flex-col items-center justify-center leading-tight">
+                                                    <span className="font-bold text-[14px]">이익</span>
+                                                    <span className="text-[11px] text-emerald-500 font-normal lowercase tracking-tight">(profit)</span>
                                                 </div>
                                             </th>
                                         </tr>
@@ -1814,16 +2055,17 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                     onItemSelect={handleItemSelect}
                                                     customPriceRecord={customPrices[[item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim()]}
                                                     onApplyCustomPrice={(record) => handleApplyCustomPrice(idx, record)}
+                                                    similarityMatchStatus={activeSimilarityCandidate?.itemMatchMap.get(idx)?.matchType ?? undefined}
                                                 />
                                             );
                                         })}
                                     </tbody>
                                     <tfoot className="bg-slate-50 border-t border-slate-200">
                                         <tr>
-                                            <td colSpan={7} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">
+                                            <td colSpan={6} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">
                                                 Total Summary (VAT 별도)
                                             </td>
-                                            <td colSpan={5} className="px-4 py-3 text-right font-mono text-sm">
+                                            <td colSpan={6} className="px-4 py-3 text-right font-mono text-sm">
                                                 <div className="flex items-center justify-end gap-4">
                                                     <div className="text-slate-500">
                                                         <span className="text-xs mr-2">매출 합계:</span>
@@ -2203,6 +2445,30 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                     isSubmitting={isApiSubmitting}
                 />
             )}
+
+            {/* L2: 유사 견적/발주 서랍 패널 */}
+            <QuoteSimilarityDrawer
+                isOpen={isSimilarityDrawerOpen}
+                onClose={() => setIsSimilarityDrawerOpen(false)}
+                candidates={similaritySummary.candidates}
+                selectedCandidate={activeSimilarityCandidate}
+                onSelectCandidate={setActiveSimilarityCandidate}
+                onOpenComparisonModal={(cand) => setComparisonCandidate(cand)}
+                onDismissMatch={(targetId) => {
+                    setDismissedTargetIds(prev => new Set([...prev, targetId]));
+                    if (activeSimilarityCandidate?.targetId === targetId) {
+                        setActiveSimilarityCandidate(null);
+                    }
+                }}
+            />
+
+            {/* L3: 사이드 바이 사이드 Visual Diff 모달 */}
+            <QuoteComparisonModal
+                isOpen={!!comparisonCandidate}
+                onClose={() => setComparisonCandidate(null)}
+                candidate={comparisonCandidate}
+                onApplyPrices={handleApplyPricesFromComparison}
+            />
         </>,
         document.body
     );

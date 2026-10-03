@@ -155,25 +155,29 @@ export function formatSizeLabel(sizeA: number, displayMode: 'both' | 'A' | 'inch
 
 export function detectItemStandard(item: LineItem): 'ANSI' | 'JIS' {
     const raw = item as Partial<LineItem> & {
-        item_material?: string;
         item_size?: string;
         spec?: string;
     };
     const sizeStr = (item.size || raw.spec || raw.item_size || '').trim();
-    const matStr = (item.material || raw.item_material || '').toUpperCase().trim();
 
-    // 1. Check size: if contains " or fractional inch pattern without A
-    if (sizeStr.includes('"') || /^\d+(\.\d+|\s+\d+\/\d+|\/\d+)?$/.test(sizeStr)) {
+    // 1. 사이즈 단위가 " (인치 기호)로 끝나는지 확인 -> ANSI
+    if (sizeStr.endsWith('"') || sizeStr.endsWith('”') || sizeStr.endsWith('″')) {
         return 'ANSI';
     }
-    // 2. Check material: WP304, WP316, A403, A53, A106
-    if (matStr.startsWith('WP') || matStr.includes('A403') || matStr.includes('A53') || matStr.includes('A106')) {
-        return 'ANSI';
-    }
-    // 3. If size has A (e.g. 50A, 100A) or mat starts with STS
-    if (sizeStr.toUpperCase().includes('A') || matStr.startsWith('STS')) {
+
+    // 2. 사이즈 단위가 A 또는 a 로 끝나는지 확인 -> JIS
+    if (sizeStr.toLowerCase().endsWith('a')) {
         return 'JIS';
     }
+
+    // 3. 끝자리가 모호한 경우 보조 fallback (포함 여부 확인)
+    if (sizeStr.includes('"') || sizeStr.includes('”') || sizeStr.includes('″')) {
+        return 'ANSI';
+    }
+    if (/[0-9]a\b/i.test(sizeStr) || sizeStr.toLowerCase().includes('a')) {
+        return 'JIS';
+    }
+
     return 'JIS';
 }
 
@@ -319,7 +323,11 @@ export function parseASize(sizeStr: string): number {
     return 0;
 }
 
-export function classifyItem(item: LineItem, splitSizeA: number = 100): ItemClassification {
+export function classifyItem(
+    item: LineItem, 
+    splitSizeA: number = 100,
+    rateField: 'discountRate' | 'supplierRate' = 'discountRate'
+): ItemClassification {
     const raw = item as Partial<LineItem> & {
         item_material?: string;
         itemName?: string;
@@ -330,7 +338,9 @@ export function classifyItem(item: LineItem, splitSizeA: number = 100): ItemClas
     const cleanMat = (item.material || raw.item_material || '').toUpperCase().trim();
     const cleanName = (item.name || raw.itemName || raw.item_name || '').toUpperCase().trim();
     const isCap = cleanName.includes('CAP');
-    const isZeroRate = (item.discountRate ?? 0) <= 0;
+    const currentRate = (rateField === 'supplierRate' ? item.supplierRate : item.discountRate) ?? 0;
+    // In supplier PO mode, rate=0 is often unconfigured and should belong to its material group instead of zero-rate locked
+    const isZeroRate = rateField === 'supplierRate' ? false : currentRate <= 0;
     const sizeA = parseASize(item.size || raw.spec || raw.item_size || '');
     const standard = detectItemStandard(item);
     
@@ -415,4 +425,119 @@ export function getMaterialVisualProps(matStr?: string, config?: UserRateConfig)
         bgLight: themeDef.bgLight,
         suffixClass
     };
+}
+
+/**
+ * Filter match helper for both quotation and purchase order rates
+ */
+export function checkItemMatchTargetRateFilter(
+    item: LineItem, 
+    targetFilter: string, 
+    thresholdSize: number = 100,
+    rateField: 'discountRate' | 'supplierRate' = 'discountRate'
+): boolean {
+    if (targetFilter === 'all') return true;
+
+    const cls = classifyItem(item, thresholdSize, rateField);
+    const itemRate = (rateField === 'supplierRate' ? item.supplierRate : item.discountRate) ?? 0;
+
+    // 1. Mat & Size Filter: e.g. "mat_size:304-s:le"
+    if (targetFilter.startsWith('mat_size:')) {
+        const [, matKey, rawCat] = targetFilter.split(':');
+        if (matKey.endsWith('-s') && cls.isCap) return false;
+        const targetCat = rawCat.startsWith('le') ? 'le' : rawCat.startsWith('gt') ? 'gt' : rawCat;
+        return cls.materialGroup.toLowerCase() === matKey.toLowerCase() &&
+               cls.sizeCategory === targetCat;
+    }
+
+    // 1-1. Mat & Standard Filter: e.g. "mat_std:304-s:ansi"
+    if (targetFilter.startsWith('mat_std:')) {
+        const [, matKey, targetStd] = targetFilter.split(':');
+        if (matKey.endsWith('-s') && cls.isCap) return false;
+        return cls.materialGroup.toLowerCase() === matKey.toLowerCase() &&
+               cls.standard.toLowerCase() === targetStd.toLowerCase();
+    }
+
+    // 1-2. Mat & Size & Standard Filter: e.g. "mat_size_std:304-s:le:ansi"
+    if (targetFilter.startsWith('mat_size_std:')) {
+        const [, matKey, rawCat, targetStd] = targetFilter.split(':');
+        if (matKey.endsWith('-s') && cls.isCap) return false;
+        const targetCat = rawCat.startsWith('le') ? 'le' : rawCat.startsWith('gt') ? 'gt' : rawCat;
+        return cls.materialGroup.toLowerCase() === matKey.toLowerCase() &&
+               cls.sizeCategory === targetCat &&
+               cls.standard.toLowerCase() === targetStd.toLowerCase();
+    }
+
+    // 1-3. Mat & Size & Specific Rate Filter: e.g. "mat_size_rate:304-s:le:40"
+    if (targetFilter.startsWith('mat_size_rate:')) {
+        const [, matKey, rawCat, rateStr] = targetFilter.split(':');
+        if (matKey.endsWith('-s') && cls.isCap) return false;
+        const targetCat = rawCat.startsWith('le') ? 'le' : rawCat.startsWith('gt') ? 'gt' : rawCat;
+        const targetRate = Number(rateStr);
+        return cls.materialGroup.toLowerCase() === matKey.toLowerCase() &&
+               cls.sizeCategory === targetCat &&
+               itemRate === targetRate;
+    }
+
+    // 1-4. Mat & Specific Rate Filter: e.g. "mat_rate:304-s:40"
+    if (targetFilter.startsWith('mat_rate:')) {
+        const [, matKey, rateStr] = targetFilter.split(':');
+        if (matKey.endsWith('-s') && cls.isCap) return false;
+        const targetRate = Number(rateStr);
+        return cls.materialGroup.toLowerCase() === matKey.toLowerCase() &&
+               itemRate === targetRate;
+    }
+
+    // 2. Mat Filter (CAP excluded for -S): e.g. "mat:304-s"
+    if (targetFilter.startsWith('mat:')) {
+        const matKey = targetFilter.split(':')[1];
+        if (matKey.endsWith('-s') && cls.isCap) return false;
+        return cls.materialGroup.toLowerCase() === matKey.toLowerCase();
+    }
+
+    // 3. CAP Special Filters
+    if (targetFilter.startsWith('cap_size_rate:')) {
+        const [, , rawCat, rateStr] = targetFilter.split(':');
+        const targetCat = rawCat.startsWith('le') ? 'le' : rawCat.startsWith('gt') ? 'gt' : rawCat;
+        const targetRate = Number(rateStr);
+        return cls.isCap && cls.sizeCategory === targetCat && itemRate === targetRate;
+    }
+    if (targetFilter.startsWith('cap_rate:')) {
+        const [, , rateStr] = targetFilter.split(':');
+        const targetRate = Number(rateStr);
+        return cls.isCap && itemRate === targetRate;
+    }
+    if (targetFilter.startsWith('cap_size:')) {
+        const [, , rawCat] = targetFilter.split(':');
+        const targetCat = rawCat.startsWith('le') ? 'le' : rawCat.startsWith('gt') ? 'gt' : rawCat;
+        return cls.isCap && cls.sizeCategory === targetCat;
+    }
+    if (targetFilter.startsWith('cap_size_std:')) {
+        const [, , rawCat, targetStd] = targetFilter.split(':');
+        const targetCat = rawCat.startsWith('le') ? 'le' : rawCat.startsWith('gt') ? 'gt' : rawCat;
+        return cls.isCap && cls.sizeCategory === targetCat && cls.standard.toLowerCase() === targetStd.toLowerCase();
+    }
+    if (targetFilter.startsWith('cap_std:')) {
+        const [, , targetStd] = targetFilter.split(':');
+        return cls.isCap && cls.standard.toLowerCase() === targetStd.toLowerCase();
+    }
+    if (targetFilter.startsWith('cap:')) {
+        return cls.isCap;
+    }
+
+    // Zero Rate Filter: "zero:all"
+    if (targetFilter === 'zero:all') {
+        return cls.isZeroRate;
+    }
+
+    // 4. Exact rate filter: e.g. "45" or "rate:45"
+    const numericRate = targetFilter.startsWith('rate:')
+        ? Number(targetFilter.split(':')[1])
+        : Number(targetFilter);
+
+    if (!isNaN(numericRate)) {
+        return itemRate === numericRate;
+    }
+
+    return true;
 }

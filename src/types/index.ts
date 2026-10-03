@@ -108,6 +108,15 @@ export interface Quotation {
     deletedBy?: string; // User ID who performed soft deletion
     attachments?: { name: string; url: string; }[]; // Customer request files
     adminAttachments?: { name: string; url: string; }[]; // Official ALTF quote files
+    source?: 'WEB' | 'EMAIL' | 'PHONE' | 'FAX' | 'KAKAO' | 'VISIT';
+    relatedId?: string;
+    relationType?: 'DUPLICATE' | 'SAME_PROJECT' | 'SHORTAGE' | 'REPEAT';
+    similarity?: {
+        topType: 'DUPLICATE' | 'SAME_PROJECT' | 'SHORTAGE' | 'REPEAT' | 'NONE';
+        topScore: number;
+        relatedDocNo?: string;
+        targetCustomer?: string;
+    };
 }
 
 export interface User {

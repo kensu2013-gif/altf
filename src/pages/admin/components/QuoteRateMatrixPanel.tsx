@@ -34,6 +34,8 @@ export interface QuoteRateMatrixPanelProps {
     onSplitSizeChange?: (size: number) => void;
     selectedFilterKey?: string | null;
     onSelectFilter?: (filterKey: string | null, label: string) => void;
+    rateField?: 'discountRate' | 'supplierRate';
+    rateLabel?: string;
 }
 
 export interface RateStatItem {
@@ -42,13 +44,17 @@ export interface RateStatItem {
     tooltip: string;
 }
 
-function buildRateStatsList(itemsList: LineItem[]): RateStatItem[] {
+function buildRateStatsList(
+    itemsList: LineItem[], 
+    rateField: 'discountRate' | 'supplierRate' = 'discountRate',
+    rateLabel: string = '요율'
+): RateStatItem[] {
     if (!itemsList || itemsList.length === 0) return [];
 
     const grouped = new Map<number, LineItem[]>();
     for (let i = 0; i < itemsList.length; i++) {
         const item = itemsList[i];
-        const r = item.discountRate ?? 0;
+        const r = (rateField === 'supplierRate' ? item.supplierRate : item.discountRate) ?? 0;
         let list = grouped.get(r);
         if (!list) {
             list = [];
@@ -80,7 +86,7 @@ function buildRateStatsList(itemsList: LineItem[]): RateStatItem[] {
         const schSummary = Array.from(schedules).slice(0, 3).join(', ');
         const sizeSummary = Array.from(sizes).slice(0, 4).join(', ');
 
-        const tooltip = `[요율 ${rate}%] 총 ${mItems.length}건 (클릭 시 아래 테이블 필터)\n` +
+        const tooltip = `[${rateLabel} ${rate}%] 총 ${mItems.length}건 (클릭 시 아래 테이블 필터)\n` +
             `• 품종: ${typeSummary || '기타'}\n` +
             (schSummary ? `• 두께: ${schSummary}\n` : '') +
             (sizeSummary ? `• 규격: ${sizeSummary}` : '');
@@ -128,8 +134,12 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
     currentSplitSize,
     onSplitSizeChange,
     selectedFilterKey,
-    onSelectFilter
+    onSelectFilter,
+    rateField = 'discountRate',
+    rateLabel
 }) => {
+    const currentRateLabel = rateLabel || (rateField === 'supplierRate' ? '매입율' : '요율');
+
     // 1. User config (Split Size & Material Theme) - persisted in localStorage
     const [config, setConfig] = useState<UserRateConfig>(() => loadUserRateConfig());
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -470,8 +480,8 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
         };
 
         items.forEach(it => {
-            const cls = classifyItem(it, splitSizeA);
-            const rate = it.discountRate ?? 0;
+            const cls = classifyItem(it, splitSizeA, rateField);
+            const rate = (rateField === 'supplierRate' ? it.supplierRate : it.discountRate) ?? 0;
 
             // If standard filter is active, skip non-matching items
             if (standardFilter !== 'all' && cls.standard !== standardFilter) {
@@ -536,12 +546,12 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
         const result = Object.values(groups).filter(g => g.totalCount > 0);
         for (let i = 0; i < result.length; i++) {
             const g = result[i];
-            g.rateStatsList = buildRateStatsList(g.items);
-            g.rateStatsListLe = buildRateStatsList(g.itemsLe);
-            g.rateStatsListGt = buildRateStatsList(g.itemsGt);
+            g.rateStatsList = buildRateStatsList(g.items, rateField, currentRateLabel);
+            g.rateStatsListLe = buildRateStatsList(g.itemsLe, rateField, currentRateLabel);
+            g.rateStatsListGt = buildRateStatsList(g.itemsGt, rateField, currentRateLabel);
         }
         return result;
-    }, [items, splitSizeA, config.theme, standardFilter]);
+    }, [items, splitSizeA, config.theme, standardFilter, rateField, currentRateLabel]);
 
     const handleInputChange = (groupKey: string, val: string) => {
         setRateInputs(prev => ({ ...prev, [groupKey]: val }));
@@ -587,7 +597,7 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                 ? ` (${formatSizeLabel(splitSizeA, sizeUnitDisplay)} 초과)` 
                 : '';
         const stdText = targetStandard ? ` [${targetStandard} 품목만]` : '';
-        setAppliedNotice(`[${groupKey}${subText}${stdText}] 그룹에 요율 ${val}%가 성공적으로 적용되었습니다.`);
+        setAppliedNotice(`[${groupKey}${subText}${stdText}] 그룹에 ${currentRateLabel} ${val}%가 성공적으로 적용되었습니다.`);
         setTimeout(() => setAppliedNotice(null), 3500);
     };
 
@@ -615,7 +625,7 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                                 if (isSelected) {
                                     onSelectFilter(null, '');
                                 } else {
-                                    onSelectFilter(filterKey, `${labelPrefix} [요율 ${st.rate}%]`);
+                                    onSelectFilter(filterKey, `${labelPrefix} [${currentRateLabel} ${st.rate}%]`);
                                 }
                             }}
                             title={st.tooltip}
@@ -656,7 +666,7 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                     <div>
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-black text-slate-800 tracking-tight">
-                                스마트 재질 및 요율 매트릭스
+                                스마트 재질 및 {currentRateLabel} 매트릭스
                             </span>
                             <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-teal-600 text-white shadow-2xs">
                                 총 {items.length}개 품목 분석
@@ -1306,7 +1316,7 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                                                 </div>
                                             ) : (
                                                 <div className="text-right shrink-0" onClick={(e) => e.stopPropagation()}>
-                                                    <span className="text-[10px] text-slate-400 font-medium">현재 요율</span>
+                                                    <span className="text-[10px] text-slate-400 font-medium">현재 {currentRateLabel}</span>
                                                     <div className="mt-0.5">
                                                         {renderRateBadges(
                                                             group.rateStatsList, 
@@ -1409,7 +1419,7 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                                                 <div className="relative flex-1">
                                                     <input
                                                         type="number"
-                                                        placeholder="요율(%)"
+                                                        placeholder={`${currentRateLabel}(%)`}
                                                         value={rateInputs[group.key] || ''}
                                                         onChange={(e) => handleInputChange(group.key, e.target.value)}
                                                         onKeyDown={(e) => {
@@ -1423,7 +1433,7 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                                                     type="button"
                                                     onClick={() => handleApply(group.key)}
                                                     className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-all shadow-2xs active:scale-95 whitespace-nowrap cursor-pointer"
-                                                    title="이 재질의 모든 품목에 요율 일괄 적용"
+                                                    title={`이 재질의 모든 품목에 ${currentRateLabel} 일괄 적용`}
                                                 >
                                                     전체 적용
                                                 </button>
@@ -1436,7 +1446,7 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                                                         type="button"
                                                         onClick={() => handleApply(group.key, undefined, 'ANSI')}
                                                         className="flex-1 py-1 px-1.5 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-lg text-[10px] font-black transition-all cursor-pointer text-center"
-                                                        title={`이 재질의 ANSI 규격 ${group.countAnsi}건만 입력한 요율로 변경`}
+                                                        title={`이 재질의 ANSI 규격 ${group.countAnsi}건만 입력한 ${currentRateLabel}로 변경`}
                                                     >
                                                         ANSI만 ({group.countAnsi})
                                                     </button>
@@ -1444,7 +1454,7 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                                                         type="button"
                                                         onClick={() => handleApply(group.key, undefined, 'JIS')}
                                                         className="flex-1 py-1 px-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-lg text-[10px] font-black transition-all cursor-pointer text-center"
-                                                        title={`이 재질의 JIS 규격 ${group.countJis}건만 입력한 요율로 변경`}
+                                                        title={`이 재질의 JIS 규격 ${group.countJis}건만 입력한 ${currentRateLabel}로 변경`}
                                                     >
                                                         JIS만 ({group.countJis})
                                                     </button>
@@ -1458,7 +1468,7 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                                                         type="button"
                                                         onClick={() => handleApply(group.key, 'le')}
                                                         className="flex-1 py-1 px-1.5 bg-slate-100 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-300 text-slate-700 rounded-lg text-[10px] font-bold border border-slate-200 transition-all cursor-pointer text-center"
-                                                        title={`${formattedSplitSize} 이하 ${group.countLe}건만 입력한 요율로 변경`}
+                                                        title={`${formattedSplitSize} 이하 ${group.countLe}건만 입력한 ${currentRateLabel}로 변경`}
                                                     >
                                                         ≤{formattedSplitSize}만 ({group.countLe})
                                                     </button>
@@ -1466,7 +1476,7 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                                                         type="button"
                                                         onClick={() => handleApply(group.key, 'gt')}
                                                         className="flex-1 py-1 px-1.5 bg-slate-100 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-300 text-slate-700 rounded-lg text-[10px] font-bold border border-slate-200 transition-all cursor-pointer text-center"
-                                                        title={`${formattedSplitSize} 초과 ${group.countGt}건만 입력한 요율로 변경`}
+                                                        title={`${formattedSplitSize} 초과 ${group.countGt}건만 입력한 ${currentRateLabel}로 변경`}
                                                     >
                                                         &gt;{formattedSplitSize}만 ({group.countGt})
                                                     </button>

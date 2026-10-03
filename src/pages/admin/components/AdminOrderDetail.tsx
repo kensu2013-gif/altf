@@ -1,12 +1,16 @@
-import { useState, memo, useMemo, useCallback, useEffect } from 'react';
+import { useState, memo, useMemo, useCallback, useEffect, startTransition } from 'react';
 import { createPortal } from 'react-dom';
 import type { Order, LineItem, Product, User as UserType, SplitDelivery } from '../../../types';
 // import { generateSku } from '../../../lib/sku'; // REMOVED: Managed in useInventoryIndex
 import { useStore } from '../../../store/useStore';
-import { X, AlertTriangle, Check, Calendar, Package, User, Trash2, Plus, Download, FileText, Minus, Equal, Send, SplitSquareHorizontal, Image, Printer, ListChecks } from 'lucide-react';
+import { X, AlertTriangle, Check, Calendar, Package, User, Trash2, Plus, Download, FileText, Minus, Equal, Send, SplitSquareHorizontal, Image, Printer, ListChecks, Sliders } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { useInventoryIndex } from '../../../hooks/useInventoryIndex';
-
+import { QuoteRateMatrixPanel } from './QuoteRateMatrixPanel';
+import { checkItemMatchTargetRateFilter, getMaterialVisualProps, loadUserRateConfig } from './quoteClassification';
+import { QuoteSimilarityDrawer } from './QuoteSimilarityDrawer';
+import { QuoteComparisonModal } from './QuoteComparisonModal';
+import { normalizeLineItem, compareTwoNormalizedDocuments, type SimilarityMatchCandidate } from '../../../utils/quoteSimilarityCore';
 
 import { formatCurrency } from '../../../lib/utils';
 import { calculateCustomerGrade } from '../../../lib/customerUtils';
@@ -363,9 +367,163 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
         return isStockOrder(initialCustomer, order.customerName || '');
     });
 
+    // Supplier Mode State
+    const [isSupplierMode, setIsSupplierMode] = useState(initialMode === 'SUPPLIER');
+
     const [bulkSupplierRateInput, setBulkSupplierRateInput] = useState<string>('');
     const [bulkDiscountRateInput, setBulkDiscountRateInput] = useState<string>('');
     const [targetDiscountRate, setTargetDiscountRate] = useState<string>('all');
+
+    // Smart Purchase Rate Matrix State
+    const [isPoMatrixOpen, setIsPoMatrixOpen] = useState<boolean>(() => ((order.po_items?.length || order.items?.length || 0) >= 10));
+    const [poSplitSizeA, setPoSplitSizeA] = useState<number>(100);
+    const [activePoMatrixFilter, setActivePoMatrixFilter] = useState<{ filterKey: string; label: string } | null>(null);
+
+    // Precomputed Set of matching item indices for activePoMatrixFilter in Supplier PO mode
+    const filteredPoItemIndices = useMemo(() => {
+        if (!activePoMatrixFilter || !isSupplierMode) return null;
+        const set = new Set<number>();
+        const filterKey = activePoMatrixFilter.filterKey;
+        for (let i = 0; i < poItems.length; i++) {
+            if (checkItemMatchTargetRateFilter(poItems[i], filterKey, poSplitSizeA, 'supplierRate')) {
+                set.add(i);
+            }
+        }
+        return set;
+    }, [poItems, activePoMatrixFilter, isSupplierMode, poSplitSizeA]);
+
+    // -------------------------------------------------------------
+    // ALTF 유사도 및 Shortage 감지 엔진 (Order Mode)
+    // -------------------------------------------------------------
+    const allOrders = useStore((state) => state.orders);
+    const [isOrderSimilarityDrawerOpen, setIsOrderSimilarityDrawerOpen] = useState(false);
+    const [activeOrderSimilarityCandidate, setActiveOrderSimilarityCandidate] = useState<SimilarityMatchCandidate | null>(null);
+    const [orderComparisonCandidate, setOrderComparisonCandidate] = useState<SimilarityMatchCandidate | null>(null);
+    const [dismissedOrderTargetIds, setDismissedOrderTargetIds] = useState<Set<string>>(new Set());
+
+    const orderSimilaritySummary = useMemo(() => {
+        const activeItems = isSupplierMode ? poItems : (items || []);
+        if (!activeItems || activeItems.length === 0) return { topType: 'NONE' as const, topScore: 0, candidates: [] };
+
+        // 1. IDF 사전 구성
+        const idfDocFreq = new Map<string, number>();
+        const normalizedDocs: { id: string; type: 'QUOTATION' | 'ORDER'; docNo: string; customerName: string; bizNo?: string; createdAt: string; items: any[]; itemKeySet: Set<string>; parentQuoteId?: string }[] = [];
+
+        allOrders.forEach(o => {
+            if (o.id === order.id || (o as any).isDeleted) return;
+            const normItems = ((o.po_items && o.po_items.length > 0) ? o.po_items : o.items || []).map(normalizeLineItem).filter(i => !i.isNonItem && i.l1Key.length > 5);
+            if (normItems.length === 0) return;
+
+            const custName = o.poEndCustomer || o.customerName || (o.payload?.customer as any)?.company_name || '';
+            const bizNo = (o.payload?.customer as any)?.business_no || '';
+            const doc = {
+                id: o.id,
+                type: 'ORDER' as const,
+                docNo: o.id,
+                customerName: custName,
+                bizNo,
+                createdAt: o.createdAt || '2026-01-01',
+                items: normItems,
+                itemKeySet: new Set(normItems.map(it => it.l1Key)),
+                parentQuoteId: o.linkedQuoteId
+            };
+            normalizedDocs.push(doc);
+            doc.itemKeySet.forEach(k => {
+                idfDocFreq.set(k, (idfDocFreq.get(k) || 0) + 1);
+            });
+        });
+
+        const N = Math.max(1, normalizedDocs.length);
+        const idfMap = new Map<string, number>();
+        idfDocFreq.forEach((count, key) => {
+            idfMap.set(key, Math.log((N - count + 0.5) / (count + 0.5) + 1));
+        });
+
+        // 2. 현재 발주 문서 정규화
+        const currentCustName = poEndCustomer || order.customerName || (order.payload?.customer as any)?.company_name || '';
+        const currentDoc = {
+            id: order.id,
+            type: 'ORDER' as const,
+            docNo: order.id,
+            customerName: currentCustName,
+            bizNo: (order.payload?.customer as any)?.business_no || '',
+            createdAt: order.createdAt || new Date().toISOString(),
+            items: activeItems.map(normalizeLineItem)
+        };
+
+        // 3. 비교
+        const candidates: SimilarityMatchCandidate[] = [];
+        normalizedDocs.forEach(targetDoc => {
+            if (dismissedOrderTargetIds.has(targetDoc.id)) return;
+            if (targetDoc.id === order.linkedQuoteId) return;
+
+            const match = compareTwoNormalizedDocuments(currentDoc, targetDoc, idfMap);
+            if (match && match.totalScore >= 60) {
+                candidates.push(match);
+            }
+        });
+
+        candidates.sort((a, b) => b.totalScore - a.totalScore);
+        const top3 = candidates.slice(0, 3);
+        const topMatch = top3[0];
+
+        return {
+            topType: topMatch?.similarityType ?? 'NONE',
+            topScore: topMatch?.totalScore ?? 0,
+            candidates: top3
+        };
+    }, [poItems, items, isSupplierMode, allOrders, order.id, order.linkedQuoteId, order.createdAt, poEndCustomer, order.customerName, order.payload, dismissedOrderTargetIds]);
+
+    const topOrderSimilarityCandidate = orderSimilaritySummary.candidates[0] || null;
+
+    // 과거 발주건의 매입처(vendorName) 및 매입율(supplierRate) 승계
+    const handleApplySupplierRatesFromComparison = useCallback((_priceMap: Map<number, { unitPrice: number; discountRate?: number }>) => {
+        if (!orderComparisonCandidate) return;
+        setPoItems(prev => prev.map((item, idx) => {
+            const match = orderComparisonCandidate.itemMatchMap.get(idx);
+            if (match && match.targetIndex !== undefined) {
+                const matchedB = orderComparisonCandidate.itemsB[match.targetIndex];
+                const rawB = matchedB.raw;
+                const newSupplierRate = rawB.supplierRate ?? item.supplierRate;
+                const newVendorName = rawB.vendorName || item.vendorName;
+                return {
+                    ...item,
+                    supplierRate: newSupplierRate,
+                    vendorName: newVendorName
+                };
+            }
+            return item;
+        }));
+    }, [orderComparisonCandidate]);
+
+    // Apply Supplier Rate to PO Items matching target filter
+    const applySupplierRateToItems = useCallback((targetFilter: string, newRate: number, customSplitSize?: number) => {
+        if (isNaN(newRate) || newRate < 0 || newRate > 100) return;
+        const effectiveSplitSize = customSplitSize !== undefined ? customSplitSize : poSplitSizeA;
+
+        setPoItems(prev => {
+            let hasChanges = false;
+            const newItems = prev.map(item => {
+                if (!checkItemMatchTargetRateFilter(item, targetFilter, effectiveSplitSize, 'supplierRate')) {
+                    return item;
+                }
+
+                if (item.supplierRate === newRate && item.supplierPriceOverride === undefined) {
+                    return item;
+                }
+
+                hasChanges = true;
+                const updated = {
+                    ...item,
+                    supplierRate: newRate
+                };
+                delete updated.supplierPriceOverride;
+                return updated;
+            });
+
+            return hasChanges ? newItems : prev;
+        });
+    }, [poSplitSizeA]);
 
     const checkDuplicates = useCallback((currentPoItems: LineItem[]) => {
         const allOrders = useStore.getState().orders || [];
@@ -453,8 +611,6 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
 
     // ... (state initialization) ...
 
-    // Supplier Mode State
-    const [isSupplierMode, setIsSupplierMode] = useState(initialMode === 'SUPPLIER');
 
     const [previewHtml, setPreviewHtml] = useState<string | null>(null);
     const [previewType, setPreviewType] = useState<'PO' | 'SALES' | 'PACKING'>('PO');
@@ -2287,7 +2443,7 @@ if (deliveryNoteFiles.length > 0) {
                                                             setShowCrmSuggestions(true);
                                                         }}
                                                         onFocus={() => setShowCrmSuggestions(true)}
-                                                        className={`px-2 py-1 text-sm font-bold border rounded min-w-[140px] shadow-sm outline-none transition-all ${!customerTouched ? 'border-red-400 ring-2 ring-red-400 animate-pulse text-red-900' : 'border-indigo-200 focus:border-indigo-500 text-indigo-900'}`}
+                                                        className={`px-2 py-1 text-sm font-bold border rounded min-w-35 shadow-sm outline-none transition-all ${!customerTouched ? 'border-red-400 ring-2 ring-red-400 animate-pulse text-red-900' : 'border-indigo-200 focus:border-indigo-500 text-indigo-900'}`}
                                                         placeholder="고객사 이름"
                                                         title="PO에 표시될 요청 고객사 이름을 수정할 수 있습니다."
                                                     />
@@ -2879,12 +3035,107 @@ if (deliveryNoteFiles.length > 0) {
 
                     {/* Order Items Table */}
                     <div>
-                        <h3 className={`text-sm font-bold mb-3 flex items-center gap-2 ${isSupplierMode ? 'text-indigo-900' : 'text-slate-900'}`}>
-                            <Package className={`w-4 h-4 ${isSupplierMode ? 'text-indigo-600' : 'text-teal-600'}`} />
-                            {isSupplierMode ? '매입 발주 품목 및 단가 설정' : '주문 품목 및 재고 확인'}
-                        </h3>
+                        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                                <h3 className={`text-sm font-bold flex items-center gap-2 ${isSupplierMode ? 'text-indigo-900' : 'text-slate-900'}`}>
+                                    <Package className={`w-4 h-4 ${isSupplierMode ? 'text-indigo-600' : 'text-teal-600'}`} />
+                                    {isSupplierMode ? '매입 발주 품목 및 단가 설정' : '주문 품목 및 재고 확인'}
+                                </h3>
+                                {topOrderSimilarityCandidate && topOrderSimilarityCandidate.similarityType !== 'NONE' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsOrderSimilarityDrawerOpen(true)}
+                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black border shadow-2xs transition-all cursor-pointer ${
+                                            topOrderSimilarityCandidate.similarityType === 'SAME_PROJECT' ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100' :
+                                            topOrderSimilarityCandidate.similarityType === 'SHORTAGE' ? 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100' :
+                                            topOrderSimilarityCandidate.similarityType === 'DUPLICATE' ? 'bg-purple-50 text-purple-800 border-purple-300 hover:bg-purple-100' :
+                                            'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                                        }`}
+                                        title="과거 발주건과의 유사도/Shortage 분석 서랍을 엽니다."
+                                    >
+                                        <span className="w-2 h-2 rounded-full bg-current animate-pulse shrink-0" />
+                                        <span>
+                                            {topOrderSimilarityCandidate.similarityType === 'SAME_PROJECT' ? `⚠️ 동일 프로젝트 (${topOrderSimilarityCandidate.totalScore}점)` :
+                                             topOrderSimilarityCandidate.similarityType === 'SHORTAGE' ? `🔗 Shortage(추가) 감지 (${topOrderSimilarityCandidate.totalScore}점)` :
+                                             topOrderSimilarityCandidate.similarityType === 'DUPLICATE' ? `중복 접수 (${topOrderSimilarityCandidate.totalScore}점)` :
+                                             `반복 발주 (${topOrderSimilarityCandidate.totalScore}점)`}
+                                        </span>
+                                    </button>
+                                )}
+                            </div>
+                            {isSupplierMode && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPoMatrixOpen(!isPoMatrixOpen)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                                        isPoMatrixOpen 
+                                            ? 'bg-indigo-600 text-white border-indigo-700' 
+                                            : 'bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-300'
+                                    }`}
+                                    title="재질 및 100A 규격별 스마트 매입율 매트릭스 패널 토글"
+                                >
+                                    <Sliders className="w-3.5 h-3.5" />
+                                    <span>재질/규격 매입율 매트릭스 {isPoMatrixOpen ? '접기' : '열기'}</span>
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Smart Material & Size Matrix Panel for Purchase Order */}
+                        {isSupplierMode && (
+                            <div className="mb-4">
+                                <QuoteRateMatrixPanel 
+                                    items={poItems}
+                                    onApplyRate={applySupplierRateToItems}
+                                    isOpen={isPoMatrixOpen}
+                                    onToggle={() => setIsPoMatrixOpen(!isPoMatrixOpen)}
+                                    currentSplitSize={poSplitSizeA}
+                                    onSplitSizeChange={setPoSplitSizeA}
+                                    selectedFilterKey={activePoMatrixFilter?.filterKey ?? null}
+                                    onSelectFilter={(filterKey, label) => {
+                                        startTransition(() => {
+                                            if (filterKey) {
+                                                setActivePoMatrixFilter({ filterKey, label });
+                                            } else {
+                                                setActivePoMatrixFilter(null);
+                                            }
+                                        });
+                                    }}
+                                    rateField="supplierRate"
+                                    rateLabel="매입율"
+                                />
+                            </div>
+                        )}
+
+                        {/* Filter notification banner if active */}
+                        {isSupplierMode && activePoMatrixFilter && (
+                            <div className="flex items-center justify-between px-4 py-2.5 bg-linear-to-r from-indigo-50 via-purple-50 to-indigo-50 border border-indigo-200 rounded-xl mb-3 text-xs font-bold text-indigo-900 shadow-2xs">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse shrink-0" />
+                                    <span>
+                                        선택 조건 필터링 중: <b className="text-indigo-800 underline underline-offset-2">{activePoMatrixFilter.label}</b>
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-600 text-white font-extrabold shadow-2xs">
+                                        {filteredPoItemIndices?.size ?? 0}건 표시
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        startTransition(() => {
+                                            setActivePoMatrixFilter(null);
+                                        });
+                                    }}
+                                    className="flex items-center gap-1 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs text-[11px] font-bold cursor-pointer transition-all active:scale-95 shrink-0"
+                                    title="필터를 해제하고 전체 품목을 다시 봅니다"
+                                >
+                                    <X className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>필터 해제 (전체 품목 보기)</span>
+                                </button>
+                            </div>
+                        )}
+
                         <div className={`border rounded-xl overflow-x-auto shadow-sm ${isSupplierMode ? 'border-indigo-200' : 'border-slate-200'}`}>
-                            <table className="w-full min-w-[800px] text-sm text-left">
+                            <table className="w-full min-w-200 text-sm text-left">
                                 <thead className={`${isSupplierMode ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-50 text-slate-600'} border-b ${isSupplierMode ? 'border-indigo-200' : 'border-slate-200'} text-sm font-bold uppercase`}>
                                     <tr>
                                         <th className="px-2 py-3 w-[2%] text-center">
@@ -2984,7 +3235,7 @@ if (deliveryNoteFiles.length > 0) {
                                                     <th className="px-4 py-3 text-center w-[12%]">
                                                         <div className="flex flex-col items-center gap-1">
                                                             <span className="text-xs font-bold text-slate-600"> Rate(요율) </span>
-                                                            <div className="flex flex-col gap-1 w-full max-w-[90px]">
+                                                            <div className="flex flex-col gap-1 w-full max-w-22.5">
                                                                 <select
                                                                     value={targetDiscountRate}
                                                                     onChange={(e) => setTargetDiscountRate(e.target.value)}
@@ -3040,7 +3291,7 @@ if (deliveryNoteFiles.length > 0) {
                                                                         <span>추천:</span>
                                                                         <span className="text-teal-600 font-extrabold">{recommendation.recommendedRate}%</span>
                                                                     </div>
-                                                                    <span className="text-slate-400 text-[8px] whitespace-normal text-center scale-90 leading-tight max-w-[120px]" title={recommendation.reason}>
+                                                                    <span className="text-slate-400 text-[8px] whitespace-normal text-center scale-90 leading-tight max-w-30" title={recommendation.reason}>
                                                                         {recommendation.reason}
                                                                     </span>
                                                                     <button
@@ -3182,6 +3433,12 @@ if (deliveryNoteFiles.length > 0) {
                                              const isSentItem = isSupplierMode && matchedDelivery ? matchedDelivery.poSent : false;
                                              const sentSupplierName = matchedDelivery?.supplier.company_name;
 
+                                            if (isSupplierMode && filteredPoItemIndices && !filteredPoItemIndices.has(idx)) {
+                                                return null;
+                                            }
+
+                                            const matVisual = getMaterialVisualProps(item.material, loadUserRateConfig());
+
                                             return (
                                                 <tr key={idx} className={`${isSentItem ? 'opacity-65 bg-slate-50' : (isSelected ? '' : 'opacity-40 grayscale')} ${isUnlinked ? 'bg-red-50/30' : (isSupplierMode ? 'bg-white hover:bg-indigo-50/30' : (isStockInsufficient ? 'bg-red-50/50' : 'bg-white hover:bg-slate-50'))} transition-all`
                                                 }>
@@ -3241,7 +3498,7 @@ if (deliveryNoteFiles.length > 0) {
                                                                 title="Material"
                                                                 onChange={(e) => handleItemChange(idx, 'material', e.target.value)}
                                                                 onKeyDown={handleKeyDown}
-                                                                className="w-20 px-1 py-1.5 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
+                                                                className={`w-20 px-1 py-1.5 text-center rounded border outline-none text-xs font-bold transition-all shadow-2xs ${matVisual.borderClass} ${matVisual.bgLight} ${matVisual.suffixClass || matVisual.textClass} focus:border-teal-500`}
                                                                 placeholder="Mat"
                                                             />
                                                         </div>
@@ -3457,7 +3714,7 @@ if (deliveryNoteFiles.length > 0) {
                                                                                     const record = customPrices[specKey];
                                                                                     if (record) {
                                                                                         return (
-                                                                                            <div className="flex flex-col items-center mt-1 border border-slate-200 bg-slate-50 rounded p-1 text-[10px] w-full max-w-[90px] mx-auto shadow-sm">
+                                                                                            <div className="flex flex-col items-center mt-1 border border-slate-200 bg-slate-50 rounded p-1 text-[10px] w-full max-w-22.5 mx-auto shadow-sm">
                                                                                                 <span className="text-slate-700 font-bold mb-0.5 whitespace-nowrap">📋 과거 실적확인</span>
                                                                                                 <span className="text-slate-600 truncate w-full flex justify-between" title={`판매: ${formatCurrency(record.salesPrice)}`}>
                                                                                                     <span className="text-[9px]">판매:</span>
@@ -3488,7 +3745,7 @@ if (deliveryNoteFiles.length > 0) {
                                                                         ) : (isSupplierMode && item.poSent) ? (
                                                                             <div className="flex flex-col items-center justify-center gap-0.5">
                                                                                 <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded font-bold border border-indigo-100 whitespace-nowrap"> 발주완료 </span>
-                                                                                <span className="text-[9px] text-slate-500 max-w-[50px] overflow-hidden text-ellipsis whitespace-nowrap" title={item.vendorName}> {item.vendorName} </span>
+                                                                                <span className="text-[9px] text-slate-500 max-w-12.5 overflow-hidden text-ellipsis whitespace-nowrap" title={item.vendorName}> {item.vendorName} </span>
                                                                             </div>
                                                                         ) : isStockInsufficient ? (
                                                                             <div className="flex items-center justify-center gap-1 text-red-600 font-bold text-xs bg-red-100 px-2 py-1 rounded">
@@ -4170,7 +4427,29 @@ if (deliveryNoteFiles.length > 0) {
                         </div>
                     </div>
                 </div>
-            )}
+            {/* L2: 발주 유사도/Shortage 서랍 패널 */}
+            <QuoteSimilarityDrawer
+                isOpen={isOrderSimilarityDrawerOpen}
+                onClose={() => setIsOrderSimilarityDrawerOpen(false)}
+                candidates={orderSimilaritySummary.candidates}
+                selectedCandidate={activeOrderSimilarityCandidate}
+                onSelectCandidate={setActiveOrderSimilarityCandidate}
+                onOpenComparisonModal={(cand) => setOrderComparisonCandidate(cand)}
+                onDismissMatch={(targetId) => {
+                    setDismissedOrderTargetIds(prev => new Set([...prev, targetId]));
+                    if (activeOrderSimilarityCandidate?.targetId === targetId) {
+                        setActiveOrderSimilarityCandidate(null);
+                    }
+                }}
+            />
+
+            {/* L3: 사이드 바이 사이드 Visual Diff 모달 */}
+            <QuoteComparisonModal
+                isOpen={!!orderComparisonCandidate}
+                onClose={() => setOrderComparisonCandidate(null)}
+                candidate={orderComparisonCandidate}
+                onApplyPrices={handleApplySupplierRatesFromComparison}
+            />
 
         </div>,
         document.body

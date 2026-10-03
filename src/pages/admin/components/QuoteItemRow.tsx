@@ -60,6 +60,7 @@ interface QuoteItemRowProps {
     onItemSelect?: (index: number, isSelected: boolean) => void;
     customPriceRecord?: CustomPriceRecord;
     onApplyCustomPrice?: (record: CustomPriceRecord) => void;
+    similarityMatchStatus?: 'L1' | 'L2' | 'NONE';
 }
 
 export const QuoteItemRow = React.memo(({
@@ -73,7 +74,8 @@ export const QuoteItemRow = React.memo(({
     isSelected = true,
     onItemSelect,
     customPriceRecord,
-    onApplyCustomPrice
+    onApplyCustomPrice,
+    similarityMatchStatus
 }: QuoteItemRowProps) => {
 
     // Memoize product lookup to prevent unnecessary recalcs if inventory/item identity changes but data is same
@@ -183,9 +185,17 @@ export const QuoteItemRow = React.memo(({
         }
     };
 
+    const matchBorderClass = similarityMatchStatus === 'L1'
+        ? 'border-l-4 border-l-emerald-500 bg-emerald-50/15'
+        : similarityMatchStatus === 'L2'
+            ? 'border-l-4 border-l-amber-500 bg-amber-50/15'
+            : similarityMatchStatus === 'NONE'
+                ? 'border-l-4 border-l-slate-300 opacity-70'
+                : '';
+
     return (
-        <tr className={`${item.convertedToOrder ? 'bg-blue-50/20' : (isSelected ? '' : 'opacity-40 grayscale')} ${isUnlinked ? 'bg-red-50/30' : 'bg-white hover:bg-slate-50'} transition-all`}>
-            <td className="px-2 py-3 text-center align-middle">
+        <tr className={`${matchBorderClass} ${item.convertedToOrder ? 'bg-blue-50/20' : (isSelected ? '' : 'opacity-40 grayscale')} ${isUnlinked ? 'bg-red-50/30' : 'bg-white hover:bg-slate-50'} divide-x divide-slate-100/60 transition-all`}>
+            <td className="px-1 py-2.5 text-center align-middle">
                 <input
                     type="checkbox"
                     checked={item.convertedToOrder ? false : isSelected}
@@ -195,11 +205,11 @@ export const QuoteItemRow = React.memo(({
                     title={item.convertedToOrder ? "이미 발주 완료된 품목입니다" : "품목 선택"}
                 />
             </td>
-            <td className="px-1 py-3 text-center align-middle text-xs font-bold text-slate-500">
+            <td className="px-1 py-2.5 text-center align-middle text-xs font-bold text-slate-500">
                 {item.item_no ?? item.no ?? (index + 1)}
             </td>
-            <td className="px-4 py-3 text-left align-middle">
-                <div className="flex items-center gap-1 whitespace-nowrap min-w-max">
+            <td className="px-2 py-2.5 text-left align-middle overflow-hidden">
+                <div className="flex items-center gap-1 whitespace-nowrap">
                     {item.convertedToOrder && (
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200 shrink-0">
                             발주 완료
@@ -212,7 +222,7 @@ export const QuoteItemRow = React.memo(({
                         placeholder="품목명"
                         onChange={(e) => onItemChange(index, 'name', e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className="w-20 px-2 py-1.5 rounded border border-slate-200 focus:border-teal-500 outline-none text-xs font-bold text-slate-800"
+                        className="w-18 px-1.5 py-1 rounded border border-slate-200 focus:border-teal-500 outline-none text-xs font-bold text-slate-800"
                     />
                     <span className="text-slate-300 select-none">-</span>
                     <input
@@ -221,7 +231,7 @@ export const QuoteItemRow = React.memo(({
                         title="Thickness"
                         onChange={(e) => onItemChange(index, 'thickness', e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className="w-20 px-1 py-1.5 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
+                        className="w-[54px] px-1 py-1 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
                         placeholder="T"
                     />
                     <span className="text-slate-300 select-none">-</span>
@@ -231,7 +241,7 @@ export const QuoteItemRow = React.memo(({
                         title="Size"
                         onChange={(e) => onItemChange(index, 'size', e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className="w-28 px-1 py-1.5 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
+                        className="w-[68px] px-1 py-1 text-center rounded border border-slate-200 focus:border-teal-500 outline-none text-xs"
                         placeholder="Size"
                     />
                     <span className="text-slate-300 select-none">-</span>
@@ -241,7 +251,7 @@ export const QuoteItemRow = React.memo(({
                         title="Material"
                         onChange={(e) => onItemChange(index, 'material', e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className={`w-32 px-1 py-1.5 text-center rounded border outline-none text-xs font-bold transition-all shadow-2xs ${matVisual.borderClass} ${matVisual.bgLight} ${matVisual.suffixClass || matVisual.textClass} focus:border-teal-500`}
+                        className={`w-[86px] px-1 py-1 text-center rounded border outline-none text-xs font-bold transition-all shadow-2xs ${matVisual.borderClass} ${matVisual.bgLight} ${matVisual.suffixClass || matVisual.textClass} focus:border-teal-500`}
                         placeholder="Mat"
                     />
                     <button
@@ -251,7 +261,7 @@ export const QuoteItemRow = React.memo(({
                             onItemChange(index, 'size', converted.size);
                             onItemChange(index, 'material', converted.material);
                         }}
-                        className="px-1.5 py-1 text-[11px] font-extrabold bg-slate-100 hover:bg-teal-100 hover:text-teal-700 text-slate-600 rounded border border-slate-200 transition-colors shrink-0 shadow-xs"
+                        className="px-1.5 py-1 text-[11px] font-extrabold bg-slate-100 hover:bg-teal-100 hover:text-teal-700 text-slate-600 rounded border border-slate-200 transition-colors shrink-0 shadow-xs cursor-pointer"
                         title="이 항목 ANSI ↔ JIS 빠르게 변환"
                     >
                         ⇄
@@ -338,41 +348,37 @@ export const QuoteItemRow = React.memo(({
                     })()
                 )}
             </td>
-            <td className="px-4 py-3 text-center align-middle">
+            <td className="px-1 py-2.5 text-center align-middle">
                 <input
                     type="number"
                     value={item.quantity}
                     title="Quantity"
                     onChange={(e) => onItemChange(index, 'quantity', Number(e.target.value))}
                     onKeyDown={handleKeyDown}
-                    className="w-16 text-center px-2 py-1.5 rounded border border-slate-200 focus:border-teal-500 outline-none font-mono text-sm"
+                    className="w-14 text-center px-1 py-1 rounded border border-slate-200 focus:border-teal-500 outline-none font-mono text-xs"
                 />
             </td>
 
-            {/* Base Price (from Inventory) */}
-            <td className="px-4 py-3 text-right align-middle font-mono text-sm text-slate-500">
-                {basePrice > 0 ? formatCurrency(basePrice) : '-'}
-            </td>
 
             {/* Supplier Rate Input */}
-            <td className="px-2 py-3 text-center align-middle">
+            <td className="px-1 py-2.5 text-center align-middle">
                 <input
                     type="number"
                     value={item.supplierRate === undefined || item.supplierRate === null ? '' : item.supplierRate}
                     placeholder="0"
-                    className="w-16 text-center px-1 py-1 rounded border border-indigo-100 focus:border-indigo-500 outline-none font-mono text-xs text-indigo-700 bg-indigo-50/10"
+                    className="w-14 text-center px-1 py-1 rounded border border-indigo-100 focus:border-indigo-500 outline-none font-mono text-xs text-indigo-700 bg-indigo-50/10"
                     onChange={(e) => onSupplierRateChange(index, e.target.value === '' ? 0 : Number(e.target.value))}
                     onKeyDown={handleKeyDown}
                 />
             </td>
 
             {/* Cost Price (Calculated) */}
-            <td className="px-2 py-3 text-right align-middle font-mono text-sm text-indigo-800">
+            <td className="px-2 py-2.5 text-right align-middle font-mono text-xs font-bold text-indigo-800">
                 {formatCurrency(costPrice)}
             </td>
 
             {/* Rate (Discount Rate) */}
-            <td className="px-4 py-3 text-center align-middle">
+            <td className="px-1 py-2.5 text-center align-middle">
                 <div className="flex flex-col items-center gap-1">
                     <div className="relative w-full flex justify-center">
                         <input
@@ -380,20 +386,20 @@ export const QuoteItemRow = React.memo(({
                             value={item.discountRate === undefined || item.discountRate === null ? '' : item.discountRate}
                             placeholder={String(product?.rate_pct || 0)}
                             title="Rate (Discount Percentage)"
-                            className="w-16 text-center px-1 py-1.5 rounded border border-slate-200 text-sm outline-none focus:border-teal-500 font-bold text-red-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="w-14 text-center px-1 py-1 rounded border border-slate-200 text-xs outline-none focus:border-teal-500 font-bold text-red-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             onChange={(e) => onDiscountRateChange(index, e.target.value === '' ? 0 : Number(e.target.value))}
                             onKeyDown={handleKeyDown}
                         />
                     </div>
-
                 </div>
             </td>
+
             {/* User Price (Reference) */}
-            <td className="px-2 py-3 text-right align-middle font-mono text-sm text-slate-400">
+            <td className="px-2 py-2.5 text-right align-middle font-mono text-xs text-slate-400">
                 {formatCurrency(item.userUnitPrice || 0)}
             </td>
 
-            <td className="px-4 py-3 text-right align-middle">
+            <td className="px-2 py-2.5 text-right align-middle">
                 <input
                     type="text"
                     value={item.unitPrice.toLocaleString()}
@@ -403,18 +409,18 @@ export const QuoteItemRow = React.memo(({
                         onPriceChange(index, val);
                     }}
                     onKeyDown={handleKeyDown}
-                    className={`w-24 text-right px-2 py-1.5 rounded border outline-none font-mono text-sm font-bold ${isPriceModified
+                    className={`w-20 text-right px-1.5 py-1 rounded border outline-none font-mono text-xs font-bold ${isPriceModified
                         ? 'border-teal-500 bg-teal-50 text-teal-700'
                         : 'border-slate-200 focus:border-teal-500'
                         } `}
                 />
             </td>
-            <td className="px-4 py-3 text-right align-middle font-mono font-bold text-slate-700 text-sm">
+            <td className="px-2 py-2.5 text-right align-middle font-mono font-bold text-slate-700 text-xs">
                 {formatCurrency(item.amount)}
             </td>
 
             {/* Profit (Calculated) */}
-            <td className={`px-2 py-3 text-right align-middle font-mono text-sm font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-500'} `}>
+            <td className={`px-2 py-2.5 text-right align-middle font-mono text-xs font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-500'} `}>
                 {formatCurrency(profit)}
             </td>
         </tr>

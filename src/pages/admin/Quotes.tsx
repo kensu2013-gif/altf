@@ -393,6 +393,23 @@ export default function AdminQuotes() {
                                                     {displayContact && <span className="text-base text-slate-500 font-medium ml-1">({displayContact})</span>}
                                                 </span>
                                                 <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{quote.id}</span>
+                                                {quote.source && (
+                                                    <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                                        {quote.source}
+                                                    </span>
+                                                )}
+                                                {quote.similarity && quote.similarity.topType !== 'NONE' && (
+                                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border shadow-2xs ml-0.5 ${
+                                                        quote.similarity.topType === 'SAME_PROJECT' ? 'bg-amber-50 text-amber-800 border-amber-300' :
+                                                        quote.similarity.topType === 'SHORTAGE' ? 'bg-blue-50 text-blue-800 border-blue-300' :
+                                                        quote.similarity.topType === 'DUPLICATE' ? 'bg-purple-50 text-purple-800 border-purple-300' :
+                                                        'bg-slate-100 text-slate-700 border-slate-300'
+                                                    }`} title={`유사도 ${quote.similarity.topScore}점 (${quote.similarity.relatedDocNo || ''})`}>
+                                                        {quote.similarity.topType === 'SAME_PROJECT' ? '⚠️ 동일프로젝트' :
+                                                         quote.similarity.topType === 'SHORTAGE' ? '🔗 Shortage' :
+                                                         quote.similarity.topType === 'DUPLICATE' ? '중복접수' : '반복발주'}
+                                                    </span>
+                                                )}
                                                 {isModified && <span className="text-[10px] font-normal text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded ml-1 border border-teal-100">수정됨</span>}
                                                 {checkQuoteStockInsufficiency(quote) && (
                                                     <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full ml-1 animate-pulse flex items-center gap-1 shadow-sm">

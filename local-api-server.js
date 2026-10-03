@@ -12,6 +12,7 @@ import { loadDbFromS3, saveDbToS3, uploadFileToS3, getInventoryFromS3, getPresig
 import { aggregateAllTrends, getPeriodRange } from './report-aggregation.js';
 import { generateAiReport } from './ai-report-generator.js';
 import { buildCustomerMatchIndex, matchCustomerToCrmFast } from './customer-matching.js';
+import { computeDocumentSimilaritySummary } from './similarity-engine.js';
 
 import multer from 'multer';
 
@@ -2715,7 +2716,15 @@ const server = http.createServer(async (req, res) => {
                         status: data.status || 'SUBMITTED',
                         createdAt: new Date().toISOString(),
                         memo: data.memo, // Save Inquiry Memo
-                        attachments: data.attachments || []
+                        attachments: data.attachments || [],
+                        source: data.source || 'WEB',
+                        similarity: computeDocumentSimilaritySummary({
+                            id: newId,
+                            customerName: data.customerName || '',
+                            customerInfo: data.customerInfo,
+                            items: data.items,
+                            createdAt: new Date().toISOString()
+                        }, db.quotations)
                     };
                     db.quotations.unshift(quote); // Add to beginning
                     return quote;
@@ -2808,7 +2817,11 @@ const server = http.createServer(async (req, res) => {
                 }
 
                 const updatedQuote = await updateDb(() => {
-                    db.quotations[targetQuoteIndex] = { ...db.quotations[targetQuoteIndex], ...updates };
+                    const finalQuote = { ...db.quotations[targetQuoteIndex], ...updates };
+                    if (updates.items && Array.isArray(updates.items)) {
+                        finalQuote.similarity = computeDocumentSimilaritySummary(finalQuote, db.quotations);
+                    }
+                    db.quotations[targetQuoteIndex] = finalQuote;
                     return db.quotations[targetQuoteIndex];
                 });
 
