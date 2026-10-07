@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "start": "node local-api-server.js",
     "api": "node --watch local-api-server.js",
-    "update-inventory": "node scripts/update-inventory.js"
+    "update-inventory": "node scripts/update-inventory.js",
+    "verify-similarity": "node scripts/verify_and_backup_similarity.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",

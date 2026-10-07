@@ -197,6 +197,12 @@ export default function AdminQuotes() {
                 if (!docB) return;
                 if (docB.id === docA.parentQuoteId || docB.parentQuoteId === docA.id) return;
 
+                // 1년 초과 건은 무거운 LCS 연산 전에 즉시 건너뛰기 (브라우저 연산 부하 90% 절감)
+                const dtA = new Date(docA.createdAt).getTime();
+                const dtB = new Date(docB.createdAt).getTime();
+                const diffDays = Math.abs(dtA - dtB) / (1000 * 60 * 60 * 24);
+                if (diffDays > 365) return;
+
                 const res = compareTwoNormalizedDocuments(docA, docB, idfMap);
                 if (res && res.totalScore >= 50) {
                     matches.push(res);
@@ -533,7 +539,12 @@ export default function AdminQuotes() {
                                 return false;
                             };
 
-                            const simInfo = similarityMap.get(quote.id);
+                            const simInfo = similarityMap.get(quote.id) || (quote.similarity && (quote.similarity.topScore ?? 0) >= 50 ? {
+                                topType: quote.similarity.topType,
+                                topScore: quote.similarity.topScore,
+                                topMatch: quote.similarity as unknown as SimilarityMatchCandidate,
+                                candidates: [quote.similarity as unknown as SimilarityMatchCandidate]
+                            } : null);
 
                             return (
                                 <div key={quote.id} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col xl:flex-row xl:items-center justify-between gap-4 group hover:shadow-md transition-all">
