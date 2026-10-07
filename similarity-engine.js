@@ -4,20 +4,23 @@
  */
 
 export const THRESHOLDS = {
-    DUPLICATE_MIN_SCORE: 85,
+    DUPLICATE_MIN_SCORE: 80,
     DUPLICATE_MAX_DAYS: 30,
 
-    SAME_PROJECT_MIN_SCORE: 75,
-    SAME_PROJECT_MIN_SEQ: 60,
-    SAME_PROJECT_MIN_RARE_ITEMS: 3,
-    SAME_PROJECT_MAX_DAYS: 90,
+    SAME_PROJECT_MIN_SCORE: 50,
+    SAME_PROJECT_MIN_SEQ: 50,
+    SAME_PROJECT_MIN_RARE_ITEMS: 2,
+    SAME_PROJECT_MAX_DAYS: 180,
 
-    SHORTAGE_MIN_OVERLAP: 0.8,
+    SHORTAGE_MIN_OVERLAP: 0.7,
     SHORTAGE_MAX_QTY_RATIO: 0.40,
-    SHORTAGE_MAX_DAYS: 120,
+    SHORTAGE_MAX_DAYS: 180,
 
-    REPEAT_MIN_SCORE: 80,
-    REPEAT_MIN_DAYS: 30
+    REPEAT_MIN_SCORE: 50,
+    REPEAT_MIN_DAYS: 30,
+    SAME_CUSTOMER_MAX_DAYS: 365,
+
+    GENERAL_MIN_SCORE: 50
 };
 
 export const ITEM_NAME_ALIASES = {
@@ -242,8 +245,10 @@ export function computeDocumentSimilaritySummary(targetDoc, allDocs, idfMap) {
         let totalScore = 0;
         if (validItemsA.length < 3 || validItemsB.length < 3) {
             totalScore = Math.round((0.70 * specScore + 0.30 * qtyScore) * 10) / 10;
+        } else if (validItemsA.length >= 20 || validItemsB.length >= 20) {
+            totalScore = Math.round((0.75 * specScore + 0.15 * qtyScore + 0.10 * seqScore) * 10) / 10;
         } else {
-            totalScore = Math.round((0.55 * specScore + 0.25 * qtyScore + 0.20 * seqScore) * 10) / 10;
+            totalScore = Math.round((0.60 * specScore + 0.25 * qtyScore + 0.15 * seqScore) * 10) / 10;
         }
 
         const custA = stripCorp(targetDoc.customerName || targetDoc.customerInfo?.companyName);
@@ -256,16 +261,27 @@ export function computeDocumentSimilaritySummary(targetDoc, allDocs, idfMap) {
         const dtB = new Date(otherDoc.createdAt || '2026-01-01').getTime();
         const diffDays = Math.abs(dtA - dtB) / (1000 * 60 * 60 * 24);
 
+        // 동일 고객인 경우 최대 1년(365일) 이내 건만 대조
+        const maxDays = THRESHOLDS.SAME_CUSTOMER_MAX_DAYS || 365;
+        if (isSameCust && diffDays > maxDays) {
+            continue;
+        }
+
         let type = 'NONE';
         if (isSameCust && totalScore >= THRESHOLDS.DUPLICATE_MIN_SCORE && diffDays <= THRESHOLDS.DUPLICATE_MAX_DAYS) {
             type = 'DUPLICATE';
-        } else if (!isSameCust && totalScore >= THRESHOLDS.SAME_PROJECT_MIN_SCORE && (seqScore >= THRESHOLDS.SAME_PROJECT_MIN_SEQ || rareCount >= THRESHOLDS.SAME_PROJECT_MIN_RARE_ITEMS) && diffDays <= THRESHOLDS.SAME_PROJECT_MAX_DAYS) {
-            type = 'SAME_PROJECT';
-        } else if (isSameCust && totalScore >= THRESHOLDS.REPEAT_MIN_SCORE && diffDays > THRESHOLDS.REPEAT_MIN_DAYS) {
+        } else if (isSameCust && totalScore >= (THRESHOLDS.REPEAT_MIN_SCORE || 50) && diffDays <= maxDays) {
             type = 'REPEAT';
+        } else if (!isSameCust && totalScore >= THRESHOLDS.SAME_PROJECT_MIN_SCORE && diffDays <= THRESHOLDS.SAME_PROJECT_MAX_DAYS) {
+            type = 'SAME_PROJECT';
         }
 
-        if (type !== 'NONE' && (!bestMatch || totalScore > bestMatch.topScore)) {
+        const minAlert = THRESHOLDS.GENERAL_MIN_SCORE || 50;
+        if (type === 'NONE' && totalScore >= minAlert) {
+            type = isSameCust ? 'REPEAT' : 'SAME_PROJECT';
+        }
+
+        if (totalScore >= minAlert && (!bestMatch || totalScore > bestMatch.topScore)) {
             bestMatch = {
                 topType: type,
                 topScore: totalScore,

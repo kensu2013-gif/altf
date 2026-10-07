@@ -198,7 +198,7 @@ export default function AdminQuotes() {
                 if (docB.id === docA.parentQuoteId || docB.parentQuoteId === docA.id) return;
 
                 const res = compareTwoNormalizedDocuments(docA, docB, idfMap);
-                if (res && res.totalScore >= 60) {
+                if (res && res.totalScore >= 50) {
                     matches.push(res);
                 }
             });
@@ -562,7 +562,7 @@ export default function AdminQuotes() {
                                                             ⚠️ 재고 부족
                                                         </span>
                                                     )}
-                                                    {simInfo && simInfo.topType !== 'NONE' && (
+                                                    {simInfo && (simInfo.topType !== 'NONE' || simInfo.topScore >= 50) && (
                                                         <button
                                                             type="button"
                                                             onClick={(e) => {
@@ -574,7 +574,7 @@ export default function AdminQuotes() {
                                                                 simInfo.topType === 'SAME_PROJECT' ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100' :
                                                                 simInfo.topType === 'SHORTAGE' ? 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100' :
                                                                 simInfo.topType === 'DUPLICATE' ? 'bg-purple-50 text-purple-800 border-purple-300 hover:bg-purple-100' :
-                                                                'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                                                                'bg-teal-50 text-teal-800 border-teal-300 hover:bg-teal-100'
                                                             }`}
                                                             title={`클릭하여 유사 내역 서랍 열기 (유사도 ${simInfo.topScore}점 / 대상: ${simInfo.topMatch.targetDocNo})`}
                                                         >
@@ -583,7 +583,7 @@ export default function AdminQuotes() {
                                                                 {simInfo.topType === 'SAME_PROJECT' ? `⚠️ 동일 프로젝트 (${simInfo.topScore}점)` :
                                                                  simInfo.topType === 'SHORTAGE' ? `🔗 Shortage (${simInfo.topScore}점)` :
                                                                  simInfo.topType === 'DUPLICATE' ? `중복 접수 (${simInfo.topScore}점)` :
-                                                                 `반복 발주 (${simInfo.topScore}점)`}
+                                                                 `반복/유사 (${simInfo.topScore}점)`}
                                                             </span>
                                                         </button>
                                                     )}

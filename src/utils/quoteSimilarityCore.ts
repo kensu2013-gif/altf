@@ -354,14 +354,17 @@ export function compareTwoNormalizedDocuments(
     }
     seqScore = Math.round(seqScore * 10) / 10;
 
-    // 5. 종합 점수 가중치 공식
+    // 5. 종합 점수 가중치 공식 (대형 견적은 품목 스펙 일치 비중을 강화하여 수량/순서 왜곡 방지)
     let totalScore = 0;
     if (validItemsA.length < 3 || validItemsB.length < 3) {
         // 3품목 미만: 순서 점수 미사용 (스펙 70% + 수량 30%)
         totalScore = Math.round((0.70 * specScore + 0.30 * qtyScore) * 10) / 10;
+    } else if (validItemsA.length >= 20 || validItemsB.length >= 20) {
+        // 대형 견적 (20품목 이상): 품목 스펙 일치도가 핵심 (스펙 75% + 수량 15% + 순서 10%)
+        totalScore = Math.round((0.75 * specScore + 0.15 * qtyScore + 0.10 * seqScore) * 10) / 10;
     } else {
-        // 표준: 스펙 55% + 수량 25% + 순서 20%
-        totalScore = Math.round((0.55 * specScore + 0.25 * qtyScore + 0.20 * seqScore) * 10) / 10;
+        // 표준: 스펙 60% + 수량 25% + 순서 15%
+        totalScore = Math.round((0.60 * specScore + 0.25 * qtyScore + 0.15 * seqScore) * 10) / 10;
     }
 
     // 6. 고객 및 경과일 분석
@@ -376,41 +379,58 @@ export function compareTwoNormalizedDocuments(
     const dateB = new Date(docB.createdAt).getTime();
     const diffDays = Math.abs(dateA - dateB) / (1000 * 60 * 60 * 24);
 
+    // 동일 고객인 경우 최대 1년(365일) 이내 건만 대조
+    const maxDays = thresholds.SAME_CUSTOMER_MAX_DAYS ?? 365;
+    if (isSameCustomer && diffDays > maxDays) {
+        return null;
+    }
+
     const overlapRatio = validItemsA.length > 0 ? (matchedL1Count + matchedL2Count) / validItemsA.length : 0;
 
-    // 7. 유형 판정 (C항 준수)
+    // 7. 유형 판정 (50점 이상 유의 알림)
     let similarityType: SimilarityType = 'NONE';
     const rationale: string[] = [];
 
-    // [DUPLICATE] 같은 고객, S >= 85, 30일 이내
+    // [DUPLICATE] 같은 고객, S >= 80, 30일 이내
     if (isSameCustomer && totalScore >= thresholds.DUPLICATE_MIN_SCORE && diffDays <= thresholds.DUPLICATE_MAX_DAYS) {
         similarityType = 'DUPLICATE';
         rationale.push(`동일고객 최근 ${Math.round(diffDays)}일 전 중복 견적 (${totalScore}점)`);
     }
-    // [SHORTAGE] 같은 고객, 포함도 >= 0.8, 수량 비율 <= 40%, 120일 이내 (발주건 대조 시 최우선)
+    // [SHORTAGE] 같은 고객, 포함도 >= 0.7, 수량 비율 <= 40%, 180일 이내 (발주건 대조 시 최우선)
     else if (isSameCustomer && overlapRatio >= thresholds.SHORTAGE_MIN_OVERLAP && (qtyScore <= thresholds.SHORTAGE_MAX_QTY_RATIO * 100 || docA.items.reduce((s,i)=>s+i.quantity,0) < docB.items.reduce((s,i)=>s+i.quantity,0) * 0.4) && diffDays <= thresholds.SHORTAGE_MAX_DAYS) {
         similarityType = 'SHORTAGE';
         rationale.push(`동일고객 지난 발주 품목 ${Math.round(overlapRatio * 100)}% 포함 (쇼티지 소량 추가 의심)`);
     }
-    // [SAME_PROJECT] 다른 고객, S >= 75, (순서 >= 60 또는 희귀품목 3개 이상 일치), 90일 이내
-    else if (!isSameCustomer && totalScore >= thresholds.SAME_PROJECT_MIN_SCORE && (seqScore >= thresholds.SAME_PROJECT_MIN_SEQ || rareItemsMatchedCount >= thresholds.SAME_PROJECT_MIN_RARE_ITEMS) && diffDays <= thresholds.SAME_PROJECT_MAX_DAYS) {
+    // [REPEAT] 같은 고객, S >= 50, 1년(365일) 이내 반복/유사 견적
+    else if (isSameCustomer && totalScore >= (thresholds.REPEAT_MIN_SCORE ?? 50) && diffDays <= maxDays) {
+        similarityType = 'REPEAT';
+        if (diffDays <= thresholds.DUPLICATE_MAX_DAYS) {
+            rationale.push(`동일고객 최근 ${Math.round(diffDays)}일 전 유사 견적 (${totalScore}점)`);
+        } else {
+            rationale.push(`동일고객 이전 ${Math.round(diffDays)}일 전 반복/유사 발주 패턴 (${totalScore}점)`);
+        }
+    }
+    // [SAME_PROJECT] 다른 고객, S >= 50, 180일 이내 유사 프로젝트 의심
+    else if (!isSameCustomer && totalScore >= thresholds.SAME_PROJECT_MIN_SCORE && diffDays <= thresholds.SAME_PROJECT_MAX_DAYS) {
         similarityType = 'SAME_PROJECT';
         rationale.push(`타 거래처(${docB.customerName})와 유사 프로젝트 의심 (${totalScore}점)`);
-        if (rareItemsMatchedCount >= 3) rationale.push(`희귀 품목 ${rareItemsMatchedCount}종 일치`);
-        if (seqScore >= 60) rationale.push(`BOM 순서 일치도 ${seqScore}%`);
-    }
-    // [REPEAT] 같은 고객, S >= 80, 30일 초과
-    else if (isSameCustomer && totalScore >= thresholds.REPEAT_MIN_SCORE && diffDays > thresholds.REPEAT_MIN_DAYS) {
-        similarityType = 'REPEAT';
-        rationale.push(`동일고객 이전 ${Math.round(diffDays)}일 전 반복 발주 패턴 (${totalScore}점)`);
+        if (rareItemsMatchedCount >= 2) rationale.push(`희귀 품목 ${rareItemsMatchedCount}종 일치`);
+        if (seqScore >= 50) rationale.push(`BOM 순서 일치도 ${seqScore}%`);
     }
 
     if (isScaleVariant && scaleRatio) {
         rationale.push(`전 품목 ${scaleRatio}배 규모 변형`);
     }
 
-    // 임계값 미달 및 무의미한 매칭 제외
-    if (similarityType === 'NONE' && totalScore < 60) {
+    // 50점 이상이면 무조건 알림이 가도록 유형 보정
+    const minAlertScore = thresholds.GENERAL_MIN_SCORE ?? 50;
+    if (similarityType === 'NONE' && totalScore >= minAlertScore) {
+        similarityType = isSameCustomer ? 'REPEAT' : 'SAME_PROJECT';
+        rationale.push(`유사도 감지 (${totalScore}점)`);
+    }
+
+    // 50점 미만은 매칭 제외
+    if (totalScore < minAlertScore) {
         return null;
     }
 

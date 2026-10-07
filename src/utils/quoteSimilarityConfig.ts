@@ -3,39 +3,45 @@
  */
 
 export interface SimilarityThresholds {
-    DUPLICATE_MIN_SCORE: number; // 동일 고객 중복 판정 최소 점수 (기본 85)
+    DUPLICATE_MIN_SCORE: number; // 동일 고객 중복 판정 최소 점수 (기본 80)
     DUPLICATE_MAX_DAYS: number;  // 동일 고객 중복 판정 유효 일수 (기본 30일)
 
-    SAME_PROJECT_MIN_SCORE: number; // 타 고객 동일 현장 판정 최소 점수 (기본 75)
-    SAME_PROJECT_MIN_SEQ: number;   // 타 고객 동일 현장 순서 일치도 기준 (기본 60)
-    SAME_PROJECT_MIN_RARE_ITEMS: number; // 희귀 품목 일치 최소 개수 (기본 3개)
-    SAME_PROJECT_MAX_DAYS: number;  // 동일 현장 판정 유효 일수 (기본 90일)
+    SAME_PROJECT_MIN_SCORE: number; // 타 고객 동일 현장 판정 최소 점수 (기본 50)
+    SAME_PROJECT_MIN_SEQ: number;   // 타 고객 동일 현장 순서 일치도 기준 (기본 50)
+    SAME_PROJECT_MIN_RARE_ITEMS: number; // 희귀 품목 일치 최소 개수 (기본 2개)
+    SAME_PROJECT_MAX_DAYS: number;  // 동일 현장 판정 유효 일수 (기본 180일)
 
-    SHORTAGE_MIN_OVERLAP: number;   // 쇼티지 포함도 |새∩기존| / |새| 기준 (기본 0.8)
+    SHORTAGE_MIN_OVERLAP: number;   // 쇼티지 포함도 |새∩기존| / |새| 기준 (기본 0.7)
     SHORTAGE_MAX_QTY_RATIO: number; // 쇼티지 수량 비율 기준 (기본 0.40)
-    SHORTAGE_MAX_DAYS: number;      // 쇼티지 유효 출하/발주 일수 (기본 120일)
+    SHORTAGE_MAX_DAYS: number;      // 쇼티지 유효 출하/발주 일수 (기본 180일)
 
-    REPEAT_MIN_SCORE: number;       // 동일 고객 반복 발주 최소 점수 (기본 80)
-    REPEAT_MIN_DAYS: number;        // 반복 발주 판정 최소 경과 일수 (기본 30일 초과)
+    REPEAT_MIN_SCORE: number;       // 동일 고객 반복/유사 발주 최소 점수 (50점 이상부터 유의 알림)
+    REPEAT_MIN_DAYS: number;        // 반복 발주 판정 최소 경과 일수 (기본 30일)
+    SAME_CUSTOMER_MAX_DAYS: number; // 동일 고객 비교 유효 기간 (1년: 365일)
+
+    GENERAL_MIN_SCORE: number;      // 유사도 감지 및 알림 최소 점수 (50점)
 
     PRICE_STALE_DAYS: number;       // 단가 시세 변동 경고 일수 (기본 60일)
 }
 
 export const DEFAULT_SIMILARITY_THRESHOLDS: SimilarityThresholds = {
-    DUPLICATE_MIN_SCORE: 85,
+    DUPLICATE_MIN_SCORE: 80,
     DUPLICATE_MAX_DAYS: 30,
 
-    SAME_PROJECT_MIN_SCORE: 75,
-    SAME_PROJECT_MIN_SEQ: 60,
-    SAME_PROJECT_MIN_RARE_ITEMS: 3,
-    SAME_PROJECT_MAX_DAYS: 90,
+    SAME_PROJECT_MIN_SCORE: 50,
+    SAME_PROJECT_MIN_SEQ: 50,
+    SAME_PROJECT_MIN_RARE_ITEMS: 2,
+    SAME_PROJECT_MAX_DAYS: 180,
 
-    SHORTAGE_MIN_OVERLAP: 0.8,
+    SHORTAGE_MIN_OVERLAP: 0.7,
     SHORTAGE_MAX_QTY_RATIO: 0.40,
-    SHORTAGE_MAX_DAYS: 120,
+    SHORTAGE_MAX_DAYS: 180,
 
-    REPEAT_MIN_SCORE: 80,
+    REPEAT_MIN_SCORE: 50,
     REPEAT_MIN_DAYS: 30,
+    SAME_CUSTOMER_MAX_DAYS: 365, // 동일고객 1년(365일) 이내
+
+    GENERAL_MIN_SCORE: 50, // 50점 이상부터 알림
 
     PRICE_STALE_DAYS: 60
 };
