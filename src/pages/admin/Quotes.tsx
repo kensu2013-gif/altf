@@ -536,59 +536,65 @@ export default function AdminQuotes() {
                             const simInfo = similarityMap.get(quote.id);
 
                             return (
-                                <div key={quote.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:shadow-md transition-all">
-                                    <div className="flex items-start gap-4">
-                                        <div className="p-3 bg-teal-50 text-teal-600 rounded-lg group-hover:bg-teal-100 transition-colors">
+                                <div key={quote.id} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col xl:flex-row xl:items-center justify-between gap-4 group hover:shadow-md transition-all">
+                                    {/* 좌측: 기본 정보 및 상태 태그 그룹 (수정됨, 재고부족, 유사도) */}
+                                    <div className="flex items-start gap-4 min-w-0 flex-1">
+                                        <div className="p-3 bg-teal-50 text-teal-600 rounded-lg group-hover:bg-teal-100 transition-colors shrink-0">
                                             <FileText className="w-6 h-6" />
                                         </div>
-                                        <div>
+                                        <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                <span className="font-bold text-slate-800 text-lg">
+                                                <span className="font-bold text-slate-800 text-lg whitespace-nowrap">
                                                     {displayCompany}
                                                     {displayContact && <span className="text-base text-slate-500 font-medium ml-1">({displayContact})</span>}
                                                 </span>
-                                                <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{quote.id}</span>
-                                                {quote.source && (
-                                                    <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                                                        {quote.source}
-                                                    </span>
-                                                )}
-                                                {isModified && <span className="text-[10px] font-normal text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded ml-1 border border-teal-100">수정됨</span>}
-                                                {checkQuoteStockInsufficiency(quote) && (
-                                                    <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full ml-1 animate-pulse flex items-center gap-1 shadow-sm">
-                                                        ⚠️ 재고 부족
-                                                    </span>
-                                                )}
-                                                {simInfo && simInfo.topType !== 'NONE' && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setDrawerQuoteId(quote.id);
-                                                            setActiveDrawerCandidate(simInfo.topMatch);
-                                                        }}
-                                                        className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-2xs ml-1 inline-flex items-center gap-1 cursor-pointer transition-all hover:scale-105 active:scale-95 shrink-0 whitespace-nowrap ${
-                                                            simInfo.topType === 'SAME_PROJECT' ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100' :
-                                                            simInfo.topType === 'SHORTAGE' ? 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100' :
-                                                            simInfo.topType === 'DUPLICATE' ? 'bg-purple-50 text-purple-800 border-purple-300 hover:bg-purple-100' :
-                                                            'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
-                                                        }`}
-                                                        title={`클릭하여 유사 내역 서랍 열기 (유사도 ${simInfo.topScore}점 / 대상: ${simInfo.topMatch.targetDocNo})`}
-                                                    >
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse shrink-0" />
-                                                        <span>
-                                                            {simInfo.topType === 'SAME_PROJECT' ? `⚠️ 동일 프로젝트 (${simInfo.topScore}점)` :
-                                                             simInfo.topType === 'SHORTAGE' ? `🔗 Shortage (${simInfo.topScore}점)` :
-                                                             simInfo.topType === 'DUPLICATE' ? `중복 접수 (${simInfo.topScore}점)` :
-                                                             `반복 발주 (${simInfo.topScore}점)`}
+                                                <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded shrink-0">{quote.id}</span>
+
+                                                {/* 좌측 정렬 상태 태그 그룹 */}
+                                                <div className="inline-flex items-center gap-1.5 flex-wrap">
+                                                    {isModified && (
+                                                        <span className="text-[10px] font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 shrink-0 whitespace-nowrap">
+                                                            수정됨
                                                         </span>
-                                                    </button>
-                                                )}
+                                                    )}
+                                                    {checkQuoteStockInsufficiency(quote) && (
+                                                        <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1 shadow-sm shrink-0 whitespace-nowrap">
+                                                            ⚠️ 재고 부족
+                                                        </span>
+                                                    )}
+                                                    {simInfo && simInfo.topType !== 'NONE' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setDrawerQuoteId(quote.id);
+                                                                setActiveDrawerCandidate(simInfo.topMatch);
+                                                            }}
+                                                            className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-2xs inline-flex items-center gap-1 cursor-pointer transition-all hover:scale-105 active:scale-95 shrink-0 whitespace-nowrap ${
+                                                                simInfo.topType === 'SAME_PROJECT' ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100' :
+                                                                simInfo.topType === 'SHORTAGE' ? 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100' :
+                                                                simInfo.topType === 'DUPLICATE' ? 'bg-purple-50 text-purple-800 border-purple-300 hover:bg-purple-100' :
+                                                                'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                                                            }`}
+                                                            title={`클릭하여 유사 내역 서랍 열기 (유사도 ${simInfo.topScore}점 / 대상: ${simInfo.topMatch.targetDocNo})`}
+                                                        >
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse shrink-0" />
+                                                            <span>
+                                                                {simInfo.topType === 'SAME_PROJECT' ? `⚠️ 동일 프로젝트 (${simInfo.topScore}점)` :
+                                                                 simInfo.topType === 'SHORTAGE' ? `🔗 Shortage (${simInfo.topScore}점)` :
+                                                                 simInfo.topType === 'DUPLICATE' ? `중복 접수 (${simInfo.topScore}점)` :
+                                                                 `반복 발주 (${simInfo.topScore}점)`}
+                                                            </span>
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
+
                                             <div className={`text-sm font-bold ${isModified ? 'text-teal-700' : 'text-indigo-700'} mb-1 flex items-center gap-1.5`}>
                                                 <span className={`w-1.5 h-1.5 rounded-full ${isModified ? 'bg-teal-400' : 'bg-indigo-400'} inline-block`}></span>
                                                 원주문: {quote.customerNumber}
                                             </div>
+
                                             <div className="text-sm text-slate-500 flex flex-wrap items-center gap-4">
                                                 <span className="flex items-center gap-1">
                                                     <Calendar className="w-3 h-3" />
@@ -607,10 +613,12 @@ export default function AdminQuotes() {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-6 pl-14 md:pl-0 flex-wrap md:flex-nowrap">
-                                        <div className="flex items-center gap-3 flex-wrap">
+                                    {/* 우측 고정 영역: 사진보기, 접수상태, 총견적금액, 액션버튼 (우측 끝에 완벽 고정) */}
+                                    <div className="flex items-center justify-end gap-3 lg:gap-5 shrink-0 w-full xl:w-auto pt-3 xl:pt-0 border-t border-slate-100 xl:border-t-0 flex-nowrap ml-auto">
+                                        {/* 사진 보기 및 접수(StatusSelect) 영역 */}
+                                        <div className="flex items-center gap-2 shrink-0">
                                             {(quote.attachments && quote.attachments.length > 0) && (
-                                                <div className="flex gap-2">
+                                                <div className="flex gap-1.5 shrink-0">
                                                     {quote.attachments.map((file, i) => (
                                                         <a 
                                                             key={i} 
@@ -618,7 +626,7 @@ export default function AdminQuotes() {
                                                             target="_blank" 
                                                             rel="noopener noreferrer" 
                                                             onClick={(e) => e.stopPropagation()}
-                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 rounded-full text-xs font-bold transition-colors shadow-sm"
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 rounded-full text-xs font-bold transition-colors shadow-sm shrink-0 whitespace-nowrap"
                                                             title={file.name}
                                                         >
                                                             <Image className="w-3.5 h-3.5" />
@@ -627,19 +635,24 @@ export default function AdminQuotes() {
                                                     ))}
                                                 </div>
                                             )}
-                                            <StatusSelect
-                                                status={quote.status}
-                                                onChange={(val) => handleStatusUpdate(quote.id, val)}
-                                            />
+                                            <div className="shrink-0">
+                                                <StatusSelect
+                                                    status={quote.status}
+                                                    onChange={(val) => handleStatusUpdate(quote.id, val)}
+                                                />
+                                            </div>
                                         </div>
 
-                                        <div className="text-right">
-                                            <div className="text-xs text-slate-400 font-medium">총 견적금액</div>
-                                            <div className="text-xl font-bold text-teal-700 font-mono">
+                                        {/* 총 견적금액 (기준선 통일을 위한 min-width 적용) */}
+                                        <div className="text-right shrink-0 min-w-[105px] lg:min-w-[120px]">
+                                            <div className="text-xs text-slate-400 font-medium whitespace-nowrap">총 견적금액</div>
+                                            <div className="text-lg lg:text-xl font-bold text-teal-700 font-mono whitespace-nowrap">
                                                 {formatCurrency(quote.totalAmount)}
                                             </div>
                                         </div>
-                                        <div className="flex gap-2">
+
+                                        {/* 액션 버튼 그룹 */}
+                                        <div className="flex items-center gap-1 shrink-0">
                                             {canManageTrash && (
                                                 <>
                                                     {filterStatus === 'TRASH' ? (
@@ -688,7 +701,7 @@ export default function AdminQuotes() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="gap-2"
+                                                className="gap-1.5 whitespace-nowrap"
                                                 onClick={() => setSelectedQuote(quote)}
                                             >
                                                 <FileText className="w-4 h-4" /> 상세
@@ -696,7 +709,7 @@ export default function AdminQuotes() {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="text-slate-400 hover:text-teal-600"
+                                                className="text-slate-400 hover:text-teal-600 gap-1 whitespace-nowrap"
                                                 onClick={(e) => handlePdfDownload(e, quote)}
                                             >
                                                 <Download className="w-4 h-4" /> PDF
