@@ -86,7 +86,7 @@ export const QuoteComparisonModal: React.FC<QuoteComparisonModalProps> = ({
                             <span className={`px-2 py-0.5 rounded text-[11px] font-black border ${
                                 isReadOnly ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-teal-100 text-teal-800 border-teal-300'
                             }`}>
-                                {candidate.similarityType === 'SAME_PROJECT' ? '⚠️ 동일 프로젝트 (읽기 전용)' : '단가 승계 가능'}
+                                {candidate.similarityType === 'SAME_PROJECT' ? '⚠️ 타사/경쟁 유의 (읽기 전용)' : '동사/반복 유의 (단가 승계 가능)'}
                             </span>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">

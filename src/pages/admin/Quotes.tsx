@@ -591,10 +591,10 @@ export default function AdminQuotes() {
                                                         >
                                                             <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse shrink-0" />
                                                             <span>
-                                                                {simInfo.topType === 'SAME_PROJECT' ? `⚠️ 동일 프로젝트 (${simInfo.topScore}점)` :
+                                                                {simInfo.topType === 'SAME_PROJECT' ? `⚠️ 타사/경쟁 유의 (${simInfo.topScore}점)` :
                                                                  simInfo.topType === 'SHORTAGE' ? `🔗 Shortage (${simInfo.topScore}점)` :
                                                                  simInfo.topType === 'DUPLICATE' ? `중복 접수 (${simInfo.topScore}점)` :
-                                                                 `반복/유사 (${simInfo.topScore}점)`}
+                                                                 `동사/반복 유의 (${simInfo.topScore}점)`}
                                                             </span>
                                                         </button>
                                                     )}

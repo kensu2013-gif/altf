@@ -3055,10 +3055,10 @@ if (deliveryNoteFiles.length > 0) {
                                     >
                                         <span className="w-2 h-2 rounded-full bg-current animate-pulse shrink-0" />
                                         <span>
-                                            {topOrderSimilarityCandidate.similarityType === 'SAME_PROJECT' ? `⚠️ 동일 프로젝트 (${topOrderSimilarityCandidate.totalScore}점)` :
+                                            {topOrderSimilarityCandidate.similarityType === 'SAME_PROJECT' ? `⚠️ 타사/경쟁 유의 (${topOrderSimilarityCandidate.totalScore}점)` :
                                              topOrderSimilarityCandidate.similarityType === 'SHORTAGE' ? `🔗 Shortage(추가) 감지 (${topOrderSimilarityCandidate.totalScore}점)` :
                                              topOrderSimilarityCandidate.similarityType === 'DUPLICATE' ? `중복 접수 (${topOrderSimilarityCandidate.totalScore}점)` :
-                                             `반복 발주 (${topOrderSimilarityCandidate.totalScore}점)`}
+                                             `동사/반복 유의 (${topOrderSimilarityCandidate.totalScore}점)`}
                                         </span>
                                     </button>
                                 )}

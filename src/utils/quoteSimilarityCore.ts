@@ -401,19 +401,19 @@ export function compareTwoNormalizedDocuments(
         similarityType = 'SHORTAGE';
         rationale.push(`동일고객 지난 발주 품목 ${Math.round(overlapRatio * 100)}% 포함 (쇼티지 소량 추가 의심)`);
     }
-    // [REPEAT] 같은 고객, S >= 50, 1년(365일) 이내 반복/유사 견적
+    // [REPEAT] 같은 고객, S >= 50, 1년(365일) 이내 동사/반복 유의 견적
     else if (isSameCustomer && totalScore >= (thresholds.REPEAT_MIN_SCORE ?? 50) && diffDays <= maxDays) {
         similarityType = 'REPEAT';
         if (diffDays <= thresholds.DUPLICATE_MAX_DAYS) {
-            rationale.push(`동일고객 최근 ${Math.round(diffDays)}일 전 유사 견적 (${totalScore}점)`);
+            rationale.push(`동사/반복 유의 (동일고객 최근 ${Math.round(diffDays)}일 전 유사 견적, ${totalScore}점)`);
         } else {
-            rationale.push(`동일고객 이전 ${Math.round(diffDays)}일 전 반복/유사 발주 패턴 (${totalScore}점)`);
+            rationale.push(`동사/반복 유의 (동일고객 이전 ${Math.round(diffDays)}일 전 발주/견적 패턴, ${totalScore}점)`);
         }
     }
-    // [SAME_PROJECT] 다른 고객, S >= 50, 180일 이내 유사 프로젝트 의심
+    // [SAME_PROJECT] 다른 고객, S >= 50, 180일 이내 타사/경쟁 유의
     else if (!isSameCustomer && totalScore >= thresholds.SAME_PROJECT_MIN_SCORE && diffDays <= thresholds.SAME_PROJECT_MAX_DAYS) {
         similarityType = 'SAME_PROJECT';
-        rationale.push(`타 거래처(${docB.customerName})와 유사 프로젝트 의심 (${totalScore}점)`);
+        rationale.push(`타사/경쟁 유의 (타 거래처 ${docB.customerName}와 동일 현장 의심, ${totalScore}점)`);
         if (rareItemsMatchedCount >= 2) rationale.push(`희귀 품목 ${rareItemsMatchedCount}종 일치`);
         if (seqScore >= 50) rationale.push(`BOM 순서 일치도 ${seqScore}%`);
     }

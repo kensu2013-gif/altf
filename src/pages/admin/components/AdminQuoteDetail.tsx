@@ -1674,10 +1674,10 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         >
                                             <span className="w-2 h-2 rounded-full bg-current animate-pulse shrink-0" />
                                             <span>
-                                                {topSimilarityCandidate.similarityType === 'SAME_PROJECT' ? `⚠️ 동일 프로젝트 (${topSimilarityCandidate.totalScore}점)` :
+                                                {topSimilarityCandidate.similarityType === 'SAME_PROJECT' ? `⚠️ 타사/경쟁 유의 (${topSimilarityCandidate.totalScore}점)` :
                                                  topSimilarityCandidate.similarityType === 'SHORTAGE' ? `🔗 Shortage 감지 (${topSimilarityCandidate.totalScore}점)` :
                                                  topSimilarityCandidate.similarityType === 'DUPLICATE' ? `중복 의심 (${topSimilarityCandidate.totalScore}점)` :
-                                                 `반복 발주 (${topSimilarityCandidate.totalScore}점)`}
+                                                 `동사/반복 유의 (${topSimilarityCandidate.totalScore}점)`}
                                             </span>
                                         </button>
                                     )}

@@ -63,7 +63,7 @@ export const QuoteSimilarityDrawer: React.FC<QuoteSimilarityDrawerProps> = ({
             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
                 {candidates.length === 0 ? (
                     <div className="text-center py-12 text-slate-400 text-xs">
-                        감지된 유사 견적 또는 반복 발주가 없습니다.
+                        감지된 타사/경쟁 유의 또는 동사/반복 유의 내역이 없습니다.
                     </div>
                 ) : (
                     candidates.map((c, idx) => {
@@ -72,12 +72,12 @@ export const QuoteSimilarityDrawer: React.FC<QuoteSimilarityDrawerProps> = ({
                             c.similarityType === 'SAME_PROJECT' ? 'bg-amber-100 text-amber-800 border-amber-300' :
                             c.similarityType === 'SHORTAGE' ? 'bg-blue-100 text-blue-800 border-blue-300' :
                             c.similarityType === 'DUPLICATE' ? 'bg-purple-100 text-purple-800 border-purple-300' :
-                            'bg-slate-100 text-slate-700 border-slate-300';
+                            'bg-teal-100 text-teal-800 border-teal-300';
 
                         const badgeTitle = 
-                            c.similarityType === 'SAME_PROJECT' ? '⚠️ 동일 프로젝트 의심' :
+                            c.similarityType === 'SAME_PROJECT' ? '⚠️ 타사/경쟁 유의' :
                             c.similarityType === 'SHORTAGE' ? '🔗 Shortage(추가) 감지' :
-                            c.similarityType === 'DUPLICATE' ? '중복 접수 의심' : '반복 발주';
+                            c.similarityType === 'DUPLICATE' ? '중복 접수 의심' : '동사/반복 유의';
 
                         return (
                             <div
