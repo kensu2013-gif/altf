@@ -332,7 +332,9 @@ export function aggregateInventoryTrend(inventoryHistory, daekyungHistory, range
 
     return {
         confirmedDaysInRange: Math.max(dSnaps.length, sSnaps.length),
-        effectiveWindow: dWindow || sWindow || '최근 확정 스냅샷 기준',
+        effectiveWindow: isDaekyungFallback || isSihwaFallback
+            ? '스냅샷 누적 소진율 추이'
+            : `${rangeStart.slice(0, 10)} ~ ${rangeEnd.slice(0, 10)}`,
         isRecentFallback: isDaekyungFallback || isSihwaFallback,
         totalOutbound,
         totalInbound,

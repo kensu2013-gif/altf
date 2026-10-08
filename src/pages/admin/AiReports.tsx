@@ -7,7 +7,7 @@ import {
     FileText, ShoppingCart, Package, Building2, TrendingUp, TrendingDown,
     ArrowUpRight, ArrowDownRight, Minus, Sparkles, Info, MapPin, Activity, PackageSearch,
     Download, Wallet, Users2, ShieldAlert, Scale, Clock, ArrowRight,
-    DollarSign, Layers,
+    DollarSign, Layers, Trash2,
 } from 'lucide-react';
 
 // 리포트 인쇄(PDF 저장) 시 화면 전용 요소(헤더/탭/버튼/원본 JSON 등)는 숨기고, 현재 펼친 리포트
@@ -845,7 +845,7 @@ function PendingOperationsCard({ pending }: { pending?: PendingOperations }) {
 
 // ── 리포트 대시보드 본문 ──────────────────────────────────────────
 
-function ReportDashboard({ report }: { report: AiReport }) {
+function ReportDashboard({ report, onDelete }: { report: AiReport; onDelete?: (id: string) => void }) {
     const [showText, setShowText] = useState(false);
     const [showRawMetrics, setShowRawMetrics] = useState(false);
     const m = report.metrics;
@@ -897,7 +897,7 @@ function ReportDashboard({ report }: { report: AiReport }) {
                 <div className="text-[11px] text-slate-500">{fmtDate(report.rangeStart)} ~ {fmtDate(report.rangeEnd)}</div>
             </div>
 
-            <div className="print:hidden flex justify-end">
+            <div className="print:hidden flex items-center justify-end gap-2">
                 <button
                     onClick={handlePdfDownload}
                     className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-teal-700 border border-slate-200 hover:border-teal-300 px-2.5 py-1.5 rounded-lg transition-colors"
@@ -905,6 +905,15 @@ function ReportDashboard({ report }: { report: AiReport }) {
                     <Download className="w-3.5 h-3.5" />
                     PDF 다운로드
                 </button>
+                {onDelete && (
+                    <button
+                        onClick={() => onDelete(report.id)}
+                        className="flex items-center gap-1.5 text-[11px] font-bold text-rose-500 hover:text-rose-700 border border-rose-200 hover:border-rose-300 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg transition-colors"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        리포트 삭제
+                    </button>
+                )}
             </div>
 
             {/* 주기별 관리 초점 & AI 전체 요약 */}
@@ -1281,6 +1290,30 @@ export default function AdminAiReports() {
         }
     };
 
+    const handleDeleteReport = async (reportId: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        if (!confirm('이 경영 리포트를 삭제하시겠습니까?')) return;
+        try {
+            const token = useStore.getState().auth.token;
+            const headers: Record<string, string> = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch((import.meta.env.VITE_API_URL || '') + `/api/admin/ai-reports?id=${encodeURIComponent(reportId)}`, {
+                method: 'DELETE',
+                headers,
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.error || `삭제 실패 (${res.status})`);
+            }
+            setReports(prev => prev.filter(r => r.id !== reportId));
+            if (expandedId === reportId) setExpandedId(null);
+        } catch (err) {
+            console.error('Failed to delete report:', err);
+            alert(err instanceof Error ? err.message : '리포트 삭제에 실패했습니다.');
+        }
+    };
+
     // MASTER 전용 — AdminRoute는 MASTER/MANAGER/admin을 모두 통과시키므로 페이지 내부에서 별도 가드 필요
     if (user?.role !== 'MASTER') {
         return <Navigate to="/admin/orders" replace />;
@@ -1347,11 +1380,11 @@ export default function AdminAiReports() {
                             : null;
                         return (
                             <div key={report.id} className={`bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs ${isExpanded ? '' : 'print:hidden'}`}>
-                                <button
-                                    onClick={() => setExpandedId(isExpanded ? null : report.id)}
-                                    className="print:hidden w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50 transition-colors"
-                                >
-                                    <div className="min-w-0 flex-1">
+                                <div className="print:hidden w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors">
+                                    <div
+                                        onClick={() => setExpandedId(isExpanded ? null : report.id)}
+                                        className="min-w-0 flex-1 cursor-pointer"
+                                    >
                                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                                             <span className="text-sm font-black text-slate-800">{report.periodKey}</span>
                                             <span
@@ -1380,15 +1413,31 @@ export default function AdminAiReports() {
                                             {report.status === 'SUCCESS' ? (report.aiSummary || '') : (report.errorMessage || '생성 실패')}
                                         </p>
                                     </div>
-                                    {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400 shrink-0 ml-3" /> : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 ml-3" />}
-                                </button>
+                                    <div className="flex items-center gap-1.5 shrink-0 ml-3">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleDeleteReport(report.id, e)}
+                                            title="리포트 삭제"
+                                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setExpandedId(isExpanded ? null : report.id)}
+                                            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg"
+                                        >
+                                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                        </button>
+                                    </div>
+                                </div>
 
                                 {isExpanded && (
                                     <div className="px-5 pb-5 border-t border-slate-100 pt-4">
                                         {report.status === 'FAILED' ? (
                                             <div className="text-xs text-rose-600">{report.errorMessage}</div>
                                         ) : (
-                                            <ReportDashboard report={report} />
+                                            <ReportDashboard report={report} onDelete={handleDeleteReport} />
                                         )}
                                     </div>
                                 )}

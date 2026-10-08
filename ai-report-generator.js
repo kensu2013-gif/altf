@@ -1,10 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 
 const PERIOD_LABEL = {
-    weekly: '주간(최근 1주일)',
-    monthly: '월간(최근 1개월)',
-    quarterly: '분기(최근 3개월)',
-    semiannual: '반기(최근 6개월)',
+    weekly: '주간 결산 브리핑',
+    monthly: '월간 결산 브리핑',
+    quarterly: '분기 전략 브리핑',
+    semiannual: '반기 종합 브리핑',
 };
 
 const SYSTEM_PROMPT = `당신은 스테인리스 파이프·피팅 전문 유통사 "알트에프(ALTF)"의 최고경영자(CEO) 전담 AI 최고전략책임자(CSO)이자 전담 비서입니다.
@@ -183,11 +183,16 @@ function generateLocalRuleBasedReport(period, metrics) {
     const oSupplierAmt = o?.totalSupplierAmount || 0;
     const oMargin = o?.estimatedMargin || (oAmount - oSupplierAmt);
     const oMarginPct = oAmount > 0 ? ((oMargin / oAmount) * 100).toFixed(1) : 0;
-    const restockBudgetStr = cash?.budgetFormatted || '약 3,500만원';
+    const hasRestockNeed = Boolean(cash && cash.estimatedRestockBudget > 0);
+    const restockBudgetStr = hasRestockNeed ? cash.budgetFormatted : '0원';
     const tiedCapitalStr = cash?.tiedCapitalFormatted || '약 4,800만원';
 
     // 1. 요약 작성 (CEO 두괄식 3문장)
-    const summary = `[${periodLabel} CEO 전략 브리핑] 이번 기간 최우선 과제는 시화 품절 임박 품목의 안전재고 확보를 위한 ${restockBudgetStr} 규모의 구매 발주 집행입니다. ` +
+    const restockLeadSentence = hasRestockNeed
+        ? `이번 기간 최우선 과제는 시화 품절 임박 품목의 안전재고 확보를 위한 ${restockBudgetStr} 규모의 구매 발주 집행입니다.`
+        : `현재 주요 품목의 시화 재고 커버일수가 안정적인 상태(21일 이상)를 유지하고 있어 즉시 선매입 집행은 불필요하며, 정상 출고 추이를 관망하십시오.`;
+
+    const summary = `[${metrics.periodKey} ${periodLabel}] ${restockLeadSentence} ` +
         `현재 총 매출은 ${formatWon(oAmount)}(마진율 약 ${oMarginPct}%)이며, 과잉·정체 재고에 묶인 자본 약 ${tiedCapitalStr}에 대한 대체 견적 유동화가 시급합니다. ` +
         `거래처 동향상 ${cust?.churnRiskCustomers?.[0]?.name ? `${cust.churnRiskCustomers[0].name} 등 일부 거래처의 이탈 징후` : '복수 거래처의 비교 견적 증가'}와 ${pending?.totalPendingCount || 0}건의 미결 주문 납기 방어에 영업/물류 역량을 집중해야 합니다.`;
 
@@ -204,7 +209,7 @@ function generateLocalRuleBasedReport(period, metrics) {
     // 3. 의사결정 액션 보드 (TOP Decisions)
     const decisions = [];
     const restockItems = (act?.items || []).filter(i => i.category === 'RESTOCK');
-    if (restockItems.length > 0) {
+    if (hasRestockNeed && restockItems.length > 0) {
         const topRestock = restockItems[0];
         decisions.push({
             priority: 1,
@@ -218,6 +223,21 @@ function generateLocalRuleBasedReport(period, metrics) {
             rationale: '주요 반복 거래처의 정기 발주 수요가 확인되었으며 대경 재고 소진 속도가 가속화되는 국면입니다.',
             riskIfIgnored: '향후 2~3주 내 납기 지연으로 인한 거래처 이탈 및 견적 실주 발생.',
             deadline: period === 'weekly' ? '이번 주 수요일 18:00 전' : '월말 마감 전',
+            confidence: 'HIGH',
+        });
+    } else {
+        decisions.push({
+            priority: 1,
+            title: '주요 품목 시화 안전재고 정상 유지 및 정상 출고 모니터링',
+            situation: '현재 시화 창고의 주요 품목 커버일수가 21일 이상으로 안정적인 상태이며, 대경 양산 공장의 출고 소진율도 정상 범위 내에서 관리되고 있습니다.',
+            options: [
+                { label: 'A안 (유지 및 관망)', action: '불필요한 선매입을 지양하고 확정 발주 흐름 지속 모니터링', impact: '운전자본 보존 및 유동성 확보', risk: '대형 프로젝트 긴급 발주시 단기 결품' },
+                { label: 'B안 (예방적 소량 매입)', action: '주력 규격 소량 보충', impact: '돌발 수요 100% 방어', risk: '재고 보관 부담 증가' },
+            ],
+            recommended: 'A안 (유지 및 관망)',
+            rationale: '단기 수급 불안 징후가 없어 현금을 확보하고 장기 과잉재고 소진에 집중하는 것이 유리합니다.',
+            riskIfIgnored: '과도한 선구매로 인한 현금흐름 경색 위험.',
+            deadline: '이번 기간 중 상시 점검',
             confidence: 'HIGH',
         });
     }

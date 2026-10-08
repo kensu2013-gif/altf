@@ -3189,6 +3189,28 @@ const server = http.createServer(async (req, res) => {
                 res.end(JSON.stringify({ error: 'Server Error', detail: String(e?.message || e) }));
             }
         });
+    // DELETE /api/admin/ai-reports?id=... 또는 /api/admin/ai-reports/:id
+    if (req.method === 'DELETE' && (url.pathname === '/api/admin/ai-reports' || url.pathname.startsWith('/api/admin/ai-reports/'))) {
+        const session = getAuthenticatedSession(req);
+        if (!session || session.role !== 'MASTER') {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Forbidden: MASTER role required' }));
+            return;
+        }
+        let reportId = url.searchParams.get('id');
+        if (!reportId && url.pathname.startsWith('/api/admin/ai-reports/')) {
+            reportId = decodeURIComponent(url.pathname.replace('/api/admin/ai-reports/', ''));
+        }
+        if (!reportId) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing report id' }));
+            return;
+        }
+        await updateDb(() => {
+            db.aiReports = (db.aiReports || []).filter(r => r.id !== reportId);
+        });
+        console.log(`[AI Report] Deleted report: ${reportId}`);
+        sendJsonResponse(req, res, 200, { success: true, deletedId: reportId });
         return;
     }
 
