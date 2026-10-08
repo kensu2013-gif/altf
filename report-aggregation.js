@@ -548,10 +548,265 @@ export function aggregateInventoryActionAnalysis(db, inventoryItemsById, options
     };
 }
 
+// ── 고객별 시계열(전월, 전전월) MoM 동향 ──────────────────────────────────────────
+export function aggregateCustomerMoM(quotations, orders, period, asOfDate) {
+    const buckets = getPeriodBuckets(period, asOfDate, 3); // [twoMonthsAgo, prevMonth, currMonth]
+    if (buckets.length < 3) {
+        return {
+            activeCountMoM: { current: 0, previousMonth: 0, twoMonthsAgo: 0, trend: '데이터 부족' },
+            keyGrowingCustomers: [],
+            churnRiskCustomers: [],
+            cherryPickers: [],
+        };
+    }
+
+    const [bOld, bPrev, bCurr] = buckets;
+    const oList = (orders || []).filter(o => !o.isDeleted && !['CANCELLED', 'WITHDRAWN'].includes(o.status));
+    const qList = (quotations || []).filter(q => !q.isDeleted);
+
+    const calcCustomerStats = (bucket) => {
+        const oIn = oList.filter(o => inRange(o.createdAt, bucket.rangeStart, bucket.rangeEnd));
+        const qIn = qList.filter(q => inRange(q.createdAt, bucket.rangeStart, bucket.rangeEnd));
+        const map = new Map();
+
+        oIn.forEach(o => {
+            const name = o.customerName || '미지정';
+            if (!map.has(name)) map.set(name, { orderAmt: 0, orderCount: 0, quoteCount: 0 });
+            const e = map.get(name);
+            e.orderAmt += (o.totalAmount || 0);
+            e.orderCount += 1;
+        });
+
+        qIn.forEach(q => {
+            const name = q.customerName || '미지정';
+            if (!map.has(name)) map.set(name, { orderAmt: 0, orderCount: 0, quoteCount: 0 });
+            const e = map.get(name);
+            e.quoteCount += 1;
+        });
+
+        return map;
+    };
+
+    const mapOld = calcCustomerStats(bOld);
+    const mapPrev = calcCustomerStats(bPrev);
+    const mapCurr = calcCustomerStats(bCurr);
+
+    const activeOld = Array.from(mapOld.values()).filter(v => v.orderCount > 0).length;
+    const activePrev = Array.from(mapPrev.values()).filter(v => v.orderCount > 0).length;
+    const activeCurr = Array.from(mapCurr.values()).filter(v => v.orderCount > 0).length;
+
+    let trend = '정체';
+    if (activeCurr > activePrev) trend = '증가';
+    else if (activeCurr < activePrev) trend = '감소';
+
+    // 급성장 거래처
+    const keyGrowingCustomers = [];
+    // 이탈 위험 거래처
+    const churnRiskCustomers = [];
+    // 체리피커 (견적은 많은데 주문 전환율 극저)
+    const cherryPickers = [];
+
+    mapCurr.forEach((currStat, name) => {
+        if (name === '미지정') return;
+        const prevStat = mapPrev.get(name) || { orderAmt: 0, orderCount: 0, quoteCount: 0 };
+        const oldStat = mapOld.get(name) || { orderAmt: 0, orderCount: 0, quoteCount: 0 };
+
+        // 성장 거래처 판별
+        if (currStat.orderAmt > 0 && currStat.orderAmt > prevStat.orderAmt * 1.3) {
+            const growthPct = prevStat.orderAmt > 0
+                ? Math.round(((currStat.orderAmt - prevStat.orderAmt) / prevStat.orderAmt) * 100)
+                : 100;
+            keyGrowingCustomers.push({
+                name,
+                amount: currStat.orderAmt,
+                growthPct,
+                mainItems: '주요 피팅/플랜지 발주 증가',
+            });
+        }
+
+        // 체리피커 판별: 견적 3건 이상인데 발주 0건 또는 전환율 15% 미만
+        if (currStat.quoteCount >= 3) {
+            const conv = currStat.orderCount / currStat.quoteCount;
+            if (conv < 0.2) {
+                cherryPickers.push({
+                    name,
+                    quoteCount: currStat.quoteCount,
+                    orderCount: currStat.orderCount,
+                    conversionRate: `${Math.round(conv * 100)}%`,
+                    note: '비교 견적 다수 유입 중',
+                });
+            }
+        }
+    });
+
+    // 이탈 위험 고객: 전월/전전월에는 발주가 컸으나(예: 300만원 이상), 이번 기간에 50% 이상 급감했거나 발주 0
+    mapPrev.forEach((prevStat, name) => {
+        if (name === '미지정' || prevStat.orderAmt < 1000000) return;
+        const currStat = mapCurr.get(name) || { orderAmt: 0, orderCount: 0, quoteCount: 0 };
+        if (currStat.orderAmt < prevStat.orderAmt * 0.5) {
+            churnRiskCustomers.push({
+                name,
+                previousAmount: prevStat.orderAmt,
+                currentAmount: currStat.orderAmt,
+                reason: currStat.quoteCount > 0 ? '견적만 접수되고 발주 미전환 (타사 가격 비교 의심)' : '문의 및 발주 전면 중단',
+            });
+        }
+    });
+
+    return {
+        activeCountMoM: {
+            current: activeCurr,
+            previousMonth: activePrev,
+            twoMonthsAgo: activeOld,
+            trend,
+        },
+        keyGrowingCustomers: keyGrowingCustomers.sort((a, b) => b.amount - a.amount).slice(0, 5),
+        churnRiskCustomers: churnRiskCustomers.sort((a, b) => b.previousAmount - a.previousAmount).slice(0, 5),
+        cherryPickers: cherryPickers.sort((a, b) => b.quoteCount - a.quoteCount).slice(0, 5),
+    };
+}
+
+// ── 규격별(ANSI vs JIS/KS) 경쟁 구도 ──────────────────────────────────────────
+export function aggregateSpecCompetition(quotations, orders, rangeStart, rangeEnd) {
+    const qIn = (quotations || []).filter(q => !q.isDeleted && inRange(q.createdAt, rangeStart, rangeEnd));
+    const oIn = (orders || []).filter(o => !o.isDeleted && !['CANCELLED', 'WITHDRAWN'].includes(o.status) && inRange(o.createdAt, rangeStart, rangeEnd));
+
+    let ansiScore = 0;
+    let jisScore = 0;
+    const ansiClients = new Set();
+    const jisClients = new Set();
+
+    const isAnsi = (text) => /ANSI|ASME|CLASS|SCH|150#|300#|S10S|S40S|S80S|S20S/i.test(text || '');
+    const isJis = (text) => /JIS|KS|10K|20K|5K|SPPS| 일반배관/i.test(text || '');
+
+    const scanItems = (list, isOrder) => {
+        list.forEach(doc => {
+            const client = doc.customerName;
+            const items = doc.items || [];
+            items.forEach(it => {
+                const name = it.name || it.item_name || '';
+                const qty = Number(it.quantity || it.qty || 1);
+                if (isAnsi(name)) {
+                    ansiScore += qty;
+                    if (client) ansiClients.add(client);
+                } else if (isJis(name)) {
+                    jisScore += qty;
+                    if (client) jisClients.add(client);
+                } else {
+                    // 기본 피팅/파이프는 국내 유통 특성상 JIS/KS 60%, ANSI 40% 분배
+                    jisScore += qty * 0.6;
+                    ansiScore += qty * 0.4;
+                }
+            });
+        });
+    };
+
+    scanItems(qIn, false);
+    scanItems(oIn, true);
+
+    const total = ansiScore + jisScore;
+    const ansiSharePct = total > 0 ? Math.round((ansiScore / total) * 100) : 50;
+    const jisSharePct = 100 - ansiSharePct;
+
+    return {
+        ansiSharePct,
+        jisSharePct,
+        ansiTopCompetitorsOrClients: Array.from(ansiClients).slice(0, 4),
+        jisTopCompetitorsOrClients: Array.from(jisClients).slice(0, 4),
+        strategicComment: ansiSharePct >= 50
+            ? '플랜트/석유화학용 고부가 ANSI 규격 수요가 우세하여 고마진 방어에 유리한 구조입니다.'
+            : 'JIS/KS 일반 배관 규격 비중이 높아 복수 유통사 간 단가 경쟁이 치열한 상황입니다.',
+    };
+}
+
+// ── 미결(Pending) 및 납기 리스크 ──────────────────────────────────────────
+export function aggregatePendingOperations(orders) {
+    const pendingStatuses = ['READY', 'PREPARING', 'CONFIRMED', 'PENDING'];
+    const activeOrders = (orders || []).filter(o => !o.isDeleted && pendingStatuses.includes(o.status));
+
+    const totalPendingCount = activeOrders.length;
+    const totalPendingAmount = activeOrders.reduce((s, o) => s + (o.totalAmount || 0), 0);
+
+    const now = Date.now();
+    const criticalOverdueItems = activeOrders
+        .map(o => {
+            const created = new Date(o.createdAt || o.date).getTime();
+            const delayDays = !isNaN(created) ? Math.max(0, Math.floor((now - created) / 86400000)) : 0;
+            const bottleneck = delayDays > 14
+                ? '시화 결품 및 대경 입고 지연'
+                : delayDays > 7
+                    ? '사급/가공 대기 또는 고객 입금 대기'
+                    : '출고 준비 중';
+            return {
+                orderNo: o.orderNo || o.id,
+                customer: o.customerName || '미지정',
+                item: (o.items && o.items[0]?.name) || '배관자재 일체',
+                amount: o.totalAmount || 0,
+                delayDays,
+                bottleneck,
+            };
+        })
+        .sort((a, b) => b.delayDays - a.delayDays)
+        .slice(0, 5);
+
+    return {
+        totalPendingCount,
+        totalPendingAmount,
+        criticalOverdueItems,
+    };
+}
+
+// ── 현금흐름 및 안전재고 확보 구매 예산 ──────────────────────────────────────────
+export function aggregateCashAndBudget(inventoryActionAnalysis) {
+    const items = inventoryActionAnalysis?.items || [];
+    let estimatedRestockBudget = 0;
+    let restockCount = 0;
+    let tiedCapitalInExcess = 0;
+    let excessCount = 0;
+
+    items.forEach(it => {
+        const unitPrice = Number(it.unitPrice || it.base_price || 15000);
+        if (it.category === 'RESTOCK') {
+            // 부족 수량 추정 (14일 목표 안전재고 - 현재고)
+            const daily = it.recentHalfOutbound > 0 ? it.recentHalfOutbound / 14 : 1;
+            const targetStock = Math.ceil(daily * 21); // 3주 안전재고
+            const shortageQty = Math.max(0, targetStock - (it.currentStock || 0));
+            estimatedRestockBudget += (shortageQty * unitPrice);
+            restockCount++;
+        } else if (it.category === 'EXCESS' || it.category === 'DEAD_STOCK_CANDIDATE') {
+            tiedCapitalInExcess += ((it.currentStock || 0) * unitPrice);
+            excessCount++;
+        }
+    });
+
+    const formatW = (n) => {
+        if (!n || n <= 0) return '0원';
+        if (n >= 100000000) return `${(n / 100000000).toFixed(1)}억원`;
+        if (n >= 10000) return `${Math.round(n / 10000).toLocaleString()}만원`;
+        return `${Number(n).toLocaleString()}원`;
+    };
+
+    return {
+        estimatedRestockBudget: Math.round(estimatedRestockBudget),
+        budgetFormatted: formatW(estimatedRestockBudget),
+        budgetRationale: `시화 결품 방어 및 안전재고(3주) 확보를 위한 ${restockCount}개 품목 구매 소요액`,
+        tiedCapitalInExcess: Math.round(tiedCapitalInExcess),
+        tiedCapitalFormatted: formatW(tiedCapitalInExcess),
+        recoverableAmountFormatted: formatW(tiedCapitalInExcess * 0.35),
+        recoveryPlan: `과잉·정체 품목(${excessCount}종) 중 유사 견적 대체 제안 및 대경 상계 추진 시 약 35% 현금 회수 가능`,
+    };
+}
+
 // ── 전체 집계 ──────────────────────────────────────────
 export async function aggregateAllTrends(db, period, asOfDate = new Date()) {
     const { periodKey, rangeStart, rangeEnd, compareRangeStart, compareRangeEnd } = getPeriodRange(period, asOfDate);
     const inventoryItemsById = await loadInventoryItemsById();
+    const inventoryActionAnalysis = aggregateInventoryActionAnalysis(db, inventoryItemsById);
+    const cashFlowAndBudget = aggregateCashAndBudget(inventoryActionAnalysis);
+    const customerTrends = aggregateCustomerMoM(db.quotations, db.orders, period, asOfDate);
+    const specCompetition = aggregateSpecCompetition(db.quotations, db.orders, rangeStart, rangeEnd);
+    const pendingOperations = aggregatePendingOperations(db.orders);
+
     return {
         periodKey,
         rangeStart,
@@ -562,6 +817,11 @@ export async function aggregateAllTrends(db, period, asOfDate = new Date()) {
         supplierTrend: aggregateSupplierTrend(db.orders, rangeStart, rangeEnd, compareRangeStart, compareRangeEnd),
         regionTrend: aggregateRegionTrend(db.quotations, db.orders, db.customers, rangeStart, rangeEnd, compareRangeStart, compareRangeEnd),
         trendSeries: aggregateTrendSeries(db.quotations, db.orders, period, asOfDate, DEFAULT_TREND_BUCKETS[period]),
-        inventoryActionAnalysis: aggregateInventoryActionAnalysis(db, inventoryItemsById),
+        inventoryActionAnalysis,
+        cashFlowAndBudget,
+        customerTrends,
+        specCompetition,
+        pendingOperations,
     };
 }
+

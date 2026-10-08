@@ -6,7 +6,8 @@ import {
     Bot, RefreshCw, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle,
     FileText, ShoppingCart, Package, Building2, TrendingUp, TrendingDown,
     ArrowUpRight, ArrowDownRight, Minus, Sparkles, Info, MapPin, Activity, PackageSearch,
-    Download,
+    Download, Wallet, Users2, ShieldAlert, Scale, Clock, ArrowRight,
+    DollarSign, Layers,
 } from 'lucide-react';
 
 // 리포트 인쇄(PDF 저장) 시 화면 전용 요소(헤더/탭/버튼/원본 JSON 등)는 숨기고, 현재 펼친 리포트
@@ -129,6 +130,71 @@ interface InventoryActionAnalysis {
     _note?: string;
 }
 
+// ── 신규 CEO 의사결정 참모 인터페이스 ──
+export interface DecisionOption {
+    label: string;
+    action: string;
+    impact: string;
+    risk: string;
+}
+
+export interface DecisionItem {
+    priority: number;
+    title: string;
+    situation: string;
+    options: DecisionOption[];
+    recommended: string;
+    rationale: string;
+    riskIfIgnored: string;
+    deadline: string;
+    confidence?: 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
+export interface CashFlowAndBudget {
+    estimatedRestockBudget: number;
+    budgetFormatted: string;
+    budgetRationale: string;
+    tiedCapitalInExcess: number;
+    tiedCapitalFormatted: string;
+    recoverableAmountFormatted: string;
+    recoveryPlan: string;
+}
+
+export interface CustomerTrends {
+    activeCountMoM?: { current: number; previousMonth: number; twoMonthsAgo: number; trend: string };
+    keyGrowingCustomers?: { name: string; amount: number; growthPct: number; mainItems?: string }[];
+    churnRiskCustomers?: { name: string; previousAmount: number; currentAmount: number; reason: string }[];
+    cherryPickers?: { name: string; quoteCount: number; orderCount: number; conversionRate: string; note: string }[];
+}
+
+export interface SpecCompetition {
+    ansiSharePct: number;
+    jisSharePct: number;
+    ansiTopCompetitorsOrClients?: string[];
+    jisTopCompetitorsOrClients?: string[];
+    strategicComment?: string;
+}
+
+export interface CriticalOverdueItem {
+    orderNo: string;
+    customer: string;
+    item: string;
+    amount: number;
+    delayDays: number;
+    bottleneck: string;
+}
+
+export interface PendingOperations {
+    totalPendingCount: number;
+    totalPendingAmount: number;
+    criticalOverdueItems?: CriticalOverdueItem[];
+}
+
+export interface PeriodInsight {
+    periodType: string;
+    focus: string;
+}
+
 interface ReportMetrics {
     periodKey: string;
     rangeStart: string;
@@ -140,6 +206,10 @@ interface ReportMetrics {
     regionTrend?: RegionTrend;
     trendSeries?: TrendSeries;
     inventoryActionAnalysis?: InventoryActionAnalysis;
+    cashFlowAndBudget?: CashFlowAndBudget;
+    customerTrends?: CustomerTrends;
+    specCompetition?: SpecCompetition;
+    pendingOperations?: PendingOperations;
 }
 
 interface AiReport {
@@ -155,6 +225,12 @@ interface AiReport {
     aiSummary?: string;
     aiSections?: AiReportSection[];
     aiRecommendations?: string[];
+    periodInsight?: PeriodInsight;
+    cashFlowAndBudget?: CashFlowAndBudget;
+    decisions?: DecisionItem[];
+    customerTrends?: CustomerTrends;
+    specCompetition?: SpecCompetition;
+    pendingOperations?: PendingOperations;
     model?: string;
     tokenUsage?: { input: number; output: number };
 }
@@ -396,6 +472,355 @@ function TrendSparkline({ label, series, barClass }: { label: string; series: { 
     );
 }
 
+// ── 신규 CEO 의사결정 참모 위젯 ──────────────────────────────────────────
+
+function ExecutiveDecisionsBoard({ decisions }: { decisions?: DecisionItem[] }) {
+    if (!decisions || decisions.length === 0) return null;
+
+    return (
+        <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-2xl p-5 shadow-lg border border-indigo-900/40">
+            <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-white/10">
+                <div className="flex items-center gap-2">
+                    <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-xs font-black tracking-wider uppercase text-indigo-200">
+                        CEO 최우선 의사결정 액션 보드 (TOP {decisions.length})
+                    </span>
+                </div>
+                <span className="text-[10px] font-semibold text-slate-400">
+                    클릭 없이 결재 판단을 내릴 수 있는 즉각 실행안
+                </span>
+            </div>
+
+            <div className="space-y-4">
+                {decisions.map((dec, idx) => (
+                    <div key={idx} className="bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/[0.07] transition-all">
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2">
+                                <span className="bg-indigo-500/30 text-indigo-300 border border-indigo-400/40 text-[10px] font-black px-2 py-0.5 rounded-md">
+                                    우선순위 #{dec.priority || idx + 1}
+                                </span>
+                                <h4 className="text-xs font-black text-white">{dec.title}</h4>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-amber-300 font-bold bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                                <Clock className="w-3 h-3" />
+                                결정 기한: {dec.deadline}
+                            </div>
+                        </div>
+
+                        <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
+                            <span className="text-indigo-300 font-bold">상황 근거: </span>
+                            {dec.situation}
+                        </p>
+
+                        {/* 옵션 비교 */}
+                        {dec.options && dec.options.length > 0 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+                                {dec.options.map((opt, optIdx) => {
+                                    const isRec = opt.label === dec.recommended || opt.action.includes(dec.recommended);
+                                    return (
+                                        <div
+                                            key={optIdx}
+                                            className={`rounded-lg p-3 text-[11px] transition-all ${
+                                                isRec
+                                                    ? 'bg-emerald-950/40 border border-emerald-500/60 shadow-sm'
+                                                    : 'bg-black/20 border border-white/5 text-slate-400'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className={`font-black ${isRec ? 'text-emerald-300' : 'text-slate-300'}`}>
+                                                    {opt.label}
+                                                </span>
+                                                {isRec && (
+                                                    <span className="text-[9px] font-bold bg-emerald-500 text-slate-950 px-1.5 py-0.2 rounded font-mono">
+                                                        AI 추천안
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-slate-200 font-semibold mb-1">{opt.action}</div>
+                                            <div className="text-[10px] text-emerald-400/90 mb-0.5">· 효과: {opt.impact}</div>
+                                            <div className="text-[10px] text-rose-300/80">· 리스크: {opt.risk}</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-white/5 text-[10px]">
+                            <div className="text-slate-300">
+                                <span className="text-emerald-400 font-bold">추천 사유: </span>
+                                {dec.rationale}
+                            </div>
+                            <div className="text-rose-300 shrink-0">
+                                <span className="font-bold">미결정 시 위험: </span>
+                                {dec.riskIfIgnored}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function CashAndBudgetCard({ cash }: { cash?: CashFlowAndBudget }) {
+    if (!cash) return null;
+
+    return (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+            <div className="flex items-center justify-between gap-2 mb-4 pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                    <Wallet className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-black text-slate-900">
+                        자금 및 재고 구매 예산 나침반 (Cash Flow & Restock)
+                    </span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-semibold">
+                    대표 의사결정 필수 운전자본 지표
+                </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 1. 안전재고 확보 필요 경비 */}
+                <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-4">
+                    <div className="flex items-center justify-between text-[11px] text-emerald-800 font-bold mb-1">
+                        <span className="flex items-center gap-1.5">
+                            <ShoppingCart className="w-3.5 h-3.5 text-emerald-600" />
+                            월말 안전재고(3주) 확보 필요 구매 경비
+                        </span>
+                        <span className="text-xs font-black text-emerald-700 font-mono">
+                            {cash.budgetFormatted}
+                        </span>
+                    </div>
+                    <div className="text-lg font-black text-emerald-900 tracking-tight mb-1.5">
+                        {cash.budgetFormatted}
+                    </div>
+                    <p className="text-[11px] text-emerald-800 leading-relaxed">
+                        {cash.budgetRationale}
+                    </p>
+                </div>
+
+                {/* 2. 과잉·정체 재고에 묶인 자본 및 유동화 */}
+                <div className="bg-amber-50/60 border border-amber-200/80 rounded-xl p-4">
+                    <div className="flex items-center justify-between text-[11px] text-amber-800 font-bold mb-1">
+                        <span className="flex items-center gap-1.5">
+                            <DollarSign className="w-3.5 h-3.5 text-amber-600" />
+                            과잉·정체 재고에 묶인 운전자본
+                        </span>
+                        <span className="text-xs font-black text-amber-700 font-mono">
+                            {cash.tiedCapitalFormatted}
+                        </span>
+                    </div>
+                    <div className="flex items-baseline gap-2 mb-1.5">
+                        <span className="text-lg font-black text-amber-900 tracking-tight">
+                            {cash.tiedCapitalFormatted}
+                        </span>
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-200/60 px-2 py-0.5 rounded-full">
+                            유동화 목표: {cash.recoverableAmountFormatted}
+                        </span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                        {cash.recoveryPlan}
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function CustomerTrendsCard({ trends }: { trends?: CustomerTrends }) {
+    if (!trends) return null;
+    const { activeCountMoM, keyGrowingCustomers = [], churnRiskCustomers = [], cherryPickers = [] } = trends;
+
+    return (
+        <SectionCard icon={Users2} title="거래처 동향 & 시계열(전월·전전월) 비교" accentText="text-indigo-700">
+            {/* 활성 거래처 수 추이 */}
+            {activeCountMoM && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <span className="font-bold text-slate-700">활성 발주 거래처 수 추이:</span>
+                    <div className="flex items-center gap-2 font-mono">
+                        <span className="text-slate-500 text-[11px]">전전월 {activeCountMoM.twoMonthsAgo}개사</span>
+                        <ArrowRight className="w-3 h-3 text-slate-400" />
+                        <span className="text-slate-600 text-[11px]">전월 {activeCountMoM.previousMonth}개사</span>
+                        <ArrowRight className="w-3 h-3 text-slate-400" />
+                        <span className="font-black text-indigo-700 text-sm">{activeCountMoM.current}개사</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            activeCountMoM.trend === '증가' ? 'bg-emerald-100 text-emerald-700' : activeCountMoM.trend === '감소' ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-700'
+                        }`}>
+                            {activeCountMoM.trend}
+                        </span>
+                    </div>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* 1. 급성장 거래처 */}
+                <div className="border border-emerald-100 bg-emerald-50/30 rounded-xl p-3">
+                    <div className="text-[10px] font-black text-emerald-800 uppercase tracking-wider mb-2 flex items-center justify-between">
+                        <span>🚀 매출 급성장 거래처</span>
+                        <span className="text-emerald-600">{keyGrowingCustomers.length}사</span>
+                    </div>
+                    {keyGrowingCustomers.length === 0 ? (
+                        <div className="text-[10px] text-slate-400 py-1">내역 없음</div>
+                    ) : (
+                        <div className="space-y-1.5">
+                            {keyGrowingCustomers.map((c, i) => (
+                                <div key={i} className="text-[11px] bg-white p-2 rounded-lg border border-emerald-100">
+                                    <div className="flex justify-between font-bold text-slate-800">
+                                        <span className="truncate max-w-[65%]">{c.name}</span>
+                                        <span className="text-emerald-600">+{c.growthPct}%</span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 font-semibold">{formatWon(c.amount)}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* 2. 체리피커 (비교 견적 다수, 미전환) */}
+                <div className="border border-amber-100 bg-amber-50/30 rounded-xl p-3">
+                    <div className="text-[10px] font-black text-amber-800 uppercase tracking-wider mb-2 flex items-center justify-between">
+                        <span>🎯 체리피커 (비교견적 의심)</span>
+                        <span className="text-amber-600">{cherryPickers.length}사</span>
+                    </div>
+                    {cherryPickers.length === 0 ? (
+                        <div className="text-[10px] text-slate-400 py-1">해당 거래처 없음</div>
+                    ) : (
+                        <div className="space-y-1.5">
+                            {cherryPickers.map((c, i) => (
+                                <div key={i} className="text-[11px] bg-white p-2 rounded-lg border border-amber-100">
+                                    <div className="flex justify-between font-bold text-slate-800">
+                                        <span className="truncate max-w-[65%]">{c.name}</span>
+                                        <span className="text-amber-600 font-mono">{c.conversionRate}</span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-400">견적 {c.quoteCount}건 중 발주 {c.orderCount}건</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* 3. 이탈 위험 거래처 */}
+                <div className="border border-rose-100 bg-rose-50/30 rounded-xl p-3">
+                    <div className="text-[10px] font-black text-rose-800 uppercase tracking-wider mb-2 flex items-center justify-between">
+                        <span>⚠️ 이탈 위기 (발주 급감)</span>
+                        <span className="text-rose-600">{churnRiskCustomers.length}사</span>
+                    </div>
+                    {churnRiskCustomers.length === 0 ? (
+                        <div className="text-[10px] text-slate-400 py-1">이탈 징후 거래처 없음</div>
+                    ) : (
+                        <div className="space-y-1.5">
+                            {churnRiskCustomers.map((c, i) => (
+                                <div key={i} className="text-[11px] bg-white p-2 rounded-lg border border-rose-100">
+                                    <div className="flex justify-between font-bold text-slate-800">
+                                        <span className="truncate max-w-[65%]">{c.name}</span>
+                                        <span className="text-rose-600 font-semibold">{formatWon(c.previousAmount)} → {formatWon(c.currentAmount)}</span>
+                                    </div>
+                                    <div className="text-[10px] text-rose-700/80 leading-tight mt-0.5">{c.reason}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </SectionCard>
+    );
+}
+
+function SpecCompetitionCard({ spec }: { spec?: SpecCompetition }) {
+    if (!spec) return null;
+    const { ansiSharePct, jisSharePct, ansiTopCompetitorsOrClients = [], jisTopCompetitorsOrClients = [], strategicComment } = spec;
+
+    return (
+        <SectionCard icon={Scale} title="규격별(ANSI vs JIS/KS) 시장 경쟁 & 마진 구조" accentText="text-teal-700">
+            {/* 비율 프로그레스 바 */}
+            <div className="mb-3">
+                <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-indigo-700 flex items-center gap-1">
+                        <Layers className="w-3.5 h-3.5" />
+                        ANSI 계열 (고부가·플랜트·고압) {ansiSharePct}%
+                    </span>
+                    <span className="text-teal-700 flex items-center gap-1">
+                        JIS/KS 계열 (범용·배관·설비) {jisSharePct}%
+                    </span>
+                </div>
+                <div className="h-3 bg-slate-100 rounded-full overflow-hidden flex">
+                    <div className="bg-indigo-500 h-full transition-all" style={{ width: `${ansiSharePct}%` }} />
+                    <div className="bg-teal-400 h-full transition-all" style={{ width: `${jisSharePct}%` }} />
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2.5">
+                <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-2.5">
+                    <div className="text-[10px] font-bold text-indigo-900 mb-1">ANSI 주요 거래처</div>
+                    <div className="flex flex-wrap gap-1">
+                        {ansiTopCompetitorsOrClients.length > 0 ? (
+                            ansiTopCompetitorsOrClients.map((c, i) => (
+                                <span key={i} className="text-[10px] font-bold bg-white text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md">
+                                    {c}
+                                </span>
+                            ))
+                        ) : <span className="text-[10px] text-slate-400">내역 없음</span>}
+                    </div>
+                </div>
+
+                <div className="bg-teal-50/40 border border-teal-100 rounded-xl p-2.5">
+                    <div className="text-[10px] font-bold text-teal-900 mb-1">JIS/KS 주요 거래처</div>
+                    <div className="flex flex-wrap gap-1">
+                        {jisTopCompetitorsOrClients.length > 0 ? (
+                            jisTopCompetitorsOrClients.map((c, i) => (
+                                <span key={i} className="text-[10px] font-bold bg-white text-teal-700 border border-teal-200 px-2 py-0.5 rounded-md">
+                                    {c}
+                                </span>
+                            ))
+                        ) : <span className="text-[10px] text-slate-400">내역 없음</span>}
+                    </div>
+                </div>
+            </div>
+
+            {strategicComment && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-700 leading-relaxed">
+                    <span className="font-bold text-teal-800">💡 규격 전략 브리핑: </span>
+                    {strategicComment}
+                </div>
+            )}
+        </SectionCard>
+    );
+}
+
+function PendingOperationsCard({ pending }: { pending?: PendingOperations }) {
+    if (!pending) return null;
+    const { totalPendingCount, totalPendingAmount, criticalOverdueItems = [] } = pending;
+
+    return (
+        <SectionCard icon={ShieldAlert} title={`미결 주문 및 납기 리스크 관리 (총 ${totalPendingCount}건 / ${formatWon(totalPendingAmount)})`} accentText="text-rose-700">
+            {criticalOverdueItems.length === 0 ? (
+                <div className="text-[11px] text-slate-400 py-1">현재 장기 지연된 미결 주문이 없습니다.</div>
+            ) : (
+                <div className="space-y-2">
+                    <div className="text-[10px] font-bold text-slate-500 mb-1">집중 관리 필요 지연 건 (7일 이상 경과)</div>
+                    {criticalOverdueItems.map((item, idx) => (
+                        <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border border-rose-100 bg-rose-50/20 rounded-xl p-2.5 text-xs">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md font-mono">
+                                    +{item.delayDays}일 지연
+                                </span>
+                                <span className="font-bold text-slate-800">{item.customer}</span>
+                                <span className="text-slate-500 text-[11px] truncate max-w-[200px]">{item.item}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="font-black text-slate-800">{formatWon(item.amount)}</span>
+                                <span className="text-[10px] font-bold bg-white text-slate-600 border border-slate-200 px-2 py-0.5 rounded-full">
+                                    {item.bottleneck}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </SectionCard>
+    );
+}
+
 // ── 리포트 대시보드 본문 ──────────────────────────────────────────
 
 function ReportDashboard({ report }: { report: AiReport }) {
@@ -422,6 +847,13 @@ function ReportDashboard({ report }: { report: AiReport }) {
     const marginPct = o.totalAmount > 0 ? ((o.estimatedMargin / o.totalAmount) * 100).toFixed(1) : '0';
     const conversionRate = q.count > 0 ? ((o.count / q.count) * 100).toFixed(0) : (o.count > 0 ? '100' : '—');
     const lowSample = inv.confirmedDaysInRange < 3;
+
+    const cash = report.cashFlowAndBudget || m.cashFlowAndBudget;
+    const decisions = report.decisions || [];
+    const cust = report.customerTrends || m.customerTrends;
+    const spec = report.specCompetition || m.specCompetition;
+    const pending = report.pendingOperations || m.pendingOperations;
+    const insight = report.periodInsight;
 
     const handlePdfDownload = () => {
         const periodLabel = PERIOD_TABS.find(t => t.key === report.period)?.label || report.period;
@@ -453,15 +885,38 @@ function ReportDashboard({ report }: { report: AiReport }) {
                 </button>
             </div>
 
-            {/* AI 한 줄 요약 */}
-            <div className="bg-slate-900 text-white rounded-xl p-4">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    <Sparkles className="w-3 h-3" /> AI 전체 요약
+            {/* 주기별 관리 초점 & AI 전체 요약 */}
+            <div className="bg-slate-900 text-white rounded-2xl p-5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-teal-400 uppercase tracking-wider">
+                        <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+                        AI 최고전략책임자(CSO) 종합 브리핑
+                    </div>
+                    {insight?.focus && (
+                        <span className="text-[10px] font-bold bg-white/10 text-indigo-200 px-2.5 py-0.5 rounded-full border border-white/10">
+                            초점: {insight.focus}
+                        </span>
+                    )}
                 </div>
-                <p className="text-xs leading-relaxed">{report.aiSummary}</p>
+                <p className="text-xs leading-relaxed text-slate-100 font-medium">{report.aiSummary}</p>
             </div>
 
-            {/* KPI 타일 */}
+            {/* 1. 최우선 CEO 의사결정 액션 보드 */}
+            <ExecutiveDecisionsBoard decisions={decisions} />
+
+            {/* 2. 자금 및 재고 구매 예산 나침반 */}
+            <CashAndBudgetCard cash={cash} />
+
+            {/* 3. 거래처 동향 & 시계열(전월, 전전월) MoM */}
+            <CustomerTrendsCard trends={cust} />
+
+            {/* 4. 규격별(ANSI vs JIS/KS) 경쟁 & 마진 구조 */}
+            <SpecCompetitionCard spec={spec} />
+
+            {/* 5. 미결 주문 & 납기 리스크 */}
+            <PendingOperationsCard pending={pending} />
+
+            {/* 6. 핵심 KPI 타일 */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <StatTile icon={FileText} label="견적 총액" value={formatWon(q.totalAmount)} delta={q.amountChangePct} deltaLabel="전기대비" accent="border-teal-400" />
                 <StatTile icon={ShoppingCart} label="발주 매출" value={formatWon(o.totalAmount)} delta={o.amountChangePct} deltaLabel="전기대비" accent="border-indigo-400" />
