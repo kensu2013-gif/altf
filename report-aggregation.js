@@ -233,22 +233,13 @@ function formatItemDisplayName(id, name, meta) {
 }
 
 export function aggregateInventoryTrend(inventoryHistory, daekyungHistory, rangeStart, rangeEnd, orders = [], inventoryItemsById = null) {
-    // 1. 대경재고 스냅샷 구간 추출 (양산 공장 소진 트렌드)
-    let dSnaps = (daekyungHistory || []).filter(h => Array.isArray(h.diff) && h.diff.length > 0 && inRange(h.date, rangeStart, rangeEnd));
-    let isDaekyungFallback = false;
-    let dWindow = '';
+    const periodBaselineWindow = `${rangeStart.slice(0, 10)} ~ ${rangeEnd.slice(0, 10)}`;
 
-    // 만약 기간 내 스냅샷이 2개 미만이면, 가장 최근 누적된 유효 스냅샷 윈도우(최대 10개)로 스마트 롤링 연계!
-    if (dSnaps.length < 2) {
-        const allValid = (daekyungHistory || []).filter(h => Array.isArray(h.diff) && h.diff.length > 0);
-        if (allValid.length > 0) {
-            dSnaps = allValid.slice(-10);
-            isDaekyungFallback = true;
-            dWindow = `${dSnaps[0].date} ~ ${dSnaps[dSnaps.length - 1].date}`;
-        }
-    } else {
-        dWindow = `${dSnaps[0].date} ~ ${dSnaps[dSnaps.length - 1].date}`;
-    }
+    // 1. 대경재고 스냅샷 구간 추출 (리포트 기준 기간 내만 정확히 집계)
+    const dSnaps = (daekyungHistory || []).filter(h => Array.isArray(h.diff) && h.diff.length > 0 && inRange(h.date, rangeStart, rangeEnd));
+    const dWindow = dSnaps.length > 0
+        ? `${dSnaps[0].date} ~ ${dSnaps[dSnaps.length - 1].date}`
+        : periodBaselineWindow;
 
     const dNetChangeById = {};
     const dNameById = {};
@@ -268,21 +259,11 @@ export function aggregateInventoryTrend(inventoryHistory, daekyungHistory, range
     const daekyungTotalOutbound = dEntries.filter(e => e.change > 0).reduce((s, e) => s + e.change, 0);
     const daekyungTotalInbound = dEntries.filter(e => e.change < 0).reduce((s, e) => s + Math.abs(e.change), 0);
 
-    // 2. 시화재고 스냅샷 구간 추출 (알트에프 직보유 재고 변동)
-    let sSnaps = (inventoryHistory || []).filter(h => Array.isArray(h.diff) && h.diff.length > 0 && inRange(h.date, rangeStart, rangeEnd));
-    let isSihwaFallback = false;
-    let sWindow = '';
-
-    if (sSnaps.length < 2) {
-        const allValid = (inventoryHistory || []).filter(h => Array.isArray(h.diff) && h.diff.length > 0);
-        if (allValid.length > 0) {
-            sSnaps = allValid.slice(-10);
-            isSihwaFallback = true;
-            sWindow = `${sSnaps[0].date} ~ ${sSnaps[sSnaps.length - 1].date}`;
-        }
-    } else {
-        sWindow = `${sSnaps[0].date} ~ ${sSnaps[sSnaps.length - 1].date}`;
-    }
+    // 2. 시화재고 스냅샷 구간 추출 (리포트 기준 기간 내만 정확히 집계)
+    const sSnaps = (inventoryHistory || []).filter(h => Array.isArray(h.diff) && h.diff.length > 0 && inRange(h.date, rangeStart, rangeEnd));
+    const sWindow = sSnaps.length > 0
+        ? `${sSnaps[0].date} ~ ${sSnaps[sSnaps.length - 1].date}`
+        : periodBaselineWindow;
 
     const sNetChangeById = {};
     const sNameById = {};
@@ -302,12 +283,9 @@ export function aggregateInventoryTrend(inventoryHistory, daekyungHistory, range
     const sihwaTotalOutbound = sEntries.filter(e => e.change > 0).reduce((s, e) => s + e.change, 0);
     const sihwaTotalInbound = sEntries.filter(e => e.change < 0).reduce((s, e) => s + Math.abs(e.change), 0);
 
-    // 3. 실제 발주(Orders) 기반 품목별 출고 실적 (하이브리드 결합)
+    // 3. 실제 발주(Orders) 기반 품목별 출고 실적 (리포트 기준 기간 내 주문만 엄격 집계)
     const oList = (orders || []).filter(o => !o.isDeleted && !['CANCELLED', 'WITHDRAWN'].includes(o.status));
-    let targetOrders = oList.filter(o => inRange(o.createdAt, rangeStart, rangeEnd));
-    if (targetOrders.length === 0 && oList.length > 0) {
-        targetOrders = oList.slice(-50);
-    }
+    const targetOrders = oList.filter(o => inRange(o.createdAt, rangeStart, rangeEnd));
 
     const orderQtyByName = {};
     let orderTotalQty = 0;
@@ -324,7 +302,7 @@ export function aggregateInventoryTrend(inventoryHistory, daekyungHistory, range
         .slice(0, 5)
         .map(([name, change]) => ({ id: name, name, change }));
 
-    // 4. 종합 지표 구성 (대경 재고 소진 추이 우선 표출)
+    // 4. 종합 지표 구성 (리포트 기준 기간과 100% 동일한 날짜 윈도우 유지)
     const topDropItems = daekyungTopDrop.length > 0 ? daekyungTopDrop : (sihwaTopDrop.length > 0 ? sihwaTopDrop : orderTopShipped);
     const topSurgeItems = daekyungTopSurge.length > 0 ? daekyungTopSurge : sihwaTopSurge;
     const totalOutbound = (daekyungTotalOutbound || 0) + (sihwaTotalOutbound || 0) + (orderTotalQty > 0 && daekyungTotalOutbound === 0 ? orderTotalQty : 0);
@@ -332,17 +310,15 @@ export function aggregateInventoryTrend(inventoryHistory, daekyungHistory, range
 
     return {
         confirmedDaysInRange: Math.max(dSnaps.length, sSnaps.length),
-        effectiveWindow: isDaekyungFallback || isSihwaFallback
-            ? '스냅샷 누적 소진율 추이'
-            : `${rangeStart.slice(0, 10)} ~ ${rangeEnd.slice(0, 10)}`,
-        isRecentFallback: isDaekyungFallback || isSihwaFallback,
+        effectiveWindow: periodBaselineWindow,
+        isRecentFallback: false,
         totalOutbound,
         totalInbound,
         topDropItems,
         topSurgeItems,
         daekyungTrend: {
             window: dWindow,
-            isFallback: isDaekyungFallback,
+            isFallback: false,
             totalOutbound: daekyungTotalOutbound,
             totalInbound: daekyungTotalInbound,
             topDropItems: daekyungTopDrop,
@@ -350,7 +326,7 @@ export function aggregateInventoryTrend(inventoryHistory, daekyungHistory, range
         },
         sihwaTrend: {
             window: sWindow,
-            isFallback: isSihwaFallback,
+            isFallback: false,
             totalOutbound: sihwaTotalOutbound,
             totalInbound: sihwaTotalInbound,
             topDropItems: sihwaTopDrop,
@@ -360,9 +336,7 @@ export function aggregateInventoryTrend(inventoryHistory, daekyungHistory, range
             totalShippedQty: orderTotalQty,
             topShippedItems: orderTopShipped,
         },
-        _note: isDaekyungFallback
-            ? `선택 기간 내 확정 스냅샷이 적어 최근 유효 확정 구간(${dWindow})의 대경 양산 공장 및 시화 재고 소진 추이를 분석했습니다.`
-            : '대경 및 시화 재고 확정 스냅샷 기준 분석 결과입니다.',
+        _note: '리포트 기준 기간과 동일한 일자의 입출고 및 발주 소진 실적을 반영했습니다.',
     };
 }
 

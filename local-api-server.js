@@ -3156,17 +3156,19 @@ const server = http.createServer(async (req, res) => {
         req.on('data', c => body += c.toString());
         req.on('end', async () => {
             try {
-                const { period } = JSON.parse(body || '{}');
+                const { period, asOfDate } = JSON.parse(body || '{}');
                 if (!AI_REPORT_PERIODS.includes(period)) {
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Invalid period' }));
                     return;
                 }
-                const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
-                const metrics = await aggregateAllTrends(db, period, kstNow);
+                const targetDate = asOfDate ? new Date(asOfDate) : new Date();
+                const metrics = await aggregateAllTrends(db, period, targetDate);
                 const aiResult = await generateAiReport(period, metrics);
                 const report = await updateDb(() => {
                     db.aiReports = db.aiReports || [];
+                    // 동일한 period + periodKey 리포트가 이미 있다면 최신 분석본으로 교체
+                    db.aiReports = db.aiReports.filter(r => !(r.period === period && r.periodKey === metrics.periodKey));
                     const rpt = {
                         id: `rpt_${period}_${metrics.periodKey}_${crypto.randomUUID()}`,
                         period,

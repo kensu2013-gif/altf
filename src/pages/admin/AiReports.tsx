@@ -1259,12 +1259,14 @@ export default function AdminAiReports() {
         }
     }, []);
 
+    const [selectedMonthlyTarget, setSelectedMonthlyTarget] = useState<string>('2026-10-01');
+
     useEffect(() => {
         if (user?.role !== 'MASTER') return;
         fetchReports(activePeriod);
     }, [activePeriod, fetchReports, user?.role]);
 
-    const handleManualGenerate = async () => {
+    const handleManualGenerate = async (targetAsOfDate?: string) => {
         try {
             setGenerating(true);
             setError(null);
@@ -1275,7 +1277,10 @@ export default function AdminAiReports() {
             const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/admin/ai-reports/generate', {
                 method: 'POST',
                 headers,
-                body: JSON.stringify({ period: activePeriod }),
+                body: JSON.stringify({
+                    period: activePeriod,
+                    asOfDate: targetAsOfDate || undefined
+                }),
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
@@ -1329,14 +1334,29 @@ export default function AdminAiReports() {
                     <h1 className="text-xl font-black text-slate-800">AI 경영 리포트</h1>
                     <span className="text-xs font-bold text-slate-400 ml-1">MASTER 전용</span>
                 </div>
-                <button
-                    onClick={handleManualGenerate}
-                    disabled={generating}
-                    className="flex items-center gap-1.5 text-xs font-bold bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 text-white px-3 py-2 rounded-lg transition-colors"
-                >
-                    <RefreshCw className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} />
-                    {generating ? '생성 중...' : `지금 ${PERIOD_TABS.find(t => t.key === activePeriod)?.label} 리포트 생성`}
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                    {activePeriod === 'monthly' && (
+                        <select
+                            value={selectedMonthlyTarget}
+                            onChange={(e) => setSelectedMonthlyTarget(e.target.value)}
+                            disabled={generating}
+                            className="text-xs font-bold bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-lg shadow-xs focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                            title="분석 대상 결산월 선택"
+                        >
+                            <option value="2026-10-01">2026-09월 (8월 대비 9월 실적)</option>
+                            <option value="2026-09-01">2026-08월 (7월 대비 8월 실적)</option>
+                            <option value="2026-08-01">2026-07월 (6월 대비 7월 실적)</option>
+                        </select>
+                    )}
+                    <button
+                        onClick={() => handleManualGenerate(activePeriod === 'monthly' ? selectedMonthlyTarget : undefined)}
+                        disabled={generating}
+                        className="flex items-center gap-1.5 text-xs font-bold bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 text-white px-3 py-2 rounded-lg transition-colors shadow-xs"
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} />
+                        {generating ? '생성 중...' : `지금 ${PERIOD_TABS.find(t => t.key === activePeriod)?.label} 리포트 생성`}
+                    </button>
+                </div>
             </div>
 
             <p className="print:hidden text-[11px] text-slate-500 mb-4 leading-relaxed">
