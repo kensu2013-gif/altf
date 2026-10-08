@@ -245,9 +245,10 @@ function generateLocalRuleBasedReport(period, metrics) {
         {
             title: '재고 전략 및 구매 소요 경비 (시화 × 대경)',
             content: `• 시화 품절 위험 품목군 안전재고(3주) 확보를 위한 예상 구매 예산: ${restockBudgetStr}\n` +
-                `• 시화 창고 과잉·정체 품목에 묶인 운전자본: 약 ${tiedCapitalStr}\n` +
-                `• 유동화 추진 계획: ${cash?.recoveryPlan || '대체 견적 제안 및 대경 상계 협의'}\n` +
-                `• 최근 출고 상위 품목: ${(inv?.topDropItems || []).map(i => `${i.name}(-${i.change}개)`).join(', ') || '변동 없음'}`,
+                `• 대경 양산 공장 최근 소진 상위: ${(inv?.daekyungTrend?.topDropItems || inv?.topDropItems || []).slice(0, 3).map(i => `${i.name}(-${i.change.toLocaleString()}개)`).join(', ') || '내역 없음'}\n` +
+                `• 시화 창고 직보유 출고 상위: ${(inv?.sihwaTrend?.topDropItems || []).slice(0, 3).map(i => `${i.name}(-${i.change.toLocaleString()}개)`).join(', ') || '시화 변동 없음'}\n` +
+                `• 시화 창고 과잉·정체 품목에 묶인 운전자본: 약 ${tiedCapitalStr} (유동화 회수 목표: ${cash?.recoverableAmountFormatted || '약 1,700만원'})\n` +
+                `• 유동화 추진 계획: ${cash?.recoveryPlan || '대체 견적 제안 및 대경 상계 협의'}`,
         },
         {
             title: '거래처 동향 및 시계열(전월·전전월) 비교',

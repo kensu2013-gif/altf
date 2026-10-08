@@ -62,10 +62,32 @@ interface InventoryItemChange {
 
 interface InventoryTrend {
     confirmedDaysInRange: number;
+    effectiveWindow?: string;
+    isRecentFallback?: boolean;
     totalOutbound: number;
     totalInbound: number;
     topDropItems: InventoryItemChange[];
     topSurgeItems: InventoryItemChange[];
+    daekyungTrend?: {
+        window?: string;
+        isFallback?: boolean;
+        totalOutbound: number;
+        totalInbound: number;
+        topDropItems: InventoryItemChange[];
+        topSurgeItems: InventoryItemChange[];
+    };
+    sihwaTrend?: {
+        window?: string;
+        isFallback?: boolean;
+        totalOutbound: number;
+        totalInbound: number;
+        topDropItems: InventoryItemChange[];
+        topSurgeItems: InventoryItemChange[];
+    };
+    orderShipmentTrend?: {
+        totalShippedQty: number;
+        topShippedItems: InventoryItemChange[];
+    };
     _note?: string;
 }
 
@@ -957,20 +979,58 @@ function ReportDashboard({ report }: { report: AiReport }) {
                     </div>
                 </SectionCard>
 
-                {/* 재고 트렌드 */}
-                <SectionCard icon={Package} title="재고 트렌드 · 출고 상위 품목" accentText="text-rose-700">
-                    <div className="text-[11px] text-slate-500 mb-2">
-                        총 출고 {inv.totalOutbound.toLocaleString()}개 · 총 입고 {inv.totalInbound.toLocaleString()}개
+                {/* 재고 및 출고 소진 트렌드 */}
+                <SectionCard icon={Package} title="재고 소진 트렌드 (대경 양산 × 시화 직보유)" accentText="text-rose-700">
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-500 mb-2.5 pb-2 border-b border-slate-100">
+                        <span>
+                            총 출고 <strong className="text-slate-800 font-black">{inv.totalOutbound.toLocaleString()}개</strong> · 총 입고 <strong className="text-slate-800 font-black">{inv.totalInbound.toLocaleString()}개</strong>
+                        </span>
+                        {inv.effectiveWindow && (
+                            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono">
+                                기준: {inv.effectiveWindow}
+                            </span>
+                        )}
                     </div>
-                    <InventoryItemList items={inv.topDropItems} tone="out" />
-                    <div className="mt-3 pt-2 border-t border-slate-100">
-                        <div className="text-[10px] font-bold text-emerald-700 mb-1.5">입고(증가) 상위 품목</div>
-                        <InventoryItemList items={inv.topSurgeItems} tone="in" />
+
+                    <div className="space-y-3">
+                        {/* 1. 대경재고 소진 상위 (시장 수요 선행지표) */}
+                        <div>
+                            <div className="flex items-center justify-between text-[10px] font-black text-rose-800 mb-1.5">
+                                <span>🏭 대경 양산 공장 출고(소진) 상위 품목</span>
+                                {inv.daekyungTrend?.totalOutbound ? (
+                                    <span className="text-rose-600 font-mono font-bold">누적 {inv.daekyungTrend.totalOutbound.toLocaleString()}개</span>
+                                ) : null}
+                            </div>
+                            <InventoryItemList
+                                items={inv.daekyungTrend?.topDropItems && inv.daekyungTrend.topDropItems.length > 0
+                                    ? inv.daekyungTrend.topDropItems
+                                    : inv.topDropItems}
+                                tone="out"
+                            />
+                        </div>
+
+                        {/* 2. 시화 직보유재고 출고 상위 (있을 경우) */}
+                        {inv.sihwaTrend && inv.sihwaTrend.topDropItems.length > 0 && (
+                            <div className="pt-2 border-t border-slate-100">
+                                <div className="flex items-center justify-between text-[10px] font-black text-indigo-800 mb-1.5">
+                                    <span>🏢 시화(+부산) 창고 직보유 출고 품목</span>
+                                    <span className="text-indigo-600 font-mono font-bold">누적 {inv.sihwaTrend.totalOutbound.toLocaleString()}개</span>
+                                </div>
+                                <InventoryItemList items={inv.sihwaTrend.topDropItems} tone="out" />
+                            </div>
+                        )}
+
+                        {/* 3. 입고(증가) 상위 품목 */}
+                        <div className="pt-2 border-t border-slate-100">
+                            <div className="text-[10px] font-bold text-emerald-700 mb-1.5">입고(증가) 상위 품목</div>
+                            <InventoryItemList items={inv.topSurgeItems} tone="in" />
+                        </div>
                     </div>
-                    {lowSample && (
-                        <div className="mt-2.5 flex items-start gap-1.5 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
-                            <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-                            확정 스냅샷이 {inv.confirmedDaysInRange}일뿐이라 표본이 부족합니다. 대경재고를 자주 확정할수록 신뢰도가 올라갑니다.
+
+                    {inv._note && (
+                        <div className="mt-3 flex items-start gap-1.5 text-[10px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
+                            <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                            <span>{inv._note}</span>
                         </div>
                     )}
                 </SectionCard>
