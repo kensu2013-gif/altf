@@ -1297,7 +1297,7 @@ export default function AdminAiReports() {
 
     const handleDeleteReport = async (reportId: string, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
-        if (!confirm('이 경영 리포트를 삭제하시겠습니까?')) return;
+        if (!confirm('이 경영 리포트를 서버에서 완전히 삭제하시겠습니까?')) return;
         try {
             const token = useStore.getState().auth.token;
             const headers: Record<string, string> = {};
@@ -1316,6 +1316,30 @@ export default function AdminAiReports() {
         } catch (err) {
             console.error('Failed to delete report:', err);
             alert(err instanceof Error ? err.message : '리포트 삭제에 실패했습니다.');
+        }
+    };
+
+    const handleClearAllReports = async () => {
+        const periodLabel = PERIOD_TABS.find(t => t.key === activePeriod)?.label || activePeriod;
+        if (!confirm(`현재 [${periodLabel}] 탭에 보관된 모든 리포트(${reports.length}건)를 서버에서 영구 삭제하시겠습니까?\n삭제 후에는 복구할 수 없습니다.`)) return;
+        try {
+            const token = useStore.getState().auth.token;
+            const headers: Record<string, string> = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch((import.meta.env.VITE_API_URL || '') + `/api/admin/ai-reports?all=true&period=${encodeURIComponent(activePeriod)}`, {
+                method: 'DELETE',
+                headers,
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.error || `삭제 실패 (${res.status})`);
+            }
+            setReports([]);
+            setExpandedId(null);
+        } catch (err) {
+            console.error('Failed to clear all reports:', err);
+            alert(err instanceof Error ? err.message : '리포트 전체 삭제에 실패했습니다.');
         }
     };
 
@@ -1365,18 +1389,30 @@ export default function AdminAiReports() {
                 더 깊게 파고들 방향은 하단의 원본 집계 데이터를 참고해 직접 결정하세요.
             </p>
 
-            <div className="print:hidden flex items-center bg-slate-200/60 p-1 rounded-lg w-fit mb-5">
-                {PERIOD_TABS.map(tab => (
+            <div className="print:hidden flex items-center justify-between gap-3 mb-5 flex-wrap">
+                <div className="flex items-center bg-slate-200/60 p-1 rounded-lg w-fit">
+                    {PERIOD_TABS.map(tab => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActivePeriod(tab.key)}
+                            className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
+                                activePeriod === tab.key ? 'bg-white text-teal-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+                {reports.length > 0 && (
                     <button
-                        key={tab.key}
-                        onClick={() => setActivePeriod(tab.key)}
-                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
-                            activePeriod === tab.key ? 'bg-white text-teal-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                        }`}
+                        onClick={handleClearAllReports}
+                        className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-rose-200"
+                        title="현재 탭의 모든 리포트를 서버에서 영구 삭제합니다"
                     >
-                        {tab.label}
+                        <Trash2 className="w-3.5 h-3.5" />
+                        목록 전체 비우기
                     </button>
-                ))}
+                )}
             </div>
 
             {error && (

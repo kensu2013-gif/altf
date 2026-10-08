@@ -3191,7 +3191,10 @@ const server = http.createServer(async (req, res) => {
                 res.end(JSON.stringify({ error: 'Server Error', detail: String(e?.message || e) }));
             }
         });
-    // DELETE /api/admin/ai-reports?id=... 또는 /api/admin/ai-reports/:id
+        return;
+    }
+
+    // DELETE /api/admin/ai-reports?id=... 또는 /api/admin/ai-reports?all=true (또는 period=...)
     if (req.method === 'DELETE' && (url.pathname === '/api/admin/ai-reports' || url.pathname.startsWith('/api/admin/ai-reports/'))) {
         const session = getAuthenticatedSession(req);
         if (!session || session.role !== 'MASTER') {
@@ -3200,18 +3203,37 @@ const server = http.createServer(async (req, res) => {
             return;
         }
         let reportId = url.searchParams.get('id');
+        const isAll = url.searchParams.get('all') === 'true';
+        const targetPeriod = url.searchParams.get('period');
+
         if (!reportId && url.pathname.startsWith('/api/admin/ai-reports/')) {
             reportId = decodeURIComponent(url.pathname.replace('/api/admin/ai-reports/', ''));
         }
+
+        if (isAll) {
+            await updateDb(() => {
+                if (targetPeriod) {
+                    db.aiReports = (db.aiReports || []).filter(r => r.period !== targetPeriod);
+                } else {
+                    db.aiReports = [];
+                }
+            });
+            console.log(`[AI Report] Deleted ${targetPeriod ? targetPeriod : 'all'} reports from DB`);
+            sendJsonResponse(req, res, 200, { success: true, message: 'Deleted reports successfully' });
+            return;
+        }
+
         if (!reportId) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Missing report id' }));
             return;
         }
         await updateDb(() => {
+            const beforeCount = (db.aiReports || []).length;
             db.aiReports = (db.aiReports || []).filter(r => r.id !== reportId);
+            const afterCount = db.aiReports.length;
+            console.log(`[AI Report] Deleted report ${reportId}: ${beforeCount} -> ${afterCount}`);
         });
-        console.log(`[AI Report] Deleted report: ${reportId}`);
         sendJsonResponse(req, res, 200, { success: true, deletedId: reportId });
         return;
     }
