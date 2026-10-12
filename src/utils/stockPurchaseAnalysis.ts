@@ -132,6 +132,10 @@ export function analyzeStockPurchaseItem(
 
     orders.forEach(order => {
         if (order.status === 'CANCELLED' || order.status === 'WITHDRAWN' || order.isDeleted) return;
+        const cust = (order.poEndCustomer || order.supplierInfo?.company_name || order.customerName || '').toLowerCase().replace(/\s+/g, '');
+        // 알트에프, (주)알트에프, 알트에프(서울영업소) 등 자사 내부 건은 고객사 판매 실적에서 제외
+        if (cust.includes('알트에프') || cust.includes('altf') || cust.includes('서울영업소') || cust.includes('시화재고') || cust.includes('서울재고') || cust.includes('부산재고')) return;
+
         const oDate = new Date(order.createdAt).getTime();
         const oItems = order.po_items && order.po_items.length > 0 ? order.po_items : order.items;
         if (!oItems) return;

@@ -59,7 +59,14 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
     const users: User[] = useStore((state: AppState) => state.users);
     
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'HISTORY' | 'INSIGHTS'>('OVERVIEW');
-    const [historySubTab, setHistorySubTab] = useState<'ALL' | 'ORDERS' | 'STOCK_ORDERS' | 'SHIPMENTS'>('ALL');
+    const [historySubTab, setHistorySubTab] = useState<'ALL' | 'ORDERS' | 'STOCK_ORDERS' | 'INTERNAL_ORDERS' | 'SHIPMENTS'>('ALL');
+
+    // 자사(알트에프 본사, 서울영업소 등 동일 회사) 여부 판별 헬퍼
+    const isOurCompany = (name: string = '') => {
+        if (!name) return false;
+        const n = name.toLowerCase().replace(/\s+/g, '');
+        return n.includes('알트에프') || n.includes('altf') || n.includes('서울영업소');
+    };
 
     // Composite Score Breakdown
     const scoreDetails = useMemo(() => {
@@ -163,19 +170,31 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
         return Array.from(uniqueOrders.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }, [orders, productId]);
 
-    // 알트에프 시화 재고 발주분 목록 및 건수
-    const stockOrders = useMemo(() => {
+    // 1. 자사(알트에프 본사, 서울영업소 등 동일 회사) 내부 전산/이관 건 (보충 발주 및 고객사 매출 실적 카운트에서 제외)
+    const internalOrders = useMemo(() => {
         return itemOrders.filter(o => {
-            const cust = (o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '').toLowerCase().replace(/\s+/g, '');
-            return o.isStockOrder || cust.includes('알트에프') || cust.includes('시화재고') || cust.includes('서울재고') || cust.includes('altf');
+            const cust = o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '';
+            return isOurCompany(cust);
         });
     }, [itemOrders]);
 
-    // 순수 외부 고객사 발주 목록
+    // 2. 순수 시화 재고보충 발주분 (자사 내부 건 제외, 순수 재고보충 목적으로 공급처에 발주한 건)
+    const stockOrders = useMemo(() => {
+        return itemOrders.filter(o => {
+            const cust = o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '';
+            if (isOurCompany(cust)) return false; // 알트에프 자사는 보충 발주분에 카운트하지 않음
+            const custNorm = cust.toLowerCase().replace(/\s+/g, '');
+            return o.isStockOrder || custNorm.includes('시화재고') || custNorm.includes('서울재고');
+        });
+    }, [itemOrders]);
+
+    // 3. 순수 외부 고객사 발주 목록 (자사 내부 건 제외)
     const customerOrders = useMemo(() => {
         return itemOrders.filter(o => {
-            const cust = (o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '').toLowerCase().replace(/\s+/g, '');
-            return !(o.isStockOrder || cust.includes('알트에프') || cust.includes('시화재고') || cust.includes('서울재고') || cust.includes('altf'));
+            const cust = o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '';
+            if (isOurCompany(cust)) return false; // 알트에프 자사는 외부 고객사가 아님
+            const custNorm = cust.toLowerCase().replace(/\s+/g, '');
+            return !(o.isStockOrder || custNorm.includes('시화재고') || custNorm.includes('서울재고'));
         });
     }, [itemOrders]);
 
@@ -259,7 +278,8 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
 
         itemOrders.forEach(o => {
             const customerName = o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '';
-            if (customerName) {
+            // 알트에프 자사는 고객사 분석에서 제외
+            if (customerName && !isOurCompany(customerName)) {
                 customerCounts[customerName] = (customerCounts[customerName] || 0) + 1;
                 const extO = o as typeof o & { customerInfo?: { address?: string }, customer?: { address?: string } };
                 let addr = (o.supplierInfo?.address || extO.customerInfo?.address || extO.customer?.address || o.customerAddress || '').toLowerCase();
@@ -279,7 +299,8 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
             const match = items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
             const m = match as typeof match & { price?: number; unit_price?: number; cost?: number; };
             const p = m?.unitPrice || m?.price || m?.unit_price || m?.cost || 0;
-            if (p > 0) {
+            // 자사 내부 전산 등록건(₩0 등)은 평균 단가 계산에서 제외
+            if (p > 0 && !isOurCompany(customerName)) {
                 totalValidPrice += Number(p);
                 validPriceCount++;
             }
@@ -315,19 +336,29 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
             const customerName = o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '알 수 없는 업체';
             if (historyCompany !== 'ALL' && customerName !== historyCompany) return false;
 
+            const isInternal = isOurCompany(customerName);
             const custNormalized = customerName.toLowerCase().replace(/\s+/g, '');
-            const isStock = o.isStockOrder || custNormalized.includes('알트에프') || custNormalized.includes('시화재고') || custNormalized.includes('서울재고') || custNormalized.includes('altf');
+            const isStock = !isInternal && (o.isStockOrder || custNormalized.includes('시화재고') || custNormalized.includes('서울재고'));
 
-            if (historySubTab === 'ORDERS' && isStock) return false;
-            if (historySubTab === 'STOCK_ORDERS' && !isStock) return false;
-            if (historySubTab === 'SHIPMENTS') return false;
+            if (historySubTab === 'ORDERS') {
+                if (isInternal || isStock) return false;
+            } else if (historySubTab === 'STOCK_ORDERS') {
+                if (!isStock) return false;
+            } else if (historySubTab === 'INTERNAL_ORDERS') {
+                if (!isInternal) return false;
+            } else if (historySubTab === 'SHIPMENTS') {
+                return false;
+            } else if (historySubTab === 'ALL') {
+                // 전체 통합 탭에서도 자사(알트에프) 내부 건은 보충 발주/고객사 발주 카운트에서 제외
+                if (isInternal) return false;
+            }
 
             return true;
         });
     }, [itemOrders, historyDays, historyCompany, historySubTab]);
 
     const filteredShipments = useMemo(() => {
-        if (historySubTab === 'ORDERS' || historySubTab === 'STOCK_ORDERS') return [];
+        if (historySubTab === 'ORDERS' || historySubTab === 'STOCK_ORDERS' || historySubTab === 'INTERNAL_ORDERS') return [];
         return sihwaActualShipments.filter(s => {
             if (historyDays !== 0) {
                 const days = (new Date().getTime() - new Date(s.date).getTime()) / (1000 * 3600 * 24);
@@ -351,8 +382,12 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
 
     const allCompanies = useMemo(() => {
         const set = new Set([
-            ...itemOrders.map(o => o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '알 수 없는 업체'),
-            ...itemQuotations.map(q => q.customerInfo?.companyName || q.customerName || '알 수 없는 업체')
+            ...itemOrders
+                .map(o => o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '알 수 없는 업체')
+                .filter(name => !isOurCompany(name)),
+            ...itemQuotations
+                .map(q => q.customerInfo?.companyName || q.customerName || '알 수 없는 업체')
+                .filter(name => !isOurCompany(name))
         ]);
         return Array.from(set).sort();
     }, [itemOrders, itemQuotations]);
@@ -677,6 +712,15 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                     >
                                         🏢 시화 실출고 ({sihwaActualShipmentCount})
                                     </button>
+                                    {internalOrders.length > 0 && (
+                                        <button 
+                                            onClick={() => setHistorySubTab('INTERNAL_ORDERS')} 
+                                            className={`px-3 py-1 text-xs font-bold rounded-md transition cursor-pointer ${historySubTab === 'INTERNAL_ORDERS' ? 'bg-slate-700 text-white shadow-xs' : 'text-slate-400 hover:text-slate-600'}`}
+                                            title="동일 회사(알트에프 본사/영업소) 내부 전산 이관 및 등록 내역 (보충 발주 카운트 제외)"
+                                        >
+                                            자사 내부이력 ({internalOrders.length})
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Filters */}
@@ -741,7 +785,7 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                 </div>
                             )}
 
-                            {/* 2. Recent Orders (고객사 발주 + 시화 재고발주) */}
+                            {/* 2. Recent Orders (고객사 발주 + 시화 재고발주 + 자사내부) */}
                             {historySubTab !== 'SHIPMENTS' && (
                                 <div>
                                     <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -755,13 +799,18 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                             <div className="divide-y divide-slate-200">
                                                 {Object.entries(ordersByCompany).map(([companyName, compOrders]) => {
                                                     const region = getCompanyRegion(companyName);
-                                                    const isStockCompany = companyName.includes('알트에프') || companyName.includes('시화재고') || companyName.includes('서울재고') || companyName.includes('altf');
+                                                    const isInternal = isOurCompany(companyName);
+                                                    const isStockCompany = !isInternal && (companyName.includes('시화재고') || companyName.includes('서울재고'));
 
                                                     return (
                                                         <div key={companyName} className="p-0">
-                                                            <div className={`px-4 py-2 border-b flex items-center gap-2 sticky top-0 ${isStockCompany ? 'bg-indigo-50/80 border-indigo-100' : 'bg-slate-50 border-slate-100'}`}>
+                                                            <div className={`px-4 py-2 border-b flex items-center gap-2 sticky top-0 ${isInternal ? 'bg-slate-100 border-slate-200' : isStockCompany ? 'bg-indigo-50/80 border-indigo-100' : 'bg-slate-50 border-slate-100'}`}>
                                                                 <span className="font-black text-slate-800 text-sm">{companyName}</span>
-                                                                {isStockCompany ? (
+                                                                {isInternal ? (
+                                                                    <span className="text-[10px] bg-slate-200 text-slate-700 font-extrabold px-2 py-0.5 rounded-full">
+                                                                        🏢 자사 내부 등록 (보충 발주 카운트 제외)
+                                                                    </span>
+                                                                ) : isStockCompany ? (
                                                                     <span className="text-[10px] bg-indigo-200/80 text-indigo-900 font-extrabold px-2 py-0.5 rounded-full">
                                                                         📦 시화 재고보충 발주분
                                                                     </span>
@@ -783,7 +832,9 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                                                                             <div className="flex flex-col gap-1">
                                                                                 <div className="flex items-center gap-2">
                                                                                     <span className="font-mono text-[10px] text-slate-400" title="발주번호">{(o.poNumber || o.id).split('-').pop()}</span>
-                                                                                    {isStockCompany ? (
+                                                                                    {isInternal ? (
+                                                                                        <span className="text-[9px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-bold">자사내부</span>
+                                                                                    ) : isStockCompany ? (
                                                                                         <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">재고발주</span>
                                                                                     ) : isDaekyungDirect ? (
                                                                                         <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">직발주</span>
