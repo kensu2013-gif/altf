@@ -28,6 +28,7 @@ import { classifyItem } from './quoteClassification';
 import { QuoteSimilarityDrawer } from './QuoteSimilarityDrawer';
 import { QuoteComparisonModal } from './QuoteComparisonModal';
 import { normalizeLineItem, compareTwoNormalizedDocuments, type SimilarityMatchCandidate, type NormalizedItem } from '../../../utils/quoteSimilarityCore';
+import { analyzeStockPurchaseItem, type StockPurchaseAnalysisResult } from '../../../utils/stockPurchaseAnalysis';
 
 // Helper: Get Stock Status Text
 
@@ -207,6 +208,7 @@ function calculateSupplierRate(name: string, size: string, material: string, pro
 
 export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQuoteDetailProps) {
     const inventory = useStore((state) => state.inventory);
+    const storeOrders = useStore((state) => state.orders);
     const user = useStore((state) => state.auth.user); // Get Admin User
     const updateQuotation = useStore((state) => state.updateQuotation);
     const customPrices = useStore((state) => state.customPrices);
@@ -214,6 +216,15 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const uploadFile = useStore((state) => state.uploadFile);
     const setMobileModalOpen = useStore((state) => state.setMobileModalOpen);
     const customerUser = useStore((state) => state.users.find(u => u.id === quote.userId));
+
+    // 고객사가 알트에프/시화재고/서울재고 등 자사 재고발주분인지 여부
+    const isAltfStockQuote = useMemo(() => {
+        const cName = (quote.customerInfo?.companyName || quote.customerName || customerUser?.companyName || '').toLowerCase().replace(/\s+/g, '');
+        return cName.includes('알트에프') || cName.includes('시화재고') || cName.includes('서울재고') || cName.includes('부산재고') || cName.includes('altf');
+    }, [quote, customerUser]);
+
+    // 재고 구매 가견적 분석 모드 토글 상태 (자사재고 견적서일 경우 자동 기본 활성화)
+    const [isStockAnalysisMode, setIsStockAnalysisMode] = useState<boolean>(() => isAltfStockQuote);
 
     const isQuoteAfterEffectiveDate = useMemo(() => {
         const EFFECTIVE_TIME = new Date('2026-06-15T00:00:00+09:00').getTime();
@@ -659,6 +670,43 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             })
             .catch(console.error);
     }, [user]);
+
+    // 품목별 실시간 재고 구매 가견적 분석 (대경/시화 재고 비교, 등급, 판매추이, 미결중복)
+    const stockPurchaseAnalyses = useMemo<StockPurchaseAnalysisResult[]>(() => {
+        const orderList = orders.length > 0 ? orders : storeOrders;
+        return items.map(item => analyzeStockPurchaseItem(item, inventory, orderList, quote.id));
+    }, [items, inventory, orders, storeOrders, quote.id]);
+
+    // 재고 구매 종합 요약 통계
+    const stockPurchaseSummary = useMemo(() => {
+        let doubleStockout = 0;
+        let urgent = 0;
+        let transfer = 0;
+        let caution = 0;
+        let normal = 0;
+        let duplicateOrders = 0;
+
+        stockPurchaseAnalyses.forEach(a => {
+            if (a.hasOpenDuplicateOrder || a.pendingDuplicateCount > 0) duplicateOrders++;
+            const type = a.suitabilityType || a.recommendation;
+            if (type === 'DOUBLE_STOCKOUT') doubleStockout++;
+            else if (type === 'URGENT_UNMET') urgent++;
+            else if (type === 'DAEKYUNG_TRANSFER') transfer++;
+            else if (type === 'EXCESS_CAUTION') caution++;
+            else normal++;
+        });
+
+        return {
+            total: stockPurchaseAnalyses.length,
+            doubleStockout,
+            urgent,
+            transfer,
+            caution,
+            normal,
+            duplicateOrders,
+            recommendPurchaseCount: doubleStockout + urgent
+        };
+    }, [stockPurchaseAnalyses]);
 
     const customerStats = useMemo(() => {
         return calculateCustomerGrade(orders, customerInfo.companyName, customerInfo.bizNo, quote.userId, crmCustomers);
@@ -1705,8 +1753,119 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         <RefreshCw className="w-3.5 h-3.5 text-teal-600" />
                                         <span>ANSI ↔ JIS 변환 {selectedItems.length > 0 && `(${selectedItems.length})`}</span>
                                     </button>
+
+                                    {/* 재고 구매 가견적 분석 모드 토글 버튼 */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsStockAnalysisMode(prev => !prev)}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                                            isStockAnalysisMode
+                                                ? 'bg-indigo-600 text-white border-indigo-700 shadow-indigo-100'
+                                                : 'bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-300'
+                                        }`}
+                                        title="시화 vs 대경 재고 비교, 등급(A~E), 최근 90일 판매, 미결 중복발주 검토 모드"
+                                    >
+                                        <Package className="w-3.5 h-3.5" />
+                                        <span>📦 재고 구매 분석 {isStockAnalysisMode ? 'ON' : 'OFF'}</span>
+                                        {stockPurchaseSummary.recommendPurchaseCount > 0 && (
+                                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                                                isStockAnalysisMode ? 'bg-white text-indigo-700' : 'bg-rose-500 text-white'
+                                            }`}>
+                                                {stockPurchaseSummary.recommendPurchaseCount}
+                                            </span>
+                                        )}
+                                        {stockPurchaseSummary.duplicateOrders > 0 && (
+                                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                                                isStockAnalysisMode ? 'bg-amber-400 text-amber-950' : 'bg-amber-500 text-white'
+                                            }`}>
+                                                중복{stockPurchaseSummary.duplicateOrders}
+                                            </span>
+                                        )}
+                                    </button>
                                 </div>
                             </div>
+
+                            {/* 재고 구매 가견적 분석 종합 요약 카드 (isStockAnalysisMode 또는 알트에프 재고견적일 때 노출) */}
+                            {isStockAnalysisMode && (
+                                <div className="p-3.5 bg-linear-to-r from-slate-900 via-indigo-950 to-slate-900 border-b border-indigo-500/30 text-white">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2.5">
+                                        <div className="flex items-center gap-2">
+                                            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                                            <h4 className="text-xs font-extrabold tracking-wide uppercase text-indigo-200">
+                                                📦 재고 발주 가견적 의사결정 브리핑 {isAltfStockQuote && <span className="ml-1 px-1.5 py-0.5 rounded bg-indigo-500/50 text-[10px] text-white">자사재고 발주분</span>}
+                                            </h4>
+                                            <span className="text-[11px] text-slate-400">
+                                                (전체 {stockPurchaseSummary.total}개 품목에 대한 시화·대경 재고 및 최근 실적 교차검증)
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-[11px]">
+                                            <span className="px-2 py-0.5 rounded bg-white/10 text-slate-300 font-medium">
+                                                대경재고는 현재고/평균재고 구분 반영됨
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                                        {/* 1. 권장 구매 */}
+                                        <div className="bg-white/10 backdrop-blur-xs rounded-lg p-2.5 border border-white/10 flex flex-col justify-between">
+                                            <div className="flex items-center justify-between text-slate-300 text-[11px] mb-1">
+                                                <span className="font-semibold text-rose-300">🚨 신규구매 권장</span>
+                                                <span className="text-[10px] text-slate-400">시화결품/안전부족</span>
+                                            </div>
+                                            <div className="flex items-baseline justify-between">
+                                                <span className="text-lg font-black text-rose-400">{stockPurchaseSummary.recommendPurchaseCount} <span className="text-xs font-normal text-slate-400">품목</span></span>
+                                                <span className="text-[10px] text-slate-400">양사결품 {stockPurchaseSummary.doubleStockout}건</span>
+                                            </div>
+                                        </div>
+
+                                        {/* 2. 대경 이송 권장 */}
+                                        <div className="bg-white/10 backdrop-blur-xs rounded-lg p-2.5 border border-white/10 flex flex-col justify-between">
+                                            <div className="flex items-center justify-between text-slate-300 text-[11px] mb-1">
+                                                <span className="font-semibold text-amber-300">🚚 대경이송 권장</span>
+                                                <span className="text-[10px] text-slate-400">대경재고 충분</span>
+                                            </div>
+                                            <div className="flex items-baseline justify-between">
+                                                <span className="text-lg font-black text-amber-400">{stockPurchaseSummary.transfer} <span className="text-xs font-normal text-slate-400">품목</span></span>
+                                                <span className="text-[10px] text-emerald-400 font-semibold">발주비용 절감</span>
+                                            </div>
+                                        </div>
+
+                                        {/* 3. 과잉/부진 주의 */}
+                                        <div className="bg-white/10 backdrop-blur-xs rounded-lg p-2.5 border border-white/10 flex flex-col justify-between">
+                                            <div className="flex items-center justify-between text-slate-300 text-[11px] mb-1">
+                                                <span className="font-semibold text-purple-300">⚠️ 과잉/부진 주의</span>
+                                                <span className="text-[10px] text-slate-400">시화재고 과다/비인기</span>
+                                            </div>
+                                            <div className="flex items-baseline justify-between">
+                                                <span className="text-lg font-black text-purple-400">{stockPurchaseSummary.caution} <span className="text-xs font-normal text-slate-400">품목</span></span>
+                                                <span className="text-[10px] text-slate-400">구매보류 검토</span>
+                                            </div>
+                                        </div>
+
+                                        {/* 4. 미결 중복발주 */}
+                                        <div className={`backdrop-blur-xs rounded-lg p-2.5 border flex flex-col justify-between ${
+                                            stockPurchaseSummary.duplicateOrders > 0
+                                                ? 'bg-rose-950/60 border-rose-500/50'
+                                                : 'bg-white/10 border-white/10'
+                                        }`}>
+                                            <div className="flex items-center justify-between text-slate-300 text-[11px] mb-1">
+                                                <span className={`font-semibold ${stockPurchaseSummary.duplicateOrders > 0 ? 'text-rose-300' : 'text-slate-300'}`}>
+                                                    {stockPurchaseSummary.duplicateOrders > 0 ? '🚨 미결 중복발주' : '✅ 미결 중복 없음'}
+                                                </span>
+                                                <span className="text-[10px] text-slate-400">입고대기 PO</span>
+                                            </div>
+                                            <div className="flex items-baseline justify-between">
+                                                <span className={`text-lg font-black ${stockPurchaseSummary.duplicateOrders > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                                    {stockPurchaseSummary.duplicateOrders} <span className="text-xs font-normal text-slate-400">품목</span>
+                                                </span>
+                                                <span className="text-[10px] text-slate-300">
+                                                    {stockPurchaseSummary.duplicateOrders > 0 ? '타 주문 발주대기중' : '중복 발주 위험 없음'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Smart Material & Size Matrix Panel */}
                             <div className="p-3 bg-slate-50/30 border-b border-slate-200">
@@ -2056,6 +2215,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                     customPriceRecord={customPrices[[item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim()]}
                                                     onApplyCustomPrice={(record) => handleApplyCustomPrice(idx, record)}
                                                     similarityMatchStatus={activeSimilarityCandidate?.itemMatchMap.get(idx)?.matchType ?? undefined}
+                                                    stockAnalysis={stockPurchaseAnalyses[idx]}
+                                                    isStockAnalysisMode={isStockAnalysisMode}
                                                 />
                                             );
                                         })}

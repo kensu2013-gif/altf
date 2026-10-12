@@ -48,6 +48,8 @@ function normalizeMaterial(matStr: string | undefined): string {
     return base;
 }
 
+import type { StockPurchaseAnalysisResult } from '../../../utils/stockPurchaseAnalysis';
+
 interface QuoteItemRowProps {
     item: QuoteItem;
     index: number;
@@ -61,6 +63,8 @@ interface QuoteItemRowProps {
     customPriceRecord?: CustomPriceRecord;
     onApplyCustomPrice?: (record: CustomPriceRecord) => void;
     similarityMatchStatus?: 'L1' | 'L2' | 'NONE';
+    stockAnalysis?: StockPurchaseAnalysisResult;
+    isStockAnalysisMode?: boolean;
 }
 
 export const QuoteItemRow = React.memo(({
@@ -75,7 +79,9 @@ export const QuoteItemRow = React.memo(({
     onItemSelect,
     customPriceRecord,
     onApplyCustomPrice,
-    similarityMatchStatus
+    similarityMatchStatus,
+    stockAnalysis,
+    isStockAnalysisMode
 }: QuoteItemRowProps) => {
 
     // Memoize product lookup to prevent unnecessary recalcs if inventory/item identity changes but data is same
@@ -267,6 +273,52 @@ export const QuoteItemRow = React.memo(({
                         ⇄
                     </button>
                 </div>
+
+                {/* [NEW] 재고 구매 분석 모드 시 품목별 심층 인디케이터 (등급/재고/적정성/판매실적/미결중복) */}
+                {isStockAnalysisMode && stockAnalysis && (
+                    <div className="mt-1.5 p-1.5 rounded-lg border bg-linear-to-r from-slate-50 to-indigo-50/40 border-indigo-100 flex flex-wrap items-center gap-1.5 text-[10px]">
+                        {/* 1. 건전성 등급 */}
+                        <span className={`px-1.5 py-0.5 rounded font-black ${
+                            stockAnalysis.healthGrade === 'A' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                            stockAnalysis.healthGrade === 'B' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                            stockAnalysis.healthGrade === 'C' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                            stockAnalysis.healthGrade === 'D' ? 'bg-orange-100 text-orange-800 border border-orange-200' :
+                            stockAnalysis.healthGrade === 'E' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
+                            'bg-slate-100 text-slate-600 border border-slate-200'
+                        }`} title="종합 재고 건전성 등급">
+                            {stockAnalysis.healthGrade}급
+                        </span>
+
+                        {/* 2. 대경 vs 시화 재고 */}
+                        <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">
+                            <span className="text-slate-500 font-bold">대경:</span>
+                            <span className={`font-black ${stockAnalysis.daekyungStock === 0 ? 'text-rose-500' : 'text-slate-700'}`}>{stockAnalysis.daekyungStock}개</span>
+                            <span className="text-slate-300">|</span>
+                            <span className="text-blue-600 font-bold">시화:</span>
+                            <span className={`font-black ${stockAnalysis.sihwaStock === 0 ? 'text-rose-600' : 'text-blue-700'}`}>{stockAnalysis.sihwaStock}개</span>
+                            <span className="text-slate-400 text-[9px]">(안전:{stockAnalysis.safeStock})</span>
+                        </div>
+
+                        {/* 3. 구매 적정성 평가 */}
+                        <span className={`px-1.5 py-0.5 rounded font-bold border ${stockAnalysis.suitabilityBadge.bgClass} ${stockAnalysis.suitabilityBadge.textClass} ${stockAnalysis.suitabilityBadge.borderClass}`} title={stockAnalysis.suitabilityReason}>
+                            {stockAnalysis.suitabilityBadge.text}
+                        </span>
+
+                        {/* 4. 최근 판매 실적 */}
+                        <div className="flex items-center gap-1 text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                            <span className="text-slate-400">90일:</span>
+                            <span className="font-bold text-slate-800">{stockAnalysis.recent90dSales}개</span>
+                            <span className="text-[9px] text-slate-400">({stockAnalysis.recent90dOrders}회)</span>
+                        </div>
+
+                        {/* 5. 미결 중복 발주 알림 */}
+                        {stockAnalysis.pendingDuplicateCount > 0 && (
+                            <span className="bg-rose-100 text-rose-800 border border-rose-200 px-1.5 py-0.5 rounded font-black flex items-center gap-1 animate-pulse" title={stockAnalysis.pendingMatches.map(m => `PO:${m.poNumber} (${m.quantity}개)`).join(', ')}>
+                                ⚠️ 미결중복: {stockAnalysis.pendingDuplicateQty}개 대기 ({stockAnalysis.pendingDuplicateCount}건)
+                            </span>
+                        )}
+                    </div>
+                )}
             </td>
             <td className="px-2 py-2 text-center align-middle font-mono text-sm text-slate-600">
                 {isUnlinked ? (

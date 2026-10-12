@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { X, TrendingUp, PackageSearch, AlertCircle, CheckCircle2, Factory, Package, Filter, BrainCircuit } from 'lucide-react';
+import { X, TrendingUp, PackageSearch, AlertCircle, CheckCircle2, Package, BrainCircuit } from 'lucide-react';
 import { useStore, type AppState } from '../../../store/useStore';
 import type { Order, Quotation, User } from '../../../types';
 
@@ -30,19 +30,36 @@ interface InventoryDataProps {
     [key: string]: unknown;
 }
 
+export interface InventoryDiffItem {
+    id: string;
+    name?: string;
+    from: number;
+    to: number;
+    change: number;
+    sales?: number;
+}
+
+export interface InventoryHistorySnapshot {
+    date: string;
+    diff: InventoryDiffItem[];
+    stock?: Record<string, { name: string; stock: number }>;
+}
+
 interface ItemIntelligenceCardProps {
     productId: string;
     productName?: string;
     onClose: () => void;
     inventoryData?: InventoryDataProps;
+    inventoryHistory?: InventoryHistorySnapshot[];
 }
 
-export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ productId, productName, onClose, inventoryData }) => {
+export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ productId, productName, onClose, inventoryData, inventoryHistory }) => {
     const orders: Order[] = useStore((state: AppState) => state.orders);
     const myQuotations: Quotation[] = useStore((state: AppState) => state.quotes);
     const users: User[] = useStore((state: AppState) => state.users);
     
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'HISTORY' | 'INSIGHTS'>('OVERVIEW');
+    const [historySubTab, setHistorySubTab] = useState<'ALL' | 'ORDERS' | 'STOCK_ORDERS' | 'SHIPMENTS'>('ALL');
 
     // Composite Score Breakdown
     const scoreDetails = useMemo(() => {
@@ -125,12 +142,10 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
         return Array.from(uniqueQuotes.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }, [myQuotations, productId]);
 
+    // 2. Orders Aggregation (고객사 발주 + 알트에프 시화 재고발주 모두 포함)
     const itemOrders = useMemo(() => {
         const filtered = orders.filter(o => {
-            const customerName = (o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '').toLowerCase();
-            // 알트에프(자사) 등고/이동 발주는 매출 실적에서 제외
-            if (customerName.includes('알트에프') || customerName.includes('alt.f') || customerName.includes('altf')) return false;
-
+            if (o.status === 'CANCELLED' || o.isDeleted) return false;
             const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
             return items && items.some(item => (item.productId === productId || item.item_id === productId || item.itemId === productId || item.name === productId));
         });
@@ -148,24 +163,75 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
         return Array.from(uniqueOrders.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }, [orders, productId]);
 
+    // 알트에프 시화 재고 발주분 목록 및 건수
+    const stockOrders = useMemo(() => {
+        return itemOrders.filter(o => {
+            const cust = (o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '').toLowerCase().replace(/\s+/g, '');
+            return o.isStockOrder || cust.includes('알트에프') || cust.includes('시화재고') || cust.includes('서울재고') || cust.includes('altf');
+        });
+    }, [itemOrders]);
+
+    // 순수 외부 고객사 발주 목록
+    const customerOrders = useMemo(() => {
+        return itemOrders.filter(o => {
+            const cust = (o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '').toLowerCase().replace(/\s+/g, '');
+            return !(o.isStockOrder || cust.includes('알트에프') || cust.includes('시화재고') || cust.includes('서울재고') || cust.includes('altf'));
+        });
+    }, [itemOrders]);
+
+    // 3. 시화 창고 실출고 내역 (스냅샷 diff 상에서 change < 0 인 실제 재고 출고 이벤트)
+    const sihwaActualShipments = useMemo(() => {
+        if (!inventoryHistory || inventoryHistory.length === 0) return [];
+        const shipments: { date: string; change: number; from: number; to: number; id: string }[] = [];
+        
+        inventoryHistory.forEach(snap => {
+            if (!snap.diff) return;
+            snap.diff.forEach(d => {
+                if (d.id === productId && d.change < 0) {
+                    shipments.push({
+                        id: `${snap.date}-${d.id}`,
+                        date: snap.date,
+                        change: Math.abs(d.change),
+                        from: d.from,
+                        to: d.to
+                    });
+                }
+            });
+        });
+
+        return shipments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [inventoryHistory, productId]);
+
+    const sihwaActualShipmentCount = sihwaActualShipments.length;
+    const sihwaTotalShippedQty = sihwaActualShipments.reduce((sum, s) => sum + s.change, 0);
+
     // Metrics
     const totalQuotations = itemQuotations.length;
     const totalOrders = itemOrders.length;
-    const conversionRate = totalQuotations > 0 ? ((totalOrders / totalQuotations) * 100).toFixed(1) : '0.0';
+    const conversionRate = totalQuotations > 0 ? ((customerOrders.length / totalQuotations) * 100).toFixed(1) : '0.0';
 
     // Dispatch Analysis
     const dispatchAnalysis = useMemo(() => {
-        let siHwaCount = 0;
         let daekyungCount = 0;
+        let customerOrderCount = 0;
         
-        itemOrders.forEach(o => {
+        customerOrders.forEach(o => {
             const isDaekyung = o.supplierInfo?.company_name?.includes('대경') || o.supplierInfo?.company_name?.includes('직발주');
             if (isDaekyung) daekyungCount++;
-            else siHwaCount++;
+            else customerOrderCount++;
         });
+
+        // 시화 실출고 건수가 있으면 실출고 건수 우선, 없으면 시화 발주 건수
+        const siHwaCount = sihwaActualShipmentCount > 0 ? sihwaActualShipmentCount : customerOrderCount;
         
-        return { siHwaCount, daekyungCount };
-    }, [itemOrders]);
+        return { 
+            siHwaCount, 
+            daekyungCount, 
+            customerOrderCount,
+            stockOrderCount: stockOrders.length,
+            sihwaTotalShippedQty
+        };
+    }, [customerOrders, stockOrders, sihwaActualShipmentCount, sihwaTotalShippedQty]);
 
     const getRegionTag = (addr: string = '') => {
         if (!addr) return null;
@@ -248,9 +314,28 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
             }
             const customerName = o.poEndCustomer || o.supplierInfo?.company_name || o.customerName || '알 수 없는 업체';
             if (historyCompany !== 'ALL' && customerName !== historyCompany) return false;
+
+            const custNormalized = customerName.toLowerCase().replace(/\s+/g, '');
+            const isStock = o.isStockOrder || custNormalized.includes('알트에프') || custNormalized.includes('시화재고') || custNormalized.includes('서울재고') || custNormalized.includes('altf');
+
+            if (historySubTab === 'ORDERS' && isStock) return false;
+            if (historySubTab === 'STOCK_ORDERS' && !isStock) return false;
+            if (historySubTab === 'SHIPMENTS') return false;
+
             return true;
         });
-    }, [itemOrders, historyDays, historyCompany]);
+    }, [itemOrders, historyDays, historyCompany, historySubTab]);
+
+    const filteredShipments = useMemo(() => {
+        if (historySubTab === 'ORDERS' || historySubTab === 'STOCK_ORDERS') return [];
+        return sihwaActualShipments.filter(s => {
+            if (historyDays !== 0) {
+                const days = (new Date().getTime() - new Date(s.date).getTime()) / (1000 * 3600 * 24);
+                if (days > historyDays) return false;
+            }
+            return true;
+        });
+    }, [sihwaActualShipments, historyDays, historySubTab]);
 
     const filteredQuotes = useMemo(() => {
         return itemQuotations.filter(q => {
@@ -349,22 +434,28 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                             <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                                 <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                                     <TrendingUp className="w-4 h-4" />
-                                    전환율 (Conversion Rate)
+                                    품목 종합 요약 지표 (수요 & 발주 & 실출고)
                                 </div>
-                                <div className="grid grid-cols-3 divide-x divide-slate-100">
+                                <div className="grid grid-cols-4 divide-x divide-slate-100">
                                     <div className="flex flex-col items-center">
-                                        <span className="text-[10px] text-slate-500 font-bold mb-1">총 견적</span>
+                                        <span className="text-[10px] text-slate-500 font-bold mb-1">총 견적 유입</span>
                                         <span className="text-2xl font-black text-slate-700">{totalQuotations}</span>
                                         <span className="text-[9px] text-slate-400">건 접수</span>
                                     </div>
                                     <div className="flex flex-col items-center">
-                                        <span className="text-[10px] text-slate-500 font-bold mb-1">총 발주</span>
-                                        <span className="text-2xl font-black text-emerald-600">{totalOrders}</span>
-                                        <span className="text-[9px] text-slate-400">건 성공</span>
+                                        <span className="text-[10px] text-slate-500 font-bold mb-1">고객사 수주</span>
+                                        <span className="text-2xl font-black text-emerald-600">{customerOrders.length}</span>
+                                        <span className="text-[9px] text-slate-400">건 완료</span>
                                     </div>
-                                    <div className="flex flex-col items-center justify-center bg-indigo-50/50 rounded-r-xl">
-                                        <span className="text-[10px] text-indigo-500 font-bold mb-1">전환 성공률</span>
-                                        <span className="text-2xl font-black text-indigo-600">{conversionRate}%</span>
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[10px] text-indigo-600 font-bold mb-1">시화 재고발주</span>
+                                        <span className="text-2xl font-black text-indigo-600">{stockOrders.length}</span>
+                                        <span className="text-[9px] text-indigo-400 font-medium">건 보충</span>
+                                    </div>
+                                    <div className="flex flex-col items-center justify-center bg-teal-50/50 rounded-r-xl">
+                                        <span className="text-[10px] text-teal-700 font-bold mb-1">시화 실출고</span>
+                                        <span className="text-2xl font-black text-teal-700">{sihwaActualShipmentCount}</span>
+                                        <span className="text-[9px] text-teal-600 font-bold">({sihwaTotalShippedQty}개 출고)</span>
                                     </div>
                                 </div>
                             </div>
@@ -373,25 +464,34 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
                             <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                                 <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                                     <Package className="w-4 h-4" />
-                                    출고처 점유율
+                                    출고 및 발주 거점 분석
                                 </div>
-                                <div className="flex gap-4">
-                                    <div className="flex-1 bg-slate-50 rounded-xl p-4 flex items-center gap-3 border border-slate-100">
-                                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                                            <Package className="w-5 h-5" />
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <div className="bg-teal-50/70 rounded-xl p-3.5 flex items-center gap-3 border border-teal-200/60">
+                                        <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 shrink-0 font-bold">
+                                            🏢
                                         </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-xs font-bold text-slate-500">시화 재고 출고</span>
-                                            <span className="text-xl font-black text-slate-800">{dispatchAnalysis.siHwaCount}건</span>
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="text-xs font-bold text-teal-800">시화 창고 실출고</span>
+                                            <span className="text-lg font-black text-teal-900">{sihwaActualShipmentCount}건 <span className="text-xs font-normal text-teal-700">({sihwaTotalShippedQty}개)</span></span>
                                         </div>
                                     </div>
-                                    <div className="flex-1 bg-slate-50 rounded-xl p-4 flex items-center gap-3 border border-slate-100">
-                                        <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
-                                            <Factory className="w-5 h-5" />
+                                    <div className="bg-indigo-50/70 rounded-xl p-3.5 flex items-center gap-3 border border-indigo-200/60">
+                                        <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 shrink-0 font-bold">
+                                            📦
                                         </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-xs font-bold text-slate-500">대경 직발주</span>
-                                            <span className="text-xl font-black text-slate-800">{dispatchAnalysis.daekyungCount}건</span>
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="text-xs font-bold text-indigo-800">시화 재고 보충 발주</span>
+                                            <span className="text-lg font-black text-indigo-900">{dispatchAnalysis.stockOrderCount}건</span>
+                                        </div>
+                                    </div>
+                                    <div className="bg-amber-50/70 rounded-xl p-3.5 flex items-center gap-3 border border-amber-200/60">
+                                        <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 shrink-0 font-bold">
+                                            🏭
+                                        </div>
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="text-xs font-bold text-amber-800">대경 본사 직발주</span>
+                                            <span className="text-lg font-black text-amber-900">{dispatchAnalysis.daekyungCount}건</span>
                                         </div>
                                     </div>
                                 </div>
@@ -550,93 +650,170 @@ export const ItemIntelligenceCard: React.FC<ItemIntelligenceCardProps> = ({ prod
 
                     {activeTab === 'HISTORY' && (
                         <div className="space-y-6">
-                            {/* Filters */}
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-wrap items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                    <Filter className="w-4 h-4 text-slate-400" />
-                                    <span className="text-xs font-bold text-slate-700">조회 필터</span>
+                            {/* Sub Tab Controls */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200">
+                                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg">
+                                    <button 
+                                        onClick={() => setHistorySubTab('ALL')} 
+                                        className={`px-3 py-1 text-xs font-bold rounded-md transition cursor-pointer ${historySubTab === 'ALL' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                                    >
+                                        전체 통합
+                                    </button>
+                                    <button 
+                                        onClick={() => setHistorySubTab('ORDERS')} 
+                                        className={`px-3 py-1 text-xs font-bold rounded-md transition cursor-pointer ${historySubTab === 'ORDERS' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                                    >
+                                        고객사 발주 ({customerOrders.length})
+                                    </button>
+                                    <button 
+                                        onClick={() => setHistorySubTab('STOCK_ORDERS')} 
+                                        className={`px-3 py-1 text-xs font-bold rounded-md transition cursor-pointer ${historySubTab === 'STOCK_ORDERS' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                                    >
+                                        시화 재고발주 ({stockOrders.length})
+                                    </button>
+                                    <button 
+                                        onClick={() => setHistorySubTab('SHIPMENTS')} 
+                                        className={`px-3 py-1 text-xs font-bold rounded-md transition cursor-pointer ${historySubTab === 'SHIPMENTS' ? 'bg-teal-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                                    >
+                                        🏢 시화 실출고 ({sihwaActualShipmentCount})
+                                    </button>
                                 </div>
-                                <select 
-                                    className="text-xs border border-slate-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    value={historyDays}
-                                    onChange={(e) => setHistoryDays(Number(e.target.value))}
-                                    aria-label="조회 기간"
-                                    title="조회 기간 필터"
-                                >
-                                    <option value={30}>최근 30일</option>
-                                    <option value={90}>최근 90일</option>
-                                    <option value={180}>최근 180일</option>
-                                    <option value={365}>최근 1년</option>
-                                    <option value={0}>전체 기간</option>
-                                </select>
-                                <select 
-                                    className="text-xs border border-slate-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-50"
-                                    value={historyCompany}
-                                    onChange={(e) => setHistoryCompany(e.target.value)}
-                                    aria-label="조회 업체"
-                                    title="조회 업체 필터"
-                                >
-                                    <option value="ALL">전체 업체</option>
-                                    {allCompanies.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </div>
 
-                            {/* Recent Orders */}
-                            <div>
-                                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                    최근 발주 이력 ({filteredOrders.length}건)
-                                </h3>
-                                <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                                    {Object.keys(ordersByCompany).length === 0 ? (
-                                        <div className="p-6 text-center text-sm text-slate-400">발주 이력이 없습니다.</div>
-                                    ) : (
-                                        <div className="divide-y divide-slate-200">
-                                            {Object.entries(ordersByCompany).map(([companyName, compOrders]) => {
-                                                const region = getCompanyRegion(companyName);
-                                                return (
-                                                    <div key={companyName} className="p-0">
-                                                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 flex items-center gap-2 sticky top-0">
-                                                            <span className="font-black text-slate-800 text-sm">{companyName}</span>
-                                                            {region && (
-                                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${region.color}`}>{region.label}</span>
-                                                            )}
-                                                            <span className="text-[10px] text-slate-400 font-medium ml-auto">{compOrders.length}건</span>
-                                                        </div>
-                                                        <div className="divide-y divide-slate-100">
-                                                            {compOrders.map(o => {
-                                                                const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
-                                                                const match = items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
-                                                                const m = match as typeof match & { price?: number; unit_price?: number; cost?: number; };
-                                                                const unitPrice = m?.unitPrice || m?.price || m?.unit_price || m?.cost || 0;
-                                                                return (
-                                                                    <div key={o.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center pl-6">
-                                                                        <div className="flex flex-col gap-1">
-                                                                            <div className="flex items-center gap-2">
-                                                                                <span className="font-mono text-[10px] text-slate-400" title="발주번호">{(o.poNumber || o.id).split('-').pop()}</span>
-                                                                                {o.supplierInfo?.company_name?.includes('대경') ? (
-                                                                                    <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">직발주</span>
-                                                                                ) : (
-                                                                                    <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">시화출고</span>
-                                                                                )}
-                                                                            </div>
-                                                                            <span className="text-xs font-bold text-slate-600">{new Date(o.createdAt).toLocaleDateString()}</span>
-                                                                        </div>
-                                                                        <div className="flex flex-col items-end">
-                                                                            <span className="font-black text-emerald-600">{match?.quantity}개</span>
-                                                                            <span className="text-[10px] text-slate-400">단가 ₩{Number(unitPrice).toLocaleString()}</span>
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                {/* Filters */}
+                                <div className="flex items-center gap-2">
+                                    <select 
+                                        className="text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                                        value={historyDays}
+                                        onChange={(e) => setHistoryDays(Number(e.target.value))}
+                                        aria-label="조회 기간"
+                                        title="조회 기간 필터"
+                                    >
+                                        <option value={30}>최근 30일</option>
+                                        <option value={90}>최근 90일</option>
+                                        <option value={180}>최근 180일</option>
+                                        <option value={365}>최근 1년</option>
+                                        <option value={0}>전체 기간</option>
+                                    </select>
+                                    {historySubTab !== 'SHIPMENTS' && (
+                                        <select 
+                                            className="text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-40 font-medium"
+                                            value={historyCompany}
+                                            onChange={(e) => setHistoryCompany(e.target.value)}
+                                            aria-label="조회 업체"
+                                            title="조회 업체 필터"
+                                        >
+                                            <option value="ALL">전체 업체</option>
+                                            {allCompanies.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
                                     )}
                                 </div>
                             </div>
+
+                            {/* 1. 시화 창고 실출고 내역 (스냅샷 실출고) */}
+                            {(historySubTab === 'ALL' || historySubTab === 'SHIPMENTS') && filteredShipments.length > 0 && (
+                                <div>
+                                    <h3 className="text-xs font-black text-teal-800 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                        🏢 시화 물류창고 실출고 이력 ({filteredShipments.length}건 / 총 {filteredShipments.reduce((acc, s) => acc + s.change, 0)}개 출고)
+                                    </h3>
+                                    <div className="bg-white border border-teal-200/80 rounded-xl shadow-xs overflow-hidden divide-y divide-slate-100">
+                                        {filteredShipments.map((s) => (
+                                            <div key={s.id} className="p-3.5 hover:bg-teal-50/30 transition-colors flex justify-between items-center">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] bg-teal-100 text-teal-800 font-bold px-1.5 py-0.5 rounded">
+                                                            🏢 시화 창고 실출고
+                                                        </span>
+                                                        <span className="text-xs font-black text-slate-700">{s.date.split('T')[0]}</span>
+                                                    </div>
+                                                    <span className="text-[10px] text-slate-400">
+                                                        출고 전 재고: {s.from}개 → 출고 후 재고: <strong className="text-slate-600">{s.to}개</strong>
+                                                    </span>
+                                                </div>
+                                                <div className="flex flex-col items-end">
+                                                    <span className="font-mono font-black text-teal-700 text-sm">
+                                                        -{s.change}개
+                                                    </span>
+                                                    <span className="text-[10px] text-teal-600/80 font-bold">실재고 차감 완료</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 2. Recent Orders (고객사 발주 + 시화 재고발주) */}
+                            {historySubTab !== 'SHIPMENTS' && (
+                                <div>
+                                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                        발주 등록 및 출고 이력 ({filteredOrders.length}건)
+                                    </h3>
+                                    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                                        {Object.keys(ordersByCompany).length === 0 ? (
+                                            <div className="p-6 text-center text-sm text-slate-400">선택한 조건의 발주 이력이 없습니다.</div>
+                                        ) : (
+                                            <div className="divide-y divide-slate-200">
+                                                {Object.entries(ordersByCompany).map(([companyName, compOrders]) => {
+                                                    const region = getCompanyRegion(companyName);
+                                                    const isStockCompany = companyName.includes('알트에프') || companyName.includes('시화재고') || companyName.includes('서울재고') || companyName.includes('altf');
+
+                                                    return (
+                                                        <div key={companyName} className="p-0">
+                                                            <div className={`px-4 py-2 border-b flex items-center gap-2 sticky top-0 ${isStockCompany ? 'bg-indigo-50/80 border-indigo-100' : 'bg-slate-50 border-slate-100'}`}>
+                                                                <span className="font-black text-slate-800 text-sm">{companyName}</span>
+                                                                {isStockCompany ? (
+                                                                    <span className="text-[10px] bg-indigo-200/80 text-indigo-900 font-extrabold px-2 py-0.5 rounded-full">
+                                                                        📦 시화 재고보충 발주분
+                                                                    </span>
+                                                                ) : region ? (
+                                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${region.color}`}>{region.label}</span>
+                                                                ) : null}
+                                                                <span className="text-[10px] text-slate-400 font-medium ml-auto">{compOrders.length}건</span>
+                                                            </div>
+                                                            <div className="divide-y divide-slate-100">
+                                                                {compOrders.map(o => {
+                                                                    const items = o.po_items && o.po_items.length > 0 ? o.po_items : o.items;
+                                                                    const match = items?.find(i => i.productId === productId || i.item_id === productId || i.itemId === productId || i.name === productId);
+                                                                    const m = match as typeof match & { price?: number; unit_price?: number; cost?: number; };
+                                                                    const unitPrice = m?.unitPrice || m?.price || m?.unit_price || m?.cost || 0;
+                                                                    const isDaekyungDirect = o.supplierInfo?.company_name?.includes('대경') || o.supplierInfo?.company_name?.includes('직발주');
+
+                                                                    return (
+                                                                        <div key={o.id} className="p-3.5 hover:bg-slate-50 transition-colors flex justify-between items-center pl-6">
+                                                                            <div className="flex flex-col gap-1">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="font-mono text-[10px] text-slate-400" title="발주번호">{(o.poNumber || o.id).split('-').pop()}</span>
+                                                                                    {isStockCompany ? (
+                                                                                        <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">재고발주</span>
+                                                                                    ) : isDaekyungDirect ? (
+                                                                                        <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">직발주</span>
+                                                                                    ) : (
+                                                                                        <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">시화출고</span>
+                                                                                    )}
+                                                                                    {o.status && (
+                                                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${o.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                                                            {o.status === 'COMPLETED' ? '출고완료' : '진행중'}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                                <span className="text-xs font-bold text-slate-600">{new Date(o.createdAt).toLocaleDateString()}</span>
+                                                                            </div>
+                                                                            <div className="flex flex-col items-end">
+                                                                                <span className="font-black text-emerald-600">{match?.quantity}개</span>
+                                                                                <span className="text-[10px] text-slate-400">단가 ₩{Number(unitPrice).toLocaleString()}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Recent Quotes */}
                             <div>

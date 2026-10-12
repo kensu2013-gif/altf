@@ -1216,15 +1216,31 @@ export default function SihwaInventory() {
             }
         });
 
-        inventory.forEach((item: Product) => {
+        // 품목 ID 기준으로 inventory 다중 레코드의 locationStock을 안전하게 병합
+        const uniqueInventoryMap = new Map<string, Product>();
+        inventory.forEach((p: Product) => {
+            if (!p.id) return;
+            if (!uniqueInventoryMap.has(p.id)) {
+                uniqueInventoryMap.set(p.id, { ...p, locationStock: { ...(p.locationStock || {}) } });
+            } else {
+                const existing = uniqueInventoryMap.get(p.id)!;
+                if (p.locationStock) {
+                    existing.locationStock = {
+                        ...(existing.locationStock || {}),
+                        ...p.locationStock
+                    };
+                }
+            }
+        });
+        const targetInventoryList = Array.from(uniqueInventoryMap.values());
+
+        targetInventoryList.forEach((item: Product) => {
             let shQty = 0;
             let ysQty = 0;
 
-            if (item.locationStock) {
+            if (item.locationStock && Object.keys(item.locationStock).length > 0) {
                 if (item.locationStock['시화'] !== undefined) shQty += Number(item.locationStock['시화']);
                 if (item.locationStock['서울'] !== undefined) shQty += Number(item.locationStock['서울']);
-                // Restore Yangsan inventory into ysQty to ensure "대경재고" column accurately reflects factory stock
-                // and matches Quote/Order system numbers.
                 if (item.locationStock['양산'] !== undefined) ysQty += Number(item.locationStock['양산']);
                 if (item.locationStock['대경'] !== undefined) ysQty += Number(item.locationStock['대경']);
             } else {
@@ -6304,13 +6320,13 @@ if (displayList.length === 0) {
                                                         </th>
                                                         <th className="px-4 py-3 text-right font-black text-teal-700 bg-teal-50/50 cursor-pointer hover:bg-teal-100/50 transition group relative" onClick={() => setDkSortConfig(prev => ({ key: 'shQty', direction: prev.key === 'shQty' && prev.direction === 'desc' ? 'asc' : 'desc' }))}>
                                                             <div className="flex flex-col items-end">
-                                                                <span>시화 현재고 {dkSortConfig.key === 'shQty' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}</span>
-                                                                <span className="text-[10px] text-teal-600/70 font-normal">[최소 ~ 최대]</span>
+                                                                <span className="flex items-center gap-1">🏢 시화 현재고 {dkSortConfig.key === 'shQty' && (dkSortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                                                                <span className="text-[10px] text-teal-600/80 font-normal">실시간 보유고</span>
                                                             </div>
                                                             <div className="absolute right-0 bottom-full mb-2 w-72 bg-slate-800 text-white text-[11px] p-3 rounded shadow-xl hidden group-hover:block z-50 text-left font-normal whitespace-normal cursor-auto">
-                                                                <div className="font-bold mb-1 border-b border-slate-600 pb-1 text-teal-300">🏢 시화 현재고 및 최근 최소/최대 보유량</div>
+                                                                <div className="font-bold mb-1 border-b border-slate-600 pb-1 text-teal-300">🏢 시화 물류센터 실시간 현재고</div>
                                                                 <div className="text-slate-200 leading-relaxed">
-                                                                    시화 물류센터의 <b>현재 보유 재고</b>와 최근 확정 스냅샷 이력상 관측된 <b>최소(Min) ~ 최대(Max)</b> 변동 범위입니다.
+                                                                    시화 물류센터에 <b>실제 보관 중인 실시간 현재 재고</b>입니다. (평균값이 아니며, 물류창고 실시간 단일 현재고 수량입니다.)
                                                                 </div>
                                                             </div>
                                                         </th>
@@ -6440,20 +6456,16 @@ if (displayList.length === 0) {
                                                                 </td>
                                                                 <td className="px-4 py-2.5 text-right font-mono bg-teal-50/30">
                                                                     <div className="flex flex-col items-end">
-                                                                        <span className="font-black text-teal-700 text-[12px]">
+                                                                        <span className="font-black text-teal-700 text-[13px]">
                                                                             {row.shQty.toLocaleString()}개
                                                                         </span>
                                                                         {row.shHasHistory ? (
-                                                                            <span className="text-[10px] text-teal-800 font-medium" title={`시화 3개월 관측치 — 최저: ${(row.shMin3m ?? row.shQty).toLocaleString()}개, 최고: ${(row.shMax3m ?? row.shQty).toLocaleString()}개`}>
-                                                                                <span className="text-teal-600/70">[</span>
-                                                                                <span className="font-bold text-amber-700">{(row.shMin3m ?? row.shQty).toLocaleString()}</span>
-                                                                                <span className="text-teal-600/70 mx-0.5">~</span>
-                                                                                <span className="font-bold text-emerald-700">{(row.shMax3m ?? row.shQty).toLocaleString()}</span>
-                                                                                <span className="text-teal-600/70">]</span>
+                                                                            <span className="text-[10px] text-slate-400 font-normal" title={`시화 3개월 관측 범위 — 최저: ${(row.shMin3m ?? row.shQty).toLocaleString()}개 ~ 최고: ${(row.shMax3m ?? row.shQty).toLocaleString()}개`}>
+                                                                                3M변동 [{(row.shMin3m ?? row.shQty).toLocaleString()}~{(row.shMax3m ?? row.shQty).toLocaleString()}]
                                                                             </span>
                                                                         ) : (
                                                                             <span className="text-[10px] text-slate-400 font-normal">
-                                                                                [변동없음: {row.shQty}개]
+                                                                                [현재고 유지]
                                                                             </span>
                                                                         )}
                                                                     </div>
@@ -6944,6 +6956,7 @@ if (displayList.length === 0) {
                     productId={selectedIntelligenceItem.product.id}
                     productName={selectedIntelligenceItem.product.name}
                     inventoryData={selectedIntelligenceItem}
+                    inventoryHistory={historyData.inventoryHistory}
                     onClose={() => setSelectedIntelligenceItem(null)}
                 />
             )}

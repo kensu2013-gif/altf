@@ -502,7 +502,7 @@ export default function AdminQuotes() {
             </div>
 
             <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] custom-scrollbar pb-4 pr-2">
-                <div className="grid grid-cols-1 gap-4 min-w-[900px]">
+                <div className="grid grid-cols-1 gap-4 min-w-225">
                     {filteredQuotes.length === 0 ? (
                         <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
                             <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -546,6 +546,11 @@ export default function AdminQuotes() {
                                 candidates: [quote.similarity as unknown as SimilarityMatchCandidate]
                             } : null);
 
+                            const isStockQuote = (() => {
+                                const cName = (displayCompany || quote.customerName || '').toLowerCase().replace(/\s+/g, '');
+                                return cName.includes('알트에프') || cName.includes('시화재고') || cName.includes('서울재고') || cName.includes('부산재고') || cName.includes('altf');
+                            })();
+
                             return (
                                 <div key={quote.id} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col xl:flex-row xl:items-center justify-between gap-4 group hover:shadow-md transition-all">
                                     {/* 좌측: 기본 정보 및 상태 태그 그룹 (수정됨, 재고부족, 유사도) */}
@@ -563,6 +568,11 @@ export default function AdminQuotes() {
 
                                                 {/* 좌측 정렬 상태 태그 그룹 */}
                                                 <div className="inline-flex items-center gap-1.5 flex-wrap">
+                                                    {isStockQuote && (
+                                                        <span className="text-[11px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs shrink-0 whitespace-nowrap">
+                                                            📦 재고발주 가견적
+                                                        </span>
+                                                    )}
                                                     {isModified && (
                                                         <span className="text-[10px] font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 shrink-0 whitespace-nowrap">
                                                             수정됨
@@ -655,7 +665,7 @@ export default function AdminQuotes() {
                                         </div>
 
                                         {/* 총 견적금액 (기준선 통일을 위한 min-width 적용) */}
-                                        <div className="text-right shrink-0 min-w-[105px] lg:min-w-[120px]">
+                                        <div className="text-right shrink-0 min-w-26.25 lg:min-w-30">
                                             <div className="text-xs text-slate-400 font-medium whitespace-nowrap">총 견적금액</div>
                                             <div className="text-lg lg:text-xl font-bold text-teal-700 font-mono whitespace-nowrap">
                                                 {formatCurrency(quote.totalAmount)}
