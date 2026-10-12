@@ -297,4 +297,10 @@ export class MyWorkflow {
 ## 🐙 Git 작업 규칙 (Git Operation Policy)
 - Git 관련 명령어 실행 (add, commit, push, pull, status, checkout, merge 등) 및 관련 문의/확인 요청 시 별도로 묻지 않고 항상 승인(Always Yes) 처리하여 즉시 실행 및 완료합니다.
 
+---
+
+## ⚡ 코드 작업 및 구현 규칙 (Code Implementation Policy)
+- 코드 변경, 버그 수정, 기능 구현 작업 시 사용자에게 사전에 "수정해도 될까요?", "진행할까요?" 등의 승인/Allow 여부를 일절 묻지 않고 **즉시 직접 수정 및 구현을 완료**합니다.
+- 구현 완료 후에는 어떤 코드가 어떻게 변경되었는지 **상세한 구현 내용(구현 전/후 비교, Diff, 주요 로직 설명)**을 명확하게 제시합니다.
+
 
