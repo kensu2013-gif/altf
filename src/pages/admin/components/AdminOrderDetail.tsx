@@ -377,20 +377,38 @@ export const AdminOrderDetail = memo(function AdminOrderDetail({ order, onClose,
     // Smart Purchase Rate Matrix State
     const [isPoMatrixOpen, setIsPoMatrixOpen] = useState<boolean>(() => ((order.po_items?.length || order.items?.length || 0) >= 10));
     const [poSplitSizeA, setPoSplitSizeA] = useState<number>(100);
-    const [activePoMatrixFilter, setActivePoMatrixFilter] = useState<{ filterKey: string; label: string } | null>(null);
+    const [activePoMatrixFilters, setActivePoMatrixFilters] = useState<Array<{ filterKey: string; label: string }>>([]);
 
-    // Precomputed Set of matching item indices for activePoMatrixFilter in Supplier PO mode
+    const togglePoMatrixFilter = useCallback((filterKey: string, label: string) => {
+        setActivePoMatrixFilters(prev => {
+            const idx = prev.findIndex(f => f.filterKey === filterKey);
+            if (idx >= 0) {
+                return prev.filter((_, i) => i !== idx);
+            } else {
+                return [...prev, { filterKey, label }];
+            }
+        });
+    }, []);
+
+    const clearPoMatrixFilters = useCallback(() => {
+        setActivePoMatrixFilters([]);
+    }, []);
+
+    // Precomputed Set of matching item indices for activePoMatrixFilters in Supplier PO mode
     const filteredPoItemIndices = useMemo(() => {
-        if (!activePoMatrixFilter || !isSupplierMode) return null;
+        if (!activePoMatrixFilters || activePoMatrixFilters.length === 0 || !isSupplierMode) return null;
         const set = new Set<number>();
-        const filterKey = activePoMatrixFilter.filterKey;
         for (let i = 0; i < poItems.length; i++) {
-            if (checkItemMatchTargetRateFilter(poItems[i], filterKey, poSplitSizeA, 'supplierRate')) {
-                set.add(i);
+            const item = poItems[i];
+            for (let f = 0; f < activePoMatrixFilters.length; f++) {
+                if (checkItemMatchTargetRateFilter(item, activePoMatrixFilters[f].filterKey, poSplitSizeA, 'supplierRate')) {
+                    set.add(i);
+                    break;
+                }
             }
         }
         return set;
-    }, [poItems, activePoMatrixFilter, isSupplierMode, poSplitSizeA]);
+    }, [poItems, activePoMatrixFilters, isSupplierMode, poSplitSizeA]);
 
     // -------------------------------------------------------------
     // ALTF 유사도 및 Shortage 감지 엔진 (Order Mode)
@@ -3090,13 +3108,18 @@ if (deliveryNoteFiles.length > 0) {
                                     onToggle={() => setIsPoMatrixOpen(!isPoMatrixOpen)}
                                     currentSplitSize={poSplitSizeA}
                                     onSplitSizeChange={setPoSplitSizeA}
-                                    selectedFilterKey={activePoMatrixFilter?.filterKey ?? null}
+                                    selectedFilterKeys={activePoMatrixFilters.map(f => f.filterKey)}
+                                    onToggleFilter={(filterKey, label) => {
+                                        startTransition(() => {
+                                            togglePoMatrixFilter(filterKey, label);
+                                        });
+                                    }}
                                     onSelectFilter={(filterKey, label) => {
                                         startTransition(() => {
                                             if (filterKey) {
-                                                setActivePoMatrixFilter({ filterKey, label });
+                                                togglePoMatrixFilter(filterKey, label);
                                             } else {
-                                                setActivePoMatrixFilter(null);
+                                                clearPoMatrixFilters();
                                             }
                                         });
                                     }}
@@ -3107,13 +3130,35 @@ if (deliveryNoteFiles.length > 0) {
                         )}
 
                         {/* Filter notification banner if active */}
-                        {isSupplierMode && activePoMatrixFilter && (
+                        {isSupplierMode && activePoMatrixFilters.length > 0 && (
                             <div className="flex items-center justify-between px-4 py-2.5 bg-linear-to-r from-indigo-50 via-purple-50 to-indigo-50 border border-indigo-200 rounded-xl mb-3 text-xs font-bold text-indigo-900 shadow-2xs">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse shrink-0" />
-                                    <span>
-                                        선택 조건 필터링 중: <b className="text-indigo-800 underline underline-offset-2">{activePoMatrixFilter.label}</b>
+                                    <span className="font-extrabold text-indigo-950">
+                                        선택 조건 다중 필터링 ({activePoMatrixFilters.length}개):
                                     </span>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        {activePoMatrixFilters.map(f => (
+                                            <span 
+                                                key={f.filterKey}
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-white/95 text-indigo-900 border border-indigo-300 shadow-2xs text-[11px] font-bold"
+                                            >
+                                                <span>{f.label}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        startTransition(() => {
+                                                            togglePoMatrixFilter(f.filterKey, f.label);
+                                                        });
+                                                    }}
+                                                    className="hover:text-red-500 hover:bg-red-50 p-0.5 rounded transition-all cursor-pointer"
+                                                    title="이 필터 조건 해제"
+                                                >
+                                                    <X className="w-3 h-3 text-slate-500 hover:text-red-500" />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
                                     <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-600 text-white font-extrabold shadow-2xs">
                                         {filteredPoItemIndices?.size ?? 0}건 표시
                                     </span>
@@ -3122,14 +3167,14 @@ if (deliveryNoteFiles.length > 0) {
                                     type="button"
                                     onClick={() => {
                                         startTransition(() => {
-                                            setActivePoMatrixFilter(null);
+                                            clearPoMatrixFilters();
                                         });
                                     }}
                                     className="flex items-center gap-1 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs text-[11px] font-bold cursor-pointer transition-all active:scale-95 shrink-0"
-                                    title="필터를 해제하고 전체 품목을 다시 봅니다"
+                                    title="모든 필터를 해제하고 전체 품목을 다시 봅니다"
                                 >
                                     <X className="w-3.5 h-3.5 text-slate-500" />
-                                    <span>필터 해제 (전체 품목 보기)</span>
+                                    <span>필터 전체 해제</span>
                                 </button>
                             </div>
                         )}

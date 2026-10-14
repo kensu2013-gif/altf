@@ -33,7 +33,9 @@ export interface QuoteRateMatrixPanelProps {
     currentSplitSize?: number;
     onSplitSizeChange?: (size: number) => void;
     selectedFilterKey?: string | null;
+    selectedFilterKeys?: string[];
     onSelectFilter?: (filterKey: string | null, label: string) => void;
+    onToggleFilter?: (filterKey: string, label: string) => void;
     rateField?: 'discountRate' | 'supplierRate';
     rateLabel?: string;
 }
@@ -134,11 +136,36 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
     currentSplitSize,
     onSplitSizeChange,
     selectedFilterKey,
+    selectedFilterKeys,
     onSelectFilter,
+    onToggleFilter,
     rateField = 'discountRate',
     rateLabel
 }) => {
     const currentRateLabel = rateLabel || (rateField === 'supplierRate' ? '매입율' : '요율');
+
+    // Multi-select active filter key set
+    const activeFilterKeySet = useMemo(() => {
+        if (selectedFilterKeys && selectedFilterKeys.length > 0) {
+            return new Set(selectedFilterKeys);
+        }
+        if (selectedFilterKey) {
+            return new Set([selectedFilterKey]);
+        }
+        return new Set<string>();
+    }, [selectedFilterKeys, selectedFilterKey]);
+
+    const handleFilterToggle = (filterKey: string, label: string) => {
+        if (onToggleFilter) {
+            onToggleFilter(filterKey, label);
+        } else if (onSelectFilter) {
+            if (activeFilterKeySet.has(filterKey)) {
+                onSelectFilter(null, '');
+            } else {
+                onSelectFilter(filterKey, label);
+            }
+        }
+    };
 
     // 1. User config (Split Size & Material Theme) - persisted in localStorage
     const [config, setConfig] = useState<UserRateConfig>(() => loadUserRateConfig());
@@ -613,7 +640,7 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
             <div className="inline-flex items-center gap-1 flex-wrap">
                 {statsList.map(st => {
                     const filterKey = `${filterKeyPrefix}:${st.rate}`;
-                    const isSelected = selectedFilterKey === filterKey;
+                    const isSelected = activeFilterKeySet.has(filterKey);
 
                     return (
                         <button
@@ -621,12 +648,7 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                             type="button"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                if (!onSelectFilter) return;
-                                if (isSelected) {
-                                    onSelectFilter(null, '');
-                                } else {
-                                    onSelectFilter(filterKey, `${labelPrefix} [${currentRateLabel} ${st.rate}%]`);
-                                }
+                                handleFilterToggle(filterKey, `${labelPrefix} [${currentRateLabel} ${st.rate}%]`);
                             }}
                             title={st.tooltip}
                             className={`px-1.5 py-0.5 rounded text-[11px] font-black transition-all cursor-pointer border ${
@@ -1224,14 +1246,14 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                             const isMixed = group.countAnsi > 0 && group.countJis > 0;
 
                             const cardFilterKey = group.key === 'CAP-SPECIAL' ? 'cap:all' : group.key === 'ZERO-RATE' ? 'zero:all' : `mat:${group.key.toLowerCase()}`;
-                            const isCardActive = selectedFilterKey === cardFilterKey;
-                            const isAnySubActive = !!(selectedFilterKey && (
-                                selectedFilterKey.startsWith(`mat_size:${group.key.toLowerCase()}:`) ||
-                                selectedFilterKey.startsWith(`mat_size_rate:${group.key.toLowerCase()}:`) ||
-                                selectedFilterKey.startsWith(`mat_rate:${group.key.toLowerCase()}:`) ||
-                                (group.key === 'CAP-SPECIAL' && selectedFilterKey.startsWith('cap')) ||
-                                (group.key === 'ZERO-RATE' && selectedFilterKey === 'zero:all')
-                            ));
+                            const isCardActive = activeFilterKeySet.has(cardFilterKey);
+                            const isAnySubActive = Array.from(activeFilterKeySet).some(key =>
+                                key.startsWith(`mat_size:${group.key.toLowerCase()}:`) ||
+                                key.startsWith(`mat_size_rate:${group.key.toLowerCase()}:`) ||
+                                key.startsWith(`mat_rate:${group.key.toLowerCase()}:`) ||
+                                (group.key === 'CAP-SPECIAL' && key.startsWith('cap')) ||
+                                (group.key === 'ZERO-RATE' && key === 'zero:all')
+                            );
 
                             return (
                                 <div 
@@ -1244,15 +1266,10 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                                         {/* Card Header with Distinct Material Badge & ANSI/JIS Hybrid indicator */}
                                         <div 
                                             onClick={() => {
-                                                if (!onSelectFilter) return;
-                                                if (isCardActive) {
-                                                    onSelectFilter(null, '');
-                                                } else {
-                                                    onSelectFilter(cardFilterKey, `${group.title} 전체 (${group.totalCount}건)`);
-                                                }
+                                                handleFilterToggle(cardFilterKey, `${group.title} (${group.totalCount}건)`);
                                             }}
                                             className={`flex items-center justify-between gap-1.5 pb-2.5 border-b ${group.headerBgClass} -mx-3.5 -mt-3.5 px-3.5 pt-3 rounded-t-2xl cursor-pointer hover:opacity-95 transition-all`}
-                                            title="클릭 시 아래 테이블에 이 재질 전체 품목을 필터링합니다"
+                                            title="클릭 시 아래 테이블에 이 재질 전체 품목을 필터링합니다 (다중 선택 가능)"
                                         >
                                             <div>
                                                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -1334,20 +1351,18 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                                                 {/* LE row */}
                                                 {(() => {
                                                     const leKey = group.key === 'CAP-SPECIAL' ? 'cap_size:all:le' : `mat_size:${group.key.toLowerCase()}:le`;
-                                                    const isLeActive = selectedFilterKey === leKey;
+                                                    const isLeActive = activeFilterKeySet.has(leKey);
                                                     return (
                                                         <div 
                                                             onClick={() => {
-                                                                if (!onSelectFilter) return;
-                                                                if (isLeActive) onSelectFilter(null, '');
-                                                                else onSelectFilter(leKey, `${group.title} ≤ ${formattedSplitSize} (${group.countLe}건)`);
+                                                                handleFilterToggle(leKey, `${group.title} ≤ ${formattedSplitSize} (${group.countLe}건)`);
                                                             }}
                                                             className={`flex items-center justify-between text-[11px] p-1.5 rounded-lg cursor-pointer transition-all ${
                                                                 isLeActive 
                                                                     ? 'bg-teal-100/90 text-teal-900 font-bold ring-1 ring-teal-500 shadow-2xs' 
                                                                     : 'hover:bg-slate-200/50'
                                                             }`}
-                                                            title="클릭 시 소구경 품목만 아래 테이블에 필터링"
+                                                            title="클릭 시 소구경 품목만 아래 테이블에 필터링 (다중 선택 가능)"
                                                         >
                                                             <span className="text-slate-600 font-medium">
                                                                 ≤ {formattedSplitSize} (소구경):
@@ -1369,20 +1384,18 @@ export const QuoteRateMatrixPanel: React.FC<QuoteRateMatrixPanelProps> = ({
                                                 {/* GT row */}
                                                 {(() => {
                                                     const gtKey = group.key === 'CAP-SPECIAL' ? 'cap_size:all:gt' : `mat_size:${group.key.toLowerCase()}:gt`;
-                                                    const isGtActive = selectedFilterKey === gtKey;
+                                                    const isGtActive = activeFilterKeySet.has(gtKey);
                                                     return (
                                                         <div 
                                                             onClick={() => {
-                                                                if (!onSelectFilter) return;
-                                                                if (isGtActive) onSelectFilter(null, '');
-                                                                else onSelectFilter(gtKey, `${group.title} > ${formattedSplitSize} (${group.countGt}건)`);
+                                                                handleFilterToggle(gtKey, `${group.title} > ${formattedSplitSize} (${group.countGt}건)`);
                                                             }}
                                                             className={`flex items-center justify-between text-[11px] p-1.5 rounded-lg cursor-pointer transition-all ${
                                                                 isGtActive 
                                                                     ? 'bg-teal-100/90 text-teal-900 font-bold ring-1 ring-teal-500 shadow-2xs' 
                                                                     : 'hover:bg-slate-200/50'
                                                             }`}
-                                                            title="클릭 시 대구경 품목만 아래 테이블에 필터링"
+                                                            title="클릭 시 대구경 품목만 아래 테이블에 필터링 (다중 선택 가능)"
                                                         >
                                                             <span className="text-slate-600 font-medium">
                                                                 &gt; {formattedSplitSize} (대구경):

@@ -37,7 +37,7 @@ export default function AdminQuotes() {
     })));
     const { inventory } = useInventory();
     const [selectedQuote, setSelectedQuote] = useState<typeof quotes[0] | null>(null);
-    const [filterStatus, setFilterStatus] = useState<string>('all');
+    const [filterStatus, setFilterStatus] = useState<string>('SUBMITTED');
     const [searchQuery, setSearchQuery] = useState(() => searchParams.get('quoteId') || '');
     const deferredSearchQuery = useDeferredValue(searchQuery);
     const [previewHtml, setPreviewHtml] = useState<string | null>(null);
@@ -461,8 +461,8 @@ export default function AdminQuotes() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 {/* Status Filters */}
                 <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm overflow-x-auto w-full sm:w-auto">
+                    <FilterButton active={filterStatus === 'SUBMITTED'} onClick={() => setFilterStatus('SUBMITTED')} label="견적접수 (Submitted)" count={quoteCounts.SUBMITTED} variant="highlight" />
                     <FilterButton active={filterStatus === 'all'} onClick={() => setFilterStatus('all')} label="All" count={quoteCounts.all} />
-                    <FilterButton active={filterStatus === 'SUBMITTED'} onClick={() => setFilterStatus('SUBMITTED')} label="접수 (Submitted)" count={quoteCounts.SUBMITTED} variant="highlight" />
                     <FilterButton active={filterStatus === 'PROCESSING'} onClick={() => setFilterStatus('PROCESSING')} label="응답대기 (Processing)" count={quoteCounts.PROCESSING} />
                     <FilterButton active={filterStatus === 'PROCESSED'} onClick={() => setFilterStatus('PROCESSED')} label="답변완료 (Processed)" count={quoteCounts.PROCESSED} />
                     <FilterButton active={filterStatus === 'COMPLETED'} onClick={() => setFilterStatus('COMPLETED')} label="주문접수 (Completed)" count={quoteCounts.COMPLETED} />
