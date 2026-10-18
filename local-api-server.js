@@ -1054,6 +1054,68 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 📂 CERTIFICATE EXPLORER API (윈도우 탐색기 폴더 열기 & 전체 PDF 파일 목록)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (url.pathname === '/api/certificates/open-folder' && req.method === 'POST') {
+        try {
+            const { exec } = await import('child_process');
+            const path = await import('path');
+            const targetDir = path.resolve('./storage/certificates/02_extracted_external');
+            exec(`explorer.exe "${targetDir}"`);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ success: true, path: targetDir, message: '윈도우 탐색기 폴더가 열렸습니다.' }));
+            return;
+        } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: e.message }));
+            return;
+        }
+    }
+
+    if (url.pathname === '/api/certificates/files-list' && req.method === 'GET') {
+        try {
+            const fs = await import('fs');
+            const path = await import('path');
+            const baseDir = path.resolve('./storage/certificates/02_extracted_external');
+            const fileList = [];
+
+            if (fs.existsSync(baseDir)) {
+                const dateFolders = fs.readdirSync(baseDir);
+                for (const folder of dateFolders) {
+                    const fullFolder = path.join(baseDir, folder);
+                    if (fs.statSync(fullFolder).isDirectory()) {
+                        const files = fs.readdirSync(fullFolder);
+                        for (const f of files) {
+                            if (f.toLowerCase().endsWith('.pdf')) {
+                                const fullFile = path.join(fullFolder, f);
+                                const stat = fs.statSync(fullFile);
+                                fileList.push({
+                                    filename: f,
+                                    dateFolder: folder,
+                                    sizeBytes: stat.size,
+                                    updatedAt: stat.mtime.toISOString(),
+                                    url: `/storage/certificates/${encodeURIComponent(f)}`
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 최신 수정순 정렬
+            fileList.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ success: true, count: fileList.length, files: fileList }));
+            return;
+        } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: e.message }));
+            return;
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 📂 CERTIFICATE PDF / ZIP FILE SERVING (성적서 원본 바로보기 및 다운로드)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     if (url.pathname.startsWith('/storage/certificates/') || url.pathname.startsWith('/api/certificates/files/')) {

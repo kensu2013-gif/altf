@@ -200,6 +200,40 @@ export default function AgentOfficeDashboard() {
         storagePaths?: { rawInbox: string; extractedPdfs: string };
     } | null>(null);
 
+    // 📄 PDF 원본 바로보기 모달 & 전체 파일 브라우저 상태
+    const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+    const [previewPdfName, setPreviewPdfName] = useState<string>('');
+    const [allExtractedFiles, setAllExtractedFiles] = useState<Array<{ filename: string; dateFolder: string; sizeBytes: number; url: string; updatedAt?: string }>>([]);
+    const [showAllFilesModal, setShowAllFilesModal] = useState<boolean>(false);
+
+    // 윈도우 파일 탐색기에서 저장 폴더 바로 열기
+    const handleOpenWindowsFolder = async () => {
+        try {
+            await fetch('/api/certificates/open-folder', { method: 'POST' });
+            const time = new Date().toTimeString().split(' ')[0];
+            setSimulationLog(prev => [
+                `📂 [${time}] [시스템] 내 컴퓨터 윈도우 탐색기에서 성적서 저장 폴더(02_extracted_external) 열기 완료!`,
+                ...prev.slice(0, 14)
+            ]);
+        } catch {
+            alert('윈도우 폴더 열기 요청 실패');
+        }
+    };
+
+    // 전체 수집된 성적서 파일 목록 로드
+    const handleLoadAllFiles = async () => {
+        try {
+            const res = await fetch('/api/certificates/files-list');
+            const data = await res.json();
+            if (data.success) {
+                setAllExtractedFiles(data.files || []);
+                setShowAllFilesModal(true);
+            }
+        } catch {
+            alert('파일 목록 조회 실패');
+        }
+    };
+
     // 메일플러그 상태 및 1시간 주기 자동 스케줄러 상태 초기 로드
     useEffect(() => {
         const loadStatuses = () => {
@@ -3104,16 +3138,26 @@ export default function AgentOfficeDashboard() {
                                                 <span className="text-slate-300 break-all">storage/certificates/대경벤드 성적서.xlsx</span>
                                             </div>
                                         </div>
-                                        <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-800 flex items-center justify-between">
+                                        <div className="text-[10px] text-slate-400 pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-1.5">
                                             <span>※ 출고일자별 폴더로 자동 분류되며 웹 브라우저에서 바로 열람 가능합니다.</span>
-                                            <a
-                                                href="/storage/certificates/261014_%EC%95%8C%ED%8A%B8%EC%97%90%ED%94%84.261014-2869%20(10-14-31).pdf"
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="text-cyan-400 hover:text-cyan-300 underline font-bold shrink-0 ml-1"
-                                            >
-                                                샘플 PDF 열기 ↗
-                                            </a>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleOpenWindowsFolder}
+                                                    className="px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs"
+                                                    title="내 컴퓨터의 실제 윈도우 탐색기 폴더 창을 직접 엽니다."
+                                                >
+                                                    <span>📂 윈도우 탐색기 폴더 열기</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleLoadAllFiles}
+                                                    className="px-2 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs"
+                                                    title="지금까지 수집된 전체 PDF 목록 보관함을 엽니다."
+                                                >
+                                                    <span>📋 전체 성적서 보관함</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -3186,18 +3230,54 @@ export default function AgentOfficeDashboard() {
                                         </button>
                                     </div>
 
-                                    {/* 최근 수집 내역 */}
+                                    {/* 최근 수집 내역 (클릭 시 즉시 PDF 원본 뷰어로 열람!) */}
                                     {mailplugSyncResult && mailplugSyncResult.savedFiles && (
                                         <div className="space-y-1 text-[10px] pt-1 border-t border-pink-900/40">
                                             <div className="flex items-center justify-between text-pink-300 font-bold">
-                                                <span>수집 완료된 PDF 성적서</span>
+                                                <span>수집 완료된 PDF 성적서 (클릭 시 즉시 열람)</span>
                                                 <span className="font-mono text-emerald-400">{mailplugSyncResult.extractedPdfCount}개 완료</span>
                                             </div>
-                                            <div className="max-h-28 overflow-y-auto space-y-0.5 bg-black/60 p-1.5 rounded border border-slate-800 font-mono text-[9px] text-slate-300">
+                                            <div className="max-h-36 overflow-y-auto space-y-1 bg-black/60 p-2 rounded border border-slate-800 font-mono text-[9px] text-slate-300">
                                                 {mailplugSyncResult.savedFiles.map((f, i) => (
-                                                    <div key={i} className="flex items-center justify-between py-0.5 border-b border-slate-900/80 truncate">
-                                                        <span className="truncate text-cyan-300">📄 {f.filename}</span>
-                                                        <span className="text-slate-500 shrink-0 ml-1">{(f.sizeBytes / 1024).toFixed(0)}KB</span>
+                                                    <div 
+                                                        key={i} 
+                                                        className="flex items-center justify-between py-1 px-1.5 rounded hover:bg-slate-800/80 border-b border-slate-900/80 transition-colors group/item"
+                                                    >
+                                                        <div 
+                                                            className="flex items-center gap-1.5 truncate cursor-pointer flex-1 mr-2"
+                                                            onClick={() => {
+                                                                setPreviewPdfName(f.filename);
+                                                                setPreviewPdfUrl(`/storage/certificates/${encodeURIComponent(f.filename)}`);
+                                                            }}
+                                                            title="클릭하여 대시보드 뷰어에서 바로보기"
+                                                        >
+                                                            <span className="text-pink-400 group-hover/item:scale-110 transition-transform">📄</span>
+                                                            <span className="truncate text-cyan-300 font-bold group-hover/item:underline">
+                                                                {f.filename}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 shrink-0 text-slate-400">
+                                                            <span>{(f.sizeBytes / 1024).toFixed(0)}KB</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setPreviewPdfName(f.filename);
+                                                                    setPreviewPdfUrl(`/storage/certificates/${encodeURIComponent(f.filename)}`);
+                                                                }}
+                                                                className="px-1.5 py-0.5 rounded bg-cyan-950/80 hover:bg-cyan-500 hover:text-black text-cyan-300 border border-cyan-500/40 text-[9px] font-bold cursor-pointer"
+                                                            >
+                                                                미리보기
+                                                            </button>
+                                                            <a
+                                                                href={`/storage/certificates/${encodeURIComponent(f.filename)}`}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[9px]"
+                                                                title="새 창으로 다운로드/열기"
+                                                            >
+                                                                새창 ↗
+                                                            </a>
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -3258,6 +3338,126 @@ export default function AgentOfficeDashboard() {
                         </div>
                     </div>
                 </>
+            )}
+
+            {/* 📄 1. PDF 원본 바로보기 모달 (화면에서 직접 열람) */}
+            {previewPdfUrl && (
+                <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-[#0B132B] border border-cyan-500/50 rounded-xl w-full max-w-5xl h-[88vh] flex flex-col shadow-[0_0_40px_rgba(0,240,255,0.35)] overflow-hidden">
+                        <div className="p-3 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-sm font-bold text-white truncate max-w-xl">
+                                <span className="text-pink-400 text-base">📄</span>
+                                <span className="truncate text-cyan-300 font-mono">{previewPdfName}</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={handleOpenWindowsFolder}
+                                    className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all cursor-pointer"
+                                    title="윈도우 탐색기로 원본 저장 폴더 열기"
+                                >
+                                    📂 윈도우 폴더 열기
+                                </button>
+                                <a
+                                    href={previewPdfUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-3 py-1 rounded bg-cyan-500 hover:bg-cyan-400 text-black font-black text-xs transition-all shadow-[0_0_10px_rgba(0,240,255,0.5)]"
+                                >
+                                    새 창 / 다운로드 ↗
+                                </a>
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewPdfUrl(null)}
+                                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white cursor-pointer ml-1"
+                                    title="닫기 (Esc)"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 bg-slate-950 p-1">
+                            <iframe
+                                src={previewPdfUrl}
+                                className="w-full h-full rounded border-0 bg-white"
+                                title="성적서 PDF 뷰어"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 📋 2. 수집된 전체 성적서 파일 보관함 모달 */}
+            {showAllFilesModal && (
+                <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-[#0B132B] border border-purple-500/50 rounded-xl w-full max-w-4xl max-h-[82vh] flex flex-col shadow-[0_0_40px_rgba(168,85,247,0.35)] overflow-hidden">
+                        <div className="p-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-sm font-bold text-white">
+                                <span className="text-purple-400 text-base">📋</span>
+                                <span>수집된 전체 성적서 PDF 보관함 ({allExtractedFiles.length}개 파일 보관 중)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleOpenWindowsFolder}
+                                    className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all cursor-pointer"
+                                >
+                                    📂 윈도우 폴더 열기
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAllFilesModal(false)}
+                                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white cursor-pointer ml-1"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="p-3 overflow-y-auto flex-1 space-y-1.5 font-mono text-xs">
+                            {allExtractedFiles.map((file, idx) => (
+                                <div
+                                    key={idx}
+                                    className="flex items-center justify-between p-2 rounded bg-slate-900/70 hover:bg-slate-800/90 border border-slate-800 transition-colors"
+                                >
+                                    <div
+                                        className="flex items-center gap-2 truncate cursor-pointer flex-1 mr-2"
+                                        onClick={() => {
+                                            setPreviewPdfName(file.filename);
+                                            setPreviewPdfUrl(file.url);
+                                            setShowAllFilesModal(false);
+                                        }}
+                                    >
+                                        <span className="text-pink-400">📄</span>
+                                        <span className="text-cyan-300 font-bold hover:underline truncate">{file.filename}</span>
+                                        <span className="text-[10px] text-slate-500 shrink-0">[{file.dateFolder}]</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className="text-slate-400 text-[11px]">{(file.sizeBytes / 1024).toFixed(0)}KB</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setPreviewPdfName(file.filename);
+                                                setPreviewPdfUrl(file.url);
+                                                setShowAllFilesModal(false);
+                                            }}
+                                            className="px-2 py-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500 hover:text-black font-bold text-[10px] cursor-pointer"
+                                        >
+                                            바로보기
+                                        </button>
+                                        <a
+                                            href={file.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="px-2 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 text-[10px]"
+                                        >
+                                            새창 ↗
+                                        </a>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
