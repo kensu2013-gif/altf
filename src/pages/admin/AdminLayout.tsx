@@ -130,6 +130,7 @@ export default function AdminLayout() {
         { label: '부산재고 관리', path: '/admin/busaninventory', emoji: '⚓' },
         { label: '재고 관리', path: '/admin/inventory', emoji: '📦' },
         { label: 'AI 경영 리포트', path: '/admin/ai-reports', emoji: '🤖', masterOnly: true },
+        { label: 'AI 오피스 관제탑', path: '/admin/agent-office', emoji: '🛸', masterOnly: true },
         { label: '설정', path: '/admin/settings', emoji: '⚙️' },
     ];
 

@@ -13,6 +13,7 @@ import { aggregateAllTrends, getPeriodRange } from './report-aggregation.js';
 import { generateAiReport } from './ai-report-generator.js';
 import { buildCustomerMatchIndex, matchCustomerToCrmFast } from './customer-matching.js';
 import { computeDocumentSimilaritySummary } from './similarity-engine.js';
+import { mailplugService } from './server/services/mailplugCollector.js';
 
 import multer from 'multer';
 
@@ -39,6 +40,7 @@ let db = {
     crmEvents: [],
     aiReports: [],
     aiReportSchedule: DEFAULT_AI_REPORT_SCHEDULE(),
+    agents: [],
     lastSnapshotDate: null,
     lastSnapshot: null,
     currentSnapshot: null,
@@ -72,7 +74,23 @@ async function loadData() {
             db.crmEvents = json.crmEvents || [];
             db.aiReports = json.aiReports || [];
             db.aiReportSchedule = json.aiReportSchedule || DEFAULT_AI_REPORT_SCHEDULE();
-            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.loginLogs.length} logs, ${db.inventoryHistory.length} history, ${db.crmEvents.length} crm events, ${db.aiReports.length} ai reports, Snapshot Date: ${db.lastSnapshotDate}`);
+            db.agents = json.agents || [];
+
+            // Local fallback seed for agents if empty
+            if (db.agents.length === 0) {
+                try {
+                    const fs = await import('fs');
+                    const localAgentPath = './server/data/agents.json';
+                    if (fs.existsSync(localAgentPath)) {
+                        db.agents = JSON.parse(fs.readFileSync(localAgentPath, 'utf8'));
+                        console.log(`[API] Loaded ${db.agents.length} agents from local backup file.`);
+                    }
+                } catch (e) {
+                    console.log(`[API] Local agents file check note: ${e.message}`);
+                }
+            }
+
+            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.agents.length} agents, Snapshot Date: ${db.lastSnapshotDate}`);
             
             // Seed Customers if empty
             if (db.customers.length === 0) {
@@ -727,6 +745,378 @@ const server = http.createServer(async (req, res) => {
             console.log(`[ReadOnly Block] Prevented ${req.method} ${url.pathname} for user ${session.email}`);
             res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ error: '수정 및 입력 권한이 없습니다. (읽기 전용 계정)' }));
+            return;
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🏢 B2B AI AGENTS PERSISTENCE ENDPOINTS (다른 컴퓨터에서도 연속 작업 지원)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (url.pathname === '/api/agents') {
+        if (req.method === 'GET') {
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({
+                success: true,
+                agents: db.agents || []
+            }));
+            return;
+        }
+
+        if (req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    const data = JSON.parse(body);
+                    const agentList = Array.isArray(data) ? data : (data.agents || []);
+                    db.agents = agentList;
+
+                    // 1. 로컬 백업 저장 (S3 연결 여부와 무관하게 즉시 보존)
+                    try {
+                        const fs = await import('fs');
+                        const dataDir = './server/data';
+                        if (!fs.existsSync(dataDir)) {
+                            fs.mkdirSync(dataDir, { recursive: true });
+                        }
+                        fs.writeFileSync('./server/data/agents.json', JSON.stringify(agentList, null, 2), 'utf8');
+                    } catch (fsErr) {
+                        console.error('[API] Local agents.json write error:', fsErr.message);
+                    }
+
+                    // 2. S3 DB 비동기 큐 동기화
+                    queueSave();
+
+                    console.log(`[API] Successfully saved ${agentList.length} agents to DB & local backup.`);
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: true, count: agentList.length }));
+                    return;
+                } catch (e) {
+                    console.error('[API] Save agents failed:', e);
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: e.message }));
+                }
+            });
+            return;
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🔬 QC CERTIFICATE LEDGER API (대경벤드 성적서.xlsx 및 구글시트 100% 호환)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (url.pathname === '/api/certificates') {
+        const certJsonPath = './server/data/certificates.json';
+        const certExcelPath = './storage/certificates/대경벤드 성적서.xlsx';
+
+        if (req.method === 'GET') {
+            try {
+                const fs = await import('fs');
+                let rows = [];
+                if (fs.existsSync(certJsonPath)) {
+                    rows = JSON.parse(fs.readFileSync(certJsonPath, 'utf8'));
+                } else {
+                    // 기본 초기 샘플 (사진 3 실측치 4행)
+                    rows = [
+                        {
+                            issueDate: '26/10/14',
+                            customer: '(주)태형산업',
+                            supplier: '(주)대경벤드',
+                            poNo: 'ES261014-2869',
+                            certNo: 'YR-26-09915',
+                            specMaterial: 'ASTM A312 TP316L',
+                            specInspection: 'KS B1543 STS316L-W /B1500',
+                            heatNo: 'SD62415',
+                            lotNo: 'KJA0879',
+                            itemNo: 1,
+                            description: '45E(L) S/10S 25A B.W',
+                            qty: 1,
+                            material: 'WELDED PIPE',
+                            chemC: 0.017,
+                            chemSi: 0.55,
+                            chemMn: 1.05,
+                            chemP: 0.032,
+                            chemS: 0.002,
+                            chemNi: 10.10,
+                            chemCr: 16.35,
+                            chemMo: 2.03,
+                            mechYs: 298,
+                            mechTs: 622,
+                            mechEl: 57,
+                            dimensionVi: 'GOOD',
+                            pdfUrl: '/storage/certificates/261014_알트에프.261014-2869 (10-14-31).pdf'
+                        }
+                    ];
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, count: rows.length, rows }));
+                return;
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+                return;
+            }
+        }
+
+        if (req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    const fs = await import('fs');
+                    const xlsx = await import('xlsx');
+                    const data = JSON.parse(body);
+                    const newRows = Array.isArray(data) ? data : (data.rows ? data.rows : [data]);
+
+                    let currentRows = [];
+                    if (fs.existsSync(certJsonPath)) {
+                        currentRows = JSON.parse(fs.readFileSync(certJsonPath, 'utf8'));
+                    }
+
+                    // 새 행 추가
+                    const updatedRows = [...currentRows, ...newRows];
+                    fs.writeFileSync(certJsonPath, JSON.stringify(updatedRows, null, 2), 'utf8');
+
+                    // 로컬 엑셀 파일(대경벤드 성적서.xlsx)에도 자동 생성 및 동기화
+                    const sheetHeaders = [
+                        '일 자', 'Customer', '공급처', 'P.O No', 'CERT-No',
+                        'Spec MATERIAL', 'Spec INSPECTION', 'HEAT No', 'LOT No', 'ITEM No',
+                        'DESCRIPTION', 'Q\'TY', 'MATERIAL', 'C', 'Si', 'Mn', 'P', 'S',
+                        'Ni', 'Cr', 'Mo', 'Y.S', 'T.S', 'E.L', '외관/치수', 'PDF 원본링크'
+                    ];
+
+                    const excelData = [
+                        sheetHeaders,
+                        ...updatedRows.map(r => [
+                            r.issueDate, r.customer, r.supplier, r.poNo, r.certNo,
+                            r.specMaterial, r.specInspection, r.heatNo, r.lotNo, r.itemNo,
+                            r.description, r.qty, r.material, r.chemC, r.chemSi, r.chemMn,
+                            r.chemP, r.chemS, r.chemNi, r.chemCr, r.chemMo, r.mechYs,
+                            r.mechTs, r.mechEl, r.dimensionVi, r.pdfUrl
+                        ])
+                    ];
+
+                    const wb = xlsx.utils.book_new();
+                    const ws = xlsx.utils.aoa_to_sheet(excelData);
+                    xlsx.utils.book_append_sheet(wb, ws, '대경벤드성적서');
+                    xlsx.writeFile(wb, certExcelPath);
+
+                    console.log(`[API] Successfully synced ${updatedRows.length} certificate rows to JSON & Excel.`);
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: true, count: updatedRows.length, added: newRows.length }));
+                    return;
+                } catch (e) {
+                    console.error('[API] Save certificates failed:', e);
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: e.message }));
+                }
+            });
+            return;
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 📬 QC-01 MAILPLUG COLLECTOR API (메일플러그 대경벤드성적서 연동)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (url.pathname.startsWith('/api/qc/mailplug')) {
+        // GET /api/qc/mailplug/status
+        if (req.method === 'GET' && url.pathname === '/api/qc/mailplug/status') {
+            try {
+                const config = mailplugService.getConfig();
+                const history = mailplugService.getHistory();
+                // 비밀번호 마스킹 처리
+                const safeConfig = {
+                    ...config,
+                    password: config.password ? '********' : ''
+                };
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    success: true,
+                    config: safeConfig,
+                    lastSync: config.lastSyncTime,
+                    historyCount: history.length,
+                    recentHistory: history.slice(0, 5)
+                }));
+                return;
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+                return;
+            }
+        }
+
+        // POST /api/qc/mailplug/config
+        if (req.method === 'POST' && url.pathname === '/api/qc/mailplug/config') {
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', () => {
+                try {
+                    const data = JSON.parse(body);
+                    const saved = mailplugService.saveConfig(data);
+                    const safeSaved = { ...saved, password: saved.password ? '********' : '' };
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: true, config: safeSaved }));
+                    return;
+                } catch (e) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: e.message }));
+                }
+            });
+            return;
+        }
+
+        // POST /api/qc/mailplug/sync (실시간 수집 실행)
+        if (req.method === 'POST' && url.pathname === '/api/qc/mailplug/sync') {
+            try {
+                const result = await mailplugService.syncNow();
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, result }));
+                return;
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+                return;
+            }
+        }
+
+        // POST /api/qc/mailplug/test (IMAP 연결 테스트)
+        if (req.method === 'POST' && url.pathname === '/api/qc/mailplug/test') {
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    let configOverride = null;
+                    if (body) {
+                        try { configOverride = JSON.parse(body); } catch {}
+                    }
+                    const testResult = await mailplugService.testConnection(configOverride);
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify(testResult));
+                    return;
+                } catch (e) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: e.message }));
+                }
+            });
+            return;
+        }
+
+        // POST /api/qc/mailplug/sync-all (전체 PDF 일괄 수집 Batch Sync)
+        if (req.method === 'POST' && url.pathname === '/api/qc/mailplug/sync-all') {
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    let limit = 30;
+                    if (body) {
+                        try {
+                            const parsed = JSON.parse(body);
+                            if (parsed.limit) limit = parsed.limit;
+                        } catch {}
+                    }
+                    const batchResult = await mailplugService.syncAllBatch(limit);
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify(batchResult));
+                    return;
+                } catch (e) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: e.message }));
+                }
+            });
+            return;
+        }
+
+        // GET /api/qc/mailplug/batch-status (일괄 수집 진행 상황)
+        if (req.method === 'GET' && url.pathname === '/api/qc/mailplug/batch-status') {
+            try {
+                const status = mailplugService.getBatchStatus();
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, ...status }));
+                return;
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+                return;
+            }
+        }
+
+        // GET /api/qc/mailplug/scheduler-status (1시간 주기 자동 스케줄러 상태)
+        if (req.method === 'GET' && url.pathname === '/api/qc/mailplug/scheduler-status') {
+            try {
+                const sched = mailplugService.getSchedulerStatus();
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, ...sched }));
+                return;
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+                return;
+            }
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 📂 CERTIFICATE PDF / ZIP FILE SERVING (성적서 원본 바로보기 및 다운로드)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (url.pathname.startsWith('/storage/certificates/') || url.pathname.startsWith('/api/certificates/files/')) {
+        try {
+            const fs = await import('fs');
+            const path = await import('path');
+            
+            // Clean requested relative path
+            let relativePath = url.pathname.replace('/api/certificates/files/', '').replace('/storage/certificates/', '');
+            relativePath = decodeURIComponent(relativePath);
+            
+            // Search order: 02_extracted_external (with date subdirs), 01_raw_inbox, root storage
+            const baseDir = path.resolve('./storage/certificates');
+            let candidatePaths = [
+                path.join(baseDir, relativePath),
+                path.join(baseDir, '01_raw_inbox', relativePath),
+                path.join(baseDir, '02_extracted_external', relativePath)
+            ];
+
+            // If not found yet and it's a bare filename, recursively search 02_extracted_external
+            let targetFilePath = candidatePaths.find(p => fs.existsSync(p));
+            if (!targetFilePath && !relativePath.includes('/') && !relativePath.includes('\\')) {
+                const extractedDir = path.join(baseDir, '02_extracted_external');
+                if (fs.existsSync(extractedDir)) {
+                    const subdirs = fs.readdirSync(extractedDir);
+                    for (const sub of subdirs) {
+                        const checkSub = path.join(extractedDir, sub, relativePath);
+                        if (fs.existsSync(checkSub)) {
+                            targetFilePath = checkSub;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!targetFilePath || !fs.existsSync(targetFilePath)) {
+                res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ error: '요청한 성적서 파일을 찾을 수 없습니다.', requested: relativePath }));
+                return;
+            }
+
+            const ext = path.extname(targetFilePath).toLowerCase();
+            let contentType = 'application/octet-stream';
+            if (ext === '.pdf') contentType = 'application/pdf';
+            else if (ext === '.zip') contentType = 'application/zip';
+            else if (ext === '.xlsx') contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+            const stat = fs.statSync(targetFilePath);
+            const encodedFilename = encodeURIComponent(path.basename(targetFilePath));
+
+            res.writeHead(200, {
+                'Content-Type': contentType,
+                'Content-Length': stat.size,
+                'Content-Disposition': `inline; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`
+            });
+
+            const stream = fs.createReadStream(targetFilePath);
+            stream.pipe(res);
+            return;
+        } catch (fileErr) {
+            console.error('[API] File serve error:', fileErr);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: fileErr.message }));
             return;
         }
     }

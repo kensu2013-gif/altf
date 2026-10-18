@@ -37,6 +37,7 @@ const AdminSettings = lazy(() => import('./pages/admin/Settings'));
 const AdminProfile = lazy(() => import('./pages/admin/Profile'));
 const PilotSplitPO = lazy(() => import('./pages/admin/PilotSplitPO'));
 const AdminAiReports = lazy(() => import('./pages/admin/AiReports'));
+const AgentOfficeDashboard = lazy(() => import('./pages/admin/AgentOfficeDashboard'));
 
 // ... (keep existing code)
 
@@ -126,8 +127,12 @@ function AnimatedRoutes() {
               <Route path="profile" element={<PageTransition><AdminProfile /></PageTransition>} />
               <Route path="pilot-split-po" element={<PageTransition><PilotSplitPO /></PageTransition>} />
               <Route path="ai-reports" element={<PageTransition><AdminAiReports /></PageTransition>} />
+              <Route path="agent-office" element={<PageTransition><AgentOfficeDashboard /></PageTransition>} />
             </Route>
           </Route>
+
+          {/* Standalone Kiosk HUD Route for Mac mini Dedicated 24/7 Monitor */}
+          <Route path="/agent-office" element={<PageTransition><AgentOfficeDashboard /></PageTransition>} />
 
           {/* User Protected App Routes (Main Layout) */}
           <Route element={<ProtectedRoute />}>

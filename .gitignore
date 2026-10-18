@@ -25,7 +25,8 @@ dist-ssr
 *.sln
 *.sw?
 
-data/
+/data/
+!src/data/
 inventory.json
 db.json
 

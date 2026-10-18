@@ -17,12 +17,14 @@
     "@anthropic-ai/sdk": "^0.120.0",
     "@aws-sdk/client-s3": "^3.994.0",
     "@aws-sdk/s3-request-presigner": "^3.1013.0",
+    "adm-zip": "^0.6.1",
     "aromanize": "^0.1.5",
     "clsx": "^2.1.1",
     "crypto-js": "^4.2.0",
     "date-fns": "^4.1.0",
     "dotenv": "^17.3.1",
     "framer-motion": "^12.29.2",
+    "imapflow": "^2.5.4",
     "lucide-react": "^0.562.0",
     "multer": "^2.0.2",
     "react": "^19.2.0",
@@ -54,5 +56,8 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.64.9"
   }
 }
