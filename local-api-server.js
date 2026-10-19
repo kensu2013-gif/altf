@@ -17,6 +17,7 @@ import { computeDocumentSimilaritySummary } from './similarity-engine.js';
 import { mailplugService } from './server/services/mailplugCollector.js';
 import { certificateParserService } from './server/services/certificateParser.js';
 import { purchaseStockOrderService } from './server/services/purchaseService.js';
+import { certificateIssuerService } from './server/services/certificateIssuer.js';
 
 import multer from 'multer';
 
@@ -1423,6 +1424,188 @@ const server = http.createServer(async (req, res) => {
                     success: true,
                     message: 'altf.kr API 호출 감지 및 재고 발주 대장 즉시 동기화 완료!',
                     ...result
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+    }
+
+    // ==========================================
+    // 🔬 품질부 QC-06 : 성적서 발행봇 & DAT-10 아카이빙 REST API
+    // ==========================================
+    if (url.pathname.startsWith('/api/qc/qc06/')) {
+        // 1. GET /api/qc/qc06/orders : 성적서 발행 대상 발주서 목록 조회
+        if (req.method === 'GET' && url.pathname === '/api/qc/qc06/orders') {
+            try {
+                const orders = (db.orders || []).map(o => ({
+                    poNumber: o.poNumber || o.id,
+                    customerName: o.targetCustomerName || o.customerName || '고객사',
+                    itemCount: (o.items || []).length,
+                    createdAt: o.createdAt || '',
+                    items: (o.items || []).map(it => ({
+                        description: it.productId || it.name || '',
+                        qty: it.quantity || 1,
+                        specMaterial: it.material || 'STS304',
+                        heatNo: it.heatNo || ''
+                    }))
+                }));
+                sendJsonResponse(req, res, 200, { success: true, count: orders.length, orders });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 2. GET /api/qc/qc06/issued-list : 발행된 성적서 대장 목록 (DAT-10 보관 인덱스)
+        if (req.method === 'GET' && url.pathname === '/api/qc/qc06/issued-list') {
+            try {
+                const urlParams = new URLSearchParams(url.search);
+                const poFilter = (urlParams.get('poNo') || '').trim();
+                let list = certificateIssuerService.getIssuedList();
+                if (poFilter) {
+                    list = list.filter(r => r.poNo?.toUpperCase() === poFilter.toUpperCase());
+                }
+                sendJsonResponse(req, res, 200, { success: true, count: list.length, items: list });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 3. POST /api/qc/qc06/issue : 발주서 기반 성적서 자동 분할 발행 (6개 아이템 단위 / 엑셀+PDF+DAT-10 아카이빙)
+        if (req.method === 'POST' && url.pathname === '/api/qc/qc06/issue') {
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    const data = JSON.parse(body || '{}');
+                    const { poNo, customer, certNo } = data;
+                    if (!poNo) {
+                        return sendJsonResponse(req, res, 400, { success: false, error: '발주번호(poNo)가 필요합니다.' });
+                    }
+                    const result = await certificateIssuerService.issueCertificatesForPo(poNo, { customer, certNo });
+                    sendJsonResponse(req, res, 200, {
+                        success: true,
+                        message: `발주번호 ${poNo} 성적서 ${result.count}건 발행 완료 (PDF/엑셀 DAT-10 아카이빙 완료)`,
+                        ...result
+                    });
+                } catch (err) {
+                    sendJsonResponse(req, res, 500, { success: false, error: err.message });
+                }
+            });
+            return;
+        }
+
+        // 4. POST /api/qc/qc06/test-sample : 첨부 사진 샘플(ES260709-1974) 즉시 발행 테스트
+        if (req.method === 'POST' && url.pathname === '/api/qc/qc06/test-sample') {
+            try {
+                const result = await certificateIssuerService.issueCertificatesForPo('ES260709-1974', {
+                    customer: '월드원플랜에탈',
+                    certNo: 'YR-26-07015'
+                });
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    message: '첨부 사진 샘플(ES260709-1974) 성적서 발행 성공!',
+                    ...result
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 5. GET /api/qc/qc06/download-pdf/:fileName : 성적서 PDF 서빙/인라인 미리보기
+        if (req.method === 'GET' && url.pathname.startsWith('/api/qc/qc06/download-pdf')) {
+            try {
+                const fs = await import('fs');
+                const path = await import('path');
+                const urlParams = new URLSearchParams(url.search);
+                const poNo = (urlParams.get('poNo') || '').replace(/[^a-zA-Z0-9_\-]/g, '_');
+                let fileName = path.basename(decodeURIComponent(url.pathname.replace('/api/qc/qc06/download-pdf/', '').replace('/api/qc/qc06/download-pdf', '')));
+                if (!fileName) fileName = (urlParams.get('file') || '').trim();
+
+                const filePath = path.resolve(`./storage/issued_certificates/${poNo}/${fileName}`);
+                if (!fs.existsSync(filePath)) {
+                    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ error: 'PDF 파일을 찾을 수 없습니다.', filePath }));
+                    return;
+                }
+
+                const stat = fs.statSync(filePath);
+                const encodedFilename = encodeURIComponent(fileName);
+                res.writeHead(200, {
+                    'Content-Type': 'application/pdf',
+                    'Content-Length': stat.size,
+                    'Content-Disposition': `inline; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`
+                });
+                fs.createReadStream(filePath).pipe(res);
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+            return;
+        }
+
+        // 6. GET /api/qc/qc06/download-excel/:fileName : 성적서 엑셀 다운로드
+        if (req.method === 'GET' && url.pathname.startsWith('/api/qc/qc06/download-excel')) {
+            try {
+                const fs = await import('fs');
+                const path = await import('path');
+                const urlParams = new URLSearchParams(url.search);
+                const poNo = (urlParams.get('poNo') || '').replace(/[^a-zA-Z0-9_\-]/g, '_');
+                let fileName = path.basename(decodeURIComponent(url.pathname.replace('/api/qc/qc06/download-excel/', '').replace('/api/qc/qc06/download-excel', '')));
+                if (!fileName) fileName = (urlParams.get('file') || '').trim();
+
+                const filePath = path.resolve(`./storage/issued_certificates/${poNo}/${fileName}`);
+                if (!fs.existsSync(filePath)) {
+                    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ error: '엑셀 파일을 찾을 수 없습니다.', filePath }));
+                    return;
+                }
+
+                const stat = fs.statSync(filePath);
+                const encodedFilename = encodeURIComponent(fileName);
+                res.writeHead(200, {
+                    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'Content-Length': stat.size,
+                    'Content-Disposition': `attachment; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`
+                });
+                fs.createReadStream(filePath).pipe(res);
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+            return;
+        }
+
+        // 7. POST /api/qc/qc06/open-folder : DAT-10 성적서 보관소 폴더 열기
+        if (req.method === 'POST' && url.pathname === '/api/qc/qc06/open-folder') {
+            try {
+                let body = '';
+                req.on('data', chunk => body += chunk.toString());
+                req.on('end', async () => {
+                    const data = JSON.parse(body || '{}');
+                    const path = await import('path');
+                    const poNo = (data.poNo || '').replace(/[^a-zA-Z0-9_\-]/g, '_');
+                    const targetDir = poNo 
+                        ? path.resolve(`./storage/issued_certificates/${poNo}`)
+                        : path.resolve('./storage/issued_certificates');
+
+                    const isWin = process.platform === 'win32';
+                    const isMac = process.platform === 'darwin';
+                    const cmd = isWin ? `explorer "${targetDir}"` : isMac ? `open "${targetDir}"` : `xdg-open "${targetDir}"`;
+
+                    exec(cmd, (err) => {
+                        if (err) console.error('[DAT-10] 성적서 폴더 열기 오류:', err.message);
+                    });
+
+                    sendJsonResponse(req, res, 200, {
+                        success: true,
+                        message: `DAT-10 보관소 폴더 열기: ${targetDir}`,
+                        folderPath: targetDir
+                    });
                 });
             } catch (err) {
                 sendJsonResponse(req, res, 500, { success: false, error: err.message });

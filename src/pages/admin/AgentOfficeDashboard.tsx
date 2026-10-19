@@ -37,10 +37,12 @@ import {
     ChevronLeft,
     ChevronRight,
     ShoppingBag,
-    Boxes
+    Boxes,
+    FileText
 } from 'lucide-react';
 import { CertificateLedgerModal } from '../../components/admin/CertificateLedgerModal';
 import { PurchaseLedgerModal } from '../../components/admin/PurchaseLedgerModal';
+import { CertificateIssuerModal } from '../../components/admin/CertificateIssuerModal';
 
 const STORAGE_KEY = 'altf_agent_swarm_custom_v4';
 const STORAGE_DEPT_KEY = 'altf_departments_v2';
@@ -500,6 +502,7 @@ export default function AgentOfficeDashboard() {
     const [showAllFilesModal, setShowAllFilesModal] = useState<boolean>(false);
     const [showLedgerModal, setShowLedgerModal] = useState<boolean>(false);
     const [showPurchaseLedgerModal, setShowPurchaseLedgerModal] = useState<boolean>(false);
+    const [showCertIssuerModal, setShowCertIssuerModal] = useState<boolean>(false);
     const [qc02Loading, setQc02Loading] = useState<boolean>(false);
     const [qc02Result, setQc02Result] = useState<{
         success: boolean;
@@ -1951,6 +1954,15 @@ export default function AgentOfficeDashboard() {
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                             <span>1일 2회 (10시/17시) 대기 중</span>
                         </span>
+                    </button>
+
+                    <button
+                        onClick={() => setShowCertIssuerModal(true)}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-indigo-500/60 bg-gradient-to-r from-indigo-950/80 to-blue-950/80 hover:from-indigo-900/90 hover:to-blue-900/90 text-indigo-300 font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all cursor-pointer group"
+                        title="[품질부 QC-06 전담] 발주서별 최대 6품목 자동 패킹 · 6개 양식지 자동 선택 · PDF/엑셀 DAT-10 아카이빙"
+                    >
+                        <FileText className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
+                        <span>📜 [QC-06] 성적서 발행기</span>
                     </button>
 
                     <button
@@ -3888,6 +3900,99 @@ export default function AgentOfficeDashboard() {
                                 </div>
                             )}
 
+                            {/* 🔬 [품질부 특화] QC-06 성적서 발행봇 (구글시트 6개 양식지 자동 매칭 & DAT-10 아카이빙) */}
+                            {(selectedAgent.code === 'QC-06' || selectedAgent.id === 'qc-cert-builder') && (
+                                <div className="border border-indigo-500/40 bg-indigo-950/20 rounded-xl p-3.5 space-y-3.5 shadow-[0_0_20px_rgba(99,102,241,0.25)] my-3">
+                                    <div className="flex items-center justify-between border-b border-indigo-900/40 pb-2">
+                                        <div className="flex items-center gap-1.5 text-indigo-300 font-bold text-xs">
+                                            <span>📜</span>
+                                            <span>QC-06 성적서 발행봇 (EN10204 3.1 MTC)</span>
+                                        </div>
+                                        <span className="text-[9px] px-2 py-0.5 rounded font-black bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/40 flex items-center gap-1">
+                                            <span>QC-06</span>
+                                            <span>대리 (발행 & 보관 전담)</span>
+                                        </span>
+                                    </div>
+
+                                    {/* 템플릿 연동 및 규칙 요약 카드 */}
+                                    <div className="p-2.5 rounded-lg border border-indigo-500/40 bg-black/50 text-xs space-y-2">
+                                        <div className="flex items-center justify-between text-slate-300">
+                                            <span>구글시트 6개 양식지 연동:</span>
+                                            <span className="text-emerald-400 font-bold font-mono">ON (storage/templates)</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-slate-300">
+                                            <span>발주서별 아이템 패킹:</span>
+                                            <span className="text-indigo-300 font-bold font-mono">최대 6개 단위 자동 분할</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-slate-300">
+                                            <span>열처리 온도 자동 판정:</span>
+                                            <span className="text-amber-300 font-mono text-[10px]">
+                                                K 또는 /B1500: <strong className="text-amber-400">1050℃</strong> | J/일반: <strong className="text-cyan-400">1040℃</strong>
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-slate-300 pt-1 border-t border-slate-800">
+                                            <span>수식 연동 영역:</span>
+                                            <span className="text-cyan-300 font-mono text-[10px]">
+                                                AX13:BC18 (HEAT·LOT·ITEM·품명·수량)
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-slate-300">
+                                            <span>데이터관리부 DAT-10 보관:</span>
+                                            <span className="text-purple-300 font-mono text-[10px]">
+                                                storage/issued_certificates/{'{poNo}'}/
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* 주요 실행 액션 버튼들 */}
+                                    <div className="space-y-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCertIssuerModal(true)}
+                                            className="w-full py-2.5 px-3 rounded-lg bg-gradient-to-r from-indigo-600 via-blue-600 to-indigo-600 hover:from-indigo-500 hover:to-blue-500 text-white font-black text-xs shadow-[0_0_15px_rgba(99,102,241,0.4)] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                                        >
+                                            <FileText className="w-4 h-4" />
+                                            <span>🚀 성적서 발행기 열기 (실시간 A4 뷰 & PDF/엑셀)</span>
+                                        </button>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        await fetch('/api/qc/qc06/test-sample', { method: 'POST' });
+                                                        setShowCertIssuerModal(true);
+                                                    } catch (e) {
+                                                        console.error(e);
+                                                    }
+                                                }}
+                                                className="py-2 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all"
+                                                title="사용자가 제공한 사진 샘플(ES260709-1974) 즉시 발행 및 확인"
+                                            >
+                                                <Sparkles className="w-3.5 h-3.5" />
+                                                <span>사진 샘플(1:1) 즉시 확인</span>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        await fetch('/api/qc/qc06/open-folder', { method: 'POST' });
+                                                    } catch (e) {
+                                                        console.error(e);
+                                                    }
+                                                }}
+                                                className="py-2 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all"
+                                                title="데이터관리부 DAT-10에 영구 저장된 성적서 폴더 열기"
+                                            >
+                                                <FolderOpen className="w-3.5 h-3.5" />
+                                                <span>DAT-10 보관 폴더 열기</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
 
                             {/* 최근 로그 */}
                             <div className="mt-2">
@@ -4282,6 +4387,12 @@ export default function AgentOfficeDashboard() {
             <PurchaseLedgerModal
                 isOpen={showPurchaseLedgerModal}
                 onClose={() => setShowPurchaseLedgerModal(false)}
+            />
+
+            {/* 📜 5. 품질부 (QC-06) 성적서 발행봇 & DAT-10 아카이빙 모달 */}
+            <CertificateIssuerModal
+                isOpen={showCertIssuerModal}
+                onClose={() => setShowCertIssuerModal(false)}
             />
         </div>
     );

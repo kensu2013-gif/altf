@@ -1,0 +1,954 @@
+[
+  {
+    "id": "cert_ES260709-1974_YR-26-07015-1",
+    "poNo": "ES260709-1974",
+    "certNo": "YR-26-07015-1",
+    "customer": "월드원플랜에탈",
+    "issueDate": "2026.07.09",
+    "sheetName": "STS304 1050",
+    "heatTreatment": "* Heat Treatment Condition : 1050℃ Solution Annealing & Water Quenching",
+    "itemCount": 6,
+    "excelPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-1.xlsx",
+    "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-1.xlsx?poNo=ES260709-1974",
+    "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-1.pdf",
+    "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-1.pdf?poNo=ES260709-1974",
+    "issuedAt": "2026-10-19T13:11:01.305Z",
+    "items": [
+      {
+        "itemNo": 1,
+        "description": "90E(L)-S10S-150A-STS304-W",
+        "qty": 6,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 2,
+        "description": "90E(L)-S10S-15A-STS304-W",
+        "qty": 28,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 3,
+        "description": "90E(L)-S10S-40A-STS304-W",
+        "qty": 20,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 4,
+        "description": "90E(L)-S10S-40A-STS304-W",
+        "qty": 1,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 5,
+        "description": "90E(L)-S10S-50A-STS304-W",
+        "qty": 22,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 6,
+        "description": "90E(L)-S10S-65A-STS304-W",
+        "qty": 7,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      }
+    ]
+  },
+  {
+    "id": "cert_ES260709-1974_YR-26-07015-2",
+    "poNo": "ES260709-1974",
+    "certNo": "YR-26-07015-2",
+    "customer": "월드원플랜에탈",
+    "issueDate": "2026.07.09",
+    "sheetName": "STS304 1050",
+    "heatTreatment": "* Heat Treatment Condition : 1050℃ Solution Annealing & Water Quenching",
+    "itemCount": 6,
+    "excelPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-2.xlsx",
+    "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-2.xlsx?poNo=ES260709-1974",
+    "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-2.pdf",
+    "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-2.pdf?poNo=ES260709-1974",
+    "issuedAt": "2026-10-19T13:11:02.676Z",
+    "items": [
+      {
+        "itemNo": 7,
+        "description": "90E(L)-S10S-25A-STS304-W",
+        "qty": 16,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 8,
+        "description": "R(C)-S10S-50A X 15A-STS304-W",
+        "qty": 3,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 9,
+        "description": "R(C)-S10S-50A X 20A-STS304-W",
+        "qty": 1,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 10,
+        "description": "R(C)-S10S-50A X 40A-STS304-W",
+        "qty": 3,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 11,
+        "description": "R(C)-S10S-50A X 25A-STS304-W",
+        "qty": 1,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 12,
+        "description": "T(S)-S10S-15A-STS304-W",
+        "qty": 3,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      }
+    ]
+  },
+  {
+    "id": "cert_ES260709-1974_YR-26-07015-3",
+    "poNo": "ES260709-1974",
+    "certNo": "YR-26-07015-3",
+    "customer": "월드원플랜에탈",
+    "issueDate": "2026.07.09",
+    "sheetName": "STS304 1050",
+    "heatTreatment": "* Heat Treatment Condition : 1050℃ Solution Annealing & Water Quenching",
+    "itemCount": 6,
+    "excelPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-3.xlsx",
+    "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-3.xlsx?poNo=ES260709-1974",
+    "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-3.pdf",
+    "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-3.pdf?poNo=ES260709-1974",
+    "issuedAt": "2026-10-19T13:11:03.981Z",
+    "items": [
+      {
+        "itemNo": 13,
+        "description": "T(R)-S10S-25A X 15A-STS304-W",
+        "qty": 5,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 14,
+        "description": "T(R)-S10S-40A X 15A-STS304-W",
+        "qty": 1,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 15,
+        "description": "T(S)-S10S-40A-STS304-W",
+        "qty": 4,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 16,
+        "description": "T(R)-S10S-50A X 15A-STS304-W",
+        "qty": 3,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 17,
+        "description": "T(R)-S10S-50A X 40A-STS304-W",
+        "qty": 3,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 18,
+        "description": "T(S)-S10S-50A-STS304-W",
+        "qty": 2,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      }
+    ]
+  },
+  {
+    "id": "cert_ES260709-1974_YR-26-07015-4",
+    "poNo": "ES260709-1974",
+    "certNo": "YR-26-07015-4",
+    "customer": "월드원플랜에탈",
+    "issueDate": "2026.07.09",
+    "sheetName": "STS304 1050",
+    "heatTreatment": "* Heat Treatment Condition : 1050℃ Solution Annealing & Water Quenching",
+    "itemCount": 6,
+    "excelPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-4.xlsx",
+    "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-4.xlsx?poNo=ES260709-1974",
+    "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-4.pdf",
+    "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-4.pdf?poNo=ES260709-1974",
+    "issuedAt": "2026-10-19T13:11:05.343Z",
+    "items": [
+      {
+        "itemNo": 19,
+        "description": "T(S)-S10S-25A-STS304-W",
+        "qty": 5,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 20,
+        "description": "T(R)-S10S-50A X 15A-STS304-W",
+        "qty": 2,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS304-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 21,
+        "description": "45E(L)-S10S-65A-STS316L-W",
+        "qty": 1,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS316L-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 22,
+        "description": "R(C)-S10S-125A X 50A-STS316L-W",
+        "qty": 1,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS316L-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 23,
+        "description": "R(C)-S10S-50A X 25A-STS316L-W",
+        "qty": 1,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS316L-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 24,
+        "description": "R(C)-S10S-50A X 40A-STS316L-W",
+        "qty": 1,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS316L-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      }
+    ]
+  },
+  {
+    "id": "cert_ES260709-1974_YR-26-07015-5",
+    "poNo": "ES260709-1974",
+    "certNo": "YR-26-07015-5",
+    "customer": "월드원플랜에탈",
+    "issueDate": "2026.07.09",
+    "sheetName": "TP316L",
+    "heatTreatment": "* Heat Treatment Condition : 1050℃ Solution Annealing & Water Quenching",
+    "itemCount": 6,
+    "excelPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-5.xlsx",
+    "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-5.xlsx?poNo=ES260709-1974",
+    "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-5.pdf",
+    "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-5.pdf?poNo=ES260709-1974",
+    "issuedAt": "2026-10-19T13:11:06.765Z",
+    "items": [
+      {
+        "itemNo": 25,
+        "description": "R(C)-S10S-65A X 50A-STS316L-W",
+        "qty": 1,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS316L-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 26,
+        "description": "R(C)-S10S-80A X 40A-STS316L-W",
+        "qty": 1,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS316L-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 27,
+        "description": "T(R)-S10S-50A X 25A-STS316L-W",
+        "qty": 3,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS316L-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 28,
+        "description": "T(S)-S10S-50A-STS316L-W",
+        "qty": 4,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS316L-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 29,
+        "description": "T(S)-S10S-25A-STS316L-W",
+        "qty": 2,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS316L-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 30,
+        "description": "T(S)-S10S-40A-STS316L-W",
+        "qty": 1,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS316L-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      }
+    ]
+  },
+  {
+    "id": "cert_ES260709-1974_YR-26-07015-6",
+    "poNo": "ES260709-1974",
+    "certNo": "YR-26-07015-6",
+    "customer": "월드원플랜에탈",
+    "issueDate": "2026.07.09",
+    "sheetName": "TP316L",
+    "heatTreatment": "* Heat Treatment Condition : 1050℃ Solution Annealing & Water Quenching",
+    "itemCount": 4,
+    "excelPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-6.xlsx",
+    "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-6.xlsx?poNo=ES260709-1974",
+    "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-6.pdf",
+    "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-6.pdf?poNo=ES260709-1974",
+    "issuedAt": "2026-10-19T13:11:08.163Z",
+    "items": [
+      {
+        "itemNo": 31,
+        "description": "T(R)-S10S-50A X 15A-STS316L-W",
+        "qty": 1,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS316L-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 32,
+        "description": "90E(L)-S10S-25A-STS316L-W",
+        "qty": 12,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS316L-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 33,
+        "description": "90E(L)-S10S-40A-STS316L-W",
+        "qty": 12,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS316L-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      },
+      {
+        "itemNo": 34,
+        "description": "90E(L)-S10S-50A-STS316L-W",
+        "qty": 6,
+        "heatNo": "SE51511",
+        "lotNo": "KGA0589",
+        "specMaterial": "STS316L-W",
+        "specInspection": "S10S",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": "0.023",
+          "Si": "0.42",
+          "Mn": "1.47",
+          "P": "0.032",
+          "S": "0.002",
+          "Ni": "8.09",
+          "Cr": "18.12",
+          "Mo": ""
+        },
+        "mech": {
+          "ys": "288",
+          "ts": "654",
+          "el": "55"
+        }
+      }
+    ]
+  }
+]

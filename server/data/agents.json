@@ -334,35 +334,29 @@
   {
     "id": "pur-stock-reorder",
     "code": "PUR-01",
-    "name": "알트에프 재고 발주 List Up 봇",
+    "name": "알트에프 재고확인 봇",
     "deptId": "purchase",
     "deptName": "구매부",
     "tier": 3,
-    "role": "altf.kr 재고 발주 대장 및 미결 관리 (1일 2회: 오전 10:00 / 오후 17:00 감지, 그 외 대기)",
-    "status": "STANDBY",
+    "role": "시화 재고 발주 list 정리",
+    "status": "ACTIVE",
     "metrics": {
-      "speed": 98,
+      "speed": 95,
       "accuracy": 99,
-      "load": 15,
-      "uptime": "100%",
-      "tasksToday": 142
+      "load": 45,
+      "uptime": "99.9%",
+      "tasksToday": 64
     },
-    "currentTask": "업무시간 1일 2회 정기 감시 대기 중 (오전 10:00 / 오후 17:00, 미결 453건 관리)",
+    "currentTask": "24시간 무한 가동 준비 완료",
     "lastActive": "방금 전",
     "triggerEvents": [
-      "CRON_DAILY_10_00",
-      "CRON_DAILY_17_00",
-      "EVENT_MANUAL_PUR_SYNC"
+      "EVENT_INVENTORY_CHANGED"
     ],
     "emittedEvents": [
-      "EVENT_STOCK_ORDER_LIST_UPDATED",
-      "EVENT_PENDING_STOCK_ALERT"
+      "EVENT_REORDER_REQUIRED"
     ],
     "logs": [
-      "[19:19] [PUR-01] 업무시간 1일 2회(10:00, 17:00) 정기 감시 체계 적용 완료 ➔ 현재 대기 상태(STANDBY) 유지",
-      "[19:18] [PUR-01] altf.kr API 재고 발주 감지 완료: 총 624건 (입고: 159건, 미결: 453건)",
-      "[PUR-01] 알트에프 재고 발주 대장 및 미결 관리 전담 지정 완료",
-      "[PUR-01] 1일 2회(10:00, 17:00) 감지 스케줄러 등록 완료"
+      "[18:58:27] [사원] 직위 배정 및 에이전트 신규 배포 완료 (연계: 1개 부서, 1명 담당자)"
     ],
     "isCreated": true,
     "connectedDeptIds": [
@@ -1121,11 +1115,11 @@
   {
     "id": "qc-cert-builder",
     "code": "QC-06",
-    "name": "EN10204 성적서 생성봇",
+    "name": "EN10204 3.1 성적서 생성봇",
     "deptId": "quality",
     "deptName": "품질부",
     "tier": 3,
-    "role": "규격 기준치(ASTM/KS) 자동 결합하여 이미지 2 서식의 공식 성적서 엑셀 및 PDF 무인 렌더링",
+    "role": "규격 기준치(ASTM/KS) 자동 결합하여 이미지 2 서식의 공식 성적서 엑셀 및 PDF 성적서 발행",
     "status": "OFFLINE",
     "metrics": {
       "speed": 96,
@@ -1148,11 +1142,16 @@
     "isCreated": true,
     "connectedDeptIds": [
       "shipping",
-      "executive"
+      "executive",
+      "quality"
     ],
     "position": "대리",
     "approvalStatus": "AUTO_RUNNING",
-    "orderIndex": 5
+    "orderIndex": 5,
+    "supervisorId": "",
+    "connectedAgentIds": [
+      "qc-inbound-ingest"
+    ]
   },
   {
     "id": "qc-tolerance-inspector",
