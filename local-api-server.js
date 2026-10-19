@@ -1687,6 +1687,33 @@ const server = http.createServer(async (req, res) => {
             }
             return;
         }
+
+        // 8. POST /api/qc/qc06/open-excel : 사용자 PC에서 MS Excel 프로그램으로 즉시 열기 & 수정
+        if (req.method === 'POST' && url.pathname === '/api/qc/qc06/open-excel') {
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    const pathModule = await import('path');
+                    const data = JSON.parse(body || '{}');
+                    const { poNo, excelPath, fileName } = data;
+                    let targetPath = excelPath;
+                    if (!targetPath && poNo && fileName) {
+                        const cleanPo = poNo.replace(/[^a-zA-Z0-9_\-]/g, '_');
+                        targetPath = `./storage/issued_certificates/${cleanPo}/${fileName}`;
+                    }
+                    if (!targetPath) {
+                        return sendJsonResponse(req, res, 400, { success: false, error: '엑셀 파일 정보가 필요합니다.' });
+                    }
+                    const resolvedPath = pathModule.resolve(targetPath);
+                    const result = certificateIssuerService.openExcelFile(resolvedPath);
+                    sendJsonResponse(req, res, 200, { success: true, ...result, path: resolvedPath });
+                } catch (err) {
+                    sendJsonResponse(req, res, 500, { success: false, error: err.message });
+                }
+            });
+            return;
+        }
     }
 
     // POST /api/quote/import

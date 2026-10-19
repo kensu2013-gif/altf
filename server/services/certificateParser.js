@@ -6,6 +6,7 @@
  * - storage/certificates/대경벤드 성적서.xlsx 및 server/data/certificates.json 실시간 동기화
  */
 
+import '../polyfills.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

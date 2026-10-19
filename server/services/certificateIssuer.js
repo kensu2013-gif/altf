@@ -24,6 +24,7 @@ import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import xlsx from 'xlsx';
 import ExcelJS from 'exceljs';
+import AdmZip from 'adm-zip';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -279,7 +280,96 @@ export class CertificateIssuerService {
         const excelFilePath = path.join(poDir, excelFileName);
         await wb.xlsx.writeFile(excelFilePath);
 
+        // ★ 원본 DrawingML(WordArt "INSPECTION CERTIFICATE", TextBox "DAEKYUNG BEND", 주소, 워터마크) 100% 복원
+        this.restoreOriginalDrawings(excelFilePath);
+
         return { excelFilePath, excelFileName };
+    }
+
+    /**
+     * ExcelJS의 Shape/WordArt/TextBox/Watermark 유실 한계를 극복하는 원본 드로잉 & 대경 워터마크 복원 엔진
+     * - 1. 원본 템플릿의 xl/drawings/ 및 xl/media/ 를 대상 엑셀 파일에 그대로 재주입
+     * - 2. 각 시트(xl/worksheets/sheet*.xml)에 원본 템플릿의 <headerFooter> 및 <legacyDrawingHF> 복원
+     * - 3. 각 시트의 관계 파일(xl/worksheets/_rels/sheet*.xml.rels)에 drawing 및 vmlDrawing(워터마크) 관계 복원
+     */
+    restoreOriginalDrawings(targetFilePath) {
+        if (!fs.existsSync(TEMPLATE_PATH) || !fs.existsSync(targetFilePath)) return;
+        try {
+            const origZip = new AdmZip(TEMPLATE_PATH);
+            const targetZip = new AdmZip(targetFilePath);
+
+            // 1. drawings 및 media 폴더 전체 복원 (WordArt, TextBox, 로고, 직인, 워터마크 원본 이미지)
+            origZip.getEntries().forEach(entry => {
+                if (entry.entryName.startsWith('xl/drawings/') || entry.entryName.startsWith('xl/media/')) {
+                    targetZip.deleteFile(entry.entryName);
+                    targetZip.addFile(entry.entryName, entry.getData());
+                }
+            });
+
+            // 2. 템플릿 시트별 매핑 (6대 양식지)
+            const sheetMetaMap = {
+                'STS304 1040': { tplSheet: 'sheet1.xml', drawing: 'drawing1.xml', vml: 'vmlDrawing1.vml' },
+                'STS304 1050': { tplSheet: 'sheet2.xml', drawing: 'drawing2.xml', vml: 'vmlDrawing2.vml' },
+                'TP304(소재ASTM사용시)': { tplSheet: 'sheet3.xml', drawing: 'drawing3.xml', vml: 'vmlDrawing3.vml' },
+                'TYPE304(PLATE 사용시)': { tplSheet: 'sheet4.xml', drawing: 'drawing4.xml', vml: 'vmlDrawing4.vml' },
+                'TP316L': { tplSheet: 'sheet5.xml', drawing: 'drawing5.xml', vml: 'vmlDrawing5.vml' },
+                'TYPE316L(PLATE사용시)': { tplSheet: 'sheet6.xml', drawing: 'drawing6.xml', vml: 'vmlDrawing6.vml' }
+            };
+
+            const targetWbXml = targetZip.readAsText('xl/workbook.xml');
+            const targetWbRels = targetZip.readAsText('xl/_rels/workbook.xml.rels');
+
+            const regex = /<sheet\s+[^>]*name="([^"]+)"[^>]*r:id="([^"]+)"/g;
+            let match;
+            while ((match = regex.exec(targetWbXml)) !== null) {
+                const sheetName = match[1];
+                const rId = match[2];
+                const meta = sheetMetaMap[sheetName];
+                if (!meta) continue;
+
+                // target workbook.xml.rels에서 해당 rId가 가리키는 실제 target sheet xml 파일 경로 찾기
+                const relMatch = targetWbRels.match(new RegExp(`<Relationship\\s+Id="${rId}"[^>]*Target="([^"]+)"`));
+                if (!relMatch) continue;
+                const targetSheetRelPath = relMatch[1];
+                const targetSheetFullPath = 'xl/' + targetSheetRelPath;
+                const sheetBaseName = targetSheetRelPath.split('/').pop();
+                const targetRelsFullPath = `xl/worksheets/_rels/${sheetBaseName}.rels`;
+
+                // 2-1. 원본 템플릿의 해당 시트에서 headerFooter 태그 가져오기
+                const tplSheetXml = origZip.readAsText(`xl/worksheets/${meta.tplSheet}`);
+                const hfMatch = tplSheetXml.match(/<headerFooter[\s\S]*?<\/headerFooter>/);
+
+                // target sheet xml 수정 (headerFooter 및 legacyDrawingHF 주입)
+                let sheetXml = targetZip.readAsText(targetSheetFullPath);
+                if (sheetXml) {
+                    if (hfMatch && !sheetXml.includes('<headerFooter')) {
+                        if (sheetXml.includes('<pageSetUp')) {
+                            sheetXml = sheetXml.replace(/(<pageSetUp[\s\S]*?\/>)/, '$1' + hfMatch[0]);
+                        } else if (sheetXml.includes('<pageMargins')) {
+                            sheetXml = sheetXml.replace(/(<pageMargins[\s\S]*?\/>)/, '$1' + hfMatch[0]);
+                        }
+                    }
+                    if (!sheetXml.includes('<legacyDrawingHF')) {
+                        sheetXml = sheetXml.replace('</worksheet>', '<legacyDrawingHF r:id="rIdVmlWatermark"/></worksheet>');
+                    }
+                    targetZip.updateFile(targetSheetFullPath, Buffer.from(sheetXml, 'utf8'));
+                }
+
+                // 2-2. sheet rels 파일 갱신 (drawing + vmlDrawing 워터마크 관계 복원)
+                const newSheetRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/${meta.drawing}"/>
+  <Relationship Id="rIdVmlWatermark" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing" Target="../drawings/${meta.vml}"/>
+</Relationships>`;
+                targetZip.deleteFile(targetRelsFullPath);
+                targetZip.addFile(targetRelsFullPath, Buffer.from(newSheetRels, 'utf8'));
+            }
+
+            targetZip.writeZip(targetFilePath);
+            console.log(`[QC-06] 원본 DrawingML(WordArt, TextBox) 및 대경 워터마크 100% 복원 완료: ${targetFilePath}`);
+        } catch (e) {
+            console.error('[QC-06] restoreOriginalDrawings 실패:', e.message);
+        }
     }
 
     /**
@@ -785,6 +875,72 @@ export class CertificateIssuerService {
     }
 
     /**
+     * 4. MS Excel COM Automation을 이용한 100% 순정 PDF 변환 엔진
+     * - 워터마크, WordArt, TextBox, 로고, 서식, 폰트가 원본 엑셀과 완전히 똑같이 인쇄됨!
+     */
+    async generatePdfViaExcel(excelFilePath, pdfFilePath, sheetName) {
+        if (process.platform !== 'win32') {
+            return false;
+        }
+
+        const absXlsx = path.resolve(excelFilePath).replace(/\\/g, '\\\\');
+        const absPdf = path.resolve(pdfFilePath).replace(/\\/g, '\\\\');
+        const targetSheet = sheetName || 'TP316L';
+
+        const psScript = `
+$excel = New-Object -ComObject Excel.Application
+$excel.Visible = $false
+$excel.DisplayAlerts = $false
+try {
+    $wb = $excel.Workbooks.Open('${absXlsx}')
+    $ws = $wb.Worksheets.Item('${targetSheet}')
+    $ws.Activate()
+    $ws.ExportAsFixedFormat(0, '${absPdf}')
+    $wb.Close($false)
+    Write-Host 'EXCEL_PDF_SUCCESS'
+} catch {
+    Write-Host ('EXCEL_PDF_ERROR: ' + $_.Exception.Message)
+} finally {
+    $excel.Quit()
+    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel) | Out-Null
+}
+`;
+
+        return new Promise((resolve) => {
+            const cmd = `powershell -NoProfile -NonInteractive -Command "${psScript.replace(/\n/g, '; ')}"`;
+            exec(cmd, (err, stdout, stderr) => {
+                if (!err && fs.existsSync(pdfFilePath) && fs.statSync(pdfFilePath).size > 1000) {
+                    console.log(`[QC-06] MS Excel 순정 PDF 변환 성공 (${fs.statSync(pdfFilePath).size} bytes): ${pdfFilePath}`);
+                    resolve(true);
+                } else {
+                    console.warn('[QC-06] MS Excel COM 변환 실패, Chrome 헤드리스 폴백 사용:', stderr || stdout || err?.message);
+                    resolve(false);
+                }
+            });
+        });
+    }
+
+    /**
+     * 5. 로컬 환경에서 지정된 성적서 엑셀 파일을 사용자 MS Excel 프로그램으로 직접 열기
+     */
+    openExcelFile(filePath) {
+        if (!fs.existsSync(filePath)) {
+            throw new Error(`파일이 존재하지 않습니다: ${filePath}`);
+        }
+        const isWin = process.platform === 'win32';
+        const isMac = process.platform === 'darwin';
+        let cmd = '';
+        if (isWin) cmd = `start "" "${filePath}"`;
+        else if (isMac) cmd = `open "${filePath}"`;
+        else cmd = `xdg-open "${filePath}"`;
+
+        exec(cmd, (err) => {
+            if (err) console.error('[QC-06] 엑셀 열기 오류:', err.message);
+        });
+        return { success: true, message: `엑셀 파일 열기 명령 실행: ${path.basename(filePath)}` };
+    }
+
+    /**
      * 4. 발주번호(poNo) 기반 성적서 일괄 자동 발행 & DAT-10 아카이빙
      */
     async issueCertificatesForPo(poNo, options = {}) {
@@ -924,11 +1080,14 @@ export class CertificateIssuerService {
             // 2. HTML 렌더링
             const htmlContent = this.generateHtml(certMeta, pageItems);
 
-            // 3. 고해상도 PDF 생성 (.pdf)
+            // 3. 고해상도 PDF 생성 (.pdf) - 1순위: MS Excel 순정 변환, 2순위: Chrome 헤드리스
             const poDir = path.dirname(excelFilePath);
             const pdfFileName = `${poNo}_성적서_${certNo}.pdf`;
             const pdfFilePath = path.join(poDir, pdfFileName);
-            await this.generatePdf(htmlContent, pdfFilePath);
+            const excelPdfSuccess = await this.generatePdfViaExcel(excelFilePath, pdfFilePath, sheetName);
+            if (!excelPdfSuccess) {
+                await this.generatePdf(htmlContent, pdfFilePath);
+            }
 
             const record = {
                 id: `cert_${poNo}_${certNo}`,
@@ -1090,11 +1249,14 @@ export class CertificateIssuerService {
             // 2) HTML 렌더링
             const htmlContent = this.generateHtml(certMeta, pageItems);
 
-            // 3) 고해상도 PDF 생성 (.pdf)
+            // 3) 고해상도 PDF 생성 (.pdf) - 1순위: MS Excel 순정 변환, 2순위: Chrome 헤드리스
             const outboundDir = path.dirname(excelFilePath);
             const pdfFileName = `${outboundNo}_성적서_${certNo}.pdf`;
             const pdfFilePath = path.join(outboundDir, pdfFileName);
-            await this.generatePdf(htmlContent, pdfFilePath);
+            const excelPdfSuccess = await this.generatePdfViaExcel(excelFilePath, pdfFilePath, sheetName);
+            if (!excelPdfSuccess) {
+                await this.generatePdf(htmlContent, pdfFilePath);
+            }
 
             const record = {
                 id: `cert_outbound_${outboundNo}_${certNo}`,

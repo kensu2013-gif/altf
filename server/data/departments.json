@@ -86,5 +86,16 @@
     "description": "CEO 일일 결산 브리핑, 자금 흐름 예측, 이탈 고객 감지 및 최종 승인",
     "headRole": "CEO 전략실",
     "totalUnits": 9
+  },
+  {
+    "id": "sle",
+    "name": "영업부",
+    "code": "SLE",
+    "color": "#7cd4da",
+    "bgGlow": "#7cd4da26",
+    "icon": "🤖",
+    "headRole": "부서 총괄 자동화",
+    "description": "영업부 자율 에이전트 관제",
+    "totalUnits": 6
   }
 ]

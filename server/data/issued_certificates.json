@@ -426,6 +426,53 @@
     ]
   },
   {
+    "id": "cert_outbound_A202610150_YR-26-07015",
+    "poNo": "A202610150",
+    "outboundNo": "A202610150",
+    "certNo": "YR-26-07015",
+    "customer": "(주)태양밴드",
+    "issueDate": "2026-10-19",
+    "sheetName": "TP316L",
+    "heatTreatment": "* Heat Treatment Condition : 1040℃ Solution Annealing & Water Quenching",
+    "itemCount": 1,
+    "excelPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\A202610150\\A202610150_성적서_YR-26-07015.xlsx",
+    "excelUrl": "/api/qc/qc06/download-excel/A202610150_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015.xlsx?poNo=A202610150",
+    "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\A202610150\\A202610150_성적서_YR-26-07015.pdf",
+    "pdfUrl": "/api/qc/qc06/download-pdf/A202610150_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015.pdf?poNo=A202610150",
+    "issuedAt": "2026-10-19T15:24:06.362Z",
+    "isOutbound": true,
+    "location": "시흥 ALT F",
+    "items": [
+      {
+        "itemNo": 1,
+        "lineNo": "1 - 1",
+        "altfLotNo": "DKB260313108",
+        "lotNo": "JCQ4366",
+        "heatNo": "SD34285",
+        "description": "R(C) S/10S 32A * 15A B.W",
+        "qty": 2,
+        "specMaterial": "ASTM A312 TP316L",
+        "specInspection": "KS B1543 STS316L-W",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.017,
+          "Si": 0.6,
+          "Mn": 1.06,
+          "P": 0.029,
+          "S": 0.002,
+          "Ni": 10.03,
+          "Cr": 16.16,
+          "Mo": 2.07
+        },
+        "mech": {
+          "ys": 285,
+          "ts": 594,
+          "el": 50
+        }
+      }
+    ]
+  },
+  {
     "id": "cert_ES260709-1974_YR-26-07015-1",
     "poNo": "ES260709-1974",
     "certNo": "YR-26-07015-1",
@@ -438,7 +485,7 @@
     "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-1.xlsx?poNo=ES260709-1974",
     "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-1.pdf",
     "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-1.pdf?poNo=ES260709-1974",
-    "issuedAt": "2026-10-19T14:18:19.530Z",
+    "issuedAt": "2026-10-19T15:23:41.857Z",
     "items": [
       {
         "itemNo": 1,
@@ -605,7 +652,7 @@
     "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-2.xlsx?poNo=ES260709-1974",
     "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-2.pdf",
     "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-2.pdf?poNo=ES260709-1974",
-    "issuedAt": "2026-10-19T14:18:21.003Z",
+    "issuedAt": "2026-10-19T15:23:47.964Z",
     "items": [
       {
         "itemNo": 7,
@@ -772,7 +819,7 @@
     "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-3.xlsx?poNo=ES260709-1974",
     "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-3.pdf",
     "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-3.pdf?poNo=ES260709-1974",
-    "issuedAt": "2026-10-19T14:18:22.408Z",
+    "issuedAt": "2026-10-19T15:23:51.960Z",
     "items": [
       {
         "itemNo": 13,
@@ -939,7 +986,7 @@
     "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-4.xlsx?poNo=ES260709-1974",
     "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-4.pdf",
     "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-4.pdf?poNo=ES260709-1974",
-    "issuedAt": "2026-10-19T14:18:23.829Z",
+    "issuedAt": "2026-10-19T15:23:55.552Z",
     "items": [
       {
         "itemNo": 19,
@@ -1106,7 +1153,7 @@
     "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-5.xlsx?poNo=ES260709-1974",
     "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-5.pdf",
     "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-5.pdf?poNo=ES260709-1974",
-    "issuedAt": "2026-10-19T14:18:25.221Z",
+    "issuedAt": "2026-10-19T15:24:01.901Z",
     "items": [
       {
         "itemNo": 25,
@@ -1273,7 +1320,7 @@
     "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-6.xlsx?poNo=ES260709-1974",
     "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-6.pdf",
     "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-6.pdf?poNo=ES260709-1974",
-    "issuedAt": "2026-10-19T14:18:26.775Z",
+    "issuedAt": "2026-10-19T15:24:08.726Z",
     "items": [
       {
         "itemNo": 31,
@@ -1373,53 +1420,6 @@
           "ys": "288",
           "ts": "654",
           "el": "55"
-        }
-      }
-    ]
-  },
-  {
-    "id": "cert_outbound_A202610150_YR-26-07015",
-    "poNo": "A202610150",
-    "outboundNo": "A202610150",
-    "certNo": "YR-26-07015",
-    "customer": "(주)태양밴드",
-    "issueDate": "2026-10-19",
-    "sheetName": "TP316L",
-    "heatTreatment": "* Heat Treatment Condition : 1040℃ Solution Annealing & Water Quenching",
-    "itemCount": 1,
-    "excelPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\A202610150\\A202610150_성적서_YR-26-07015.xlsx",
-    "excelUrl": "/api/qc/qc06/download-excel/A202610150_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015.xlsx?poNo=A202610150",
-    "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\A202610150\\A202610150_성적서_YR-26-07015.pdf",
-    "pdfUrl": "/api/qc/qc06/download-pdf/A202610150_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015.pdf?poNo=A202610150",
-    "issuedAt": "2026-10-19T14:19:49.280Z",
-    "isOutbound": true,
-    "location": "시흥 ALT F",
-    "items": [
-      {
-        "itemNo": 1,
-        "lineNo": "1 - 1",
-        "altfLotNo": "DKB260313108",
-        "lotNo": "JCQ4366",
-        "heatNo": "SD34285",
-        "description": "R(C) S/10S 32A * 15A B.W",
-        "qty": 2,
-        "specMaterial": "ASTM A312 TP316L",
-        "specInspection": "KS B1543 STS316L-W",
-        "startingMaterial": "WELDED PIPE",
-        "chem": {
-          "C": 0.017,
-          "Si": 0.6,
-          "Mn": 1.06,
-          "P": 0.029,
-          "S": 0.002,
-          "Ni": 10.03,
-          "Cr": 16.16,
-          "Mo": 2.07
-        },
-        "mech": {
-          "ys": 285,
-          "ts": 594,
-          "el": 50
         }
       }
     ]
