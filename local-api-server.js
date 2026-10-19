@@ -802,6 +802,38 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🤖 QC-02 AGENT API : MTC 비전 판독 및 다중 페이지 성적서 대장 누적
+    if (url.pathname.startsWith('/api/qc/qc02')) {
+        // 1. POST /api/qc/qc02/run : QC-02 에이전트 실행 (누적 모드)
+        if (req.method === 'POST' && url.pathname === '/api/qc/qc02/run') {
+            try {
+                const parseResult = await certificateParserService.runQC02Agent({ incremental: true });
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify(parseResult));
+                return;
+            } catch (err) {
+                console.error('[API] QC-02 execution failed:', err);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+                return;
+            }
+        }
+
+        // 2. GET /api/qc/qc02/status : QC-02 처리 상태 및 통계 조회
+        if (req.method === 'GET' && url.pathname === '/api/qc/qc02/status') {
+            try {
+                const status = certificateParserService.getQC02Status();
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, ...status }));
+                return;
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+                return;
+            }
+        }
+    }
+
     // 🔬 QC CERTIFICATE LEDGER API (대경벤드 성적서.xlsx 및 구글시트 100% 호환)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     if (url.pathname.startsWith('/api/certificates')) {

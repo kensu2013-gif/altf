@@ -302,9 +302,42 @@ function parseCertificatePage(pageText, fileName) {
     });
 }
 
+// 2. 성적서 양식.xlsx 복사 전용 헤더 (화학 성분 및 기계 성질 3칸 간격 호환)
+// 사용자가 '성적서 양식.xlsx'의 2.CHEMICAL 및 3.MECHANICAL에 드래그 복사/붙여넣기할 수 있도록 3열 병합 간격 맞춤
+export const FORM_TEMPLATE_COMPATIBLE_HEADERS = [
+    '일 자', 'Customer', 'P.O No', 'CERT-No', 'HEAT No', 'LOT No', 'ITEM No', 'DESCRIPTION', "Q'TY", 'MATERIAL',
+    'C', '', '',
+    'Si', '', '',
+    'Mn', '', '',
+    'P', '', '',
+    'S', '', '',
+    'Ni', '', '',
+    'Cr', '', '',
+    'Mo', '', '',
+    'Y.S', '', '',
+    'T.S', '', '',
+    'E.L', '', '',
+    '외관/치수', 'PDF 원본링크'
+];
+
 export class CertificateParserService {
+    constructor() {
+        this.qc02Status = {
+            isProcessing: false,
+            progress: 100,
+            totalFiles: 0,
+            processedFiles: 0,
+            totalRowsCount: 0,
+            currentFileName: '',
+            lastCompletedAt: null,
+            recentLogs: [
+                `[${new Date().toLocaleTimeString('ko-KR')}] QC-02 에이전트 대기 중 (다중 페이지 및 대용량 성적서 판독 준비 완료)`
+            ]
+        };
+    }
+
     /**
-     * 특정 PDF 파일 1건 파싱
+     * 특정 PDF 파일 1건 파싱 (10장, 20장, 30장 이상의 다중 페이지 지원)
      */
     async parsePdfFile(filePath) {
         if (!fs.existsSync(filePath)) {
@@ -319,61 +352,103 @@ export class CertificateParserService {
         const pages = res.text.split(/-- \d+ of \d+ --/);
         const allRows = [];
 
-        for (const page of pages) {
-            const rows = parseCertificatePage(page, fileName);
-            allRows.push(...rows);
+        for (let i = 0; i < pages.length; i++) {
+            const pageText = pages[i];
+            const rows = parseCertificatePage(pageText, fileName);
+            if (rows.length > 0) {
+                allRows.push(...rows);
+            }
         }
 
         return {
             fileName,
+            totalPages: pages.length,
             totalRows: allRows.length,
             rows: allRows
         };
     }
 
     /**
-     * storage/certificates 내의 모든 PDF를 스캔하여 26개 컬럼 엑셀 및 JSON 장부 전체 동기화
+     * QC-02 에이전트 핵심 실행: 전체 또는 신규 PDF 스캔 후 누적(Incremental Upsert) 저장
+     * - 파일당 10~30장, 10~20개 이상의 대용량 파일 안정 처리
+     * - '대경벤드 성적서.xlsx' 마스터 대장 및 '성적서양식_복사용(3열병합호환)' 2개 시트 동시 생성
      */
-    async parseAndSyncAll() {
+    async runQC02Agent(options = { incremental: true }) {
         if (!fs.existsSync(CERTIFICATES_STORAGE_DIR)) {
             fs.mkdirSync(CERTIFICATES_STORAGE_DIR, { recursive: true });
         }
 
         const files = fs.readdirSync(CERTIFICATES_STORAGE_DIR).filter(f => f.endsWith('.pdf'));
-        console.log(`[QC-01 Parser] 전체 성적서 파싱 시작: 총 ${files.length}개 PDF 대상`);
+        const startTime = Date.now();
 
-        const allExtractedRows = [];
-        let parsedFilesCount = 0;
+        this.qc02Status.isProcessing = true;
+        this.qc02Status.progress = 0;
+        this.qc02Status.totalFiles = files.length;
+        this.qc02Status.processedFiles = 0;
+        this.qc02Status.recentLogs.unshift(`[${new Date().toLocaleTimeString('ko-KR')}] 🚀 QC-02 성적서 비전 판독 시작: 총 ${files.length}개 PDF 대상`);
 
-        for (const f of files) {
+        console.log(`[QC-02 Agent] 성적서 판독 및 누적 동기화 시작: 총 ${files.length}개 PDF 파일`);
+
+        // 1. 기존 누적 데이터 로드 (Incremental 모드)
+        const uniqueMap = new Map();
+        if (options.incremental && fs.existsSync(CERT_JSON_PATH)) {
+            try {
+                const existing = JSON.parse(fs.readFileSync(CERT_JSON_PATH, 'utf8'));
+                if (Array.isArray(existing)) {
+                    for (const r of existing) {
+                        const key = `${r.poNo}_${r.certNo}_${r.itemNo}_${r.heatNo}`;
+                        uniqueMap.set(key, r);
+                    }
+                }
+            } catch (e) {
+                console.warn('[QC-02 Agent] 기존 장부 로드 실패, 신규 작성:', e.message);
+            }
+        }
+
+        let newItemsCount = 0;
+        let processedFilesCount = 0;
+
+        for (let i = 0; i < files.length; i++) {
+            const f = files[i];
+            this.qc02Status.currentFileName = f;
+            this.qc02Status.progress = Math.round(((i + 1) / files.length) * 90);
+
             try {
                 const fullPath = path.join(CERTIFICATES_STORAGE_DIR, f);
                 const result = await this.parsePdfFile(fullPath);
+                
                 if (result.rows && result.rows.length > 0) {
-                    allExtractedRows.push(...result.rows);
-                    parsedFilesCount++;
+                    for (const r of result.rows) {
+                        const key = `${r.poNo}_${r.certNo}_${r.itemNo}_${r.heatNo}`;
+                        if (!uniqueMap.has(key)) {
+                            newItemsCount++;
+                        }
+                        uniqueMap.set(key, r);
+                    }
+                    processedFilesCount++;
+                    this.qc02Status.recentLogs.unshift(
+                        `[${new Date().toLocaleTimeString('ko-KR')}] 📄 [${i + 1}/${files.length}] ${f} 판독 완료 (${result.totalPages}p 중 ${result.rows.length}개 품목 추출)`
+                    );
                 }
             } catch (err) {
-                console.error(`[QC-01 Parser] ${f} 파싱 중 오류 발생:`, err.message);
+                console.error(`[QC-02 Agent] ${f} 파싱 중 오류 발생:`, err.message);
+                this.qc02Status.recentLogs.unshift(
+                    `[${new Date().toLocaleTimeString('ko-KR')}] ⚠️ ${f} 판독 실패: ${err.message}`
+                );
             }
+
+            this.qc02Status.processedFiles = i + 1;
         }
 
-        // 중복 제거 (poNo + certNo + itemNo + heatNo 복합키)
-        const uniqueMap = new Map();
-        for (const r of allExtractedRows) {
-            const key = `${r.poNo}_${r.certNo}_${r.itemNo}_${r.heatNo}`;
-            if (!uniqueMap.has(key)) {
-                uniqueMap.set(key, r);
-            }
-        }
         const consolidatedRows = Array.from(uniqueMap.values());
 
-        // 1. server/data/certificates.json 영구 저장
+        // 2. server/data/certificates.json 영구 누적 저장
         fs.mkdirSync(path.dirname(CERT_JSON_PATH), { recursive: true });
         fs.writeFileSync(CERT_JSON_PATH, JSON.stringify(consolidatedRows, null, 2), 'utf8');
 
-        // 2. storage/certificates/대경벤드 성적서.xlsx 엑셀 생성 및 동기화
-        const excelData = [
+        // 3. storage/certificates/대경벤드 성적서.xlsx 생성
+        // Sheet 1: 대경벤드성적서 (표준 26개 컬럼 마스터 대장)
+        const masterExcelData = [
             CERTIFICATE_SHEET_HEADERS,
             ...consolidatedRows.map(r => [
                 r.issueDate, r.customer, r.supplier, r.poNo, r.certNo,
@@ -384,24 +459,105 @@ export class CertificateParserService {
             ])
         ];
 
+        // Sheet 2: 성적서양식_복사용 (3열 병합 간격 맞춤: C, '', '', Si, '', '', Mn, '', '', ...)
+        const copySheetData = [
+            FORM_TEMPLATE_COMPATIBLE_HEADERS,
+            ...consolidatedRows.map(r => [
+                r.issueDate, r.customer, r.poNo, r.certNo, r.heatNo, r.lotNo, r.itemNo, r.description, r.qty, r.material,
+                r.chemC, '', '',
+                r.chemSi, '', '',
+                r.chemMn, '', '',
+                r.chemP, '', '',
+                r.chemS, '', '',
+                r.chemNi, '', '',
+                r.chemCr, '', '',
+                r.chemMo, '', '',
+                r.mechYs, '', '',
+                r.mechTs, '', '',
+                r.mechEl, '', '',
+                r.dimensionVi, r.pdfUrl
+            ])
+        ];
+
         const wb = xlsx.utils.book_new();
-        const ws = xlsx.utils.aoa_to_sheet(excelData);
-        xlsx.utils.book_append_sheet(wb, ws, '대경벤드성적서');
+        const wsMaster = xlsx.utils.aoa_to_sheet(masterExcelData);
+        const wsCopy = xlsx.utils.aoa_to_sheet(copySheetData);
+
+        xlsx.utils.book_append_sheet(wb, wsMaster, '대경벤드성적서');
+        xlsx.utils.book_append_sheet(wb, wsCopy, '성적서양식_복사용(3열병합호환)');
         xlsx.writeFile(wb, CERT_EXCEL_PATH);
 
-        console.log(`[QC-01 Parser] 파싱 완료! 총 ${parsedFilesCount}개 PDF에서 ${consolidatedRows.length}개 품목 장부(Excel/JSON) 동기화 완료.`);
-
-        // 품질 통계 계산
+        const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
         const stats = this.calculateQualityStats(consolidatedRows);
+
+        this.qc02Status.isProcessing = false;
+        this.qc02Status.progress = 100;
+        this.qc02Status.totalRowsCount = consolidatedRows.length;
+        this.qc02Status.lastCompletedAt = new Date().toISOString();
+        this.qc02Status.recentLogs.unshift(
+            `[${new Date().toLocaleTimeString('ko-KR')}] ✅ QC-02 판독 및 엑셀 누적 완료! (총 ${files.length}개 파일, 누적 ${consolidatedRows.length}개 품목, 소요시간 ${durationSec}초)`
+        );
+        if (this.qc02Status.recentLogs.length > 50) {
+            this.qc02Status.recentLogs = this.qc02Status.recentLogs.slice(0, 50);
+        }
+
+        // 4. 에이전트 상태 업데이트 (Agent Office Dashboard 연동용)
+        this.syncQC02AgentMetrics(consolidatedRows.length, processedFilesCount);
 
         return {
             success: true,
             totalPdfFiles: files.length,
-            parsedFilesCount,
+            parsedFilesCount: processedFilesCount,
+            newItemsCount,
             totalRowsCount: consolidatedRows.length,
+            durationSec: `${durationSec}s`,
             stats,
             rows: consolidatedRows
         };
+    }
+
+    /**
+     * 기존 호환용 메서드
+     */
+    async parseAndSyncAll() {
+        return this.runQC02Agent({ incremental: true });
+    }
+
+    /**
+     * QC-02 상태 조회
+     */
+    getQC02Status() {
+        return {
+            ...this.qc02Status,
+            ledgerStats: this.getLedgerData().stats
+        };
+    }
+
+    /**
+     * 서버 agents.json에 QC-02 최신 메트릭 반영
+     */
+    syncQC02AgentMetrics(totalItems, filesCount) {
+        const AGENTS_JSON_PATH = path.join(ROOT_DIR, 'server/data/agents.json');
+        if (fs.existsSync(AGENTS_JSON_PATH)) {
+            try {
+                const agents = JSON.parse(fs.readFileSync(AGENTS_JSON_PATH, 'utf8'));
+                if (Array.isArray(agents)) {
+                    const qc02 = agents.find(a => a.code === 'QC-02' || a.id === 'qc-mtc-vision-reader');
+                    if (qc02) {
+                        qc02.status = 'ACTIVE';
+                        qc02.currentTask = `성적서 ${filesCount}개 파일 판독 완료 (대장 누적 ${totalItems}개 행 보관 중)`;
+                        qc02.lastActive = '방금 전';
+                        qc02.metrics = {
+                            ...qc02.metrics,
+                            tasksToday: totalItems,
+                            load: 45
+                        };
+                        qc02.logs = this.qc02Status.recentLogs.slice(0, 5);
+                        fs.writeFileSync(AGENTS_JSON_PATH, JSON.stringify(agents, null, 2), 'utf8');
+                    }
+                }
+            } catch {}
+        }
     }
 
     /**
@@ -415,7 +571,6 @@ export class CertificateParserService {
             } catch {}
         }
 
-        // 품질 검사 메타데이터 보강
         const enrichedRows = rows.map(r => ({
             ...r,
             quality: r.quality || evaluateRowQuality(r)
