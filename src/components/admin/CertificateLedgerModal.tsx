@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Search, Download, RefreshCw, FileText, CheckCircle2, AlertTriangle, ShieldCheck, FolderOpen, Filter } from 'lucide-react';
+import { X, Search, Download, RefreshCw, FileText, CheckCircle2, AlertTriangle, ShieldCheck, FolderOpen, Filter, Copy, Check, Sparkles } from 'lucide-react';
 import type { CertificateLedgerRow } from '../../data/certificateSchema';
 
 interface CertificateLedgerModalProps {
@@ -21,6 +21,8 @@ export const CertificateLedgerModal: React.FC<CertificateLedgerModalProps> = ({
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [gradeFilter, setGradeFilter] = useState<string>('ALL');
     const [statusFilter, setStatusFilter] = useState<string>('ALL');
+    const [viewMode, setViewMode] = useState<'standard' | 'template_copy'>('standard');
+    const [copiedToast, setCopiedToast] = useState<string | null>(null);
     const [stats, setStats] = useState<{
         totalItems: number;
         passCount: number;
@@ -53,18 +55,20 @@ export const CertificateLedgerModal: React.FC<CertificateLedgerModalProps> = ({
         }
     }, [isOpen]);
 
-    // 전체 PDF 일괄 파싱 및 장부 동기화 트리거
+    // 전체 PDF 일괄 파싱 및 장부 동기화 트리거 (QC-02 에이전트 실행)
     const handleParseAll = async () => {
         setSyncing(true);
         try {
-            const res = await fetch('/api/certificates/parse-all', { method: 'POST' });
+            const res = await fetch('/api/qc/qc02/run', { method: 'POST' });
             const data = await res.json();
             if (data.success) {
                 setRows(data.rows || []);
                 if (data.stats) setStats(data.stats);
+                setCopiedToast(`QC-02 판독 완료! 총 ${data.totalRowsCount}개 품목이 엑셀에 누적 저장되었습니다.`);
+                setTimeout(() => setCopiedToast(null), 4000);
             }
         } catch (err) {
-            console.error('Failed to parse all certificates:', err);
+            console.error('Failed to run QC-02 agent:', err);
         } finally {
             setSyncing(false);
         }
@@ -73,6 +77,33 @@ export const CertificateLedgerModal: React.FC<CertificateLedgerModalProps> = ({
     // 엑셀 다운로드
     const handleDownloadExcel = () => {
         window.open('/api/certificates/download-excel', '_blank');
+    };
+
+    // 📋 성적서 양식.xlsx 3열 병합 간격 맞춤 클립보드 복사
+    // 성적서 양식의 C, Si, Mn, P, S, Ni, Cr, Mo / YS, TS, EL 각 셀이 3열 병합되어 있으므로 3칸 탭 간격으로 복사
+    const handleCopyForTemplate = (targetRows: CertificateLedgerRow[]) => {
+        if (targetRows.length === 0) return;
+        
+        const lines = targetRows.map(r => {
+            // C(H~J), Si(K~M), Mn(N~P), P(Q~S), S(T~V), Ni(W~Y), Cr(Z~AB), Mo(AC~AE) / YS, TS, EL
+            return [
+                r.chemC ?? 0, '', '',
+                r.chemSi ?? 0, '', '',
+                r.chemMn ?? 0, '', '',
+                r.chemP ?? 0, '', '',
+                r.chemS ?? 0, '', '',
+                r.chemNi ?? 0, '', '',
+                r.chemCr ?? 0, '', '',
+                r.chemMo ?? 0, '', '',
+                r.mechYs ?? 0, '', '',
+                r.mechTs ?? 0, '', '',
+                r.mechEl ?? 0
+            ].join('\t');
+        }).join('\n');
+
+        navigator.clipboard.writeText(lines);
+        setCopiedToast(`${targetRows.length}개 품목의 성분값이 '성적서 양식.xlsx'(3열 병합 간격)으로 복사되었습니다! 엑셀에 바로 붙여넣기(Ctrl+V)하세요.`);
+        setTimeout(() => setCopiedToast(null), 4000);
     };
 
     // 필터링된 행 목록
@@ -125,14 +156,14 @@ export const CertificateLedgerModal: React.FC<CertificateLedgerModalProps> = ({
                         <div>
                             <div className="flex items-center gap-2">
                                 <h2 className="text-base font-bold text-white tracking-wide">
-                                    품질부(QC-01) 공인 성적서 관리 대장 (26개 컬럼)
+                                    품질부 (QC-02) 공인 성적서 관리 대장 & 3열 병합 복사 연동
                                 </h2>
                                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-500/40">
-                                    대경벤드 성적서.xlsx 및 Google Sheets 100% 호환
+                                    대경벤드 성적서.xlsx (Sheet1: 대장 / Sheet2: 3열병합복사)
                                 </span>
                             </div>
                             <p className="text-[11px] text-slate-400 font-mono">
-                                storage/certificates/대경벤드 성적서.xlsx · KS B 1543 / ASTM A312 공차 검사 룰 엔진 연동
+                                storage/certificates/대경벤드 성적서.xlsx · 다중 페이지(10~30p) 전수 판독 및 '성적서 양식.xlsx' 1:1 클립보드 호환
                             </p>
                         </div>
                     </div>
@@ -141,22 +172,31 @@ export const CertificateLedgerModal: React.FC<CertificateLedgerModalProps> = ({
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
+                            onClick={() => handleCopyForTemplate(filteredRows)}
+                            className="px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/50 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                            title="현재 필터된 품목의 성분값을 성적서 양식(3열 병합 간격)으로 클립보드 복사"
+                        >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>📋 양식 복사 (3열 병합)</span>
+                        </button>
+                        <button
+                            type="button"
                             onClick={handleDownloadExcel}
                             className="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-                            title="엑셀(XLSX) 원장 다운로드"
+                            title="엑셀(XLSX) 원장 다운로드 (2개 시트 포함)"
                         >
                             <Download className="w-3.5 h-3.5" />
-                            <span>엑셀 다운로드 (XLSX)</span>
+                            <span>엑셀 다운로드 (2개 시트)</span>
                         </button>
                         <button
                             type="button"
                             onClick={handleParseAll}
                             disabled={syncing}
                             className="px-3 py-1.5 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs disabled:opacity-50"
-                            title="전체 PDF 재스캔 및 장부 자동 동기화"
+                            title="QC-02 에이전트: 전체 PDF 재스캔 및 장부 자동 동기화"
                         >
                             <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-                            <span>{syncing ? '동기화 중...' : '전체 PDF 자동 파싱 & 장부 동기화'}</span>
+                            <span>{syncing ? 'QC-02 판독 중...' : '🚀 QC-02 전수 판독 & 대장 누적'}</span>
                         </button>
                         <button
                             type="button"
@@ -177,12 +217,50 @@ export const CertificateLedgerModal: React.FC<CertificateLedgerModalProps> = ({
                     </div>
                 </div>
 
+                {/* 복사 완료 알림 토스트 배너 */}
+                {copiedToast && (
+                    <div className="px-4 py-2 bg-gradient-to-r from-indigo-950 via-cyan-950 to-slate-900 border-b border-cyan-500/40 flex items-center justify-between text-xs text-cyan-200 animate-fadeIn">
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+                            <span className="font-semibold">{copiedToast}</span>
+                        </div>
+                        <button 
+                            type="button" 
+                            onClick={() => setCopiedToast(null)}
+                            className="text-slate-400 hover:text-white"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
+
                 {/* 2. KPI 대시보드 및 필터 툴바 */}
                 <div className="p-3 bg-[#0d162b] border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
-                    {/* 통계 KPI 카드 */}
+                    {/* 뷰 모드 탭 & 통계 KPI */}
                     <div className="flex items-center gap-2 text-xs">
+                        <div className="flex items-center bg-slate-900 p-1 rounded-lg border border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('standard')}
+                                className={`px-2.5 py-1 rounded text-xs font-bold cursor-pointer transition-colors ${
+                                    viewMode === 'standard' ? 'bg-cyan-500 text-black' : 'text-slate-400 hover:text-white'
+                                }`}
+                            >
+                                📊 표준 26개 컬럼 대장
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('template_copy')}
+                                className={`px-2.5 py-1 rounded text-xs font-bold cursor-pointer transition-colors ${
+                                    viewMode === 'template_copy' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
+                                }`}
+                            >
+                                📋 성적서 양식 복사용 (3열 병합 간격)
+                            </button>
+                        </div>
+
                         <div className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center gap-2">
-                            <span className="text-slate-400 font-bold">누적 등록 품목:</span>
+                            <span className="text-slate-400 font-bold">누적 등록:</span>
                             <span className="text-cyan-300 font-mono font-bold text-sm">{rows.length}건</span>
                         </div>
                         <div className="px-3 py-1.5 rounded-lg bg-slate-900 border border-emerald-900/50 flex items-center gap-2">
@@ -194,7 +272,7 @@ export const CertificateLedgerModal: React.FC<CertificateLedgerModalProps> = ({
                         </div>
                         <div className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center gap-2">
                             <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                            <span className="text-slate-400 font-bold">이상치/경고:</span>
+                            <span className="text-slate-400 font-bold">이상치:</span>
                             <span className={`font-mono font-bold text-sm ${stats?.outliersCount ? 'text-amber-400' : 'text-slate-300'}`}>
                                 {stats?.outliersCount || 0}건
                             </span>
