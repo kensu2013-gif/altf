@@ -50,3 +50,8 @@ history*.json
 raw_prod_inventory*.json
 backup_restore_point_*/
 ._*
+
+# Storage binary files
+storage/certificates/*.pdf
+storage/certificates/*.zip
+storage/certificates/*.xlsx

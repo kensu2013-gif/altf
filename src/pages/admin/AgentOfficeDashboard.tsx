@@ -212,7 +212,7 @@ export default function AgentOfficeDashboard() {
             await fetch('/api/certificates/open-folder', { method: 'POST' });
             const time = new Date().toTimeString().split(' ')[0];
             setSimulationLog(prev => [
-                `📂 [${time}] [시스템] 내 컴퓨터 윈도우 탐색기에서 성적서 저장 폴더(02_extracted_external) 열기 완료!`,
+                `📂 [${time}] [시스템] 내 컴퓨터 윈도우 탐색기에서 성적서 저장 폴더(storage/certificates) 열기 완료!`,
                 ...prev.slice(0, 14)
             ]);
         } catch {
@@ -3213,7 +3213,7 @@ export default function AgentOfficeDashboard() {
                                         <button
                                             type="button"
                                             onClick={handleSyncMailplug}
-                                            disabled={mailplugLoading || (batchStatus && batchStatus.isRunning)}
+                                            disabled={mailplugLoading || Boolean(batchStatus?.isRunning)}
                                             className="py-2.5 px-2 rounded-lg bg-gradient-to-r from-slate-800 to-slate-700 hover:from-slate-700 hover:to-slate-600 border border-slate-600 text-white font-bold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                                         >
                                             <RefreshCw className={`w-3.5 h-3.5 ${mailplugLoading ? 'animate-spin' : ''}`} />
@@ -3222,7 +3222,7 @@ export default function AgentOfficeDashboard() {
                                         <button
                                             type="button"
                                             onClick={handleBatchSyncMailplug}
-                                            disabled={mailplugLoading || (batchStatus && batchStatus.isRunning)}
+                                            disabled={mailplugLoading || Boolean(batchStatus?.isRunning)}
                                             className="py-2.5 px-2 rounded-lg bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-bold text-xs shadow-[0_0_15px_rgba(255,0,85,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                                         >
                                             <HardDrive className="w-3.5 h-3.5" />

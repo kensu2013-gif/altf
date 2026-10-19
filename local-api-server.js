@@ -1060,7 +1060,7 @@ const server = http.createServer(async (req, res) => {
         try {
             const { exec } = await import('child_process');
             const path = await import('path');
-            const targetDir = path.resolve('./storage/certificates/02_extracted_external');
+            const targetDir = path.resolve('./storage/certificates');
             exec(`explorer.exe "${targetDir}"`);
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ success: true, path: targetDir, message: '윈도우 탐색기 폴더가 열렸습니다.' }));
@@ -1076,28 +1076,21 @@ const server = http.createServer(async (req, res) => {
         try {
             const fs = await import('fs');
             const path = await import('path');
-            const baseDir = path.resolve('./storage/certificates/02_extracted_external');
+            const baseDir = path.resolve('./storage/certificates');
             const fileList = [];
 
             if (fs.existsSync(baseDir)) {
-                const dateFolders = fs.readdirSync(baseDir);
-                for (const folder of dateFolders) {
-                    const fullFolder = path.join(baseDir, folder);
-                    if (fs.statSync(fullFolder).isDirectory()) {
-                        const files = fs.readdirSync(fullFolder);
-                        for (const f of files) {
-                            if (f.toLowerCase().endsWith('.pdf')) {
-                                const fullFile = path.join(fullFolder, f);
-                                const stat = fs.statSync(fullFile);
-                                fileList.push({
-                                    filename: f,
-                                    dateFolder: folder,
-                                    sizeBytes: stat.size,
-                                    updatedAt: stat.mtime.toISOString(),
-                                    url: `/storage/certificates/${encodeURIComponent(f)}`
-                                });
-                            }
-                        }
+                const files = fs.readdirSync(baseDir);
+                for (const f of files) {
+                    if (f.toLowerCase().endsWith('.pdf')) {
+                        const fullFile = path.join(baseDir, f);
+                        const stat = fs.statSync(fullFile);
+                        fileList.push({
+                            filename: f,
+                            sizeBytes: stat.size,
+                            updatedAt: stat.mtime.toISOString(),
+                            url: `/storage/certificates/${encodeURIComponent(f)}`
+                        });
                     }
                 }
             }
@@ -1116,7 +1109,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 📂 CERTIFICATE PDF / ZIP FILE SERVING (성적서 원본 바로보기 및 다운로드)
+    // 📂 CERTIFICATE PDF FILE SERVING (성적서 원본 바로보기 및 다운로드)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     if (url.pathname.startsWith('/storage/certificates/') || url.pathname.startsWith('/api/certificates/files/')) {
         try {
@@ -1127,31 +1120,10 @@ const server = http.createServer(async (req, res) => {
             let relativePath = url.pathname.replace('/api/certificates/files/', '').replace('/storage/certificates/', '');
             relativePath = decodeURIComponent(relativePath);
             
-            // Search order: 02_extracted_external (with date subdirs), 01_raw_inbox, root storage
             const baseDir = path.resolve('./storage/certificates');
-            let candidatePaths = [
-                path.join(baseDir, relativePath),
-                path.join(baseDir, '01_raw_inbox', relativePath),
-                path.join(baseDir, '02_extracted_external', relativePath)
-            ];
+            const targetFilePath = path.join(baseDir, path.basename(relativePath));
 
-            // If not found yet and it's a bare filename, recursively search 02_extracted_external
-            let targetFilePath = candidatePaths.find(p => fs.existsSync(p));
-            if (!targetFilePath && !relativePath.includes('/') && !relativePath.includes('\\')) {
-                const extractedDir = path.join(baseDir, '02_extracted_external');
-                if (fs.existsSync(extractedDir)) {
-                    const subdirs = fs.readdirSync(extractedDir);
-                    for (const sub of subdirs) {
-                        const checkSub = path.join(extractedDir, sub, relativePath);
-                        if (fs.existsSync(checkSub)) {
-                            targetFilePath = checkSub;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (!targetFilePath || !fs.existsSync(targetFilePath)) {
+            if (!fs.existsSync(targetFilePath) || !fs.statSync(targetFilePath).isFile()) {
                 res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ error: '요청한 성적서 파일을 찾을 수 없습니다.', requested: relativePath }));
                 return;

@@ -21,8 +21,7 @@ const ROOT_DIR = path.join(__dirname, '../..');
 const CONFIG_PATH = path.join(ROOT_DIR, 'server/data/mailplug_config.json');
 const HISTORY_PATH = path.join(ROOT_DIR, 'server/data/mailplug_history.json');
 const SYNCED_UIDS_PATH = path.join(ROOT_DIR, 'server/data/synced_mail_uids.json');
-const RAW_STORAGE_DIR = path.join(ROOT_DIR, 'storage/certificates/01_raw_inbox');
-const EXTRACTED_STORAGE_DIR = path.join(ROOT_DIR, 'storage/certificates/02_extracted_external');
+const CERTIFICATES_STORAGE_DIR = path.join(ROOT_DIR, 'storage/certificates');
 
 // MIME 헤더 디코딩 (ks_c_5601-1987 / euc-kr / utf-8)
 export function decodeMimeWord(str) {
@@ -69,7 +68,7 @@ export class MailplugCollectorService {
     }
 
     ensureDirectories() {
-        [RAW_STORAGE_DIR, EXTRACTED_STORAGE_DIR, path.dirname(CONFIG_PATH)].forEach(dir => {
+        [CERTIFICATES_STORAGE_DIR, path.dirname(CONFIG_PATH)].forEach(dir => {
             if (!fs.existsSync(dir)) {
                 fs.mkdirSync(dir, { recursive: true });
             }
@@ -302,7 +301,7 @@ export class MailplugCollectorService {
         });
     }
 
-    // 3. 특정 메일의 첨부파일(ZIP 또는 PDF) 다운로드 및 압축 해제
+    // 3. 특정 메일의 첨부파일(ZIP 또는 PDF) 다운로드 및 압축 해제 (ZIP 파일은 즉시 폐기하고 PDF만 보관)
     async downloadAndExtractAttachment(seq, uid, emailSubject, emailDate) {
         const config = this.getConfig();
         if (!config.password) return { success: false, reason: 'No password' };
@@ -337,7 +336,7 @@ export class MailplugCollectorService {
                         step = 3;
                         buffer = Buffer.alloc(0);
                         isFetchingBody = true;
-                        // 첨부파일 파트 (대부분 part 2)
+                        // 첨부파일 파트 (BODY.PEEK[2])
                         socket.write(`A03 FETCH ${seq} (BODY.PEEK[2])\r\n`);
                     }
                 } else {
@@ -362,56 +361,48 @@ export class MailplugCollectorService {
                                 return;
                             }
 
-                            // 날짜 폴더 산출 (메일 제목에서 출고일자 추출 or 메일 날짜)
-                            let dateFolder = new Date().toISOString().split('T')[0];
-                            const dateMatch = emailSubject.match(/(\d{1,2})\/(\d{1,2})/);
-                            if (dateMatch) {
-                                const m = dateMatch[1].padStart(2, '0');
-                                const d = dateMatch[2].padStart(2, '0');
-                                const y = new Date(emailDate || Date.now()).getFullYear();
-                                dateFolder = `${y}-${m}-${d}`;
-                            }
-
-                            const extractedSubDir = path.join(EXTRACTED_STORAGE_DIR, dateFolder);
-                            if (!fs.existsSync(extractedSubDir)) {
-                                fs.mkdirSync(extractedSubDir, { recursive: true });
-                            }
-
                             const extractedFiles = [];
 
                             // ZIP 파일 여부 확인 (PK 시그니처 0x50, 0x4B)
                             if (fileBuffer[0] === 0x50 && fileBuffer[1] === 0x4b) {
-                                // ZIP 파일 원본 저장
-                                const zipName = `${dateFolder}_${uid}_${emailSubject.replace(/[\\/:*?"<>|]/g, '_').trim()}.zip`;
-                                const rawZipPath = path.join(RAW_STORAGE_DIR, zipName);
-                                fs.writeFileSync(rawZipPath, fileBuffer);
-
-                                // ZIP 압축 해제 (CP949 파일명 복원)
-                                const zip = new AdmZip(rawZipPath);
+                                // ZIP 파일은 디스크에 저장하지 않고 메모리 상에서 바로 압축 해제! (압축파일은 즉시 폐기)
+                                const zip = new AdmZip(fileBuffer);
                                 const entries = zip.getEntries();
 
                                 entries.forEach(entry => {
+                                    // 디렉토리는 무시
+                                    if (entry.isDirectory) return;
+
                                     let properName = entry.entryName;
                                     if (entry.rawEntryName) {
                                         try {
                                             properName = iconv.decode(entry.rawEntryName, 'cp949');
                                         } catch {}
                                     }
-                                    const outPath = path.join(extractedSubDir, properName);
-                                    fs.writeFileSync(outPath, entry.getData());
-                                    extractedFiles.push({
-                                        filename: properName,
-                                        path: outPath,
-                                        sizeBytes: entry.header.size,
-                                        sourceZip: zipName,
-                                        emailSubject,
-                                        dateFolder
-                                    });
+                                    
+                                    // 경로 구분자 제거 (순수 파일명만 취득)
+                                    properName = path.basename(properName);
+
+                                    // 오직 PDF 파일만 storage/certificates에 바로 저장
+                                    if (properName.toLowerCase().endsWith('.pdf')) {
+                                        const outPath = path.join(CERTIFICATES_STORAGE_DIR, properName);
+                                        fs.writeFileSync(outPath, entry.getData());
+                                        extractedFiles.push({
+                                            filename: properName,
+                                            path: outPath,
+                                            sizeBytes: entry.header.size,
+                                            sourceZip: null, // 압축파일은 폐기됨
+                                            emailSubject,
+                                            date: emailDate
+                                        });
+                                        console.log(`[QC-01 Collector] ZIP 해제 -> PDF 보관 완료: ${properName} (ZIP 원본은 폐기됨)`);
+                                    }
                                 });
                             } else if (fileBuffer.slice(0, 4).toString() === '%PDF') {
-                                // 단일 PDF 파일인 경우
-                                const pdfName = `${dateFolder}_${uid}_성적서.pdf`;
-                                const outPath = path.join(extractedSubDir, pdfName);
+                                // 단일 PDF 파일인 경우 (압축 없이 온 메일)
+                                const safeSubject = emailSubject.replace(/[\\/:*?"<>|]/g, '_').trim();
+                                const pdfName = `${safeSubject}.pdf`;
+                                const outPath = path.join(CERTIFICATES_STORAGE_DIR, pdfName);
                                 fs.writeFileSync(outPath, fileBuffer);
                                 extractedFiles.push({
                                     filename: pdfName,
@@ -419,21 +410,20 @@ export class MailplugCollectorService {
                                     sizeBytes: fileBuffer.length,
                                     sourceZip: null,
                                     emailSubject,
-                                    dateFolder
+                                    date: emailDate
                                 });
+                                console.log(`[QC-01 Collector] 단일 PDF 첨부파일 저장 완료: ${pdfName}`);
                             }
 
                             this.markUidSynced(uid, {
                                 emailSubject,
-                                dateFolder,
                                 extractedCount: extractedFiles.length
                             });
 
                             resolve({
                                 success: true,
                                 uid,
-                                extractedFiles,
-                                dateFolder
+                                extractedFiles
                             });
                         } catch (err) {
                             resolve({ success: false, reason: err.message });
@@ -591,8 +581,7 @@ export class MailplugCollectorService {
             isRunning: this.isBatchRunning,
             progress: this.batchProgress,
             storagePaths: {
-                rawInbox: RAW_STORAGE_DIR,
-                extractedPdfs: EXTRACTED_STORAGE_DIR
+                certificatesDir: CERTIFICATES_STORAGE_DIR
             }
         };
     }
