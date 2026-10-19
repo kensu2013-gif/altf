@@ -8,7 +8,6 @@ import {
     Sparkles, 
     CheckCircle2, 
     Layers, 
-    Search,
     ChevronLeft,
     ChevronRight,
     RefreshCw
@@ -77,7 +76,6 @@ export function CertificateIssuerModal({ isOpen, onClose, initialPoNo }: Certifi
     const [selectedPageIdx, setSelectedPageIdx] = useState<number>(0);
     const [loading, setLoading] = useState(false);
     const [issuing, setIssuing] = useState(false);
-    const [filterKeyword, setFilterKeyword] = useState('');
 
     // 발주서 및 발행 기록 로드
     useEffect(() => {
