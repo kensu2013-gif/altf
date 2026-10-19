@@ -3584,7 +3584,9 @@ export default function AgentOfficeDashboard() {
                                             onClick={async () => {
                                                 try {
                                                     await fetch('/api/pur/open-folder', { method: 'POST' });
-                                                } catch {}
+                                                } catch (err) {
+                                                    console.error('Failed to open purchase folder:', err);
+                                                }
                                             }}
                                             className="py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all"
                                         >
