@@ -384,7 +384,7 @@ export const CertificateLedgerModal: React.FC<CertificateLedgerModalProps> = ({
                                     <th className="p-2 border-r border-slate-800 text-right text-emerald-300">T.S</th>
                                     <th className="p-2 border-r border-slate-800 text-right text-emerald-300">E.L</th>
                                     <th className="p-2 border-r border-slate-800 text-center">외관/치수</th>
-                                    <th className="p-2 text-center sticky right-0 bg-slate-900 z-20">PDF 원본열람</th>
+                                    <th className="p-2 text-center sticky right-0 bg-slate-900 z-20">양식복사 / PDF</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800/80">
@@ -448,16 +448,27 @@ export const CertificateLedgerModal: React.FC<CertificateLedgerModalProps> = ({
 
                                             <td className="p-2 border-r border-slate-800 text-center text-emerald-400 font-bold">{r.dimensionVi || 'GOOD'}</td>
 
-                                            {/* PDF 원본 링크 액션 버튼 */}
+                                            {/* 양식 복사 및 PDF 미리보기 액션 버튼 */}
                                             <td className="p-2 text-center sticky right-0 bg-[#070b14] group-hover:bg-[#0c182b]">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => onViewPdf(r.pdfUrl)}
-                                                    className="px-2 py-0.5 rounded bg-cyan-950 hover:bg-cyan-500 hover:text-black text-cyan-300 border border-cyan-500/40 text-[10px] font-bold cursor-pointer transition-colors"
-                                                    title="원본 PDF 즉시 보기"
-                                                >
-                                                    미리보기
-                                                </button>
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleCopyForTemplate([r])}
+                                                        className="px-2 py-0.5 rounded bg-indigo-950 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                                        title="이 품목 성분값을 성적서 양식(3열 병합 간격)으로 복사"
+                                                    >
+                                                        <Copy className="w-2.5 h-2.5" />
+                                                        <span>양식복사</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onViewPdf(r.pdfUrl)}
+                                                        className="px-2 py-0.5 rounded bg-cyan-950 hover:bg-cyan-500 hover:text-black text-cyan-300 border border-cyan-500/40 text-[10px] font-bold cursor-pointer transition-colors"
+                                                        title="원본 PDF 즉시 보기"
+                                                    >
+                                                        미리보기
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );

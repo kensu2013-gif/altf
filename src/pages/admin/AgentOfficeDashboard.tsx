@@ -242,6 +242,34 @@ export default function AgentOfficeDashboard() {
     const [allExtractedFiles, setAllExtractedFiles] = useState<Array<{ filename: string; dateFolder: string; sizeBytes: number; url: string; updatedAt?: string }>>([]);
     const [showAllFilesModal, setShowAllFilesModal] = useState<boolean>(false);
     const [showLedgerModal, setShowLedgerModal] = useState<boolean>(false);
+    const [qc02Loading, setQc02Loading] = useState<boolean>(false);
+    const [qc02Result, setQc02Result] = useState<{
+        success: boolean;
+        totalPdfFiles: number;
+        totalRowsCount: number;
+        durationSec: string;
+    } | null>(null);
+
+    // 🚀 QC-02 에이전트 실행 (다중 페이지 성적서 판독 & 엑셀 장부 누적)
+    const handleRunQC02 = async () => {
+        setQc02Loading(true);
+        try {
+            const res = await fetch('/api/qc/qc02/run', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                setQc02Result(data);
+                const time = new Date().toTimeString().split(' ')[0];
+                setSimulationLog(prev => [
+                    `🚀 [${time}] [품질부 QC-02] ${data.totalPdfFiles}개 파일(다중 페이지) 판독 완료! 누적 ${data.totalRowsCount}개 품목 장부(Excel/JSON) 동기화 완료 (${data.durationSec})`,
+                    ...prev.slice(0, 14)
+                ]);
+            }
+        } catch (e: unknown) {
+            console.error('Failed to run QC-02 agent:', e);
+        } finally {
+            setQc02Loading(false);
+        }
+    };
 
     // 윈도우 파일 탐색기에서 저장 폴더 바로 열기
     const handleOpenWindowsFolder = async () => {
@@ -1625,7 +1653,16 @@ export default function AgentOfficeDashboard() {
                 </div>
 
                 {/* 우측 유틸 & 토큰 경제 */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
+                    <button
+                        onClick={() => setShowLedgerModal(true)}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-cyan-500/60 bg-gradient-to-r from-cyan-950/80 to-blue-950/80 hover:from-cyan-900/90 hover:to-blue-900/90 text-cyan-300 font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,240,255,0.2)] transition-all cursor-pointer"
+                        title="26개 컬럼 성적서 관리 대장 및 성적서 양식(3열 병합) 복사용 모달 열기"
+                    >
+                        <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>📊 대경벤드 성적서 대장</span>
+                    </button>
+
                     <button
                         onClick={() => setIsDemoRunning(!isDemoRunning)}
                         className={`text-xs px-2.5 py-1 rounded border font-bold flex items-center gap-1 transition-all ${
@@ -3328,6 +3365,58 @@ export default function AgentOfficeDashboard() {
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+                            {/* 🔬 [품질부 특화] QC-02 성적서 비전 판독 & 엑셀 대장 누적 제어반 */}
+                            {(selectedAgent.code === 'QC-02' || selectedAgent.id === 'qc-mtc-vision-reader') && (
+                                <div className="border border-cyan-500/40 bg-cyan-950/20 rounded-xl p-3.5 space-y-3.5 shadow-[0_0_20px_rgba(0,240,255,0.2)] my-3">
+                                    <div className="flex items-center justify-between border-b border-cyan-900/40 pb-2">
+                                        <div className="flex items-center gap-1.5 text-cyan-300 font-bold text-xs">
+                                            <span>🔬</span>
+                                            <span>QC-02 성적서 비전 판독 및 엑셀 대장 누적</span>
+                                        </div>
+                                        <span className="text-[9px] px-2 py-0.5 rounded font-black bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-500/40 flex items-center gap-1">
+                                            <span>QC-02</span>
+                                            <span>과장 (정밀 검수 & 누적)</span>
+                                        </span>
+                                    </div>
+
+                                    <div className="p-2.5 rounded-lg border border-cyan-500/40 bg-black/50 text-xs space-y-2">
+                                        <div className="flex items-center justify-between text-slate-300">
+                                            <span>다중 페이지(10~30p) 성적서 전수 스캔:</span>
+                                            <span className="text-emerald-400 font-bold font-mono">ON (무인 자동화)</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-slate-300">
+                                            <span>성적서 양식(3열 병합 간격) 동시 생성:</span>
+                                            <span className="text-indigo-300 font-bold font-mono">호환 활성화</span>
+                                        </div>
+                                        {qc02Result && (
+                                            <div className="p-2 rounded bg-cyan-950/60 border border-cyan-500/40 text-[10px] text-cyan-200">
+                                                ✓ 최근 실행: {qc02Result.totalPdfFiles}개 파일 판독 ➔ 누적 {qc02Result.totalRowsCount}개 품목 완료 ({qc02Result.durationSec})
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleRunQC02}
+                                            disabled={qc02Loading}
+                                            className="py-2.5 px-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-[0_0_15px_rgba(0,240,255,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                        >
+                                            <Sparkles className={`w-3.5 h-3.5 ${qc02Loading ? 'animate-spin' : ''}`} />
+                                            <span>{qc02Loading ? '판독 및 누적 중...' : '🚀 QC-02 전수 판독 & 누적'}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowLedgerModal(true)}
+                                            className="py-2.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-cyan-300 font-bold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
+                                        >
+                                            <ShieldCheck className="w-3.5 h-3.5" />
+                                            <span>📊 관리 대장 & 양식 복사</span>
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 
