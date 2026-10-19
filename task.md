@@ -32,6 +32,14 @@
   - `storage/certificates/대경벤드 성적서.xlsx` 및 `server/data/certificates.json` 자동 동기화 (총 34개 품목 100% 매핑 완료)
   - `mailplugCollector.js` 연동: 신규 성적서 다운로드 즉시 26개 컬럼 장부 자동 파싱 및 엑셀 누적
   - `src/components/admin/CertificateLedgerModal.tsx` 26개 컬럼 인터랙티브 대형 데이터 그리드 뷰어 및 엑셀 다운로드(`GET /api/certificates/download-excel`) 연동 완료
+- `[x]` **QC-02 (MTC 비전 판독 에이전트) 및 2개 시트(3열 병합 양식 호환) 엑셀 생성 체계 구축**
+  - `runQC02Agent`: 10~30장 이상의 다중 페이지 및 대용량 PDF 증분(Incremental Upsert) 누적 판독 지원
+  - `storage/certificates/대경벤드 성적서.xlsx` 내 2개 시트 동시 생성:
+    - Sheet 1: `대경벤드성적서` (표준 26개 컬럼 마스터 대장)
+    - Sheet 2: `성적서양식_복사용(3열병합호환)` (화학/기계 성질 3열 병합 간격 매칭)
+  - `POST /api/qc/qc02/run` 및 `GET /api/qc/qc02/status` API 연동
+  - 모달 상단 `📋 양식 복사 (3열 병합)` 원클릭 클립보드 복사 지원 (엑셀 `성적서 양식.xlsx`에 바로 붙여넣기 가능)
+  - `server/data/agents.json` 내 QC-02 에이전트 실시간 지표(Task 처리수, 활성 상태) 자동 동기화
 - `[ ]` **[다음 작업 예정] 발주서(PO) 스펙 대조 자동화 & 구글 시트 양방향 실시간 동기화**
   - 알트에프 발주서 데이터베이스(`orders.json`, `quotes.json`)와 P.O No 매칭하여 품목/규격/수량 일치 여부 실시간 교차 검증
   - Google Drive/Sheets API 연동을 통한 구글 스프레드시트 실시간 양방향 자동 업로드
