@@ -1,0 +1,18 @@
+{
+  "manager": "PUR-01 (구매부 사원 에이전트)",
+  "managerName": "알트에프 재고 발주 List Up 봇",
+  "cycle": "하루 1회 (24시간 주기)",
+  "intervalMs": 86400000,
+  "targetUrl": "https://altf.kr/api/orders (재고 발주 API 감지)",
+  "status": "ACTIVE_MONITORING",
+  "lastSyncTime": "2026-10-19T10:18:13.840Z",
+  "nextSyncTime": "2026-10-20T10:18:13.840Z",
+  "lastSyncType": "MANUAL_TRIGGER",
+  "summary": {
+    "totalItems": 624,
+    "fulfilledCount": 159,
+    "partialCount": 12,
+    "pendingCount": 453,
+    "fulfillmentRate": 25
+  }
+}

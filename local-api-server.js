@@ -1,3 +1,4 @@
+import './server/polyfills.js';
 import http from 'http';
 import aromanize from 'aromanize';
 import crypto from 'crypto';
@@ -15,6 +16,7 @@ import { buildCustomerMatchIndex, matchCustomerToCrmFast } from './customer-matc
 import { computeDocumentSimilaritySummary } from './similarity-engine.js';
 import { mailplugService } from './server/services/mailplugCollector.js';
 import { certificateParserService } from './server/services/certificateParser.js';
+import { purchaseStockOrderService } from './server/services/purchaseService.js';
 
 import multer from 'multer';
 
@@ -1276,6 +1278,155 @@ const server = http.createServer(async (req, res) => {
             console.error('[API] File serve error:', fileErr);
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: fileErr.message }));
+            return;
+        }
+    }
+
+    // ==========================================
+    // 🛒 구매부 PUR-01 : 알트에프 재고 발주 List Up 전용 REST API
+    // ==========================================
+    if (url.pathname.startsWith('/api/pur/')) {
+        // 1. GET /api/pur/summary : 구매부 현황 지표 요약
+        if (req.method === 'GET' && url.pathname === '/api/pur/summary') {
+            try {
+                const summary = purchaseStockOrderService.getSummary();
+                sendJsonResponse(req, res, 200, { success: true, ...summary });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 2. POST /api/pur/sync : 웹 알트에프 재고 발주 신호 감지 & List Up 및 QC 성적서 매칭
+        if (req.method === 'POST' && url.pathname === '/api/pur/sync') {
+            try {
+                const result = purchaseStockOrderService.listUpStockOrders(db.orders);
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    totalItems: result.items.length,
+                    summary: result.summary,
+                    message: `알트에프 재고 발주 ${result.items.length}개 품목 List Up 및 성적서 매칭 완료!`
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 3. GET /api/pur/stock-orders (또는 /api/pur/matches 호환) : 재고 발주 ⟷ 성적서 대장 목록
+        if (req.method === 'GET' && (url.pathname === '/api/pur/stock-orders' || url.pathname === '/api/pur/matches')) {
+            try {
+                const urlParams = new URLSearchParams(url.search);
+                const statusFilter = urlParams.get('status') || 'ALL';
+                const search = (urlParams.get('search') || '').toLowerCase().trim();
+
+                const filtered = purchaseStockOrderService.getStockOrders({
+                    status: statusFilter,
+                    search
+                });
+
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    total: filtered.length,
+                    items: filtered
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 4. GET /api/pur/download-excel : '알트에프 재고 발주 대장.xlsx' 다운로드
+        if (req.method === 'GET' && url.pathname === '/api/pur/download-excel') {
+            try {
+                const fs = await import('fs');
+                const path = await import('path');
+                const excelPath = path.resolve('./storage/purchases/알트에프 재고 발주 대장.xlsx');
+
+                if (!fs.existsSync(excelPath)) {
+                    purchaseStockOrderService.listUpStockOrders(db.orders);
+                }
+
+                if (!fs.existsSync(excelPath)) {
+                    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ error: '엑셀 파일이 존재하지 않습니다.' }));
+                    return;
+                }
+
+                const stat = fs.statSync(excelPath);
+                const filename = encodeURIComponent('알트에프_재고_발주_대장.xlsx');
+
+                res.writeHead(200, {
+                    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'Content-Length': stat.size,
+                    'Content-Disposition': `attachment; filename="${filename}"; filename*=UTF-8''${filename}`
+                });
+
+                const stream = fs.createReadStream(excelPath);
+                stream.pipe(res);
+                return;
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+                return;
+            }
+        }
+
+        // 5. POST /api/pur/open-folder : 구매부 보관함 폴더(storage/purchases) 탐색기 열기
+        if (req.method === 'POST' && url.pathname === '/api/pur/open-folder') {
+            try {
+                const path = await import('path');
+                const targetDir = path.resolve('./storage/purchases');
+                const isWin = process.platform === 'win32';
+                const isMac = process.platform === 'darwin';
+
+                let cmd = '';
+                if (isWin) cmd = `explorer "${targetDir}"`;
+                else if (isMac) cmd = `open "${targetDir}"`;
+                else cmd = `xdg-open "${targetDir}"`;
+
+                exec(cmd, (err) => {
+                    if (err) {
+                        console.error('[PUR-01] 폴더 열기 오류:', err.message);
+                    }
+                });
+
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    message: `구매부 보관함 폴더 열기 완료: ${targetDir}`,
+                    folderPath: targetDir
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 6. GET /api/pur/scheduler-status : 하루 1회 altf.kr 감지 스케줄러 상태 및 다음 동기화 시각
+        if (req.method === 'GET' && url.pathname === '/api/pur/scheduler-status') {
+            try {
+                const status = purchaseStockOrderService.getSchedulerStatus();
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    ...status
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 7. POST /api/pur/scheduler-trigger : altf.kr API 호출 즉시 감지 & 재고 발주 대장 수동 갱신
+        if (req.method === 'POST' && url.pathname === '/api/pur/scheduler-trigger') {
+            try {
+                const result = await purchaseStockOrderService.syncFromAltfApi(true);
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    message: 'altf.kr API 호출 감지 및 재고 발주 대장 즉시 동기화 완료!',
+                    ...result
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
             return;
         }
     }

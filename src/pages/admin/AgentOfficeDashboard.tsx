@@ -35,9 +35,12 @@ import {
     AlertCircle,
     LayoutGrid,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    ShoppingBag,
+    Boxes
 } from 'lucide-react';
 import { CertificateLedgerModal } from '../../components/admin/CertificateLedgerModal';
+import { PurchaseLedgerModal } from '../../components/admin/PurchaseLedgerModal';
 
 const STORAGE_KEY = 'altf_agent_swarm_custom_v4';
 const STORAGE_DEPT_KEY = 'altf_departments_v2';
@@ -496,6 +499,7 @@ export default function AgentOfficeDashboard() {
     const [allExtractedFiles, setAllExtractedFiles] = useState<Array<{ filename: string; dateFolder: string; sizeBytes: number; url: string; updatedAt?: string }>>([]);
     const [showAllFilesModal, setShowAllFilesModal] = useState<boolean>(false);
     const [showLedgerModal, setShowLedgerModal] = useState<boolean>(false);
+    const [showPurchaseLedgerModal, setShowPurchaseLedgerModal] = useState<boolean>(false);
     const [qc02Loading, setQc02Loading] = useState<boolean>(false);
     const [qc02Result, setQc02Result] = useState<{
         success: boolean;
@@ -1934,6 +1938,18 @@ export default function AgentOfficeDashboard() {
                     >
                         <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
                         <span>📊 대경벤드 성적서 대장</span>
+                    </button>
+
+                    <button
+                        onClick={() => setShowPurchaseLedgerModal(true)}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-emerald-500/60 bg-gradient-to-r from-emerald-950/80 to-teal-950/80 hover:from-emerald-900/90 hover:to-teal-900/90 text-emerald-300 font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.25)] transition-all cursor-pointer group"
+                        title="[구매부 PUR-01 전담] 하루 1회 altf.kr API 감지 기반 알트에프 재고 발주 & 미결 관리 대장 열기"
+                    >
+                        <ShoppingBag className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                        <span>🛒 [PUR-01] 알트에프 재고 발주 대장</span>
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono font-bold border border-emerald-500/30">
+                            1일 1회 감지 ON
+                        </span>
                     </button>
 
                     <button
@@ -3494,6 +3510,86 @@ export default function AgentOfficeDashboard() {
                                 </div>
                             </div>
 
+                            {/* 🛒 [구매부 PUR-01 전용] 알트에프 재고 발주 List Up & 미결 관리 제어반 */}
+                            {(selectedAgent.deptId === 'purchase' || selectedAgent.code?.startsWith('PUR-')) && (
+                                <div className="border border-emerald-500/40 bg-emerald-950/20 rounded-xl p-3.5 space-y-3.5 shadow-[0_0_20px_rgba(16,185,129,0.2)] my-3">
+                                    <div className="flex items-center justify-between border-b border-emerald-900/40 pb-2">
+                                        <div className="flex items-center gap-1.5 text-emerald-300 font-bold text-xs">
+                                            <span>🛒</span>
+                                            <span>알트에프 재고 발주 대장 & 미결 관리기</span>
+                                        </div>
+                                        <span className="text-[9px] px-2 py-0.5 rounded font-black bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/40 flex items-center gap-1">
+                                            <span>PUR-01</span>
+                                            <span>사원 (전담 관리지정)</span>
+                                        </span>
+                                    </div>
+
+                                    {/* 실시간 현황 뱃지 */}
+                                    <div className="p-2.5 rounded-lg border border-emerald-500/50 bg-emerald-950/30 text-emerald-200 text-xs flex flex-col gap-1.5 shadow-sm">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-1.5 font-bold">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                                                <span className="text-emerald-300">altf.kr API 자동 감시: ONLINE</span>
+                                            </div>
+                                            <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-mono font-bold border border-emerald-500/40">
+                                                주기: 하루 1회 (24h)
+                                            </span>
+                                        </div>
+                                        <div className="text-[10px] text-emerald-300/90 flex items-center justify-between">
+                                            <span>재고 발주 624개 품목 List Up 완료 (미결 453건 실시간 추적 & 성적서 매칭)</span>
+                                        </div>
+                                    </div>
+
+                                    {/* 대장 저장 위치 안내 */}
+                                    <div className="p-2.5 rounded-lg border border-emerald-500/40 bg-[#081812] space-y-1.5 text-[11px]">
+                                        <div className="text-emerald-300 font-bold flex items-center gap-1.5">
+                                            <span>📂</span>
+                                            <span>재고 발주 대장 파일 저장 위치:</span>
+                                        </div>
+                                        <div className="space-y-1 font-mono text-[10px] text-slate-300 pl-1">
+                                            <div className="flex items-start gap-1">
+                                                <span className="text-emerald-400 shrink-0 font-bold">1. 엑셀 마스터 원장:</span>
+                                                <span className="text-slate-200 break-all font-bold">storage/purchases/알트에프 재고 발주 대장.xlsx</span>
+                                            </div>
+                                            <div className="flex items-start gap-1">
+                                                <span className="text-cyan-400 shrink-0 font-bold">2. 성적서 연동 JSON:</span>
+                                                <span className="text-slate-300 break-all">server/data/purchase_stock_orders.json</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 3대 실행 액션 버튼 */}
+                                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPurchaseLedgerModal(true)}
+                                            className="flex-1 py-2 px-3 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer transition-all"
+                                        >
+                                            <Boxes className="w-3.5 h-3.5" />
+                                            <span>📊 재고 발주 & 성적서 대장 열기</span>
+                                        </button>
+                                        <a
+                                            href="/api/pur/download-excel"
+                                            download="알트에프_재고_발주_대장.xlsx"
+                                            className="py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-emerald-500/50 text-emerald-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                                        >
+                                            <span>📥 엑셀 다운로드</span>
+                                        </a>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                try {
+                                                    await fetch('/api/pur/open-folder', { method: 'POST' });
+                                                } catch {}
+                                            }}
+                                            className="py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                                        >
+                                            <span>📂 폴더 열기</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* 📬 [품질부 QC-01 전용] 메일플러그(gw.mailplug.com) 외주 성적서 수집 제어반 */}
                             {(selectedAgent.code === 'QC-01' || selectedAgent.id === 'qc-inbound-ingest') && (
                                 <div className="border border-pink-500/40 bg-pink-950/20 rounded-xl p-3.5 space-y-3.5 shadow-[0_0_20px_rgba(255,0,85,0.2)] my-3">
@@ -4193,6 +4289,12 @@ export default function AgentOfficeDashboard() {
                     setPreviewPdfUrl(`/storage/certificates/${encodeURIComponent(filename)}`);
                 }}
                 onOpenFolder={handleOpenWindowsFolder}
+            />
+
+            {/* 🛒 4. 구매부 (PUR) SCM 매입 발주 & 성적서 HEAT 교차 대장 및 질의응답 모달 */}
+            <PurchaseLedgerModal
+                isOpen={showPurchaseLedgerModal}
+                onClose={() => setShowPurchaseLedgerModal(false)}
             />
         </div>
     );

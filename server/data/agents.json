@@ -334,35 +334,48 @@
   {
     "id": "pur-stock-reorder",
     "code": "PUR-01",
-    "name": "안전재고 발주봇",
+    "name": "알트에프 재고 발주 List Up 봇",
     "deptId": "purchase",
     "deptName": "구매부",
     "tier": 3,
-    "role": "시화 안전재고 21일 미만 품목 실시간 선매입 감지",
+    "role": "altf.kr 재고 발주 대장 및 미결(Pending) 관리, QC-01 성적서 1:1 매칭",
     "status": "ACTIVE",
     "metrics": {
-      "speed": 95,
+      "speed": 98,
       "accuracy": 99,
-      "load": 45,
-      "uptime": "99.9%",
-      "tasksToday": 64
+      "load": 40,
+      "uptime": "100%",
+      "tasksToday": 142
     },
-    "currentTask": "50A 10K 엘보 재고 14일분 미만 감지! 선발주 큐 인큐",
-    "lastActive": "2분 전",
+    "currentTask": "하루 1회 altf.kr API 자동 감시 가동 중 (미결 453건 실시간 추적 관리)",
+    "lastActive": "방금 전",
     "triggerEvents": [
-      "EVENT_INVENTORY_CHANGED"
+      "CRON_DAILY_24H",
+      "EVENT_ALTF_API_POLL",
+      "EVENT_STOCK_ORDER_DETECTED"
     ],
     "emittedEvents": [
-      "EVENT_REORDER_REQUIRED"
+      "EVENT_STOCK_ORDER_LIST_UPDATED",
+      "EVENT_PENDING_STOCK_ALERT"
     ],
     "logs": [
-      "[09:10] 시화 안전재고 미달 2품목 발주 권고"
+      "[19:18] [PUR-01] altf.kr API 재고 발주 감지 완료: 총 624건 (입고: 159건, 미결: 453건)",
+      "[19:07] [PUR-01] altf.kr API 재고 발주 감지 완료: 총 624건 (입고: 159건, 미결: 453건)",
+      "[PUR-01] 알트에프 재고 발주 대장 및 미결 관리 전담 지정 완료",
+      "[PUR-01] 하루 1회 altf.kr API 호출 감지 스케줄러(24h 주기) 활성화",
+      "[PUR-01] 재고 발주 624개 품목 List Up & 미결 453건 관리 중 (입고율 25%)"
     ],
-    "isCreated": false,
-    "connectedDeptIds": [],
-    "position": "대리",
+    "isCreated": true,
+    "connectedDeptIds": [
+      "quality"
+    ],
+    "position": "사원",
     "approvalStatus": "AUTO_RUNNING",
-    "orderIndex": 0
+    "orderIndex": 0,
+    "supervisorId": "",
+    "connectedAgentIds": [
+      "qc-inbound-ingest"
+    ]
   },
   {
     "id": "pur-daekyung-watcher",
@@ -980,11 +993,11 @@
     "metrics": {
       "speed": 94,
       "accuracy": 99,
-      "load": 45,
+      "load": 42,
       "uptime": "99.9%",
-      "tasksToday": 1469
+      "tasksToday": 285
     },
-    "currentTask": "성적서 26개 파일 판독 완료 (대장 누적 1469개 행 보관 중)",
+    "currentTask": "YR-26-09915 성적서 판독 완료 (Heat: SD62415, C: 0.017, Ni: 10.10)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_MTC_FILES_READY"
@@ -993,11 +1006,7 @@
       "EVENT_MTC_DATA_EXTRACTED"
     ],
     "logs": [
-      "[오후 3:20:05] ✅ QC-02 판독 및 엑셀 누적 완료! (총 28개 파일, 누적 1469개 품목, 소요시간 0.5초)",
-      "[오후 3:20:04] 📄 [28/28] 261016_알트에프.261016-2904 (10-16-40).pdf 판독 완료 (4p 중 2개 품목 추출)",
-      "[오후 3:20:04] 📄 [27/28] 261016_알트에프.261016-2902 (10-16-37).pdf 판독 완료 (4p 중 2개 품목 추출)",
-      "[오후 3:20:04] 📄 [26/28] 261016_알트에프.261016-2901 (10-16-31).pdf 판독 완료 (3p 중 1개 품목 추출)",
-      "[오후 3:20:04] 📄 [25/28] 261016_알트에프.261016-2900 (10-16-30).pdf 판독 완료 (3p 중 1개 품목 추출)"
+      "[09:06] SD62415 실측치 추출 성공"
     ],
     "isCreated": true,
     "connectedDeptIds": [
@@ -2510,5 +2519,185 @@
     "position": "사원",
     "approvalStatus": "AUTO_RUNNING",
     "orderIndex": 8
+  },
+  {
+    "id": "sle-slot-1",
+    "code": "SLE-01",
+    "name": "영업부 팀장 1",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "tier": 3,
+    "role": "영업부 팀장 실무 에이전트",
+    "status": "OFFLINE",
+    "isCreated": false,
+    "position": "팀장",
+    "metrics": {
+      "speed": 85,
+      "accuracy": 95,
+      "load": 10,
+      "uptime": "99.9%",
+      "tasksToday": 0
+    },
+    "currentTask": "미생성 슬롯 대기 중",
+    "lastActive": "방금 전",
+    "triggerEvents": [],
+    "emittedEvents": [],
+    "logs": [
+      "[시스템] 영업부 신규 부서 슬롯 생성됨"
+    ],
+    "connectedDeptIds": [],
+    "connectedAgentIds": [],
+    "approvalStatus": "AUTO_RUNNING",
+    "orderIndex": 0
+  },
+  {
+    "id": "sle-slot-2",
+    "code": "SLE-02",
+    "name": "영업부 과장 2",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "tier": 3,
+    "role": "영업부 과장 실무 에이전트",
+    "status": "OFFLINE",
+    "isCreated": false,
+    "position": "과장",
+    "metrics": {
+      "speed": 85,
+      "accuracy": 95,
+      "load": 10,
+      "uptime": "99.9%",
+      "tasksToday": 0
+    },
+    "currentTask": "미생성 슬롯 대기 중",
+    "lastActive": "방금 전",
+    "triggerEvents": [],
+    "emittedEvents": [],
+    "logs": [
+      "[시스템] 영업부 신규 부서 슬롯 생성됨"
+    ],
+    "connectedDeptIds": [],
+    "connectedAgentIds": [],
+    "approvalStatus": "AUTO_RUNNING",
+    "orderIndex": 1
+  },
+  {
+    "id": "sle-slot-3",
+    "code": "SLE-03",
+    "name": "영업부 과장 3",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "tier": 3,
+    "role": "영업부 과장 실무 에이전트",
+    "status": "OFFLINE",
+    "isCreated": false,
+    "position": "과장",
+    "metrics": {
+      "speed": 85,
+      "accuracy": 95,
+      "load": 10,
+      "uptime": "99.9%",
+      "tasksToday": 0
+    },
+    "currentTask": "미생성 슬롯 대기 중",
+    "lastActive": "방금 전",
+    "triggerEvents": [],
+    "emittedEvents": [],
+    "logs": [
+      "[시스템] 영업부 신규 부서 슬롯 생성됨"
+    ],
+    "connectedDeptIds": [],
+    "connectedAgentIds": [],
+    "approvalStatus": "AUTO_RUNNING",
+    "orderIndex": 2
+  },
+  {
+    "id": "sle-slot-4",
+    "code": "SLE-04",
+    "name": "영업부 대리 4",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "tier": 3,
+    "role": "영업부 대리 실무 에이전트",
+    "status": "OFFLINE",
+    "isCreated": false,
+    "position": "대리",
+    "metrics": {
+      "speed": 85,
+      "accuracy": 95,
+      "load": 10,
+      "uptime": "99.9%",
+      "tasksToday": 0
+    },
+    "currentTask": "미생성 슬롯 대기 중",
+    "lastActive": "방금 전",
+    "triggerEvents": [],
+    "emittedEvents": [],
+    "logs": [
+      "[시스템] 영업부 신규 부서 슬롯 생성됨"
+    ],
+    "connectedDeptIds": [],
+    "connectedAgentIds": [],
+    "approvalStatus": "AUTO_RUNNING",
+    "orderIndex": 3
+  },
+  {
+    "id": "sle-slot-5",
+    "code": "SLE-05",
+    "name": "영업부 대리 5",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "tier": 3,
+    "role": "영업부 대리 실무 에이전트",
+    "status": "OFFLINE",
+    "isCreated": false,
+    "position": "대리",
+    "metrics": {
+      "speed": 85,
+      "accuracy": 95,
+      "load": 10,
+      "uptime": "99.9%",
+      "tasksToday": 0
+    },
+    "currentTask": "미생성 슬롯 대기 중",
+    "lastActive": "방금 전",
+    "triggerEvents": [],
+    "emittedEvents": [],
+    "logs": [
+      "[시스템] 영업부 신규 부서 슬롯 생성됨"
+    ],
+    "connectedDeptIds": [],
+    "connectedAgentIds": [],
+    "approvalStatus": "AUTO_RUNNING",
+    "orderIndex": 4
+  },
+  {
+    "id": "sle-slot-6",
+    "code": "SLE-06",
+    "name": "영업부 대리 6",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "tier": 3,
+    "role": "영업부 대리 실무 에이전트",
+    "status": "OFFLINE",
+    "isCreated": false,
+    "position": "대리",
+    "metrics": {
+      "speed": 85,
+      "accuracy": 95,
+      "load": 10,
+      "uptime": "99.9%",
+      "tasksToday": 0
+    },
+    "currentTask": "미생성 슬롯 대기 중",
+    "lastActive": "방금 전",
+    "triggerEvents": [],
+    "emittedEvents": [],
+    "logs": [
+      "[시스템] 영업부 신규 부서 슬롯 생성됨"
+    ],
+    "connectedDeptIds": [],
+    "connectedAgentIds": [],
+    "approvalStatus": "AUTO_RUNNING",
+    "orderIndex": 5
   }
 ]
