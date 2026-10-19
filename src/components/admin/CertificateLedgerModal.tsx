@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Search, Download, RefreshCw, FileText, CheckCircle2, AlertTriangle, ShieldCheck, FolderOpen, Filter, Copy, Check, Sparkles } from 'lucide-react';
+import { X, Search, Download, RefreshCw, FileText, CheckCircle2, AlertTriangle, ShieldCheck, FolderOpen, Filter, Copy, Sparkles } from 'lucide-react';
 import type { CertificateLedgerRow } from '../../data/certificateSchema';
 
 interface CertificateLedgerModalProps {

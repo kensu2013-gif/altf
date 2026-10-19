@@ -76,6 +76,7 @@ async function loadData() {
             db.aiReports = json.aiReports || [];
             db.aiReportSchedule = json.aiReportSchedule || DEFAULT_AI_REPORT_SCHEDULE();
             db.agents = json.agents || [];
+            db.departments = json.departments || [];
 
             // Local fallback seed for agents if empty
             if (db.agents.length === 0) {
@@ -91,7 +92,21 @@ async function loadData() {
                 }
             }
 
-            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.agents.length} agents, Snapshot Date: ${db.lastSnapshotDate}`);
+            // Local fallback seed for departments if empty
+            if (db.departments.length === 0) {
+                try {
+                    const fs = await import('fs');
+                    const localDeptPath = './server/data/departments.json';
+                    if (fs.existsSync(localDeptPath)) {
+                        db.departments = JSON.parse(fs.readFileSync(localDeptPath, 'utf8'));
+                        console.log(`[API] Loaded ${db.departments.length} departments from local backup file.`);
+                    }
+                } catch (e) {
+                    console.log(`[API] Local departments file check note: ${e.message}`);
+                }
+            }
+
+            console.log(`[API] Loaded data from S3: ${db.users.length} users, ${db.quotations.length} quotes, ${db.orders.length} orders, ${db.agents.length} agents, ${db.departments.length} departments, Snapshot Date: ${db.lastSnapshotDate}`);
             
             // Seed Customers if empty
             if (db.customers.length === 0) {
@@ -793,6 +808,57 @@ const server = http.createServer(async (req, res) => {
                     return;
                 } catch (e) {
                     console.error('[API] Save agents failed:', e);
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: e.message }));
+                }
+            });
+            return;
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🏢 B2B DEPARTMENTS PERSISTENCE ENDPOINTS (부서 추가/수정/삭제 관리)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (url.pathname === '/api/departments') {
+        if (req.method === 'GET') {
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({
+                success: true,
+                departments: db.departments || []
+            }));
+            return;
+        }
+
+        if (req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    const data = JSON.parse(body);
+                    const deptList = Array.isArray(data) ? data : (data.departments || []);
+                    db.departments = deptList;
+
+                    // 1. 로컬 백업 저장
+                    try {
+                        const fs = await import('fs');
+                        const dataDir = './server/data';
+                        if (!fs.existsSync(dataDir)) {
+                            fs.mkdirSync(dataDir, { recursive: true });
+                        }
+                        fs.writeFileSync('./server/data/departments.json', JSON.stringify(deptList, null, 2), 'utf8');
+                    } catch (fsErr) {
+                        console.error('[API] Local departments.json write error:', fsErr.message);
+                    }
+
+                    // 2. S3 DB 비동기 큐 동기화
+                    queueSave();
+
+                    console.log(`[API] Successfully saved ${deptList.length} departments to DB & local backup.`);
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: true, count: deptList.length }));
+                    return;
+                } catch (e) {
+                    console.error('[API] Save departments failed:', e);
                     res.writeHead(500, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: e.message }));
                 }

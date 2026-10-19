@@ -6,7 +6,8 @@ import {
     POSITION_CONFIG,
     type AgentUnit,
     type AgentStatus,
-    type AgentPosition 
+    type AgentPosition,
+    type Department
 } from '../../data/agentOrganization';
 import { 
     Activity, 
@@ -39,6 +40,7 @@ import {
 import { CertificateLedgerModal } from '../../components/admin/CertificateLedgerModal';
 
 const STORAGE_KEY = 'altf_agent_swarm_custom_v4';
+const STORAGE_DEPT_KEY = 'altf_departments_v2';
 
 // 에이전트 직위 초기화 헬퍼 (팀장 1, 과장 2, 대리 3, 사원 나머지)
 function initAgentPositions(rawAgents: AgentUnit[]): AgentUnit[] {
@@ -177,6 +179,258 @@ export default function AgentOfficeDashboard() {
         return () => clearTimeout(timer);
     }, [agents]);
 
+    // 🏢 부서 상태 (로컬 스토리지 및 백엔드 서버 영구 보존)
+    const [departments, setDepartments] = useState<Department[]>(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_DEPT_KEY);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    return parsed;
+                }
+            }
+        } catch (e) {
+            console.error('Failed to load departments from localStorage:', e);
+        }
+        return DEPARTMENTS;
+    });
+
+    const lastSavedDeptsRef = React.useRef<string>('');
+
+    // 🌐 부서 목록 서버 동기화
+    useEffect(() => {
+        const fetchServerDepts = async () => {
+            try {
+                const res = await fetch('/api/departments');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success && Array.isArray(data.departments) && data.departments.length > 0) {
+                        setDepartments(data.departments);
+                        localStorage.setItem(STORAGE_DEPT_KEY, JSON.stringify(data.departments));
+                        lastSavedDeptsRef.current = JSON.stringify(data.departments);
+                    }
+                }
+            } catch {
+                console.warn('[AgentOffice] Backend /api/departments unreachable, using cache.');
+            }
+        };
+        fetchServerDepts();
+    }, []);
+
+    // 🌐 부서 변경 시 로컬 스토리지 및 백엔드 서버 동시 영구 저장
+    useEffect(() => {
+        try {
+            localStorage.setItem(STORAGE_DEPT_KEY, JSON.stringify(departments));
+        } catch (e) {
+            console.error('Failed to save departments to localStorage:', e);
+        }
+
+        const snapshot = JSON.stringify(departments);
+        if (lastSavedDeptsRef.current === snapshot) {
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            lastSavedDeptsRef.current = snapshot;
+            fetch('/api/departments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(departments)
+            }).catch(err => {
+                console.warn('[AgentOffice] Failed to sync departments to backend server:', err.message);
+            });
+        }, 600);
+
+        return () => clearTimeout(timer);
+    }, [departments]);
+
+    // 🏢 부서 추가 / 수정 모달 상태
+    const [deptModalOpen, setDeptModalOpen] = useState(false);
+    const [editingDeptId, setEditingDeptId] = useState<string | null>(null);
+    const [deptForm, setDeptForm] = useState({
+        name: '',
+        code: '',
+        color: '#00F0FF',
+        icon: '🏢',
+        headRole: '부서 총괄 자동화',
+        description: '',
+        totalUnits: 10
+    });
+
+    const handleOpenAddDept = () => {
+        setEditingDeptId(null);
+        setDeptForm({
+            name: '',
+            code: '',
+            color: '#00F0FF',
+            icon: '🏢',
+            headRole: '부서 총괄 자동화',
+            description: '',
+            totalUnits: 10
+        });
+        setDeptModalOpen(true);
+    };
+
+    const handleOpenEditDept = (dept: Department, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setEditingDeptId(dept.id);
+        setDeptForm({
+            name: dept.name,
+            code: dept.code,
+            color: dept.color,
+            icon: dept.icon,
+            headRole: dept.headRole,
+            description: dept.description,
+            totalUnits: dept.totalUnits || 10
+        });
+        setDeptModalOpen(true);
+    };
+
+    const handleSaveDept = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!deptForm.name.trim() || !deptForm.code.trim()) {
+            alert('부서명과 부서 코드를 입력해주세요.');
+            return;
+        }
+
+        const cleanCode = deptForm.code.trim().toUpperCase();
+        const cleanName = deptForm.name.trim();
+
+        if (editingDeptId) {
+            // 1. 기존 부서 수정
+            setDepartments(prev => prev.map(d => {
+                if (d.id === editingDeptId) {
+                    return {
+                        ...d,
+                        name: cleanName,
+                        code: cleanCode,
+                        color: deptForm.color,
+                        bgGlow: `${deptForm.color}26`,
+                        icon: deptForm.icon.trim() || '🏢',
+                        headRole: deptForm.headRole.trim() || `${cleanName} 총괄`,
+                        description: deptForm.description.trim() || `${cleanName} 자율 에이전트 관제`,
+                        totalUnits: Math.max(1, deptForm.totalUnits || 10)
+                    };
+                }
+                return d;
+            }));
+
+            // 소속 에이전트들의 deptName 동기화
+            setAgents(prev => prev.map(a => {
+                if (a.deptId === editingDeptId) {
+                    return { ...a, deptName: cleanName };
+                }
+                return a;
+            }));
+
+            setSimulationLog(prev => [
+                `🏢 [${new Date().toTimeString().split(' ')[0]}] [부서 관제] '${cleanName}(${cleanCode})' 부서 정보 수정 완료`,
+                ...prev.slice(0, 14)
+            ]);
+        } else {
+            // 2. 신규 부서 추가
+            let newId = cleanCode.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (!newId || departments.some(d => d.id === newId)) {
+                newId = `${newId || 'dept'}_${Date.now().toString().slice(-4)}`;
+            }
+
+            const newDept: Department = {
+                id: newId,
+                name: cleanName,
+                code: cleanCode,
+                color: deptForm.color,
+                bgGlow: `${deptForm.color}26`,
+                icon: deptForm.icon.trim() || '🏢',
+                headRole: deptForm.headRole.trim() || `${cleanName} 총괄`,
+                description: deptForm.description.trim() || `${cleanName} 자율 에이전트 관제`,
+                totalUnits: Math.max(1, deptForm.totalUnits || 10)
+            };
+
+            setDepartments(prev => [...prev, newDept]);
+
+            // 새 부서 기본 슬롯 자동 생성 (팀장 1, 과장 2, 대리 3, 사원 나머지)
+            const count = newDept.totalUnits;
+            const newSlots: AgentUnit[] = Array.from({ length: count }).map((_, idx) => {
+                const pos: AgentPosition = idx === 0 ? '팀장' : idx <= 2 ? '과장' : idx <= 5 ? '대리' : '사원';
+                const slotCode = `${cleanCode}-${String(idx + 1).padStart(2, '0')}`;
+                return {
+                    id: `${newId}-slot-${idx + 1}`,
+                    code: slotCode,
+                    name: `${cleanName} ${pos} ${idx + 1}`,
+                    deptId: newId,
+                    deptName: cleanName,
+                    tier: 3,
+                    role: `${cleanName} ${pos} 실무 에이전트`,
+                    status: 'OFFLINE',
+                    isCreated: false,
+                    position: pos,
+                    metrics: { speed: 85, accuracy: 95, load: 10, uptime: '99.9%', tasksToday: 0 },
+                    currentTask: '미생성 슬롯 대기 중',
+                    lastActive: '방금 전',
+                    triggerEvents: [],
+                    emittedEvents: [],
+                    logs: [`[시스템] ${cleanName} 신규 부서 슬롯 생성됨`],
+                    connectedDeptIds: [],
+                    connectedAgentIds: [],
+                    approvalStatus: 'AUTO_RUNNING',
+                    orderIndex: idx
+                };
+            });
+
+            setAgents(prev => [...prev, ...newSlots]);
+            setSelectedDeptId(newId);
+
+            setSimulationLog(prev => [
+                `🏢 [${new Date().toTimeString().split(' ')[0]}] [부서 관제] '${cleanName}(${cleanCode})' 신규 부서 생성 완료 (${count}개 슬롯 즉시 배치)`,
+                ...prev.slice(0, 14)
+            ]);
+        }
+
+        setDeptModalOpen(false);
+    };
+
+    const handleDeleteDept = (deptId: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        const deptToDelete = departments.find(d => d.id === deptId);
+        if (!deptToDelete) return;
+
+        const deptAgents = agents.filter(a => a.deptId === deptId);
+        const createdCount = deptAgents.filter(a => a.isCreated).length;
+
+        const confirmMsg = `'${deptToDelete.name}' 부서를 정말 삭제하시겠습니까?\n\n- 소속 에이전트 총 ${deptAgents.length}개 (가동 중 ${createdCount}개)가 함께 삭제/정리됩니다.\n- 타 부서와의 그물망 연계에서도 이 부서가 제거됩니다.`;
+        if (!window.confirm(confirmMsg)) return;
+
+        setDepartments(prev => prev.filter(d => d.id !== deptId));
+        setAgents(prev => prev
+            .filter(a => a.deptId !== deptId)
+            .map(a => ({
+                ...a,
+                connectedDeptIds: a.connectedDeptIds?.filter(id => id !== deptId) || [],
+                connectedAgentIds: a.connectedAgentIds?.filter(id => !deptAgents.some(da => da.id === id)) || []
+            }))
+        );
+
+        if (selectedDeptId === deptId) {
+            setSelectedDeptId('all');
+        }
+        if (selectedMeshDept === deptId) {
+            setSelectedMeshDept('all');
+        }
+        if (activeDeptForCreate === deptId) {
+            setActiveDeptForCreate('quote');
+        }
+        if (activeDeptForEdit === deptId) {
+            setActiveDeptForEdit('quote');
+        }
+
+        setDeptModalOpen(false);
+
+        setSimulationLog(prev => [
+            `🗑️ [${new Date().toTimeString().split(' ')[0]}] [부서 관제] '${deptToDelete.name}' 부서 및 소속 에이전트 영구 삭제 완료`,
+            ...prev.slice(0, 14)
+        ]);
+    };
+
     // 에이전트 생성 모달 상태
     const [creatingSlot, setCreatingSlot] = useState<AgentUnit | null>(null);
     const [activeDeptForCreate, setActiveDeptForCreate] = useState<string>('quote');
@@ -248,6 +502,14 @@ export default function AgentOfficeDashboard() {
         totalPdfFiles: number;
         totalRowsCount: number;
         durationSec: string;
+    } | null>(null);
+    const [ledgerStats, setLedgerStats] = useState<{
+        totalItems: number;
+        passCount: number;
+        warnCount: number;
+        failCount: number;
+        passRate: string;
+        outliersCount: number;
     } | null>(null);
 
     // 🚀 QC-02 에이전트 실행 (다중 페이지 성적서 판독 & 엑셀 장부 누적)
@@ -340,6 +602,15 @@ export default function AgentOfficeDashboard() {
                 .then(data => {
                     if (data.success) {
                         setBatchStatus(data);
+                    }
+                })
+                .catch(() => {});
+
+            fetch('/api/certificates')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.stats) {
+                        setLedgerStats(data.stats);
                     }
                 })
                 .catch(() => {});
@@ -565,14 +836,14 @@ export default function AgentOfficeDashboard() {
             const hasAgents = agent.connectedAgentIds && agent.connectedAgentIds.length > 0;
             if (!hasDepts && !hasAgents) return;
 
-            const sourceDept = DEPARTMENTS.find(d => d.id === agent.deptId);
+            const sourceDept = departments.find(d => d.id === agent.deptId);
 
             // 1) 구체적인 담당자(에이전트)가 지정된 경우 ➔ 1:1 업무 교류 정밀 파이프라인 생성
             if (hasAgents) {
                 agent.connectedAgentIds!.forEach(targetAgentId => {
                     const targetAgent = agents.find(a => a.id === targetAgentId);
                     if (!targetAgent) return;
-                    const targetDept = DEPARTMENTS.find(d => d.id === targetAgent.deptId);
+                    const targetDept = departments.find(d => d.id === targetAgent.deptId);
                     if (!targetDept) return;
 
                     links.push({
@@ -601,7 +872,7 @@ export default function AgentOfficeDashboard() {
                     const alreadyHasAgentLink = links.some(l => l.agent.id === agent.id && l.targetDeptId === targetId && l.targetAgentName);
                     if (alreadyHasAgentLink) return;
 
-                    const targetDept = DEPARTMENTS.find(d => d.id === targetId);
+                    const targetDept = departments.find(d => d.id === targetId);
                     if (!targetDept) return;
 
                     links.push({
@@ -622,11 +893,11 @@ export default function AgentOfficeDashboard() {
         });
 
         return links;
-    }, [createdAgents, agents]);
+    }, [createdAgents, agents, departments]);
 
     // 8대 부서별 그물망 연결 통계 (Mesh Topology Matrix)
     const deptMeshStats = useMemo(() => {
-        return DEPARTMENTS.map(dept => {
+        return departments.map(dept => {
             const outgoingDeptIds = new Set<string>();
             let incomingCount = 0;
 
@@ -660,10 +931,10 @@ export default function AgentOfficeDashboard() {
                 outgoingCount,
                 incomingCount,
                 totalLinks: relatedLinks.length,
-                connectedDepts: Array.from(outgoingDeptIds).map(id => DEPARTMENTS.find(d => d.id === id)).filter(Boolean)
+                connectedDepts: Array.from(outgoingDeptIds).map(id => departments.find(d => d.id === id)).filter(Boolean)
             };
         });
-    }, [createdAgents, agents, dynamicMeshLinks]);
+    }, [createdAgents, agents, dynamicMeshLinks, departments]);
 
     // 담당자 연계 토글 헬퍼 함수
     const toggleConnectedAgent = (agentId: string, deptId: string, isCreate: boolean) => {
@@ -942,7 +1213,7 @@ export default function AgentOfficeDashboard() {
             }
             return a;
         }));
-        const dept = DEPARTMENTS.find(d => d.id === deptId);
+        const dept = departments.find(d => d.id === deptId);
         const time = new Date().toTimeString().split(' ')[0];
         setSimulationLog(prev => [
             `👑 [${time}] [${dept?.name}] 팀장 최종 결재권 발동! 부서 내 모든 상신 업무 일괄 통과 완료!`,
@@ -1054,8 +1325,10 @@ export default function AgentOfficeDashboard() {
 
     // 전체 데이터 초기화 (기본값 복원)
     const handleResetAll = () => {
-        if (!window.confirm('전체 에이전트 설정을 기본값으로 초기화하시겠습니까?')) return;
+        if (!window.confirm('전체 에이전트 및 부서 설정을 기본값으로 초기화하시겠습니까?')) return;
         localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(STORAGE_DEPT_KEY);
+        setDepartments(DEPARTMENTS);
         setAgents(INITIAL_AGENTS);
         setSelectedAgent(null);
     };
@@ -1084,8 +1357,8 @@ export default function AgentOfficeDashboard() {
     };
 
     // 🏢 단일 에이전트 조직도 카드 렌더링 (미생성 vs 실제 생성 에이전트)
-    const renderOrgCard = (agent: AgentUnit, dept?: typeof DEPARTMENTS[0]) => {
-        const currentDept = dept || DEPARTMENTS.find(d => d.id === agent.deptId);
+    const renderOrgCard = (agent: AgentUnit, dept?: Department) => {
+        const currentDept = dept || departments.find(d => d.id === agent.deptId);
         const pos = agent.position || '사원';
         const posMeta = POSITION_CONFIG[pos] || POSITION_CONFIG['사원'];
         const isHead = pos === '팀장';
@@ -1386,7 +1659,7 @@ export default function AgentOfficeDashboard() {
                                 agent.connectedAgentIds.map(targetId => {
                                     const targetAg = agents.find(a => a.id === targetId);
                                     if (!targetAg) return null;
-                                    const tDept = DEPARTMENTS.find(d => d.id === targetAg.deptId);
+                                    const tDept = departments.find(d => d.id === targetAg.deptId);
                                     return (
                                         <span
                                             key={targetId}
@@ -1412,7 +1685,7 @@ export default function AgentOfficeDashboard() {
                                 agent.connectedDeptIds
                                     .filter(dId => !(agent.connectedAgentIds && agents.some(a => a.deptId === dId && agent.connectedAgentIds?.includes(a.id))))
                                     .map(dId => {
-                                        const d = DEPARTMENTS.find(dept => dept.id === dId);
+                                        const d = departments.find(dept => dept.id === dId);
                                         return (
                                             <span 
                                                 key={dId}
@@ -1742,11 +2015,18 @@ export default function AgentOfficeDashboard() {
                         </button>
                     </div>
 
-                    {/* 부서 필터 (DEPT FILTER - 8개 부서) */}
+                    {/* 부서 필터 (DEPT FILTER) */}
                     <div className="flex-1 overflow-y-auto p-3 space-y-1">
                         <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-2 flex items-center justify-between">
-                            <span>DEPT FILTER (8개 부서)</span>
-                            <span className="text-cyan-400 font-bold">{createdAgents.length} / 75 GAUGE</span>
+                            <span>DEPT FILTER ({departments.length}개 부서)</span>
+                            <button
+                                onClick={handleOpenAddDept}
+                                className="text-[10px] px-2 py-0.5 rounded border border-cyan-500/60 bg-cyan-950/60 text-cyan-300 hover:bg-cyan-500 hover:text-black font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs"
+                                title="신규 관제 부서 추가"
+                            >
+                                <Plus className="w-3 h-3" />
+                                <span>부서 추가</span>
+                            </button>
                         </div>
 
                         {/* 전체 보기 */}
@@ -1767,47 +2047,69 @@ export default function AgentOfficeDashboard() {
                             </span>
                         </button>
 
-                        {/* 8개 부서 목록 */}
-                        {DEPARTMENTS.map((dept, idx) => {
+                        {/* 부서 목록 (추가/수정/삭제 지원) */}
+                        {departments.map((dept, idx) => {
                             const isSelected = selectedDeptId === dept.id;
                             const deptUnits = agents.filter(a => a.deptId === dept.id);
                             const deptCreated = deptUnits.filter(a => a.isCreated === true);
                             const deptActive = deptCreated.filter(a => a.status === 'ACTIVE').length;
 
                             return (
-                                <button
+                                <div
                                     key={dept.id}
-                                    onClick={() => setSelectedDeptId(dept.id)}
-                                    className={`w-full text-left px-2.5 py-2 rounded text-xs font-bold flex items-center justify-between transition-all ${
-                                        isSelected
-                                            ? 'bg-slate-800/90 text-white shadow'
-                                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
-                                    }`}
-                                    style={{
-                                        borderLeft: isSelected ? `4px solid ${dept.color}` : '4px solid transparent'
-                                    }}
+                                    className="group/dept relative flex items-center"
                                 >
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <span className="text-sm">{dept.icon}</span>
-                                        <div className="truncate">
-                                            <div className="truncate flex items-center gap-1.5">
-                                                <span>{idx + 1}. {dept.name}</span>
-                                                {dept.id === 'quality' && (
-                                                    <span className="text-[8px] bg-pink-500/30 text-pink-300 px-1 rounded font-normal">READY</span>
-                                                )}
+                                    <button
+                                        onClick={() => setSelectedDeptId(dept.id)}
+                                        className={`w-full text-left px-2.5 py-2 rounded text-xs font-bold flex items-center justify-between transition-all pr-12 ${
+                                            isSelected
+                                                ? 'bg-slate-800/90 text-white shadow'
+                                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                                        }`}
+                                        style={{
+                                            borderLeft: isSelected ? `4px solid ${dept.color}` : '4px solid transparent'
+                                        }}
+                                    >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="text-sm">{dept.icon}</span>
+                                            <div className="truncate">
+                                                <div className="truncate flex items-center gap-1.5">
+                                                    <span>{idx + 1}. {dept.name}</span>
+                                                    {dept.id === 'quality' && (
+                                                        <span className="text-[8px] bg-pink-500/30 text-pink-300 px-1 rounded font-normal">READY</span>
+                                                    )}
+                                                </div>
+                                                <div className="text-[9px] text-slate-500 truncate">{dept.headRole}</div>
                                             </div>
-                                            <div className="text-[9px] text-slate-500 truncate">{dept.headRole}</div>
                                         </div>
+                                        <div className="text-right shrink-0">
+                                            <div className="text-[11px] font-mono" style={{ color: deptCreated.length > 0 ? dept.color : '#64748B' }}>
+                                                {deptCreated.length} / {deptUnits.length}
+                                            </div>
+                                            <div className="text-[8px] font-mono" style={{ color: deptActive > 0 ? '#00E676' : '#64748B' }}>
+                                                {deptActive} ACT
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    {/* 마우스 호버 시 부서 수정/삭제 빠른 액션 버튼 */}
+                                    <div className="absolute right-1 hidden group-hover/dept:flex items-center gap-0.5 bg-[#0A0F1D]/90 p-0.5 rounded border border-slate-700 shadow-md">
+                                        <button
+                                            onClick={(e) => handleOpenEditDept(dept, e)}
+                                            className="p-1 rounded text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors cursor-pointer"
+                                            title={`${dept.name} 정보 수정`}
+                                        >
+                                            <Edit2 className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => handleDeleteDept(dept.id, e)}
+                                            className="p-1 rounded text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                                            title={`${dept.name} 부서 삭제`}
+                                        >
+                                            <Trash2 className="w-3 h-3" />
+                                        </button>
                                     </div>
-                                    <div className="text-right shrink-0">
-                                        <div className="text-[11px] font-mono" style={{ color: deptCreated.length > 0 ? dept.color : '#64748B' }}>
-                                            {deptCreated.length} / {deptUnits.length}
-                                        </div>
-                                        <div className="text-[8px] font-mono" style={{ color: deptActive > 0 ? '#00E676' : '#64748B' }}>
-                                            {deptActive} ACT
-                                        </div>
-                                    </div>
-                                </button>
+                                </div>
                             );
                         })}
                     </div>
@@ -1840,11 +2142,47 @@ export default function AgentOfficeDashboard() {
                                 <span>
                                     {selectedDeptId === 'all' 
                                         ? '전체 부서 통합 관제' 
-                                        : DEPARTMENTS.find(d => d.id === selectedDeptId)?.name}
+                                        : departments.find(d => d.id === selectedDeptId)?.name}
                                 </span>
                                 <span className="text-xs px-2 py-0.5 rounded border border-cyan-800 bg-cyan-950/30 text-cyan-400 font-mono">
                                     {filteredAgents.filter(a => a.isCreated).length} ACTIVE / {filteredAgents.length} SLOTS
                                 </span>
+                            </div>
+
+                            {/* + 부서 추가 및 선택 부서 수정/삭제 버튼 */}
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={handleOpenAddDept}
+                                    className="px-2.5 py-1 rounded border border-cyan-500/50 bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 hover:text-white text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                                    title="신규 관제 부서 추가 등록"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>부서 추가</span>
+                                </button>
+                                {selectedDeptId !== 'all' && (() => {
+                                    const curr = departments.find(d => d.id === selectedDeptId);
+                                    if (!curr) return null;
+                                    return (
+                                        <>
+                                            <button
+                                                onClick={(e) => handleOpenEditDept(curr, e)}
+                                                className="px-2 py-1 rounded border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                                title={`${curr.name} 설정 수정`}
+                                            >
+                                                <Edit2 className="w-3 h-3 text-cyan-400" />
+                                                <span>부서 수정</span>
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleDeleteDept(curr.id, e)}
+                                                className="px-2 py-1 rounded border border-slate-800 bg-slate-900/80 hover:bg-red-950/40 hover:border-red-500/50 text-slate-400 hover:text-red-300 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                                title={`${curr.name} 부서 삭제`}
+                                            >
+                                                <Trash2 className="w-3 h-3 text-red-400" />
+                                                <span>삭제</span>
+                                            </button>
+                                        </>
+                                    );
+                                })()}
                             </div>
 
                             {/* 🏢 계층형 조직도 (Tree Org Chart) vs ▦ 전체 격자 관제 (Swarm Grid) 토글 스위치 */}
@@ -1918,7 +2256,7 @@ export default function AgentOfficeDashboard() {
                             ───────────────────────────────────────────────────────────── */}
                             {officeLayoutMode === 'hierarchy' && (
                                 <div className="space-y-10">
-                                    {(selectedDeptId === 'all' ? DEPARTMENTS : DEPARTMENTS.filter(d => d.id === selectedDeptId)).map((dept) => {
+                                    {(selectedDeptId === 'all' ? departments : departments.filter(d => d.id === selectedDeptId)).map((dept) => {
                                         const deptAllAgents = agents.filter(a => a.deptId === dept.id);
                                         const deptFiltered = filteredAgents.filter(a => a.deptId === dept.id);
                                         if (selectedDeptId === 'all' && deptFiltered.length === 0 && searchQuery) {
@@ -1956,8 +2294,27 @@ export default function AgentOfficeDashboard() {
                                                         </div>
                                                     </div>
 
-                                                    {/* 부서 결재선 현황 및 팀장 일괄 승인 버튼 */}
+                                                    {/* 부서 관리 액션 (수정/삭제) 및 결재선 현황 / 팀장 일괄 승인 */}
                                                     <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-1 mr-1 border-r border-slate-800/80 pr-2">
+                                                            <button
+                                                                onClick={(e) => handleOpenEditDept(dept, e)}
+                                                                className="px-2.5 py-1 rounded border border-slate-700 hover:border-cyan-400 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-cyan-300 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                                                                title={`${dept.name} 설정 수정`}
+                                                            >
+                                                                <Edit2 className="w-3 h-3 text-cyan-400" />
+                                                                <span>수정</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => handleDeleteDept(dept.id, e)}
+                                                                className="px-2.5 py-1 rounded border border-slate-800 hover:border-red-500/60 bg-slate-900/90 hover:bg-red-950/40 text-slate-400 hover:text-red-300 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                                                                title={`${dept.name} 부서 삭제`}
+                                                            >
+                                                                <Trash2 className="w-3 h-3 text-red-400" />
+                                                                <span>삭제</span>
+                                                            </button>
+                                                        </div>
+
                                                         {pendingTasks.length > 0 ? (
                                                             <div className="flex items-center gap-2 animate-pulse">
                                                                 <span className="text-xs px-2.5 py-1 rounded-full border border-amber-500 bg-amber-950/60 text-amber-300 font-bold flex items-center gap-1.5 shadow-[0_0_10px_rgba(245,158,11,0.5)]">
@@ -2069,7 +2426,7 @@ export default function AgentOfficeDashboard() {
                             {officeLayoutMode === 'grid' && (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                                     {filteredAgents.map((agent) => {
-                                        const dept = DEPARTMENTS.find(d => d.id === agent.deptId);
+                                        const dept = departments.find(d => d.id === agent.deptId);
                                         return renderOrgCard(agent, dept);
                                     })}
                                 </div>
@@ -2216,7 +2573,7 @@ export default function AgentOfficeDashboard() {
                                         <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800 text-cyan-300">
                                             {selectedMeshDept === 'all' 
                                                 ? `전체 ${dynamicMeshLinks.length}건` 
-                                                : `${DEPARTMENTS.find(d => d.id === selectedMeshDept)?.name} 관련 ${dynamicMeshLinks.filter(l => l.agent.deptId === selectedMeshDept || l.targetDeptId === selectedMeshDept).length}건`}
+                                                : `${departments.find(d => d.id === selectedMeshDept)?.name} 관련 ${dynamicMeshLinks.filter(l => l.agent.deptId === selectedMeshDept || l.targetDeptId === selectedMeshDept).length}건`}
                                         </span>
                                     </div>
                                     <div className="text-[11px] text-slate-400">
@@ -2647,7 +3004,7 @@ export default function AgentOfficeDashboard() {
 
                                 {/* 1. 부서 탭 버튼 그리드 */}
                                 <div className="grid grid-cols-4 gap-1 bg-slate-950/80 p-1.5 rounded border border-purple-900/40">
-                                    {DEPARTMENTS.map(d => {
+                                    {departments.map(d => {
                                         const isTabActive = activeDeptForCreate === d.id;
                                         const selectedCount = agents.filter(a => a.deptId === d.id && createForm.connectedAgentIds.includes(a.id)).length;
                                         const isSelf = creatingSlot.deptId === d.id;
@@ -2684,7 +3041,7 @@ export default function AgentOfficeDashboard() {
 
                                 {/* 2. 선택된 부서의 담당자(에이전트/업무) 상세 선택 서브 패널 */}
                                 {activeDeptForCreate && (() => {
-                                    const activeDeptObj = DEPARTMENTS.find(d => d.id === activeDeptForCreate);
+                                    const activeDeptObj = departments.find(d => d.id === activeDeptForCreate);
                                     const deptAgents = agents.filter(a => a.deptId === activeDeptForCreate);
 
                                     return (
@@ -3026,7 +3383,7 @@ export default function AgentOfficeDashboard() {
 
                                     {/* 1. 부서 탭 버튼 그리드 */}
                                     <div className="grid grid-cols-4 gap-1 bg-slate-950/80 p-1.5 rounded border border-purple-900/40">
-                                        {DEPARTMENTS.map(d => {
+                                        {departments.map(d => {
                                             const isTabActive = activeDeptForEdit === d.id;
                                             const selectedCount = agents.filter(a => a.deptId === d.id && editForm.connectedAgentIds.includes(a.id)).length;
                                             const isSelf = selectedAgent.deptId === d.id;
@@ -3063,7 +3420,7 @@ export default function AgentOfficeDashboard() {
 
                                     {/* 2. 선택된 부서의 담당자(에이전트) 목록 서브 패널 */}
                                     {activeDeptForEdit && (() => {
-                                        const activeDeptObj = DEPARTMENTS.find(d => d.id === activeDeptForEdit);
+                                        const activeDeptObj = departments.find(d => d.id === activeDeptForEdit);
                                         const deptAgents = agents.filter(a => a.deptId === activeDeptForEdit);
 
                                         return (
@@ -3137,8 +3494,8 @@ export default function AgentOfficeDashboard() {
                                 </div>
                             </div>
 
-                            {/* 📬 [품질부 특화] 메일플러그(gw.mailplug.com) 외주 성적서 수집 제어반 */}
-                            {(selectedAgent.deptId === 'quality' || selectedAgent.code.startsWith('QC-')) && (
+                            {/* 📬 [품질부 QC-01 전용] 메일플러그(gw.mailplug.com) 외주 성적서 수집 제어반 */}
+                            {(selectedAgent.code === 'QC-01' || selectedAgent.id === 'qc-inbound-ingest') && (
                                 <div className="border border-pink-500/40 bg-pink-950/20 rounded-xl p-3.5 space-y-3.5 shadow-[0_0_20px_rgba(255,0,85,0.2)] my-3">
                                     <div className="flex items-center justify-between border-b border-pink-900/40 pb-2">
                                         <div className="flex items-center gap-1.5 text-pink-300 font-bold text-xs">
@@ -3391,6 +3748,15 @@ export default function AgentOfficeDashboard() {
                                             <span>성적서 양식(3열 병합 간격) 동시 생성:</span>
                                             <span className="text-indigo-300 font-bold font-mono">호환 활성화</span>
                                         </div>
+                                        <div className="flex items-center justify-between text-slate-300 pt-1 border-t border-slate-800">
+                                            <span>누적 관리 대장 현황:</span>
+                                            <span className="text-cyan-300 font-bold font-mono">
+                                                {ledgerStats ? `${ledgerStats.totalItems.toLocaleString()}건 (합격률 ${ledgerStats.passRate})` : '1,424건 관리 중'}
+                                            </span>
+                                        </div>
+                                        <div className="text-[10px] text-slate-400 font-mono bg-cyan-950/30 p-1.5 rounded border border-cyan-900/40 break-all">
+                                            📁 저장: storage/certificates/대경벤드 성적서.xlsx
+                                        </div>
                                         {qc02Result && (
                                             <div className="p-2 rounded bg-cyan-950/60 border border-cyan-500/40 text-[10px] text-cyan-200">
                                                 ✓ 최근 실행: {qc02Result.totalPdfFiles}개 파일 판독 ➔ 누적 {qc02Result.totalRowsCount}개 품목 완료 ({qc02Result.durationSec})
@@ -3590,6 +3956,230 @@ export default function AgentOfficeDashboard() {
                                 </div>
                             ))}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 🏢 4. 부서 추가 / 수정 모달 (Department Management Modal) */}
+            {deptModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                    <div className="bg-[#0A0F1D] border border-cyan-500/50 rounded-xl w-full max-w-lg shadow-[0_0_50px_rgba(0,240,255,0.2)] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+                        {/* 헤더 */}
+                        <div className="p-4 border-b border-slate-800 bg-[#0E1528] flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <span className="text-2xl">{deptForm.icon || '🏢'}</span>
+                                <div>
+                                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                        <span>{editingDeptId ? '부서 정보 수정' : '신규 관제 부서 추가'}</span>
+                                        {editingDeptId && (
+                                            <span className="text-xs px-2 py-0.5 rounded border border-cyan-500/40 text-cyan-300 font-mono">
+                                                ID: {editingDeptId}
+                                            </span>
+                                        )}
+                                    </h3>
+                                    <p className="text-xs text-slate-400 mt-0.5">
+                                        {editingDeptId 
+                                            ? '부서 명칭, 코드, 테마 색상 및 총괄 직책을 수정합니다.' 
+                                            : '조직도 및 관제 시스템에 연동될 새로운 부서와 기본 슬롯을 생성합니다.'}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setDeptModalOpen(false)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* 폼 본문 */}
+                        <form onSubmit={handleSaveDept} className="p-5 space-y-4 overflow-y-auto max-h-[75vh]">
+                            {/* 1. 부서명 & 부서 코드 */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                                        부서명 <span className="text-red-400">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="예: 해외영업부, 연구개발부"
+                                        value={deptForm.name}
+                                        onChange={e => setDeptForm(prev => ({ ...prev, name: e.target.value }))}
+                                        className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white text-xs focus:outline-hidden focus:border-cyan-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                                        부서 식별 코드 <span className="text-red-400">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="예: GLO, RND, SEC"
+                                        value={deptForm.code}
+                                        onChange={e => setDeptForm(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                                        className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white text-xs font-mono uppercase focus:outline-hidden focus:border-cyan-400"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* 2. 아이콘 빠른 선택 & 커스텀 입력 */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-300 mb-1">
+                                    대표 아이콘 / 이모지
+                                </label>
+                                <div className="flex flex-wrap gap-1.5 p-2 bg-slate-950/70 border border-slate-800 rounded-lg mb-2">
+                                    {['🏢', '📝', '🛒', '📑', '🔬', '🚚', '💾', '📦', '👑', '🛡️', '⚙️', '🚀', '💡', '🌐', '🎯', '📊', '⚡', '🤖', '🔍', '📈', '🏭', '🧪', '💼'].map(emoji => (
+                                        <button
+                                            key={emoji}
+                                            type="button"
+                                            onClick={() => setDeptForm(prev => ({ ...prev, icon: emoji }))}
+                                            className={`w-8 h-8 rounded text-sm flex items-center justify-center transition-all cursor-pointer ${
+                                                deptForm.icon === emoji
+                                                    ? 'bg-cyan-500/30 border border-cyan-400 scale-110 shadow-xs'
+                                                    : 'bg-slate-900 hover:bg-slate-800 border border-slate-700/60'
+                                            }`}
+                                        >
+                                            {emoji}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-slate-400">직접 입력:</span>
+                                    <input
+                                        type="text"
+                                        value={deptForm.icon}
+                                        onChange={e => setDeptForm(prev => ({ ...prev, icon: e.target.value }))}
+                                        className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-center text-sm text-white"
+                                        maxLength={4}
+                                    />
+                                    <span className="text-[11px] text-slate-500">원하는 이모지 직접 입력 가능</span>
+                                </div>
+                            </div>
+
+                            {/* 3. 테마 컬러 프리셋 & 픽커 */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-300 mb-1">
+                                    부서 테마 컬러 (네온)
+                                </label>
+                                <div className="flex flex-wrap items-center gap-2 p-2 bg-slate-950/70 border border-slate-800 rounded-lg">
+                                    {[
+                                        { color: '#00F0FF', name: 'Cyber Cyan' },
+                                        { color: '#00E676', name: 'Neon Green' },
+                                        { color: '#FFD600', name: 'Electric Gold' },
+                                        { color: '#FF0055', name: 'Cyber Pink' },
+                                        { color: '#7C4DFF', name: 'Neon Purple' },
+                                        { color: '#00B0FF', name: 'Deep Sky' },
+                                        { color: '#FF6D00', name: 'Safety Orange' },
+                                        { color: '#E040FB', name: 'Cyber Magenta' },
+                                        { color: '#AEEA00', name: 'Lime Neon' },
+                                        { color: '#FF1744', name: 'Crimson' }
+                                    ].map(item => (
+                                        <button
+                                            key={item.color}
+                                            type="button"
+                                            onClick={() => setDeptForm(prev => ({ ...prev, color: item.color }))}
+                                            className="w-6 h-6 rounded-full border-2 transition-transform relative flex items-center justify-center cursor-pointer"
+                                            style={{
+                                                backgroundColor: item.color,
+                                                borderColor: deptForm.color === item.color ? '#FFFFFF' : 'transparent',
+                                                transform: deptForm.color === item.color ? 'scale(1.2)' : 'scale(1)',
+                                                boxShadow: deptForm.color === item.color ? `0 0 10px ${item.color}` : 'none'
+                                            }}
+                                            title={item.name}
+                                        >
+                                            {deptForm.color === item.color && (
+                                                <Check className="w-3 h-3 text-black stroke-[3]" />
+                                            )}
+                                        </button>
+                                    ))}
+                                    <div className="flex items-center gap-1.5 ml-auto">
+                                        <input
+                                            type="color"
+                                            value={deptForm.color}
+                                            onChange={e => setDeptForm(prev => ({ ...prev, color: e.target.value }))}
+                                            className="w-7 h-7 rounded border-0 cursor-pointer bg-transparent"
+                                        />
+                                        <span className="font-mono text-xs text-slate-300 font-bold">{deptForm.color}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 4. 총괄 직책명 & 기본 슬롯 수 */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                                        부서 총괄 직책명
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="예: 해외영업 총괄, R&D 총괄"
+                                        value={deptForm.headRole}
+                                        onChange={e => setDeptForm(prev => ({ ...prev, headRole: e.target.value }))}
+                                        className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white text-xs focus:outline-hidden focus:border-cyan-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                                        배정 슬롯 인원수 (기본 10)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={30}
+                                        value={deptForm.totalUnits}
+                                        onChange={e => setDeptForm(prev => ({ ...prev, totalUnits: parseInt(e.target.value) || 10 }))}
+                                        className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white text-xs focus:outline-hidden focus:border-cyan-400"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* 5. 부서 설명 */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-300 mb-1">
+                                    부서 역할 및 관제 목적 설명
+                                </label>
+                                <textarea
+                                    rows={2}
+                                    placeholder="해당 부서 에이전트들이 수행할 주요 자율 업무 및 관제 목적을 입력하세요."
+                                    value={deptForm.description}
+                                    onChange={e => setDeptForm(prev => ({ ...prev, description: e.target.value }))}
+                                    className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white text-xs focus:outline-hidden focus:border-cyan-400"
+                                />
+                            </div>
+
+                            {/* 하단 버튼 바 */}
+                            <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
+                                {editingDeptId ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDeleteDept(editingDeptId)}
+                                        className="px-3 py-2 rounded border border-red-500/40 bg-red-950/40 hover:bg-red-900/60 text-red-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <span>이 부서 삭제</span>
+                                    </button>
+                                ) : <div />}
+
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setDeptModalOpen(false)}
+                                        className="px-3.5 py-2 rounded border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                                    >
+                                        취소
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="px-4 py-2 rounded bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black shadow-[0_0_15px_rgba(0,240,255,0.4)] flex items-center gap-1.5 transition-all cursor-pointer"
+                                    >
+                                        <Check className="w-4 h-4" />
+                                        <span>{editingDeptId ? '수정 내용 저장' : '부서 생성 완료'}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

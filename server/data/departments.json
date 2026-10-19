@@ -1,0 +1,90 @@
+[
+  {
+    "id": "quote",
+    "name": "견적부",
+    "code": "EST",
+    "color": "#00F0FF",
+    "bgGlow": "rgba(0, 240, 255, 0.15)",
+    "icon": "📝",
+    "description": "24시간 견적 인입 파싱, 규격 매핑, 단가/마진 산출 및 고객 회신",
+    "headRole": "견적 총괄 자동화",
+    "totalUnits": 10
+  },
+  {
+    "id": "purchase",
+    "name": "구매부",
+    "code": "PUR",
+    "color": "#00E676",
+    "bgGlow": "rgba(0, 230, 118, 0.15)",
+    "icon": "🛒",
+    "description": "대경재고 감시, 안전재고 부족 선매입 발주 및 외주 발주서 생성",
+    "headRole": "구매/SCM 총괄",
+    "totalUnits": 9
+  },
+  {
+    "id": "general",
+    "name": "총무부",
+    "code": "GEN",
+    "color": "#FFD600",
+    "bgGlow": "rgba(255, 214, 0, 0.15)",
+    "icon": "📑",
+    "description": "전자세금계산서, 거래명세표 발행, 입금 대조 및 여신 한도 관리",
+    "headRole": "경리/회계 총괄",
+    "totalUnits": 9
+  },
+  {
+    "id": "quality",
+    "name": "품질부",
+    "code": "QC",
+    "color": "#FF0055",
+    "bgGlow": "rgba(255, 0, 85, 0.15)",
+    "icon": "🔬",
+    "description": "외주/재고 성적서(MTC) 판독, 구글시트 DB화, 매칭 및 성적서 자동 발송",
+    "headRole": "품질 보증(QA) 총괄",
+    "totalUnits": 10
+  },
+  {
+    "id": "shipping",
+    "name": "출고부",
+    "code": "LOG",
+    "color": "#7C4DFF",
+    "bgGlow": "rgba(124, 77, 255, 0.15)",
+    "icon": "🚚",
+    "description": "출고 신호 발행, 미결 관리, 화물 배차 및 운송장 자동 알림",
+    "headRole": "물류/출고 총괄",
+    "totalUnits": 9
+  },
+  {
+    "id": "data",
+    "name": "데이터관리부",
+    "code": "DAT",
+    "color": "#00B0FF",
+    "bgGlow": "rgba(0, 176, 255, 0.15)",
+    "icon": "💾",
+    "description": "대경 재고 크롤링, 시화/부산 색인, 유사도 엔진 및 S3 동기화",
+    "headRole": "데이터 아키텍트",
+    "totalUnits": 10
+  },
+  {
+    "id": "material",
+    "name": "자재관리부",
+    "code": "MAT",
+    "color": "#FF6D00",
+    "bgGlow": "rgba(255, 109, 0, 0.15)",
+    "icon": "📦",
+    "description": "창고 랙 위치 추적, 장기 과잉재고 유동화, 실사 오차 보정",
+    "headRole": "창고 자재 총괄",
+    "totalUnits": 9
+  },
+  {
+    "id": "executive",
+    "name": "경영지원부",
+    "code": "EXE",
+    "color": "#E040FB",
+    "bgGlow": "rgba(224, 64, 251, 0.15)",
+    "icon": "👑",
+    "description": "CEO 일일 결산 브리핑, 자금 흐름 예측, 이탈 고객 감지 및 최종 승인",
+    "headRole": "CEO 전략실",
+    "totalUnits": 9
+  }
+]
