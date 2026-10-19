@@ -306,15 +306,17 @@ export class MyWorkflow {
 ---
 
 ## 🔁 연속 작업 재개 규칙 (Continuous Agent Workflow Policy)
-- 사용자가 **"agent 준비"**, **"에이전트 준비"**, **"agent 계속 하자"**, **"에이전트 계속 하자"**라고 입력하면, 에이전트는 즉시 다음 절차를 자동으로 수행합니다:
-  1. **로컬 개발 환경 자동 점검 & 무중단 가동**:
-     - 백엔드 API 서버 (포트 3001) 및 프론트엔드 Vite 개발 서버 (포트 5173) 실행 상태를 점검합니다.
-     - 실행되어 있지 않다면 즉시 백그라운드 데몬으로 구동합니다.
-  2. **에이전트 오피스 큰 화면 자동 오픈 (Kiosk HUD)**:
+- 사용자가 **"agent 수정하자"**, **"에이전트 수정하자"**, **"agent 수정"**, **"에이전트 수정"**, **"agent 준비"**, **"에이전트 준비"**, **"agent 계속 하자"**, **"에이전트 계속 하자"**, **"agent 시작"**, **"에이전트 시작"**이라고 입력하면, 어떤 컴퓨터(새로운 PC, 노트북, 맥북 등)에서든 에이전트는 즉시 다음 절차를 자동으로 수행합니다:
+  1. **Git 원격 저장소 최신 상태 확인 & 동기화**:
+     - `git status` 및 필요시 `git pull` 상태를 확인하여 다른 컴퓨터에서 커밋된 최신 에이전트/부서/성적서 데이터를 완벽히 로드합니다.
+  2. **로컬 개발 환경 자동 점검 & 무중단 가동**:
+     - 백엔드 API 서버 (포트 3001) 및 프론트엔드 Vite 개발 서버 (포트 5173) 실행 상태를 점검합니다 (`node local-api-server.js` 및 `npm run dev` 또는 `npm run agent`).
+     - 실행되어 있지 않다면 즉시 백그라운드 데몬으로 무중단 구동합니다.
+  3. **에이전트 오피스 대화면 자동 오픈 (Kiosk HUD)**:
      - 브라우저를 통해 무한 새로고침 없는 안정화된 대화면 오피스 `http://localhost:5173/agent-office`를 즉시 열어 사용자가 실시간 대시보드를 바로 볼 수 있게 만듭니다 (`open http://localhost:5173/agent-office`).
-  3. **진행 상태 파악 및 요약 보고**:
-     - [task.md](file:///Volumes/Extreme%20SSD/altf-kr-web-skeleton/task.md)와 [server/services/mailplugCollector.js](file:///Volumes/Extreme%20SSD/altf-kr-web-skeleton/server/services/mailplugCollector.js) 및 최신 코드 변경 사항을 로드하여 현재 개발 단계(QC-01 품질부 에이전트, 메일플러그 실제 수집, 성적서 26개 컬럼 파싱 및 엑셀 장부 연동 등)를 즉시 파악하고 요약 보고합니다.
-  4. **다음 우선순위 작업 즉시 착수**:
-     - 사전에 "진행할까요?" 묻지 않고, 이어서 개발해야 할 최우선 과제(품질부 성적서 엑셀 26개 컬럼 매칭, 이상치 검출, 구글 시트 연동 등)를 즉시 직접 구현하고 보고합니다.
+  4. **진행 상태 파악 및 요약 보고**:
+     - [task.md](file:///Volumes/Extreme%20SSD/altf-kr-web-skeleton/task.md), [server/data/departments.json](file:///Volumes/Extreme%20SSD/altf-kr-web-skeleton/server/data/departments.json), [server/data/agents.json](file:///Volumes/Extreme%20SSD/altf-kr-web-skeleton/server/data/agents.json), [server/data/certificates.json](file:///Volumes/Extreme%20SSD/altf-kr-web-skeleton/server/data/certificates.json) 및 [server/services/mailplugCollector.js](file:///Volumes/Extreme%20SSD/altf-kr-web-skeleton/server/services/mailplugCollector.js)를 로드하여 현재 단계(부서 CRUD, QC-01 메일플러그 수집, QC-02 1,424개 성적서 대장 연동 등)를 즉시 파악하고 요약 보고합니다.
+  5. **다음 우선순위 작업 즉시 착수**:
+     - 사전에 "진행할까요?" 묻지 않고, 사용자가 지시한 에이전트 수정 또는 다음 최우선 과제(품질부 성적서 26개 컬럼 매칭, 이상치 검출, 구글 시트 연동 등)를 즉시 직접 구현하고 보고합니다.
 
 

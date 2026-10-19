@@ -18,7 +18,7 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 
 const API_PORT = 3001;
 const VITE_PORT = 5173;
-const TARGET_URL = `http://localhost:${VITE_PORT}/admin/agents`;
+const TARGET_URL = `http://localhost:${VITE_PORT}/agent-office`;
 
 console.log('\n======================================================');
 console.log('🚀 [ALTF] AI Agent Office 자동 환경 구축 및 구동 시작');
