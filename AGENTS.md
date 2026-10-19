@@ -306,11 +306,15 @@ export class MyWorkflow {
 ---
 
 ## 🔁 연속 작업 재개 규칙 (Continuous Agent Workflow Policy)
-- 사용자가 **"agent 계속 하자"** 또는 **"에이전트 계속 하자"**라고 입력하면, 에이전트는 즉시 다음 절차를 자동으로 수행합니다:
-  1. **진행 상태 파악**: [task.md](file:///f:/altf-kr-web-skeleton/task.md)와 [server/services/mailplugCollector.js](file:///f:/altf-kr-web-skeleton/server/services/mailplugCollector.js) 및 최신 코드 변경 사항을 로드하여 현재 개발 단계(QC-01 품질부 에이전트, 메일플러그 실제 수집, 성적서 파싱 및 엑셀 장부 연동 등)를 즉시 파악하고 요약 보고합니다.
-  2. **로컬 개발 환경 자동 점검 & 준비**:
+- 사용자가 **"agent 준비"**, **"에이전트 준비"**, **"agent 계속 하자"**, **"에이전트 계속 하자"**라고 입력하면, 에이전트는 즉시 다음 절차를 자동으로 수행합니다:
+  1. **로컬 개발 환경 자동 점검 & 무중단 가동**:
      - 백엔드 API 서버 (포트 3001) 및 프론트엔드 Vite 개발 서버 (포트 5173) 실행 상태를 점검합니다.
-     - 실행되어 있지 않다면 즉시 백그라운드 데몬으로 구동하여 사용자가 즉시 `http://localhost:5173/admin/agents` 대시보드를 열람할 수 있도록 준비합니다.
-  3. **다음 우선순위 작업 즉시 착수**: 사전에 "진행할까요?" 묻지 않고, 이어서 개발해야 할 최우선 과제(품질부 성적서 엑셀 26개 컬럼 매칭, 이상치 검출, 구글 시트 연동 등)를 즉시 직접 구현하고 보고합니다.
+     - 실행되어 있지 않다면 즉시 백그라운드 데몬으로 구동합니다.
+  2. **에이전트 오피스 큰 화면 자동 오픈 (Kiosk HUD)**:
+     - 브라우저를 통해 무한 새로고침 없는 안정화된 대화면 오피스 `http://localhost:5173/agent-office`를 즉시 열어 사용자가 실시간 대시보드를 바로 볼 수 있게 만듭니다 (`open http://localhost:5173/agent-office`).
+  3. **진행 상태 파악 및 요약 보고**:
+     - [task.md](file:///Volumes/Extreme%20SSD/altf-kr-web-skeleton/task.md)와 [server/services/mailplugCollector.js](file:///Volumes/Extreme%20SSD/altf-kr-web-skeleton/server/services/mailplugCollector.js) 및 최신 코드 변경 사항을 로드하여 현재 개발 단계(QC-01 품질부 에이전트, 메일플러그 실제 수집, 성적서 26개 컬럼 파싱 및 엑셀 장부 연동 등)를 즉시 파악하고 요약 보고합니다.
+  4. **다음 우선순위 작업 즉시 착수**:
+     - 사전에 "진행할까요?" 묻지 않고, 이어서 개발해야 할 최우선 과제(품질부 성적서 엑셀 26개 컬럼 매칭, 이상치 검출, 구글 시트 연동 등)를 즉시 직접 구현하고 보고합니다.
 
 
