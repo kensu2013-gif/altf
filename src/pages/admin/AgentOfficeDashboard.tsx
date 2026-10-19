@@ -3888,25 +3888,6 @@ export default function AgentOfficeDashboard() {
                                 </div>
                             )}
 
-                            {/* 메트릭 그리드 */}
-                            <div className="grid grid-cols-2 gap-2 my-4 text-xs font-mono">
-                                <div className="border border-slate-800 rounded p-2 bg-slate-900/60">
-                                    <div className="text-[10px] text-slate-500">SPEED / 처리속도</div>
-                                    <div className="text-cyan-400 font-bold text-sm mt-0.5">{selectedAgent.metrics.speed} pts</div>
-                                </div>
-                                <div className="border border-slate-800 rounded p-2 bg-slate-900/60">
-                                    <div className="text-[10px] text-slate-500">ACCURACY / 정확도</div>
-                                    <div className="text-emerald-400 font-bold text-sm mt-0.5">{selectedAgent.metrics.accuracy}%</div>
-                                </div>
-                                <div className="border border-slate-800 rounded p-2 bg-slate-900/60">
-                                    <div className="text-[10px] text-slate-500">LOAD / 현재부하</div>
-                                    <div className="text-amber-400 font-bold text-sm mt-0.5">{selectedAgent.metrics.load}%</div>
-                                </div>
-                                <div className="border border-slate-800 rounded p-2 bg-slate-900/60">
-                                    <div className="text-[10px] text-slate-500">TODAY / 처리건수</div>
-                                    <div className="text-purple-400 font-bold text-sm mt-0.5">{selectedAgent.metrics.tasksToday}건</div>
-                                </div>
-                            </div>
 
                             {/* 최근 로그 */}
                             <div className="mt-2">
