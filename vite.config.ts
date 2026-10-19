@@ -30,6 +30,15 @@ export default defineConfig({
   },
   server: {
     allowedHosts: true,
+    watch: {
+      ignored: [
+        '**/server/**',
+        '**/storage/**',
+        '**/agents/**',
+        '**/.agents/**',
+        '**/*.json',
+      ],
+    },
     proxy: {
       '/api/geo': {
         target: 'http://localhost:8787',

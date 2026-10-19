@@ -80,10 +80,11 @@ export default function AgentOfficeDashboard() {
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'STANDBY' | 'IDLE' | 'UNCREATED'>('ALL');
     const [selectedAgent, setSelectedAgent] = useState<AgentUnit | null>(null);
     const [selectedMeshDept, setSelectedMeshDept] = useState<string>('all');
-    const [isDemoRunning, setIsDemoRunning] = useState<boolean>(true);
+    const [isDemoRunning, setIsDemoRunning] = useState<boolean>(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [activeNetworkStep, setActiveNetworkStep] = useState<number | null>(null);
     const [simulationLog, setSimulationLog] = useState<string[]>([]);
+    const lastSavedStructureRef = React.useRef<string>('');
 
     // 에이전트 상태 (로컬 스토리지에 영구 보존 및 직위 체계 보정)
     const [agents, setAgents] = useState<AgentUnit[]>(() => {
@@ -109,6 +110,20 @@ export default function AgentOfficeDashboard() {
                 if (res.ok) {
                     const data = await res.json();
                     if (data.success && Array.isArray(data.agents) && data.agents.length > 0) {
+                        const structureSnapshot = JSON.stringify(data.agents.map((a: AgentUnit) => ({
+                            id: a.id,
+                            code: a.code,
+                            name: a.name,
+                            role: a.role,
+                            status: a.status,
+                            position: a.position,
+                            deptId: a.deptId,
+                            isCreated: a.isCreated,
+                            supervisorId: a.supervisorId,
+                            connectedDeptIds: a.connectedDeptIds,
+                            connectedAgentIds: a.connectedAgentIds
+                        })));
+                        lastSavedStructureRef.current = structureSnapshot;
                         setAgents(data.agents);
                         localStorage.setItem(STORAGE_KEY, JSON.stringify(data.agents));
                     }
@@ -128,8 +143,28 @@ export default function AgentOfficeDashboard() {
             console.error('Failed to save agents to localStorage:', e);
         }
 
+        const structureSnapshot = JSON.stringify(agents.map(a => ({
+            id: a.id,
+            code: a.code,
+            name: a.name,
+            role: a.role,
+            status: a.status,
+            position: a.position,
+            deptId: a.deptId,
+            isCreated: a.isCreated,
+            supervisorId: a.supervisorId,
+            connectedDeptIds: a.connectedDeptIds,
+            connectedAgentIds: a.connectedAgentIds
+        })));
+
+        // 구조적 변경이 없으면 백엔드 파일 재작성 및 네트워크 요청을 방지함
+        if (lastSavedStructureRef.current === structureSnapshot) {
+            return;
+        }
+
         // 백엔드 API 서버에 비동기 영구 저장 (다른 PC 동기화용)
         const timer = setTimeout(() => {
+            lastSavedStructureRef.current = structureSnapshot;
             fetch('/api/agents', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -137,7 +172,7 @@ export default function AgentOfficeDashboard() {
             }).catch(err => {
                 console.warn('[AgentOffice] Failed to sync agents to backend server:', err.message);
             });
-        }, 500);
+        }, 800);
 
         return () => clearTimeout(timer);
     }, [agents]);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Search, Download, RefreshCw, FileText, CheckCircle2, AlertTriangle, ShieldCheck, FolderOpen, ExternalLink, Filter } from 'lucide-react';
-import { CertificateLedgerRow, CERTIFICATE_SHEET_HEADERS } from '../../data/certificateSchema';
+import { X, Search, Download, RefreshCw, FileText, CheckCircle2, AlertTriangle, ShieldCheck, FolderOpen, Filter } from 'lucide-react';
+import type { CertificateLedgerRow } from '../../data/certificateSchema';
 
 interface CertificateLedgerModalProps {
     isOpen: boolean;
@@ -245,6 +245,22 @@ export const CertificateLedgerModal: React.FC<CertificateLedgerModalProps> = ({
                                 STS316L
                             </button>
                         </div>
+
+                        {/* 판정 상태 필터 */}
+                        <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800 text-xs">
+                            {(['ALL', 'PASS', 'WARN', 'FAIL'] as const).map(st => (
+                                <button
+                                    key={st}
+                                    type="button"
+                                    onClick={() => setStatusFilter(st)}
+                                    className={`px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer transition-colors ${
+                                        statusFilter === st ? 'bg-cyan-500 text-black' : 'text-slate-400 hover:text-white'
+                                    }`}
+                                >
+                                    {st === 'ALL' ? '전체 상태' : st}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
@@ -313,7 +329,9 @@ export const CertificateLedgerModal: React.FC<CertificateLedgerModalProps> = ({
                                                             ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/40' 
                                                             : isWarn
                                                                 ? 'bg-amber-950 text-amber-400 border border-amber-500/40'
-                                                                : 'bg-rose-950 text-rose-400 border border-rose-500/40'
+                                                                : isFail
+                                                                    ? 'bg-rose-950 text-rose-400 border border-rose-500/40'
+                                                                    : 'bg-slate-800 text-slate-400 border border-slate-700'
                                                     }`}
                                                     title={q.outliers?.join(' | ') || '규격 적합 (OK)'}
                                                 >
