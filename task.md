@@ -25,9 +25,16 @@
   - 윈도우 원클릭 런처: `start-agent-office.bat` (더블클릭 시 백엔드+프론트엔드+브라우저 자동 오픈)
   - 통합 실행 스크립트: `npm run agent` (`scripts/start-agent-office.js`)
   - 규칙 등록: `AGENTS.md`에 `"agent 계속 하자"` 키워드 자동 인지 및 연속 작업 복원 룰 탑재
-- `[ ]` **[다음 작업 예정] 성적서 본문 OCR/텍스트 파싱 & 발주서 스펙 자동 매칭**
-  - PDF 성적서 내부 텍스트 추출 (HEAT No, LOT No, 화학성분 C, Si, Mn, P, S, 인장강도 T.S, 항복강도 Y.S)
-  - 알트에프 발주서 데이터와의 품목/규격 일치 여부 판정
+- `[x]` **성적서 본문 파싱 & 26개 컬럼 장부 자동 누적 & 이상치 검출 엔진 구축**
+  - `server/services/certificateParser.js` 신규 구현: `PDFParse` 기반 전 페이지 텍스트/표 스트림 파싱
+  - HEAT No, LOT No, 품목(Description), 수량, 화학성분(C, Si, Mn, P, S, Ni, Cr, Mo), 기계적 성질(Y.S, T.S, E.L), 외관/치수 추출 완료
+  - 한국산업표준(KS B 1543, KS D 3576) 및 ASTM A312 TP304/TP316L 공차 규격 기반 이상치(Outlier) 자동 판정 엔진 탑재 (PASS / WARN / FAIL)
+  - `storage/certificates/대경벤드 성적서.xlsx` 및 `server/data/certificates.json` 자동 동기화 (총 34개 품목 100% 매핑 완료)
+  - `mailplugCollector.js` 연동: 신규 성적서 다운로드 즉시 26개 컬럼 장부 자동 파싱 및 엑셀 누적
+  - `src/components/admin/CertificateLedgerModal.tsx` 26개 컬럼 인터랙티브 대형 데이터 그리드 뷰어 및 엑셀 다운로드(`GET /api/certificates/download-excel`) 연동 완료
+- `[ ]` **[다음 작업 예정] 발주서(PO) 스펙 대조 자동화 & 구글 시트 양방향 실시간 동기화**
+  - 알트에프 발주서 데이터베이스(`orders.json`, `quotes.json`)와 P.O No 매칭하여 품목/규격/수량 일치 여부 실시간 교차 검증
+  - Google Drive/Sheets API 연동을 통한 구글 스프레드시트 실시간 양방향 자동 업로드
 
 ---
 

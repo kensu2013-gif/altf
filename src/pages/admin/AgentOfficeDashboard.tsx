@@ -36,6 +36,7 @@ import {
     ChevronLeft,
     ChevronRight
 } from 'lucide-react';
+import { CertificateLedgerModal } from '../../components/admin/CertificateLedgerModal';
 
 const STORAGE_KEY = 'altf_agent_swarm_custom_v4';
 
@@ -205,6 +206,7 @@ export default function AgentOfficeDashboard() {
     const [previewPdfName, setPreviewPdfName] = useState<string>('');
     const [allExtractedFiles, setAllExtractedFiles] = useState<Array<{ filename: string; dateFolder: string; sizeBytes: number; url: string; updatedAt?: string }>>([]);
     const [showAllFilesModal, setShowAllFilesModal] = useState<boolean>(false);
+    const [showLedgerModal, setShowLedgerModal] = useState<boolean>(false);
 
     // 윈도우 파일 탐색기에서 저장 폴더 바로 열기
     const handleOpenWindowsFolder = async () => {
@@ -3143,11 +3145,19 @@ export default function AgentOfficeDashboard() {
                                             <div className="flex items-center gap-1.5 shrink-0">
                                                 <button
                                                     type="button"
+                                                    onClick={() => setShowLedgerModal(true)}
+                                                    className="px-2 py-1 rounded bg-gradient-to-r from-cyan-600/30 to-blue-600/30 hover:from-cyan-500/40 hover:to-blue-500/40 text-cyan-200 border border-cyan-400/50 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs"
+                                                    title="26개 컬럼 성적서 원장 대장(대경벤드 성적서.xlsx) 및 품질 판정 뷰어를 엽니다."
+                                                >
+                                                    <span>📊 26개 컬럼 장부 열람</span>
+                                                </button>
+                                                <button
+                                                    type="button"
                                                     onClick={handleOpenWindowsFolder}
                                                     className="px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs"
                                                     title="내 컴퓨터의 실제 윈도우 탐색기 폴더 창을 직접 엽니다."
                                                 >
-                                                    <span>📂 윈도우 탐색기 폴더 열기</span>
+                                                    <span>📂 폴더 열기</span>
                                                 </button>
                                                 <button
                                                     type="button"
@@ -3155,7 +3165,7 @@ export default function AgentOfficeDashboard() {
                                                     className="px-2 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs"
                                                     title="지금까지 수집된 전체 PDF 목록 보관함을 엽니다."
                                                 >
-                                                    <span>📋 전체 성적서 보관함</span>
+                                                    <span>📋 PDF 보관함</span>
                                                 </button>
                                             </div>
                                         </div>
@@ -3459,6 +3469,17 @@ export default function AgentOfficeDashboard() {
                     </div>
                 </div>
             )}
+
+            {/* 📊 3. 26개 컬럼 성적서 관리 대장 (대경벤드 성적서.xlsx) 모달 */}
+            <CertificateLedgerModal
+                isOpen={showLedgerModal}
+                onClose={() => setShowLedgerModal(false)}
+                onViewPdf={(filename) => {
+                    setPreviewPdfName(filename);
+                    setPreviewPdfUrl(`/storage/certificates/${encodeURIComponent(filename)}`);
+                }}
+                onOpenFolder={handleOpenWindowsFolder}
+            />
         </div>
     );
 }

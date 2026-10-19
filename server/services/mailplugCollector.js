@@ -13,6 +13,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
 import iconv from 'iconv-lite';
+import { certificateParserService } from './certificateParser.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -419,6 +420,13 @@ export class MailplugCollectorService {
                                 emailSubject,
                                 extractedCount: extractedFiles.length
                             });
+
+                            // 추출된 PDF가 있으면 26개 컬럼 엑셀 원장 및 품질 검사 즉시 자동 실행
+                            if (extractedFiles.length > 0) {
+                                certificateParserService.parseAndSyncAll().catch(e => {
+                                    console.error('[QC-01 Collector] Auto-parse error:', e.message);
+                                });
+                            }
 
                             resolve({
                                 success: true,

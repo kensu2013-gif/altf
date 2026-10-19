@@ -14,6 +14,7 @@ import { generateAiReport } from './ai-report-generator.js';
 import { buildCustomerMatchIndex, matchCustomerToCrmFast } from './customer-matching.js';
 import { computeDocumentSimilaritySummary } from './similarity-engine.js';
 import { mailplugService } from './server/services/mailplugCollector.js';
+import { certificateParserService } from './server/services/certificateParser.js';
 
 import multer from 'multer';
 
@@ -803,51 +804,21 @@ const server = http.createServer(async (req, res) => {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 🔬 QC CERTIFICATE LEDGER API (대경벤드 성적서.xlsx 및 구글시트 100% 호환)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    if (url.pathname === '/api/certificates') {
+    if (url.pathname.startsWith('/api/certificates')) {
         const certJsonPath = './server/data/certificates.json';
         const certExcelPath = './storage/certificates/대경벤드 성적서.xlsx';
 
-        if (req.method === 'GET') {
+        // 1. GET /api/certificates : 26개 컬럼 장부 및 이상치 품질 통계 조회
+        if (req.method === 'GET' && url.pathname === '/api/certificates') {
             try {
-                const fs = await import('fs');
-                let rows = [];
-                if (fs.existsSync(certJsonPath)) {
-                    rows = JSON.parse(fs.readFileSync(certJsonPath, 'utf8'));
-                } else {
-                    // 기본 초기 샘플 (사진 3 실측치 4행)
-                    rows = [
-                        {
-                            issueDate: '26/10/14',
-                            customer: '(주)태형산업',
-                            supplier: '(주)대경벤드',
-                            poNo: 'ES261014-2869',
-                            certNo: 'YR-26-09915',
-                            specMaterial: 'ASTM A312 TP316L',
-                            specInspection: 'KS B1543 STS316L-W /B1500',
-                            heatNo: 'SD62415',
-                            lotNo: 'KJA0879',
-                            itemNo: 1,
-                            description: '45E(L) S/10S 25A B.W',
-                            qty: 1,
-                            material: 'WELDED PIPE',
-                            chemC: 0.017,
-                            chemSi: 0.55,
-                            chemMn: 1.05,
-                            chemP: 0.032,
-                            chemS: 0.002,
-                            chemNi: 10.10,
-                            chemCr: 16.35,
-                            chemMo: 2.03,
-                            mechYs: 298,
-                            mechTs: 622,
-                            mechEl: 57,
-                            dimensionVi: 'GOOD',
-                            pdfUrl: '/storage/certificates/261014_알트에프.261014-2869 (10-14-31).pdf'
-                        }
-                    ];
-                }
+                const ledger = certificateParserService.getLedgerData();
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                res.end(JSON.stringify({ success: true, count: rows.length, rows }));
+                res.end(JSON.stringify({ 
+                    success: true, 
+                    count: ledger.count, 
+                    stats: ledger.stats,
+                    rows: ledger.rows 
+                }));
                 return;
             } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -856,7 +827,60 @@ const server = http.createServer(async (req, res) => {
             }
         }
 
-        if (req.method === 'POST') {
+        // 2. POST /api/certificates/parse-all : 전체 보관 PDF 일괄 파싱 및 엑셀/JSON 동기화
+        if (req.method === 'POST' && url.pathname === '/api/certificates/parse-all') {
+            try {
+                const parseResult = await certificateParserService.parseAndSyncAll();
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify(parseResult));
+                return;
+            } catch (err) {
+                console.error('[API] Parse all certificates failed:', err);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+                return;
+            }
+        }
+
+        // 3. GET /api/certificates/stats : 품질 검사 통계 및 이상치 목록
+        if (req.method === 'GET' && url.pathname === '/api/certificates/stats') {
+            try {
+                const ledger = certificateParserService.getLedgerData();
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, stats: ledger.stats }));
+                return;
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+                return;
+            }
+        }
+
+        // 4. GET /api/certificates/download-excel : '대경벤드 성적서.xlsx' 다운로드
+        if (req.method === 'GET' && url.pathname === '/api/certificates/download-excel') {
+            try {
+                const fs = await import('fs');
+                if (!fs.existsSync(certExcelPath)) {
+                    // 없으면 즉시 동기화 실행
+                    await certificateParserService.parseAndSyncAll();
+                }
+                const fileBuffer = fs.readFileSync(certExcelPath);
+                res.writeHead(200, {
+                    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'Content-Disposition': 'attachment; filename="daekyung_bend_certificates.xlsx"',
+                    'Content-Length': fileBuffer.length
+                });
+                res.end(fileBuffer);
+                return;
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+                return;
+            }
+        }
+
+        // 5. POST /api/certificates : 행 수동 추가 / 수정
+        if (req.method === 'POST' && url.pathname === '/api/certificates') {
             let body = '';
             req.on('data', chunk => body += chunk.toString());
             req.on('end', async () => {
@@ -871,11 +895,9 @@ const server = http.createServer(async (req, res) => {
                         currentRows = JSON.parse(fs.readFileSync(certJsonPath, 'utf8'));
                     }
 
-                    // 새 행 추가
                     const updatedRows = [...currentRows, ...newRows];
                     fs.writeFileSync(certJsonPath, JSON.stringify(updatedRows, null, 2), 'utf8');
 
-                    // 로컬 엑셀 파일(대경벤드 성적서.xlsx)에도 자동 생성 및 동기화
                     const sheetHeaders = [
                         '일 자', 'Customer', '공급처', 'P.O No', 'CERT-No',
                         'Spec MATERIAL', 'Spec INSPECTION', 'HEAT No', 'LOT No', 'ITEM No',
@@ -1061,9 +1083,14 @@ const server = http.createServer(async (req, res) => {
             const { exec } = await import('child_process');
             const path = await import('path');
             const targetDir = path.resolve('./storage/certificates');
-            exec(`explorer.exe "${targetDir}"`);
+            const openCmd = process.platform === 'win32' 
+                ? `explorer.exe "${targetDir}"` 
+                : process.platform === 'darwin' 
+                    ? `open "${targetDir}"` 
+                    : `xdg-open "${targetDir}"`;
+            exec(openCmd);
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ success: true, path: targetDir, message: '윈도우 탐색기 폴더가 열렸습니다.' }));
+            res.end(JSON.stringify({ success: true, path: targetDir, message: '성적서 저장 폴더가 열렸습니다.' }));
             return;
         } catch (e) {
             res.writeHead(500, { 'Content-Type': 'application/json' });

@@ -30,6 +30,14 @@ export interface CertificateLedgerRow {
     mechEl: number;           // X: E.L (예: 57)
     dimensionVi: string;      // Y: 외관/치수 (예: 'GOOD')
     pdfUrl: string;           // Z: PDF 원본링크 (예: '/storage/certificates/261014_알트에프...pdf')
+    quality?: {
+        grade: string;
+        status: 'PASS' | 'WARN' | 'FAIL';
+        hasOutliers: boolean;
+        outlierCount: number;
+        outliers: string[];
+        specName: string;
+    };
 }
 
 // 엑셀/구글 시트 1행 헤더 매핑 정의 (사용자가 세팅한 시트와 1:1 일치)
