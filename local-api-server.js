@@ -1516,6 +1516,81 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // 4-1. POST /api/qc/qc06/test-outbound-sample : 3번째 사진 실데이터(A202610150 - (주)태양밴드, JCQ4366, STS316L) 즉시 발행 테스트
+        if (req.method === 'POST' && url.pathname === '/api/qc/qc06/test-outbound-sample') {
+            try {
+                const sampleOutbound = {
+                    outboundNo: 'A202610150',
+                    customer: '(주)태양밴드',
+                    customerContact: '동신유니온',
+                    customerPhone: '032-561-3800~2',
+                    requestDate: '2026-10-19',
+                    destination: '시흥유통상가 26동 125호 동신유니온',
+                    location: '시흥 ALT F',
+                    marking: '기본마킹',
+                    remark: '-52%\n기존 출고 316L T(R) 32x15 반품후 납품.',
+                    items: [
+                        {
+                            lineNo: '1 - 1',
+                            altfLotNo: 'DKB260313108',
+                            lotNo: 'JCQ4366',
+                            vendorLot: 'JCQ4366',
+                            itemType: 'R(C)',
+                            productType: 'R(C)',
+                            standardType: 'KS',
+                            method: 'ERW',
+                            material: 'STS316L',
+                            size: '32A x 15A',
+                            schedule: 'S/10S',
+                            length: '0L',
+                            qty: 2,
+                            deliveryDate: '2026-10-19',
+                            location: '시흥 ALT F'
+                        }
+                    ]
+                };
+
+                const result = await certificateIssuerService.issueCertificatesForOutbound(sampleOutbound, {
+                    certNo: 'YR-26-07015'
+                });
+
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    message: '3번째 사진(A202610150 - (주)태양밴드) 재고출고분 성적서 발행 성공! (업체LOT JCQ4366 ➔ SD34285 매칭)',
+                    ...result
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 4-2. POST /api/qc/qc06/issue-outbound : 출고지시서(재고 출고분) 기반 성적서 자동 분할 발행
+        if (req.method === 'POST' && url.pathname === '/api/qc/qc06/issue-outbound') {
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    const data = JSON.parse(body || '{}');
+                    const outboundOrder = data.outboundOrder || data;
+                    if (!outboundOrder || (!outboundOrder.outboundNo && !outboundOrder.poNo && !outboundOrder.id)) {
+                        return sendJsonResponse(req, res, 400, { success: false, error: '출고지시서 번호(outboundNo)가 필요합니다.' });
+                    }
+                    const result = await certificateIssuerService.issueCertificatesForOutbound(outboundOrder, {
+                        certNo: data.certNo
+                    });
+                    sendJsonResponse(req, res, 200, {
+                        success: true,
+                        message: `출고지시서 ${outboundOrder.outboundNo || outboundOrder.id} 재고출고 성적서 ${result.count}건 발행 완료`,
+                        ...result
+                    });
+                } catch (err) {
+                    sendJsonResponse(req, res, 500, { success: false, error: err.message });
+                }
+            });
+            return;
+        }
+
         // 5. GET /api/qc/qc06/download-pdf/:fileName : 성적서 PDF 서빙/인라인 미리보기
         if (req.method === 'GET' && url.pathname.startsWith('/api/qc/qc06/download-pdf')) {
             try {

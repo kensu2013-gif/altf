@@ -1083,7 +1083,7 @@
     "deptName": "품질부",
     "tier": 3,
     "role": "출고 신호(출고부) + 거래명세표(총무부) 수신 시 고객사 P.O 번호와 Heat No 자동 1:1 매칭",
-    "status": "OFFLINE",
+    "status": "IDLE",
     "metrics": {
       "speed": 97,
       "accuracy": 100,
@@ -1091,7 +1091,7 @@
       "uptime": "100%",
       "tasksToday": 193
     },
-    "currentTask": "태형산업 ES261014-2869 발주건 Heat No SD62415 자동 매칭 성공",
+    "currentTask": "에이전트 생성 대기 중",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_MATERIAL_SHIPPED",
@@ -1103,7 +1103,7 @@
     "logs": [
       "[09:19] 출고부/총무부 신호 결합 -> 성적서 매칭 성공"
     ],
-    "isCreated": true,
+    "isCreated": false,
     "connectedDeptIds": [
       "shipping",
       "general"
@@ -1120,7 +1120,7 @@
     "deptName": "품질부",
     "tier": 3,
     "role": "규격 기준치(ASTM/KS) 자동 결합하여 이미지 2 서식의 공식 성적서 엑셀 및 PDF 성적서 발행",
-    "status": "OFFLINE",
+    "status": "ACTIVE",
     "metrics": {
       "speed": 96,
       "accuracy": 100,
@@ -1128,7 +1128,7 @@
       "uptime": "100%",
       "tasksToday": 204
     },
-    "currentTask": "CERT_YR-26-09915_태형산업.xlsx 및 고해상도 PDF 생성 완료",
+    "currentTask": "재고출고 [A202610150] (시흥 ALT F) 성적서 1건 발행 완료 (PDF/엑셀 보관)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_MTC_MATCHED"
@@ -1137,6 +1137,8 @@
       "EVENT_MTC_GENERATED"
     ],
     "logs": [
+      "[23:19] [QC-06] 출고지시서 A202610150 ((주)태양밴드) 재고출고분 성적서 발행 성공: YR-26-07015 (양식: TP316L, 매칭: JCQ4366➔SD34285)",
+      "[23:18] [QC-06] 발주번호 ES260709-1974 성적서 발행 성공: YR-26-07015-1, YR-26-07015-2, YR-26-07015-3, YR-26-07015-4, YR-26-07015-5, YR-26-07015-6 (양식: TP304(소재ASTM사용시))",
       "[09:20] 공식 성적서 PDF 렌더링 완료"
     ],
     "isCreated": true,
@@ -1194,7 +1196,7 @@
     "deptName": "품질부",
     "tier": 2,
     "role": "총무부 거래명세표와 성적서 PDF를 하나로 묶어 고객사 메일로 원스톱 자동 전송",
-    "status": "OFFLINE",
+    "status": "IDLE",
     "metrics": {
       "speed": 98,
       "accuracy": 100,
@@ -1202,7 +1204,7 @@
       "uptime": "100%",
       "tasksToday": 213
     },
-    "currentTask": "(주)태형산업 품질관리팀 앞 거래명세서 + 성적서 동봉 발송 완료",
+    "currentTask": "에이전트 생성 대기 중",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_TOLERANCE_VERIFIED"
@@ -1213,7 +1215,7 @@
     "logs": [
       "[09:21] 고객사 발송 완료 및 텔레그램 대표님 보고"
     ],
-    "isCreated": true,
+    "isCreated": false,
     "connectedDeptIds": [
       "general",
       "shipping",
@@ -1611,6 +1613,8 @@
       "EVENT_DAEKYUNG_SCRAPED"
     ],
     "logs": [
+      "[23:19] [DAT-10] 출고지시서 A202610150 성적서 보관소 저장 완료 (storage/issued_certificates/A202610150/)",
+      "[23:18] [DAT-10] 발주번호 ES260709-1974 성적서 보관소 저장 완료 (storage/issued_certificates/ES260709-1974/)",
       "[09:00] 대경벤드 4852개 품목 수집 완료"
     ],
     "isCreated": false,

@@ -48,9 +48,26 @@
   - `POST /api/qc/qc02/run` 및 `GET /api/qc/qc02/status` API 연동
   - 모달 상단 `📋 양식 복사 (3열 병합)` 원클릭 클립보드 복사 지원 (엑셀 `성적서 양식.xlsx`에 바로 붙여넣기 가능)
   - `server/data/agents.json` 내 QC-02 에이전트 실시간 지표(Task 처리수, 활성 상태) 자동 동기화
-- `[ ]` **[다음 작업 예정] 발주서(PO) 스펙 대조 자동화 & 구글 시트 양방향 실시간 동기화**
-  - 알트에프 발주서 데이터베이스(`orders.json`, `quotes.json`)와 P.O No 매칭하여 품목/규격/수량 일치 여부 실시간 교차 검증
-  - Google Drive/Sheets API 연동을 통한 구글 스프레드시트 실시간 양방향 자동 업로드
+- `[x]` **발주서(PO) ⟷ 외주 성적서 교차 대조 자동화 & 구매부 SCM 파이프라인 구축 완료**
+  - 알트에프 발주서 데이터베이스(`db.orders` 1,537건, 7,030개 발주품목)와 QC 성적서(`certificates.json` 1,469건) P.O No 및 규격 1:1 자동 매칭
+  - `server/services/purchaseService.js` 신규 구현: 알트에프 재고 구매분(`isStockOrder`) 417건 자동 필터링, 매입발주 대장(`purchase_orders.json`) 및 교차 대장(`purchase_qc_matches.json`) 구축
+  - 발주번호별 입고 완료 / 부분입고 / 미결(Pending) 실시간 상태 판정 및 상급자 통보 체계 확립
+
+---
+
+## 3. [완료] 구매부 (PUR-01) 알트에프 재고 발주 List Up & QC 성적서 1:1 매칭 에이전트
+- `[x]` **PUR-01 (사원 / 알트에프 재고 발주 List Up 봇 - Lv.1 자율 루틴)**:
+  - `altf.kr` 웹에서 알트에프 재고로 구매한 발주 신호 실시간 감지 (30분 주기 스케줄러 자동 가동)
+  - 발주번호별(`poNo`), 아이템별(`itemNo`)로 완전 자동 List Up (총 624개 재고 발주품목)
+  - QC-01 외주 성적서 List와 1:1 정밀 규격 대조 및 성적서 번호(`certNo`), `heatNo`, `lotNo` 매핑
+  - 입고 상태 판정: 입고완료 159건, 부분입고 12건, 잔여 미결 453건 실시간 추적
+- `[x]` **QC-01과 100% 동일한 26개 컬럼 엑셀 마스터 원장 자동 생성**:
+  - 파일 위치: `storage/purchases/알트에프 재고 발주 대장.xlsx`
+  - 발주일자, 입고일자, Customer, 공급처, P.O No, CERT-No, Spec MAT/INSP, HEAT No, LOT No, ITEM No, DESCRIPTION, 발주수량, 입고수량, 미결수량, 입고상태, 화학성분(C/Si/Mn/P/S/Ni/Cr/Mo), 기계적성질, PDF 링크 26개 컬럼 완전 일치
+- `[x]` **REST API & 대시보드 UI 연동**:
+  - `GET /api/pur/summary`, `GET /api/pur/stock-orders`, `POST /api/pur/sync`, `GET /api/pur/download-excel`, `POST /api/pur/open-folder` 연동
+  - 불필요한 질의응답(QNA) 전면 제거 ➔ 오직 **알트에프 재고 발주 & 성적서 1:1 매칭 대장** 전문 뷰어로 직관적 개편
+  - Agent Office 대시보드 상단 서브헤더 및 PUR-01 인스펙터 패널 연동 완료
 
 ---
 

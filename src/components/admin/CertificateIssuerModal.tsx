@@ -26,6 +26,11 @@ export interface IssuedCertRecord {
     excelUrl: string;
     pdfPath: string;
     pdfUrl: string;
+    specMaterial?: string;
+    specInspection?: string;
+    outboundNo?: string;
+    isOutbound?: boolean;
+    location?: string;
     issuedAt: string;
     items: Array<{
         itemNo: number;
@@ -147,28 +152,22 @@ export function CertificateIssuerModal({ isOpen, onClose, initialPoNo }: Certifi
         }
     };
 
-    // 첨부 사진 3번 실데이터 즉시 발행 및 보기 (주 태형산업 / ES261014-2869 / YR-26-09915 / TP316L)
-    const handleIssuePhoto3Sample = async () => {
+    // 3번째 사진 실데이터(A202610150 - (주)태양밴드, JCQ4366, STS316L) 즉시 발행 및 보기
+    const handleIssueOutboundSample = async () => {
         try {
             setIssuing(true);
-            const res = await fetch('/api/qc/qc06/issue', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    poNo: 'ES261014-2869',
-                    customer: '주 태형산업',
-                    certNo: 'YR-26-09915'
-                })
+            const res = await fetch('/api/qc/qc06/test-outbound-sample', {
+                method: 'POST'
             });
             const data = await res.json();
             if (data.success) {
-                setSelectedPoNo('ES261014-2869');
-                setCustomerName('주 태형산업');
-                setCertNoInput('YR-26-09915');
-                await loadIssuedList('ES261014-2869');
+                setSelectedPoNo('A202610150');
+                setCustomerName('(주)태양밴드');
+                setCertNoInput('YR-26-07015');
+                await loadIssuedList('A202610150');
             }
         } catch (err) {
-            console.error('3번 사진 성적서 발행 실패:', err);
+            console.error('3번 사진 출고지시서 성적서 발행 실패:', err);
         } finally {
             setIssuing(false);
         }
@@ -300,7 +299,7 @@ export function CertificateIssuerModal({ isOpen, onClose, initialPoNo }: Certifi
                             value={selectedPoNo}
                             className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
                         >
-                            <option value="ES261014-2869">⭐ [3번 사진] ES261014-2869 (주 태형산업 - TP316L)</option>
+                            <option value="A202610150">📦 [3번 사진] A202610150 ((주)태양밴드 - JCQ4366, STS316L)</option>
                             <option value="ES260709-1974">📌 [1·2번 사진] ES260709-1974 (월드원플랜에탈 - 34품목)</option>
                             {availableOrders.map(o => (
                                 <option key={o.poNumber} value={o.poNumber}>
@@ -332,13 +331,13 @@ export function CertificateIssuerModal({ isOpen, onClose, initialPoNo }: Certifi
 
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={handleIssuePhoto3Sample}
+                            onClick={handleIssueOutboundSample}
                             disabled={issuing}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)]"
-                            title="3번 사진의 실제 데이터(주 태형산업 / ES261014-2869 / TP316L)를 성적서 양식.xlsx에 100% 서식 보존 주입"
+                            title="3번 사진의 실제 출고지시서 데이터((주)태양밴드 / A202610150 / 업체LOT JCQ4366)를 성적서 양식.xlsx에 100% 서식 보존 주입"
                         >
                             <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                            [3번 사진] 주태형산업 로드
+                            [3번 사진] 태양밴드 재고출고 로드
                         </button>
 
                         <button
@@ -527,9 +526,9 @@ export function CertificateIssuerModal({ isOpen, onClose, initialPoNo }: Certifi
                                 </tr>
                                 <tr>
                                     <td className="border border-black font-bold p-1 bg-slate-50">Spec. for Material</td>
-                                    <td className="border border-black p-1 font-semibold">{currentItems[0]?.specMaterial || 'ASTM A312 TP304'}</td>
+                                    <td className="border border-black p-1 font-semibold">{currentCert?.specMaterial || currentItems[0]?.specMaterial || 'ASTM A312 TP304'}</td>
                                     <td className="border border-black font-bold p-1 bg-slate-50">Spec. for Inspection</td>
-                                    <td className="border border-black p-1 font-semibold">{currentItems[0]?.specInspection || 'KS B1543 STS304-W /B1500'}</td>
+                                    <td className="border border-black p-1 font-semibold">{currentCert?.specInspection || currentItems[0]?.specInspection || 'KS B1543 STS304-W /B1500'}</td>
                                 </tr>
                             </tbody>
                         </table>
