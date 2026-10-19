@@ -38,7 +38,8 @@ import {
     ChevronRight,
     ShoppingBag,
     Boxes,
-    FileText
+    FileText,
+    FolderOpen
 } from 'lucide-react';
 import { CertificateLedgerModal } from '../../components/admin/CertificateLedgerModal';
 import { PurchaseLedgerModal } from '../../components/admin/PurchaseLedgerModal';
