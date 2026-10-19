@@ -152,9 +152,45 @@ export function evaluateRowQuality(row) {
 }
 
 /**
- * 단일 페이지 텍스트에서 성적서 품목 데이터 추출
+ * 원소재사 성적서 (Mill Sheet: UST, POSCO, 세아제강, 현대제철 등) 여부 엄격 판별
+ * 사용자 지침: "원소재 성적서는 저장할 필요 없어. 오히려 헷갈릴 수 있기 때문에 대경벤드 성적서의 내용만 저장하면 돼."
+ */
+export function isRawMaterialMillSheet(pageText) {
+    const upper = pageText.toUpperCase();
+    
+    // 1. 대표 원소재 제조사명 감지
+    if (
+        upper.includes('UST CO.,LTD') || upper.includes('UST CO') || upper.includes('POSCO') || 
+        upper.includes('SEAH STEEL') || upper.includes('세아제강') || upper.includes('현대제철') ||
+        upper.includes('HYUNDAI STEEL') || upper.includes('DAEHAN STEEL') || upper.includes('KISCO')
+    ) {
+        return true;
+    }
+    
+    // 2. 원소재 성적서 특유의 서식 표기 감지 (완제품 피팅 성적서와 다름)
+    if (upper.includes('COMMODITY') && upper.includes('ORDER SIZE') && (upper.includes('제강 번호') || upper.includes('제강번호'))) {
+        return true;
+    }
+
+    if (upper.includes('MILL SHEET') || upper.includes('MILL CERTIFICATE') || upper.includes('RAW MATERIAL')) {
+        // 대경벤드 공식 번호가 없는 원소재 첨부 문서 제외
+        if (!upper.includes('YR-') && !upper.includes('ALTF-')) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * 단일 페이지 텍스트에서 성적서 품목 데이터 추출 (대경벤드 공식 성적서 전용)
  */
 function parseCertificatePage(pageText, fileName) {
+    // ⚡ 원소재 성적서(Mill Sheet) 페이지는 100% 건너뜀 (오직 대경벤드 완제품 성적서 페이지만 저장)
+    if (isRawMaterialMillSheet(pageText)) {
+        return [];
+    }
+
     const lines = pageText.split('\n').map(l => l.trim()).filter(Boolean);
     if (lines.length < 5) return [];
 
@@ -197,7 +233,10 @@ function parseCertificatePage(pageText, fileName) {
         }
     }
 
-    if (!certNo) return [];
+    // 대경벤드 공식 성적서 번호(YR- 또는 ALTF-)가 없으면 원소재사 문서 또는 기타 페이지이므로 제외
+    if (!certNo || (!certNo.startsWith('YR-') && !certNo.startsWith('ALTF-'))) {
+        return [];
+    }
 
     // 2. 아이템 라인 파싱 (LOT No, ITEM No, HEAT No, DESCRIPTION, Q'TY, MATERIAL)
     const items = [];
@@ -378,7 +417,8 @@ export class CertificateParserService {
             fs.mkdirSync(CERTIFICATES_STORAGE_DIR, { recursive: true });
         }
 
-        const files = fs.readdirSync(CERTIFICATES_STORAGE_DIR).filter(f => f.endsWith('.pdf'));
+        const files = fs.readdirSync(CERTIFICATES_STORAGE_DIR)
+            .filter(f => f.endsWith('.pdf') && !f.startsWith('._'));
         const startTime = Date.now();
 
         this.qc02Status.isProcessing = true;
