@@ -460,7 +460,13 @@ export function CertificateIssuerModal({ isOpen, onClose, initialPoNo }: Certifi
                 </div>
 
                 {/* 중앙 A4 규격 성적서 실시간 뷰어 (첨부 사진과 100% 동일한 서식) */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-950 flex justify-center">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-950 flex justify-center relative">
+                    {loading && (
+                        <div className="absolute inset-0 z-30 bg-slate-950/70 backdrop-blur-xs flex flex-col items-center justify-center gap-3">
+                            <RefreshCw className="w-8 h-8 text-indigo-400 animate-spin" />
+                            <span className="text-xs text-indigo-200 font-medium">성적서 데이터 로드 중...</span>
+                        </div>
+                    )}
                     <div className="w-[794px] min-h-[1123px] bg-white text-slate-900 border-2 border-black p-5 relative shadow-2xl select-text print:border-none print:shadow-none print:w-full">
                         
                         {/* 대경벤드 붉은색 워터마크 심볼 */}
