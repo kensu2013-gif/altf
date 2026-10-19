@@ -177,8 +177,9 @@ export function PurchaseLedgerModal({ isOpen, onClose }: PurchaseLedgerModalProp
                                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                                     <span>PUR-01 사원 관리지정</span>
                                 </span>
-                                <span className="px-2 py-0.5 text-[11px] font-mono font-bold bg-slate-800 text-cyan-300 border border-cyan-500/40 rounded">
-                                    🌐 하루 1회 altf.kr API 감지 ON ({schedulerInfo?.remainingFormatted ? `다음 감지: ${schedulerInfo.remainingFormatted}` : '24h 주기'})
+                                <span className="px-2 py-0.5 text-[11px] font-mono font-bold bg-slate-800 text-amber-300 border border-amber-500/40 rounded flex items-center gap-1 shadow-sm">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                    <span>1일 2회 (10:00 / 17:00) 대기 중 (다음: {schedulerInfo?.remainingFormatted || '오전 10:00'})</span>
                                 </span>
                             </div>
                             <p className="text-xs text-slate-400 mt-0.5">
@@ -259,7 +260,9 @@ export function PurchaseLedgerModal({ isOpen, onClose }: PurchaseLedgerModalProp
                         <div className="flex items-center gap-3 text-[11px] font-mono text-slate-400">
                             <span>관리자: <strong className="text-emerald-300">PUR-01 사원</strong></span>
                             <span className="text-slate-600">|</span>
-                            <span>다음 altf.kr API 감지: <strong className="text-cyan-300">{schedulerInfo?.remainingFormatted || '24시간 후'}</strong></span>
+                            <span>스케줄: <strong className="text-amber-300">1일 2회 (10:00 / 17:00) 대기 중</strong></span>
+                            <span className="text-slate-600">|</span>
+                            <span>다음 감지: <strong className="text-cyan-300">{schedulerInfo?.remainingFormatted || '오전 10:00'}</strong></span>
                             <span className="text-slate-600">|</span>
                             <span>원장: <span className="text-slate-200">storage/purchases/알트에프 재고 발주 대장.xlsx</span></span>
                         </div>

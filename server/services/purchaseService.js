@@ -417,9 +417,31 @@ export class PurchaseStockOrderService {
     }
 
     /**
-     * PUR-01: agents.json 내 에이전트 상태 및 로그 갱신
+     * 다음 정기 감지 시각 계산 (오전 10:00, 오후 17:00)
      */
-    updateAgentState(summary) {
+    getNextScheduledTime(now = new Date()) {
+        const t10 = new Date(now);
+        t10.setHours(10, 0, 0, 0);
+
+        const t17 = new Date(now);
+        t17.setHours(17, 0, 0, 0);
+
+        if (now.getTime() < t10.getTime()) {
+            return { nextTime: t10, label: `오늘 오전 10:00` };
+        } else if (now.getTime() < t17.getTime()) {
+            return { nextTime: t17, label: `오늘 오후 17:00` };
+        } else {
+            const nextDay10 = new Date(now);
+            nextDay10.setDate(nextDay10.getDate() + 1);
+            nextDay10.setHours(10, 0, 0, 0);
+            return { nextTime: nextDay10, label: `내일 오전 10:00` };
+        }
+    }
+
+    /**
+     * PUR-01: agents.json 내 에이전트 상태 및 로그 갱신 (평상시 STANDBY 대기 상태)
+     */
+    updateAgentState(summary, isRunning = false) {
         try {
             if (!fs.existsSync(AGENTS_PATH)) return;
             const agents = JSON.parse(fs.readFileSync(AGENTS_PATH, 'utf8'));
@@ -427,11 +449,15 @@ export class PurchaseStockOrderService {
             if (purAgent) {
                 const now = new Date();
                 const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-                purAgent.currentTask = `하루 1회 altf.kr API 자동 감시 가동 중 (미결 ${summary.pendingCount}건 실시간 추적 관리)`;
-                purAgent.lastActive = '방금 전';
-                purAgent.status = 'ACTIVE';
+                const { label } = this.getNextScheduledTime(now);
 
-                const newLog = `[${timeStr}] [PUR-01] altf.kr API 재고 발주 감지 완료: 총 ${summary.totalItems}건 (입고: ${summary.fulfilledCount}건, 미결: ${summary.pendingCount}건)`;
+                purAgent.status = isRunning ? 'ACTIVE' : 'STANDBY';
+                purAgent.currentTask = isRunning 
+                    ? `altf.kr API 재고 발주 동기화 실행 중...` 
+                    : `업무시간 1일 2회 정기 감시 대기 중 (다음: ${label}, 미결 ${summary.pendingCount}건 관리)`;
+                purAgent.lastActive = '방금 전';
+
+                const newLog = `[${timeStr}] [PUR-01] altf.kr API 재고 발주 동기화 완료: 총 ${summary.totalItems}건 (입고: ${summary.fulfilledCount}건, 미결: ${summary.pendingCount}건) ➔ ${label}까지 대기 상태 전환`;
                 purAgent.logs = [newLog, ...(purAgent.logs || []).slice(0, 15)];
                 fs.writeFileSync(AGENTS_PATH, JSON.stringify(agents, null, 2), 'utf8');
             }
@@ -445,17 +471,20 @@ export class PurchaseStockOrderService {
      */
     updateSchedulerRecord(summary, isManual = false) {
         const now = new Date();
-        const nextRun = new Date(now.getTime() + ONE_DAY_MS);
+        const { nextTime, label } = this.getNextScheduledTime(now);
+
         const record = {
             manager: 'PUR-01 (구매부 사원 에이전트)',
             managerName: '알트에프 재고 발주 List Up 봇',
-            cycle: '하루 1회 (24시간 주기)',
-            intervalMs: ONE_DAY_MS,
+            cycle: '1일 2회 (오전 10:00, 오후 17:00 정기 감지)',
+            scheduleHours: [10, 17],
             targetUrl: 'https://altf.kr/api/orders (재고 발주 API 감지)',
-            status: 'ACTIVE_MONITORING',
+            status: 'STANDBY',
+            statusLabel: '대기 중 (STANDBY)',
             lastSyncTime: now.toISOString(),
-            nextSyncTime: nextRun.toISOString(),
-            lastSyncType: isManual ? 'MANUAL_TRIGGER' : 'DAILY_SCHEDULED',
+            nextSyncTime: nextTime.toISOString(),
+            nextSyncLabel: label,
+            lastSyncType: isManual ? 'MANUAL_TRIGGER' : 'SCHEDULED_TRIGGER',
             summary: {
                 totalItems: summary.totalItems,
                 fulfilledCount: summary.fulfilledCount,
@@ -490,23 +519,28 @@ export class PurchaseStockOrderService {
         }
 
         const now = new Date();
-        const nextRun = new Date(record.nextSyncTime);
-        const remainingMs = Math.max(0, nextRun.getTime() - now.getTime());
+        const { nextTime, label } = this.getNextScheduledTime(now);
+        const remainingMs = Math.max(0, nextTime.getTime() - now.getTime());
         const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60));
         const remainingMinutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
 
         return {
             ...record,
+            status: 'STANDBY',
+            statusLabel: '대기 중 (STANDBY)',
+            cycle: '1일 2회 (오전 10:00 / 오후 17:00)',
+            nextSyncTime: nextTime.toISOString(),
+            nextSyncLabel: label,
             remainingMs,
-            remainingFormatted: `${remainingHours}시간 ${remainingMinutes}분 후`
+            remainingFormatted: `${label} (${remainingHours > 0 ? `${remainingHours}시간 ` : ''}${remainingMinutes}분 후)`
         };
     }
 
     /**
-     * 🛒 하루 1회 altf.kr API 호출 감지 & 재고 발주 List Up 및 미결 동기화
+     * 🛒 altf.kr API 호출 감지 & 재고 발주 List Up 및 미결 동기화
      */
     async syncFromAltfApi(isManual = false) {
-        console.log(`[PUR-01] altf.kr API 호출 감지 시작 (수동여부: ${isManual})...`);
+        console.log(`[PUR-01] altf.kr API 호출 감지 실행 (수동여부: ${isManual})...`);
         let remoteOrders = null;
 
         // 원격 altf.kr API 호출 시도
@@ -532,69 +566,49 @@ export class PurchaseStockOrderService {
         // 재고 발주 List Up & QC 성적서 1:1 매칭 대장 생성
         const { items, summary } = this.listUpStockOrders(remoteOrders);
 
-        // 스케줄러 정보 및 에이전트 상태 갱신
+        // 스케줄러 정보 및 에이전트 상태 갱신 (완료 후 STANDBY 복귀)
         this.updateSchedulerRecord(summary, isManual);
-        this.updateAgentState(summary);
+        this.updateAgentState(summary, false);
 
-        console.log(`[PUR-01] altf.kr 재고 발주 동기화 완료: 총 ${items.length}건 (미결 ${summary.pendingCount}건 추적 관리)`);
+        console.log(`[PUR-01] altf.kr 재고 발주 동기화 완료: 총 ${items.length}건 (미결 ${summary.pendingCount}건 관리 중) ➔ 대기 상태 전환`);
         return { success: true, summary, itemsCount: items.length };
     }
 
     /**
-     * 하루에 1번(24시간 주기) altf.kr API 감지 스케줄러 가동
+     * 하루 2번 (오전 10:00, 오후 17:00) 정기 감시 스케줄러 가동 (그 외 시간 대기 상태 유지)
      */
-    startDailyWatcher() {
+    startTwiceDailyWatcher() {
         if (this.watcherTimer) clearTimeout(this.watcherTimer);
-        console.log('[PUR-01 Agent] 알트에프 재고 발주 하루 1회(24시간 주기) altf.kr API 자동 감시 가동 시작');
+        console.log('[PUR-01 Agent] 알트에프 재고 발주 1일 2회(오전 10:00, 오후 17:00) 정기 감시 스케줄러 가동 (그 외 대기 상태)');
 
-        let delayMs = 0;
-        let lastSyncTime = null;
-
-        if (fs.existsSync(SCHEDULER_INFO_PATH)) {
-            try {
-                const record = JSON.parse(fs.readFileSync(SCHEDULER_INFO_PATH, 'utf8'));
-                if (record.lastSyncTime) {
-                    lastSyncTime = new Date(record.lastSyncTime);
-                }
-            } catch {}
+        // 최초 기동 시 데이터가 없으면 대장 1회 초기화
+        if (!this.cache.stockOrders) {
+            this.listUpStockOrders();
         }
 
-        if (lastSyncTime && !isNaN(lastSyncTime.getTime())) {
-            const elapsed = Date.now() - lastSyncTime.getTime();
-            if (elapsed < ONE_DAY_MS) {
-                delayMs = ONE_DAY_MS - elapsed;
-            }
-        }
+        const planNextRun = () => {
+            const now = new Date();
+            const { nextTime, label } = this.getNextScheduledTime(now);
+            const waitMs = Math.max(1000, nextTime.getTime() - now.getTime());
 
-        // 지연 시간 후 1차 실행, 그 후 24시간마다 반복
-        console.log(`[PUR-01 Agent] 다음 altf.kr API 감지까지 남은 시간: ${Math.round(delayMs / 60000)}분`);
-        
-        // 서버 기동 시 즉시 1회 초기화(대장 확인용)
-        if (delayMs === 0) {
-            this.syncFromAltfApi(false);
-            delayMs = ONE_DAY_MS;
-        } else {
-            // 캐시와 엑셀이 없으면 우선 1회 생성
-            if (!this.cache.stockOrders) {
-                this.listUpStockOrders();
-            }
-        }
+            console.log(`[PUR-01 Agent] 현재 대기 상태 (STANDBY). 다음 정기 감지: ${label} (${Math.round(waitMs / 60000)}분 후)`);
 
-        const scheduleNext = (waitMs) => {
             this.watcherTimer = setTimeout(async () => {
+                console.log(`[PUR-01 Agent] ⏰ 정기 감지 시각 도래 (${label}) ➔ altf.kr API 감지 실행 시작!`);
                 try {
                     await this.syncFromAltfApi(false);
                 } catch (e) {
-                    console.error('[PUR-01] 일일 자동 동기화 에러:', e.message);
+                    console.error('[PUR-01] 정기 동기화 에러:', e.message);
                 }
-                scheduleNext(ONE_DAY_MS);
+                // 다음 시각 예약 (10시 -> 17시, 또는 17시 -> 익일 10시)
+                planNextRun();
             }, waitMs);
         };
 
-        scheduleNext(delayMs);
+        planNextRun();
     }
 }
 
 export const purchaseStockOrderService = new PurchaseStockOrderService();
-purchaseStockOrderService.startDailyWatcher();
+purchaseStockOrderService.startTwiceDailyWatcher();
 

@@ -1943,12 +1943,13 @@ export default function AgentOfficeDashboard() {
                     <button
                         onClick={() => setShowPurchaseLedgerModal(true)}
                         className="text-xs px-3 py-1.5 rounded-lg border border-emerald-500/60 bg-gradient-to-r from-emerald-950/80 to-teal-950/80 hover:from-emerald-900/90 hover:to-teal-900/90 text-emerald-300 font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.25)] transition-all cursor-pointer group"
-                        title="[구매부 PUR-01 전담] 하루 1회 altf.kr API 감지 기반 알트에프 재고 발주 & 미결 관리 대장 열기"
+                        title="[구매부 PUR-01 전담] 업무시간 1일 2회 (오전 10:00, 오후 17:00) altf.kr API 정기 감지 및 미결 대장 관리 (그 외 대기 상태)"
                     >
                         <ShoppingBag className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
                         <span>🛒 [PUR-01] 알트에프 재고 발주 대장</span>
-                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono font-bold border border-emerald-500/30">
-                            1일 1회 감지 ON
+                        <span className="text-[10px] bg-slate-900/90 text-amber-300 px-1.5 py-0.5 rounded font-mono font-bold border border-amber-500/40 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                            <span>1일 2회 (10시/17시) 대기 중</span>
                         </span>
                     </button>
 
@@ -3525,18 +3526,21 @@ export default function AgentOfficeDashboard() {
                                     </div>
 
                                     {/* 실시간 현황 뱃지 */}
-                                    <div className="p-2.5 rounded-lg border border-emerald-500/50 bg-emerald-950/30 text-emerald-200 text-xs flex flex-col gap-1.5 shadow-sm">
+                                    <div className="p-2.5 rounded-lg border border-amber-500/40 bg-amber-950/20 text-amber-200 text-xs flex flex-col gap-1.5 shadow-sm">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-1.5 font-bold">
-                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
-                                                <span className="text-emerald-300">altf.kr API 자동 감시: ONLINE</span>
+                                                <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                                                <span className="text-amber-300">altf.kr API 정기 감시: 대기 중 (STANDBY)</span>
                                             </div>
-                                            <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-mono font-bold border border-emerald-500/40">
-                                                주기: 하루 1회 (24h)
+                                            <span className="text-[9px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-mono font-bold border border-amber-500/40">
+                                                주기: 1일 2회 (10:00 / 17:00)
                                             </span>
                                         </div>
-                                        <div className="text-[10px] text-emerald-300/90 flex items-center justify-between">
-                                            <span>재고 발주 624개 품목 List Up 완료 (미결 453건 실시간 추적 & 성적서 매칭)</span>
+                                        <div className="text-[10px] text-slate-300 flex items-center justify-between">
+                                            <span>웹 재고 발주분 624개 품목 List Up 완료 (성적서 26개 컬럼 1:1 매칭 & 미결 453건 관리)</span>
+                                        </div>
+                                        <div className="text-[9px] text-amber-400/80 font-mono pt-1 border-t border-amber-900/40">
+                                            * 업무시간(오전 10:00, 오후 17:00) 하루 2회만 실행하며, 그 외 시간은 대기 상태를 유지합니다.
                                         </div>
                                     </div>
 

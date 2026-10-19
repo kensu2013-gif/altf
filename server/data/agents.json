@@ -338,32 +338,31 @@
     "deptId": "purchase",
     "deptName": "구매부",
     "tier": 3,
-    "role": "altf.kr 재고 발주 대장 및 미결(Pending) 관리, QC-01 성적서 1:1 매칭",
-    "status": "ACTIVE",
+    "role": "altf.kr 재고 발주 대장 및 미결 관리 (1일 2회: 오전 10:00 / 오후 17:00 감지, 그 외 대기)",
+    "status": "STANDBY",
     "metrics": {
       "speed": 98,
       "accuracy": 99,
-      "load": 40,
+      "load": 15,
       "uptime": "100%",
       "tasksToday": 142
     },
-    "currentTask": "하루 1회 altf.kr API 자동 감시 가동 중 (미결 453건 실시간 추적 관리)",
+    "currentTask": "업무시간 1일 2회 정기 감시 대기 중 (오전 10:00 / 오후 17:00, 미결 453건 관리)",
     "lastActive": "방금 전",
     "triggerEvents": [
-      "CRON_DAILY_24H",
-      "EVENT_ALTF_API_POLL",
-      "EVENT_STOCK_ORDER_DETECTED"
+      "CRON_DAILY_10_00",
+      "CRON_DAILY_17_00",
+      "EVENT_MANUAL_PUR_SYNC"
     ],
     "emittedEvents": [
       "EVENT_STOCK_ORDER_LIST_UPDATED",
       "EVENT_PENDING_STOCK_ALERT"
     ],
     "logs": [
+      "[19:19] [PUR-01] 업무시간 1일 2회(10:00, 17:00) 정기 감시 체계 적용 완료 ➔ 현재 대기 상태(STANDBY) 유지",
       "[19:18] [PUR-01] altf.kr API 재고 발주 감지 완료: 총 624건 (입고: 159건, 미결: 453건)",
-      "[19:07] [PUR-01] altf.kr API 재고 발주 감지 완료: 총 624건 (입고: 159건, 미결: 453건)",
       "[PUR-01] 알트에프 재고 발주 대장 및 미결 관리 전담 지정 완료",
-      "[PUR-01] 하루 1회 altf.kr API 호출 감지 스케줄러(24h 주기) 활성화",
-      "[PUR-01] 재고 발주 624개 품목 List Up & 미결 453건 관리 중 (입고율 25%)"
+      "[PUR-01] 1일 2회(10:00, 17:00) 감지 스케줄러 등록 완료"
     ],
     "isCreated": true,
     "connectedDeptIds": [
