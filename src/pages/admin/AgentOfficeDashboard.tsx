@@ -3677,7 +3677,7 @@ export default function AgentOfficeDashboard() {
                                                 <button
                                                     type="button"
                                                     onClick={() => setShowLedgerModal(true)}
-                                                    className="px-2 py-1 rounded bg-gradient-to-r from-cyan-600/30 to-blue-600/30 hover:from-cyan-500/40 hover:to-blue-500/40 text-cyan-200 border border-cyan-400/50 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs"
+                                                    className="px-2 py-1 rounded bg-linear-to-r from-cyan-600/30 to-blue-600/30 hover:from-cyan-500/40 hover:to-blue-500/40 text-cyan-200 border border-cyan-400/50 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs"
                                                     title="26개 컬럼 성적서 원장 대장(대경벤드 성적서.xlsx) 및 품질 판정 뷰어를 엽니다."
                                                 >
                                                     <span>📊 26개 컬럼 장부 열람</span>
