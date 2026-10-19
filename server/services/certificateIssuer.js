@@ -23,6 +23,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import xlsx from 'xlsx';
+import ExcelJS from 'exceljs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -165,34 +166,38 @@ export class CertificateIssuerService {
     }
 
     /**
-     * 1. 엑셀 성적서 파일 생성 (.xlsx)
-     * - AX13:BC18 영역에 공식 수식 입력값 기입
-     * - 화학 성분 및 기계 성질 셀에 3열 병합 위치별 시험 성적값 기입
+     * 1. 엑셀 성적서 파일 생성 (.xlsx) - 성적서 양식.xlsx 서식 100% 보존
+     * - ExcelJS 엔진으로 템플릿의 셀 테두리, 배경색, 폰트, 열 너비, 행 높이, 로고, 인쇄 마진 완전 보존
+     * - 수식이 걸린 본문(A13:AL18, A24:A29, A37:A42, A45:A50)은 건드리지 않고
+     * - 사용자가 지정한 공식 수식 입력 영역 AX13:BC18 에만 값을 주입하여 수식 자동 연동
+     * - 화학 성분(Row 24~29) 및 기계 성질(Row 37~42) 실측값만 해당 셀에 안전하게 기입
      */
-    generateExcel(certMeta, items) {
+    async generateExcel(certMeta, items) {
         if (!fs.existsSync(TEMPLATE_PATH)) {
             throw new Error(`성적서 양식지 파일이 존재하지 않습니다: ${TEMPLATE_PATH}`);
         }
 
-        const wb = xlsx.readFile(TEMPLATE_PATH, { cellFormula: true, cellStyles: true });
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.readFile(TEMPLATE_PATH);
+
         const sheetName = certMeta.sheetName || 'TP304(소재ASTM사용시)';
-        const ws = wb.Sheets[sheetName];
+        const ws = wb.getWorksheet(sheetName);
         if (!ws) {
             throw new Error(`시트 '${sheetName}'가 템플릿에 존재하지 않습니다.`);
         }
 
-        // 헤더 기입
-        ws['K6'] = { t: 's', v: certMeta.customer || '월드원플랜트' };
-        ws['AJ6'] = { t: 's', v: certMeta.certNo || 'YR-26-07015' };
-        ws['K7'] = { t: 's', v: certMeta.poNo || 'ES260709-1974' };
-        ws['AJ7'] = { t: 's', v: certMeta.issueDate || new Date().toISOString().slice(0, 10).replace(/-/g, '.') };
-        ws['K8'] = { t: 's', v: 'N/A' };
-        ws['AJ8'] = { t: 's', v: 'GOOD' };
-        if (certMeta.specMaterial) ws['K9'] = { t: 's', v: certMeta.specMaterial };
-        if (certMeta.specInspection) ws['AJ9'] = { t: 's', v: certMeta.specInspection };
+        // 헤더 기입 (기존 셀 서식 유지)
+        ws.getCell('K6').value = certMeta.customer || '월드원플랜트';
+        ws.getCell('AJ6').value = certMeta.certNo || 'YR-26-07015';
+        ws.getCell('K7').value = certMeta.poNo || 'ES260709-1974';
+        ws.getCell('AJ7').value = certMeta.issueDate || new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+        ws.getCell('K8').value = 'N/A';
+        ws.getCell('AJ8').value = 'GOOD';
+        if (certMeta.specMaterial) ws.getCell('K9').value = certMeta.specMaterial;
+        if (certMeta.specInspection) ws.getCell('AJ9').value = certMeta.specInspection;
 
         // 열처리 조건
-        ws['A19'] = { t: 's', v: certMeta.heatTreatment };
+        ws.getCell('A19').value = certMeta.heatTreatment;
 
         // 아이템 기입 (최대 6개: Row 13 ~ Row 18)
         items.slice(0, 6).forEach((item, idx) => {
@@ -200,51 +205,32 @@ export class CertificateIssuerService {
             const chemRow = 24 + idx;
             const mechRow = 37 + idx;
 
-            // AX: HEAT, AY: LOT, AZ: ITEM No, BA: 제품명, BB: 수량, BC: Starting Material
-            ws[`AX${row}`] = { t: 's', v: item.heatNo || '' };
-            ws[`AY${row}`] = { t: 's', v: item.lotNo || '' };
-            ws[`AZ${row}`] = { t: 'n', v: idx + 1 };
-            ws[`BA${row}`] = { t: 's', v: item.description || '' };
-            ws[`BB${row}`] = { t: 'n', v: Number(item.qty) || 0 };
-            ws[`BC${row}`] = { t: 's', v: item.startingMaterial || 'WELDED PIPE' };
+            // ★ 공식 수식 입력 영역 AX13:BC18 (AX:HEAT, AY:LOT, AZ:ITEM, BA:제품명, BB:수량, BC:Starting Material)
+            // 이 셀들에 값을 넣으면 본문 A13, I13, N13, AD13 및 화학/기계 Heat No가 수식으로 자동 연동됨!
+            ws.getCell(`AX${row}`).value = item.heatNo || '';
+            ws.getCell(`AY${row}`).value = item.lotNo || '';
+            ws.getCell(`AZ${row}`).value = idx + 1;
+            ws.getCell(`BA${row}`).value = item.description || '';
+            ws.getCell(`BB${row}`).value = Number(item.qty) || 0;
+            ws.getCell(`BC${row}`).value = item.startingMaterial || 'WELDED PIPE';
 
-            // 본문 직접 보강 (수식 외에 수치 확실히 세팅)
-            ws[`A${row}`] = { t: 's', v: item.lotNo || '' };
-            ws[`F${row}`] = { t: 's', v: String(idx + 1) };
-            ws[`I${row}`] = { t: 's', v: item.heatNo || '' };
-            ws[`N${row}`] = { t: 's', v: item.description || '' };
-            ws[`Z${row}`] = { t: 'n', v: Number(item.qty) || 0 };
-            ws[`AD${row}`] = { t: 's', v: item.startingMaterial || 'WELDED PIPE' };
-            ws[`AL${row}`] = { t: 's', v: 'N/A' };
+            // 본문 수량 (Z열: 수식 외 단독 숫자 셀)
+            if (item.qty) ws.getCell(`Z${row}`).value = Number(item.qty) || 0;
 
-            // 2. CHEMICAL COMPOSITION(%) (H=C, K=Si, N=Mn, Q=P, T=S, W=Ni, Z=Cr, AC=Mo)
-            ws[`A${chemRow}`] = { t: 's', v: item.heatNo || '' };
-            ws[`F${chemRow}`] = { t: 's', v: 'L' };
-            if (item.chem?.C !== undefined) ws[`H${chemRow}`] = { t: 'n', v: Number(item.chem.C) || 0 };
-            if (item.chem?.Si !== undefined) ws[`K${chemRow}`] = { t: 'n', v: Number(item.chem.Si) || 0 };
-            if (item.chem?.Mn !== undefined) ws[`N${chemRow}`] = { t: 'n', v: Number(item.chem.Mn) || 0 };
-            if (item.chem?.P !== undefined) ws[`Q${chemRow}`] = { t: 'n', v: Number(item.chem.P) || 0 };
-            if (item.chem?.S !== undefined) ws[`T${chemRow}`] = { t: 'n', v: Number(item.chem.S) || 0 };
-            if (item.chem?.Ni !== undefined) ws[`W${chemRow}`] = { t: 'n', v: Number(item.chem.Ni) || 0 };
-            if (item.chem?.Cr !== undefined) ws[`Z${chemRow}`] = { t: 'n', v: Number(item.chem.Cr) || 0 };
-            if (item.chem?.Mo !== undefined) ws[`AC${chemRow}`] = { t: 'n', v: Number(item.chem.Mo) || 0 };
+            // 2. CHEMICAL COMPOSITION(%) 시험 성적 실측값 (H=C, K=Si, N=Mn, Q=P, T=S, W=Ni, Z=Cr, AC=Mo)
+            if (item.chem?.C !== undefined && item.chem?.C !== '') ws.getCell(`H${chemRow}`).value = Number(item.chem.C) || 0;
+            if (item.chem?.Si !== undefined && item.chem?.Si !== '') ws.getCell(`K${chemRow}`).value = Number(item.chem.Si) || 0;
+            if (item.chem?.Mn !== undefined && item.chem?.Mn !== '') ws.getCell(`N${chemRow}`).value = Number(item.chem.Mn) || 0;
+            if (item.chem?.P !== undefined && item.chem?.P !== '') ws.getCell(`Q${chemRow}`).value = Number(item.chem.P) || 0;
+            if (item.chem?.S !== undefined && item.chem?.S !== '') ws.getCell(`T${chemRow}`).value = Number(item.chem.S) || 0;
+            if (item.chem?.Ni !== undefined && item.chem?.Ni !== '') ws.getCell(`W${chemRow}`).value = Number(item.chem.Ni) || 0;
+            if (item.chem?.Cr !== undefined && item.chem?.Cr !== '') ws.getCell(`Z${chemRow}`).value = Number(item.chem.Cr) || 0;
+            if (item.chem?.Mo !== undefined && item.chem?.Mo !== '') ws.getCell(`AC${chemRow}`).value = Number(item.chem.Mo) || 0;
 
-            // 3. MECHANICAL PROPERTIES (I=YS, L=TS, O=EL, R=RA)
-            ws[`A${mechRow}`] = { t: 's', v: item.heatNo || '' };
-            ws[`F${mechRow}`] = { t: 's', v: 'L,B' };
-            if (item.mech?.ys !== undefined) ws[`I${mechRow}`] = { t: 'n', v: Number(item.mech.ys) || 0 };
-            if (item.mech?.ts !== undefined) ws[`L${mechRow}`] = { t: 'n', v: Number(item.mech.ts) || 0 };
-            if (item.mech?.el !== undefined) ws[`O${mechRow}`] = { t: 'n', v: Number(item.mech.el) || 0 };
-
-            // 추가 검사 (Row 45~50)
-            const addRow = 45 + idx;
-            ws[`A${addRow}`] = { t: 's', v: item.heatNo || '' };
-            ws[`F${addRow}`] = { t: 's', v: 'GOOD' };
-            ws[`M${addRow}`] = { t: 's', v: 'N/A' };
-            ws[`U${addRow}`] = { t: 's', v: 'N/A' };
-            ws[`AB${addRow}`] = { t: 's', v: 'N/A' };
-            ws[`AJ${addRow}`] = { t: 's', v: 'N/A' };
-            ws[`AQ${addRow}`] = { t: 's', v: 'N/A' };
+            // 3. MECHANICAL PROPERTIES 시험 성적 실측값 (I=YS, L=TS, O=EL)
+            if (item.mech?.ys !== undefined && item.mech?.ys !== '') ws.getCell(`I${mechRow}`).value = Number(item.mech.ys) || 0;
+            if (item.mech?.ts !== undefined && item.mech?.ts !== '') ws.getCell(`L${mechRow}`).value = Number(item.mech.ts) || 0;
+            if (item.mech?.el !== undefined && item.mech?.el !== '') ws.getCell(`O${mechRow}`).value = Number(item.mech.el) || 0;
         });
 
         // 발주서별 폴더에 저장 (DAT-10 보관소)
@@ -253,7 +239,7 @@ export class CertificateIssuerService {
 
         const excelFileName = `${certMeta.poNo}_성적서_${certMeta.certNo}.xlsx`;
         const excelFilePath = path.join(poDir, excelFileName);
-        xlsx.writeFile(wb, excelFilePath);
+        await wb.xlsx.writeFile(excelFilePath);
 
         return { excelFilePath, excelFileName };
     }
@@ -895,7 +881,7 @@ export class CertificateIssuerService {
             };
 
             // 1. 엑셀 생성 (.xlsx)
-            const { excelFilePath, excelFileName } = this.generateExcel(certMeta, pageItems);
+            const { excelFilePath, excelFileName } = await this.generateExcel(certMeta, pageItems);
 
             // 2. HTML 렌더링
             const htmlContent = this.generateHtml(certMeta, pageItems);

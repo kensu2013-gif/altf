@@ -1,5 +1,431 @@
 [
   {
+    "id": "cert_ES261014-2869_YR-26-09915-1",
+    "poNo": "ES261014-2869",
+    "certNo": "YR-26-09915-1",
+    "customer": "주 태형산업",
+    "issueDate": "2026.07.09",
+    "sheetName": "TP316L",
+    "heatTreatment": "* Heat Treatment Condition : 1050℃ Solution Annealing & Water Quenching",
+    "itemCount": 6,
+    "excelPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES261014-2869\\ES261014-2869_성적서_YR-26-09915-1.xlsx",
+    "excelUrl": "/api/qc/qc06/download-excel/ES261014-2869_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-09915-1.xlsx?poNo=ES261014-2869",
+    "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES261014-2869\\ES261014-2869_성적서_YR-26-09915-1.pdf",
+    "pdfUrl": "/api/qc/qc06/download-pdf/ES261014-2869_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-09915-1.pdf?poNo=ES261014-2869",
+    "issuedAt": "2026-10-19T13:39:23.547Z",
+    "items": [
+      {
+        "itemNo": 1,
+        "description": "45E(L) S/10S 25A B.W",
+        "qty": 1,
+        "heatNo": "SD62415",
+        "lotNo": "KJA0879",
+        "specMaterial": "ASTM A312 TP316L",
+        "specInspection": "KS B1543 STS316L-W /B1500",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.017,
+          "Si": 0.55,
+          "Mn": 1.05,
+          "P": 0.032,
+          "S": 0.002,
+          "Ni": 10.1,
+          "Cr": 16.35,
+          "Mo": 2.03
+        },
+        "mech": {
+          "ys": 298,
+          "ts": 622,
+          "el": 57
+        }
+      },
+      {
+        "itemNo": 2,
+        "description": "90E(L) S/10S 25A B.W",
+        "qty": 4,
+        "heatNo": "SD62415",
+        "lotNo": "KJA0880",
+        "specMaterial": "ASTM A312 TP316L",
+        "specInspection": "KS B1543 STS316L-W /B1500",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.017,
+          "Si": 0.55,
+          "Mn": 1.05,
+          "P": 0.032,
+          "S": 0.002,
+          "Ni": 10.1,
+          "Cr": 16.35,
+          "Mo": 2.03
+        },
+        "mech": {
+          "ys": 298,
+          "ts": 622,
+          "el": 57
+        }
+      },
+      {
+        "itemNo": 3,
+        "description": "TEE S/10S 25A B.W",
+        "qty": 2,
+        "heatNo": "SD62415",
+        "lotNo": "KJA0886",
+        "specMaterial": "ASTM A312 TP316L",
+        "specInspection": "KS B1543 STS316L-W /B1500",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.017,
+          "Si": 0.55,
+          "Mn": 1.05,
+          "P": 0.032,
+          "S": 0.002,
+          "Ni": 10.1,
+          "Cr": 16.35,
+          "Mo": 2.03
+        },
+        "mech": {
+          "ys": 298,
+          "ts": 622,
+          "el": 57
+        }
+      },
+      {
+        "itemNo": 4,
+        "description": "TEE S/10S 25A * 20A B.W",
+        "qty": 2,
+        "heatNo": "SD62415",
+        "lotNo": "KJA0887",
+        "specMaterial": "ASTM A312 TP316L",
+        "specInspection": "KS B1543 STS316L-W /B1500",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.017,
+          "Si": 0.55,
+          "Mn": 1.05,
+          "P": 0.032,
+          "S": 0.002,
+          "Ni": 10.1,
+          "Cr": 16.35,
+          "Mo": 2.03
+        },
+        "mech": {
+          "ys": 298,
+          "ts": 622,
+          "el": 57
+        }
+      },
+      {
+        "itemNo": 5,
+        "description": "90E(L) S/10S 20A B.W",
+        "qty": 7,
+        "heatNo": "SE28856",
+        "lotNo": "KDC0011",
+        "specMaterial": "KS D3576 STS304 TP",
+        "specInspection": "KS B1543 STS304-W /B1500",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.057,
+          "Si": 0.36,
+          "Mn": 1.02,
+          "P": 0.034,
+          "S": 0.006,
+          "Ni": 8.01,
+          "Cr": 18.08,
+          "Mo": 0
+        },
+        "mech": {
+          "ys": 285,
+          "ts": 657,
+          "el": 60
+        }
+      },
+      {
+        "itemNo": 6,
+        "description": "90E(L) S/10S 40A B.W",
+        "qty": 22,
+        "heatNo": "SD59218",
+        "lotNo": "KDC0014",
+        "specMaterial": "KS D3576 STS304 TP",
+        "specInspection": "KS B1543 STS304-W /B1500",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.066,
+          "Si": 0.37,
+          "Mn": 1.03,
+          "P": 0.033,
+          "S": 0.004,
+          "Ni": 8.09,
+          "Cr": 18.22,
+          "Mo": 0
+        },
+        "mech": {
+          "ys": 329,
+          "ts": 692,
+          "el": 55
+        }
+      }
+    ]
+  },
+  {
+    "id": "cert_ES261014-2869_YR-26-09915-2",
+    "poNo": "ES261014-2869",
+    "certNo": "YR-26-09915-2",
+    "customer": "주 태형산업",
+    "issueDate": "2026.07.09",
+    "sheetName": "STS304 1050",
+    "heatTreatment": "* Heat Treatment Condition : 1050℃ Solution Annealing & Water Quenching",
+    "itemCount": 6,
+    "excelPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES261014-2869\\ES261014-2869_성적서_YR-26-09915-2.xlsx",
+    "excelUrl": "/api/qc/qc06/download-excel/ES261014-2869_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-09915-2.xlsx?poNo=ES261014-2869",
+    "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES261014-2869\\ES261014-2869_성적서_YR-26-09915-2.pdf",
+    "pdfUrl": "/api/qc/qc06/download-pdf/ES261014-2869_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-09915-2.pdf?poNo=ES261014-2869",
+    "issuedAt": "2026-10-19T13:39:25.044Z",
+    "items": [
+      {
+        "itemNo": 7,
+        "description": "90E(L) S/10S 50A B.W",
+        "qty": 11,
+        "heatNo": "SE49720",
+        "lotNo": "KDC0015",
+        "specMaterial": "KS D3576 STS304 TP",
+        "specInspection": "KS B1543 STS304-W /B1500",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.062,
+          "Si": 0.39,
+          "Mn": 1.02,
+          "P": 0.035,
+          "S": 0.006,
+          "Ni": 8.09,
+          "Cr": 18.05,
+          "Mo": 0
+        },
+        "mech": {
+          "ys": 314,
+          "ts": 661,
+          "el": 53.8
+        }
+      },
+      {
+        "itemNo": 8,
+        "description": "90E(L) S/10S 80A B.W",
+        "qty": 4,
+        "heatNo": "SD68272",
+        "lotNo": "KDC0017",
+        "specMaterial": "KS D3576 STS304 TP",
+        "specInspection": "KS B1543 STS304-W /B1500",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.047,
+          "Si": 0.42,
+          "Mn": 1.08,
+          "P": 0.031,
+          "S": 0.002,
+          "Ni": 8.12,
+          "Cr": 18.26,
+          "Mo": 0
+        },
+        "mech": {
+          "ys": 285,
+          "ts": 641,
+          "el": 53.6
+        }
+      },
+      {
+        "itemNo": 9,
+        "description": "R(C) S/10S 80A * 40A B.W",
+        "qty": 1,
+        "heatNo": "SD68272",
+        "lotNo": "KJA0885",
+        "specMaterial": "KS D3576 STS304 TP",
+        "specInspection": "KS B1543 STS304-W /B1500",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.047,
+          "Si": 0.42,
+          "Mn": 1.08,
+          "P": 0.031,
+          "S": 0.002,
+          "Ni": 8.12,
+          "Cr": 18.26,
+          "Mo": 0
+        },
+        "mech": {
+          "ys": 285,
+          "ts": 641,
+          "el": 53.6
+        }
+      },
+      {
+        "itemNo": 10,
+        "description": "TEE S/10S 150A * 80A B.W",
+        "qty": 1,
+        "heatNo": "SE51511",
+        "lotNo": "KJA0888",
+        "specMaterial": "ASTM A312 TP304",
+        "specInspection": "KS B1543 STS304-W /B1500",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.023,
+          "Si": 0.42,
+          "Mn": 1.47,
+          "P": 0.032,
+          "S": 0.002,
+          "Ni": 8.09,
+          "Cr": 18.12,
+          "Mo": 0
+        },
+        "mech": {
+          "ys": 288,
+          "ts": 654,
+          "el": 55
+        }
+      },
+      {
+        "itemNo": 11,
+        "description": "TEE S/10S 150A * 50A B.W",
+        "qty": 1,
+        "heatNo": "SE51511",
+        "lotNo": "KJA0889",
+        "specMaterial": "ASTM A312 TP304",
+        "specInspection": "KS B1543 STS304-W /DKB STANDARD",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.023,
+          "Si": 0.42,
+          "Mn": 1.47,
+          "P": 0.032,
+          "S": 0.002,
+          "Ni": 8.09,
+          "Cr": 18.12,
+          "Mo": 0
+        },
+        "mech": {
+          "ys": 288,
+          "ts": 654,
+          "el": 55
+        }
+      },
+      {
+        "itemNo": 12,
+        "description": "TEE S/10S 40A * 20A B.W",
+        "qty": 2,
+        "heatNo": "SD59218",
+        "lotNo": "KJA0890",
+        "specMaterial": "KS D3576 STS304 TP",
+        "specInspection": "KS B1543 STS304-W /B1500",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.066,
+          "Si": 0.37,
+          "Mn": 1.03,
+          "P": 0.033,
+          "S": 0.004,
+          "Ni": 8.09,
+          "Cr": 18.22,
+          "Mo": 0
+        },
+        "mech": {
+          "ys": 329,
+          "ts": 692,
+          "el": 55
+        }
+      }
+    ]
+  },
+  {
+    "id": "cert_ES261014-2869_YR-26-09915-3",
+    "poNo": "ES261014-2869",
+    "certNo": "YR-26-09915-3",
+    "customer": "주 태형산업",
+    "issueDate": "2026.07.09",
+    "sheetName": "STS304 1050",
+    "heatTreatment": "* Heat Treatment Condition : 1050℃ Solution Annealing & Water Quenching",
+    "itemCount": 3,
+    "excelPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES261014-2869\\ES261014-2869_성적서_YR-26-09915-3.xlsx",
+    "excelUrl": "/api/qc/qc06/download-excel/ES261014-2869_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-09915-3.xlsx?poNo=ES261014-2869",
+    "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES261014-2869\\ES261014-2869_성적서_YR-26-09915-3.pdf",
+    "pdfUrl": "/api/qc/qc06/download-pdf/ES261014-2869_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-09915-3.pdf?poNo=ES261014-2869",
+    "issuedAt": "2026-10-19T13:39:26.690Z",
+    "items": [
+      {
+        "itemNo": 13,
+        "description": "TEE S/10S 40A B.W",
+        "qty": 4,
+        "heatNo": "SD59218",
+        "lotNo": "KDC0023",
+        "specMaterial": "KS D3576 STS304 TP",
+        "specInspection": "KS B1543 STS304-W /B1500",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.066,
+          "Si": 0.37,
+          "Mn": 1.03,
+          "P": 0.033,
+          "S": 0.004,
+          "Ni": 8.09,
+          "Cr": 18.22,
+          "Mo": 0
+        },
+        "mech": {
+          "ys": 329,
+          "ts": 692,
+          "el": 55
+        }
+      },
+      {
+        "itemNo": 14,
+        "description": "TEE S/10S 50A B.W",
+        "qty": 3,
+        "heatNo": "SE49720",
+        "lotNo": "KDC0024",
+        "specMaterial": "KS D3576 STS304 TP",
+        "specInspection": "KS B1543 STS304-W /B1500",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.062,
+          "Si": 0.39,
+          "Mn": 1.02,
+          "P": 0.035,
+          "S": 0.006,
+          "Ni": 8.09,
+          "Cr": 18.05,
+          "Mo": 0
+        },
+        "mech": {
+          "ys": 314,
+          "ts": 661,
+          "el": 53.8
+        }
+      },
+      {
+        "itemNo": 15,
+        "description": "TEE S/10S 80A B.W",
+        "qty": 1,
+        "heatNo": "SD68272",
+        "lotNo": "KDC0026",
+        "specMaterial": "KS D3576 STS304 TP",
+        "specInspection": "KS B1543 STS304-W /B1500",
+        "startingMaterial": "WELDED PIPE",
+        "chem": {
+          "C": 0.047,
+          "Si": 0.42,
+          "Mn": 1.08,
+          "P": 0.031,
+          "S": 0.002,
+          "Ni": 8.12,
+          "Cr": 18.26,
+          "Mo": 0
+        },
+        "mech": {
+          "ys": 285,
+          "ts": 641,
+          "el": 53.6
+        }
+      }
+    ]
+  },
+  {
     "id": "cert_ES260709-1974_YR-26-07015-1",
     "poNo": "ES260709-1974",
     "certNo": "YR-26-07015-1",
@@ -12,7 +438,7 @@
     "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-1.xlsx?poNo=ES260709-1974",
     "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-1.pdf",
     "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-1.pdf?poNo=ES260709-1974",
-    "issuedAt": "2026-10-19T13:11:01.305Z",
+    "issuedAt": "2026-10-19T13:39:44.664Z",
     "items": [
       {
         "itemNo": 1,
@@ -179,7 +605,7 @@
     "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-2.xlsx?poNo=ES260709-1974",
     "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-2.pdf",
     "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-2.pdf?poNo=ES260709-1974",
-    "issuedAt": "2026-10-19T13:11:02.676Z",
+    "issuedAt": "2026-10-19T13:39:46.014Z",
     "items": [
       {
         "itemNo": 7,
@@ -346,7 +772,7 @@
     "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-3.xlsx?poNo=ES260709-1974",
     "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-3.pdf",
     "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-3.pdf?poNo=ES260709-1974",
-    "issuedAt": "2026-10-19T13:11:03.981Z",
+    "issuedAt": "2026-10-19T13:39:47.418Z",
     "items": [
       {
         "itemNo": 13,
@@ -513,7 +939,7 @@
     "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-4.xlsx?poNo=ES260709-1974",
     "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-4.pdf",
     "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-4.pdf?poNo=ES260709-1974",
-    "issuedAt": "2026-10-19T13:11:05.343Z",
+    "issuedAt": "2026-10-19T13:39:48.781Z",
     "items": [
       {
         "itemNo": 19,
@@ -680,7 +1106,7 @@
     "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-5.xlsx?poNo=ES260709-1974",
     "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-5.pdf",
     "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-5.pdf?poNo=ES260709-1974",
-    "issuedAt": "2026-10-19T13:11:06.765Z",
+    "issuedAt": "2026-10-19T13:39:50.227Z",
     "items": [
       {
         "itemNo": 25,
@@ -847,7 +1273,7 @@
     "excelUrl": "/api/qc/qc06/download-excel/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-6.xlsx?poNo=ES260709-1974",
     "pdfPath": "F:\\altf-kr-web-skeleton\\storage\\issued_certificates\\ES260709-1974\\ES260709-1974_성적서_YR-26-07015-6.pdf",
     "pdfUrl": "/api/qc/qc06/download-pdf/ES260709-1974_%EC%84%B1%EC%A0%81%EC%84%9C_YR-26-07015-6.pdf?poNo=ES260709-1974",
-    "issuedAt": "2026-10-19T13:11:08.163Z",
+    "issuedAt": "2026-10-19T13:39:51.676Z",
     "items": [
       {
         "itemNo": 31,

@@ -130,7 +130,7 @@ export function CertificateIssuerModal({ isOpen, onClose, initialPoNo }: Certifi
         loadIssuedList(po);
     };
 
-    // 첨부 사진 샘플 즉시 발행 및 보기
+    // 첨부 사진 1·2번 샘플 즉시 발행 및 보기 (월드원플랜에탈)
     const handleIssueSample = async () => {
         try {
             setIssuing(true);
@@ -144,6 +144,33 @@ export function CertificateIssuerModal({ isOpen, onClose, initialPoNo }: Certifi
             }
         } catch (err) {
             console.error('샘플 성적서 발행 실패:', err);
+        } finally {
+            setIssuing(false);
+        }
+    };
+
+    // 첨부 사진 3번 실데이터 즉시 발행 및 보기 (주 태형산업 / ES261014-2869 / YR-26-09915 / TP316L)
+    const handleIssuePhoto3Sample = async () => {
+        try {
+            setIssuing(true);
+            const res = await fetch('/api/qc/qc06/issue', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    poNo: 'ES261014-2869',
+                    customer: '주 태형산업',
+                    certNo: 'YR-26-09915'
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setSelectedPoNo('ES261014-2869');
+                setCustomerName('주 태형산업');
+                setCertNoInput('YR-26-09915');
+                await loadIssuedList('ES261014-2869');
+            }
+        } catch (err) {
+            console.error('3번 사진 성적서 발행 실패:', err);
         } finally {
             setIssuing(false);
         }
@@ -275,7 +302,8 @@ export function CertificateIssuerModal({ isOpen, onClose, initialPoNo }: Certifi
                             value={selectedPoNo}
                             className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
                         >
-                            <option value="ES260709-1974">📌 ES260709-1974 (사진 샘플 - 34개 품목)</option>
+                            <option value="ES261014-2869">⭐ [3번 사진] ES261014-2869 (주 태형산업 - TP316L)</option>
+                            <option value="ES260709-1974">📌 [1·2번 사진] ES260709-1974 (월드원플랜에탈 - 34품목)</option>
                             {availableOrders.map(o => (
                                 <option key={o.poNumber} value={o.poNumber}>
                                     {o.poNumber} - {o.customerName} ({o.itemCount}품목)
@@ -306,12 +334,22 @@ export function CertificateIssuerModal({ isOpen, onClose, initialPoNo }: Certifi
 
                     <div className="flex items-center gap-2">
                         <button
+                            onClick={handleIssuePhoto3Sample}
+                            disabled={issuing}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)]"
+                            title="3번 사진의 실제 데이터(주 태형산업 / ES261014-2869 / TP316L)를 성적서 양식.xlsx에 100% 서식 보존 주입"
+                        >
+                            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                            [3번 사진] 주태형산업 로드
+                        </button>
+
+                        <button
                             onClick={handleIssueSample}
                             disabled={issuing}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 font-medium transition-all"
                         >
                             <Sparkles className="w-3.5 h-3.5" />
-                            사진 샘플(1:1) 로드
+                            [1·2번 사진] 월드원 로드
                         </button>
 
                         <button
@@ -323,6 +361,21 @@ export function CertificateIssuerModal({ isOpen, onClose, initialPoNo }: Certifi
                             {issuing ? '성적서 생성중...' : '성적서 일괄 자동 발행'}
                         </button>
                     </div>
+                </div>
+
+                {/* 📌 시화/부산 재고 발주분 전담 & 서식 100% 보존 안내 배너 */}
+                <div className="px-6 py-2 bg-gradient-to-r from-blue-950/60 via-slate-900 to-indigo-950/60 border-b border-indigo-900/40 text-[11px] text-slate-300 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">
+                            시화·부산 재고 전담
+                        </span>
+                        <span>
+                            웹 등록 일반 발주 = <strong>QC-01</strong>이 외주 성적서 수집 매칭 | <strong>시화·부산 재고 출고분</strong> = <strong>QC-06</strong>이 양식지 서식 100% 보존 발행
+                        </span>
+                    </div>
+                    <span className="text-emerald-400 font-bold font-mono">
+                        ✓ 성적서 양식.xlsx 6개 시트 서식/수식 100% 보존
+                    </span>
                 </div>
 
                 {/* 6개 양식지 선택 상태 바 및 페이지네이션 */}
