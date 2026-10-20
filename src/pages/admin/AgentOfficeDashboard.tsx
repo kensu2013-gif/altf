@@ -40,7 +40,9 @@ import {
     ShoppingBag,
     Boxes,
     FileText,
-    FolderOpen
+    FolderOpen,
+    ChevronDown,
+    Zap
 } from 'lucide-react';
 import { CertificateLedgerModal } from '../../components/admin/CertificateLedgerModal';
 import { PurchaseLedgerModal } from '../../components/admin/PurchaseLedgerModal';
@@ -507,6 +509,49 @@ export default function AgentOfficeDashboard() {
     const [showPurchaseLedgerModal, setShowPurchaseLedgerModal] = useState<boolean>(false);
     const [showCertIssuerModal, setShowCertIssuerModal] = useState<boolean>(false);
     const [showDaekyungInvoiceModal, setShowDaekyungInvoiceModal] = useState<boolean>(false);
+    const [showToolsDropdown, setShowToolsDropdown] = useState<boolean>(false);
+    const toolsDropdownRef = React.useRef<HTMLDivElement>(null);
+    const [latestSignal, setLatestSignal] = useState<{
+        time: string;
+        botCode: string;
+        botName: string;
+        summary: string;
+        amount?: number;
+    } | null>(null);
+
+    // ⚡ 텔레그램 / 거래명세표 등 외부 신호 처리 결과 실시간 로드 & 드롭다운 외부 클릭 닫기
+    useEffect(() => {
+        const fetchLatestSignal = async () => {
+            try {
+                const res = await fetch('/api/inbound/daekyung-invoice/list');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.invoices && data.invoices.length > 0) {
+                        const inv = data.invoices[0];
+                        setLatestSignal({
+                            time: inv.invoiceDate || '최근',
+                            botCode: 'GEN-01',
+                            botName: '거래명세표 발행봇',
+                            summary: `No.${inv.invoiceNo} 전표 매입 확정 및 미결 해제`,
+                            amount: inv.pricing?.grandTotal || 0
+                        });
+                    }
+                }
+            } catch {
+                // silent
+            }
+        };
+        fetchLatestSignal();
+
+        const handleClickOutside = (e: MouseEvent) => {
+            if (toolsDropdownRef.current && !toolsDropdownRef.current.contains(e.target as Node)) {
+                setShowToolsDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     const [qc02Loading, setQc02Loading] = useState<boolean>(false);
     const [qc02Result, setQc02Result] = useState<{
         success: boolean;
@@ -1926,18 +1971,16 @@ export default function AgentOfficeDashboard() {
                         <span className="text-[10px] bg-pink-500/20 px-1 rounded text-pink-300">5 ACTIVE</span>
                     </div>
 
-                    {/* ACTIVE */}
-                    <div className="px-3 py-1 rounded-full border border-emerald-500/60 bg-emerald-950/40 text-emerald-400 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_10px_rgba(0,230,118,0.2)]">
+                    {/* ACTIVE (상시 가동) */}
+                    <div className="px-3 py-1 rounded-full border border-emerald-500/60 bg-emerald-950/40 text-emerald-400 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_10px_rgba(0,230,118,0.2)]" title="24시간 또는 정기 스케줄러로 상시 동작 중인 에이전트">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span>ACTIVE</span>
-                        <span className="text-emerald-300 font-mono text-sm">{String(activeCount).padStart(3, '0')}</span>
+                        <span>상시 {activeCount}</span>
                     </div>
 
-                    {/* STANDBY */}
-                    <div className="px-3 py-1 rounded-full border border-cyan-500/60 bg-cyan-950/40 text-cyan-400 text-xs font-bold flex items-center gap-1.5">
+                    {/* STANDBY (신호 대기) */}
+                    <div className="px-3 py-1 rounded-full border border-cyan-500/60 bg-cyan-950/40 text-cyan-400 text-xs font-bold flex items-center gap-1.5" title="외부 신호(텔레그램, 메일, 발주 접수)가 올 때만 즉시 실행되는 신호 대기 봇">
                         <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-                        <span>STANDBY</span>
-                        <span className="text-cyan-300 font-mono text-sm">{String(standbyCount).padStart(3, '0')}</span>
+                        <span>신호대기 {standbyCount}</span>
                     </div>
 
                     {/* IDLE */}
@@ -1959,51 +2002,118 @@ export default function AgentOfficeDashboard() {
                     </div>
                 </div>
 
-                {/* 우측 유틸 & 토큰 경제 */}
-                <div className="flex items-center gap-2.5">
-                    <button
-                        onClick={() => setShowLedgerModal(true)}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-cyan-500/60 bg-gradient-to-r from-cyan-950/80 to-blue-950/80 hover:from-cyan-900/90 hover:to-blue-900/90 text-cyan-300 font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,240,255,0.2)] transition-all cursor-pointer"
-                        title="26개 컬럼 성적서 관리 대장 및 성적서 양식(3열 병합) 복사용 모달 열기"
-                    >
-                        <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>📊 대경벤드 성적서 대장</span>
-                    </button>
-
-                    <button
-                        onClick={() => setShowPurchaseLedgerModal(true)}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-emerald-500/60 bg-gradient-to-r from-emerald-950/80 to-teal-950/80 hover:from-emerald-900/90 hover:to-teal-900/90 text-emerald-300 font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.25)] transition-all cursor-pointer group"
-                        title="[구매부 PUR-01 전담] 업무시간 1일 2회 (오전 10:00, 오후 17:00) altf.kr API 정기 감지 및 미결 대장 관리 (그 외 대기 상태)"
-                    >
-                        <ShoppingBag className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
-                        <span>🛒 [PUR-01] 알트에프 재고 발주 대장</span>
-                        <span className="text-[10px] bg-slate-900/90 text-amber-300 px-1.5 py-0.5 rounded font-mono font-bold border border-amber-500/40 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                            <span>1일 2회 (10시/17시) 대기 중</span>
-                        </span>
-                    </button>
-
-                    <button
-                        onClick={() => setShowCertIssuerModal(true)}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-indigo-500/60 bg-gradient-to-r from-indigo-950/80 to-blue-950/80 hover:from-indigo-900/90 hover:to-blue-900/90 text-indigo-300 font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all cursor-pointer group"
-                        title="[품질부 QC-06 전담] 발주서별 최대 6품목 자동 패킹 · 6개 양식지 자동 선택 · PDF/엑셀 DAT-10 아카이빙"
-                    >
-                        <FileText className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
-                        <span>📜 [QC-06] 성적서 발행기</span>
-                    </button>
-
-                    <button
+                {/* 우측 유틸 & 토큰 경제 & 컴팩트 도구 */}
+                <div className="flex items-center gap-2">
+                    {/* ⚡ 최근 신호 처리 결과 알림 칩 (보통 하루 1~2회 인입되는 텔레그램/전표 신호의 결과만 깔끔하게 노출) */}
+                    <div 
                         onClick={() => setShowDaekyungInvoiceModal(true)}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-cyan-500/60 bg-gradient-to-r from-cyan-950/80 to-blue-950/80 hover:from-cyan-900/90 hover:to-blue-900/90 text-cyan-300 font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(6,182,212,0.25)] transition-all cursor-pointer group"
-                        title="[전사 연계] 대경벤드 거래명세표(메신저/PDF) 매입 확정 및 미결 해제·성적서 확인"
+                        className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-cyan-500/40 bg-[#081524]/90 hover:bg-cyan-950/50 hover:border-cyan-400/70 transition-all cursor-pointer shadow-xs group"
+                        title="신호 기반 봇(GEN-01 등)의 최근 처리 결과입니다. 클릭 시 상세 전표 내역을 확인합니다."
                     >
-                        <FileText className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
-                        <span>📑 [전사연계] 대경 거래명세표 인입</span>
-                        <span className="text-[10px] bg-slate-900/90 text-cyan-300 px-1.5 py-0.5 rounded font-mono font-bold border border-cyan-500/40 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                            <span>텔레그램/PDF</span>
+                        <span className="flex items-center gap-1 text-[11px] font-bold text-amber-400 shrink-0">
+                            <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
+                            <span>최근 신호:</span>
                         </span>
-                    </button>
+                        {latestSignal ? (
+                            <div className="flex items-center gap-1.5 text-xs min-w-0">
+                                <span className="font-mono font-bold text-cyan-300 shrink-0">[{latestSignal.botCode}]</span>
+                                <span className="text-slate-300 truncate max-w-[220px] font-medium">{latestSignal.summary}</span>
+                                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2 rounded font-mono font-bold shrink-0">
+                                    완료 ✓
+                                </span>
+                            </div>
+                        ) : (
+                            <span className="text-xs text-slate-400 font-mono">
+                                📡 텔레그램·메신저 신호 대기 중
+                            </span>
+                        )}
+                    </div>
+
+                    {/* 📁 업무 대장 & 관제 도구 통합 드롭다운 (거대 배너 4개를 컴팩트 툴바로 일원화) */}
+                    <div className="relative" ref={toolsDropdownRef}>
+                        <button
+                            onClick={() => setShowToolsDropdown(!showToolsDropdown)}
+                            className={`text-xs px-3 py-1.5 rounded-lg border font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+                                showToolsDropdown
+                                    ? 'border-cyan-400 bg-cyan-950/90 text-cyan-300 shadow-[0_0_15px_rgba(0,240,255,0.3)]'
+                                    : 'border-slate-700 bg-slate-800/90 hover:bg-slate-700 hover:border-cyan-500/50 text-slate-200 hover:text-white'
+                            }`}
+                            title="성적서 대장, 재고 발주 대장, 성적서 발행기, 거래명세표 인입 관제 도구 모달 열기"
+                        >
+                            <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>업무 대장·도구</span>
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showToolsDropdown ? 'rotate-180 text-cyan-400' : 'text-slate-400'}`} />
+                        </button>
+
+                        {showToolsDropdown && (
+                            <div className="absolute right-0 mt-2 w-72 rounded-xl border border-cyan-500/40 bg-[#070D19]/95 backdrop-blur-md shadow-2xl p-1.5 z-50 space-y-1">
+                                <div className="px-2.5 py-1.5 text-[10px] font-bold text-slate-400 border-b border-slate-800 uppercase tracking-wider flex items-center justify-between">
+                                    <span>전사 관제 도구함</span>
+                                    <span className="text-cyan-400 font-mono">4 TOOLS</span>
+                                </div>
+
+                                {/* 1. 성적서 관리 대장 */}
+                                <button
+                                    onClick={() => { setShowLedgerModal(true); setShowToolsDropdown(false); }}
+                                    className="w-full text-left p-2 rounded-lg hover:bg-cyan-950/40 border border-transparent hover:border-cyan-500/30 flex items-center justify-between transition-colors group cursor-pointer"
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <ShieldCheck className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+                                        <div>
+                                            <div className="text-xs font-bold text-slate-200 group-hover:text-cyan-300">📊 대경벤드 성적서 대장</div>
+                                            <div className="text-[10px] text-slate-400">QC-01/02 26개 컬럼 마스터 대장</div>
+                                        </div>
+                                    </div>
+                                    <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1 py-0.5 rounded font-mono">상시</span>
+                                </button>
+
+                                {/* 2. 알트에프 재고 발주 대장 */}
+                                <button
+                                    onClick={() => { setShowPurchaseLedgerModal(true); setShowToolsDropdown(false); }}
+                                    className="w-full text-left p-2 rounded-lg hover:bg-emerald-950/40 border border-transparent hover:border-emerald-500/30 flex items-center justify-between transition-colors group cursor-pointer"
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <ShoppingBag className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                                        <div>
+                                            <div className="text-xs font-bold text-slate-200 group-hover:text-emerald-300">🛒 알트에프 재고 발주 대장</div>
+                                            <div className="text-[10px] text-slate-400">PUR-01 재고 발주 & 성적서 매칭</div>
+                                        </div>
+                                    </div>
+                                    <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded font-mono">정기</span>
+                                </button>
+
+                                {/* 3. 성적서 발행기 */}
+                                <button
+                                    onClick={() => { setShowCertIssuerModal(true); setShowToolsDropdown(false); }}
+                                    className="w-full text-left p-2 rounded-lg hover:bg-indigo-950/40 border border-transparent hover:border-indigo-500/30 flex items-center justify-between transition-colors group cursor-pointer"
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <FileText className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" />
+                                        <div>
+                                            <div className="text-xs font-bold text-slate-200 group-hover:text-indigo-300">📜 [QC-06] 성적서 발행기</div>
+                                            <div className="text-[10px] text-slate-400">발주서별 최대 6품목 자동 패킹/PDF</div>
+                                        </div>
+                                    </div>
+                                    <span className="text-[9px] bg-indigo-500/20 text-indigo-300 px-1 py-0.5 rounded font-mono">신호</span>
+                                </button>
+
+                                {/* 4. 대경 거래명세표 인입 */}
+                                <button
+                                    onClick={() => { setShowDaekyungInvoiceModal(true); setShowToolsDropdown(false); }}
+                                    className="w-full text-left p-2 rounded-lg hover:bg-cyan-950/40 border border-transparent hover:border-cyan-500/30 flex items-center justify-between transition-colors group cursor-pointer"
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <FileText className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+                                        <div>
+                                            <div className="text-xs font-bold text-slate-200 group-hover:text-cyan-300">📑 [전사연계] 대경 거래명세표 인입</div>
+                                            <div className="text-[10px] text-slate-400">GEN-01 텔레그램/PDF 인입 매입 확정</div>
+                                        </div>
+                                    </div>
+                                    <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1 py-0.5 rounded font-mono">신호</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
 
                     <button
                         onClick={() => setIsDemoRunning(!isDemoRunning)}

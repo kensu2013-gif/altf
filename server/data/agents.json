@@ -551,7 +551,7 @@
       "uptime": "99.9%",
       "tasksToday": 2440
     },
-    "currentTask": "대경벤드 출하 통보 확인 ➔ 발주 ES261019-2924 미결 해제 및 입고 전환",
+    "currentTask": "[영업시간 1시간 주기] 발주 2440건 분류 관리 | 미결 462건 | 고객발송준비 353건 (다음: 오늘 17:00)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_ORDER_RECEIVED",
@@ -566,11 +566,10 @@
       "EVENT_DOCS_PACKAGED_FOR_CUSTOMER"
     ],
     "logs": [
-      "[15:39] 대경벤드 발송 신호 수신: 발주번호 ES261019-2924 미결 해제",
-      "[15:39] [PUR-07] 발주 ES261019-2924 총 2개 품목 '입고완료(대경발송)' 상태 갱신 및 미결 대장 엑셀 저장 완료!",
-      "[15:39] 대경벤드 발송 신호 수신: 발주번호  미결 해제",
-      "[15:39] 거래명세서에 매칭할 P.O 번호(ES...)가 없습니다.",
-      "[15:39] 대경벤드 발송 신호 수신: 발주번호 ES261019-2924 미결 해제"
+      "[16:01] [PUR-07] altf.kr 발주 2440건 업체/날짜별 분류 완료",
+      "[16:01] 미결(Pending) 462건 추적 중 (매입발주서 자동 매핑)",
+      "[16:01] QC-01 성적서 교차 대조: 365건 접수 확인",
+      "[16:01] 출고 완료 패키징: 거래명세표+성적서 번들 353건 발송 대기"
     ],
     "isCreated": true,
     "connectedDeptIds": [
@@ -690,12 +689,16 @@
     "isCreated": true,
     "connectedDeptIds": [
       "purchase",
-      "quality",
-      "shipping"
+      "quality"
     ],
-    "position": "팀장",
+    "position": "사원",
     "approvalStatus": "APPROVED",
-    "orderIndex": 0
+    "orderIndex": 0,
+    "supervisorId": "",
+    "connectedAgentIds": [
+      "qc-inbound-ingest",
+      "pur-split-balancer"
+    ]
   },
   {
     "id": "gen-tax-homotax-sync",
