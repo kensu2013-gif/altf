@@ -19,6 +19,8 @@ import { certificateParserService } from './server/services/certificateParser.js
 import { purchaseStockOrderService } from './server/services/purchaseService.js';
 import { purchaseBacklogBotService } from './server/services/purchaseBacklogBotService.js';
 import { certificateIssuerService } from './server/services/certificateIssuer.js';
+import { daekyungInvoiceService } from './server/services/daekyungInvoiceService.js';
+import { telegramBotService } from './server/services/telegramBotService.js';
 
 import multer from 'multer';
 
@@ -727,6 +729,18 @@ const getAuthenticatedSession = (req) => {
     }
     return null;
 };
+
+const parseBody = (req) => new Promise((resolve) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', () => {
+        try {
+            resolve(body ? JSON.parse(body) : {});
+        } catch {
+            resolve({});
+        }
+    });
+});
 
 const server = http.createServer(async (req, res) => {
     // Global body size limit protection against DoS memory exhaustion (25MB limit)
@@ -1542,6 +1556,198 @@ const server = http.createServer(async (req, res) => {
                 sendJsonResponse(req, res, 500, { success: false, error: err.message });
                 return;
             }
+        }
+    }
+
+    // ==========================================
+    // 📑 대경벤드 거래명세표(메신저/PDF) 파싱 & 전사 연계 (총무/구매/품질/출고)
+    // ==========================================
+    if (url.pathname.startsWith('/api/inbound/daekyung-invoice/') || url.pathname.startsWith('/api/inbound/telegram/')) {
+        // 1. GET /api/inbound/daekyung-invoice/list : 매입 전표 목록 조회
+        if (req.method === 'GET' && url.pathname === '/api/inbound/daekyung-invoice/list') {
+            sendJsonResponse(req, res, 200, {
+                success: true,
+                count: daekyungInvoiceService.invoices.length,
+                invoices: daekyungInvoiceService.invoices
+            });
+            return;
+        }
+
+        // 2. POST /api/inbound/daekyung-invoice/simulate : 사진/샘플 기반 즉시 연계 시뮬레이션
+        if (req.method === 'POST' && url.pathname === '/api/inbound/daekyung-invoice/simulate') {
+            try {
+                const body = await parseBody(req);
+                const sampleId = body?.sampleId || '0031';
+
+                let sampleData;
+                if (sampleId === '0015') {
+                    sampleData = {
+                        id: 'DKB-INV-SAMPLE-0015',
+                        fileName: '20261019_대경벤드_거래명세서_0015.pdf',
+                        invoiceNo: '0015- 1/ 1',
+                        invoiceDate: '2026-10-19',
+                        supplier: {
+                            name: '(주)대경벤드',
+                            bizNo: '606-81-75098',
+                            ceo: '김학철',
+                            address: '경남 양산시 어실로 115'
+                        },
+                        buyer: {
+                            name: '알트에프(ALT.F)',
+                            bizNo: '838-05-01054',
+                            ceo: '조현진',
+                            address: '부산광역시 사상구 낙동대로 1330번길 67'
+                        },
+                        items: [
+                            {
+                                itemNo: 1,
+                                type: 'PRODUCT',
+                                name: '45E(S)',
+                                rawLine: '45E(S) STS 304-W S/20S ERW 300A',
+                                quantity: 2,
+                                unit: 'EA',
+                                unitPrice: 237830,
+                                amount: 475660,
+                                poNo: 'ES261019-2915',
+                                remarks: '국제밸브앤드피팅 910660201847ES261019-2915'
+                            }
+                        ],
+                        itemCount: 1,
+                        poNumbers: ['ES261019-2915'],
+                        pricing: {
+                            totalSupplyPrice: 475660,
+                            freightPrice: 0,
+                            subtotal: 475660,
+                            vat: 47566,
+                            grandTotal: 523226
+                        }
+                    };
+                } else {
+                    sampleData = {
+                        id: 'DKB-INV-SAMPLE-0031',
+                        fileName: '20261019_대경벤드_거래명세서_0031.pdf',
+                        invoiceNo: '0031- 1/ 1',
+                        invoiceDate: '2026-10-19',
+                        supplier: {
+                            name: '(주)대경벤드',
+                            bizNo: '606-81-75098',
+                            ceo: '김학철',
+                            address: '경남 양산시 어실로 115'
+                        },
+                        buyer: {
+                            name: '알트에프(ALT.F)',
+                            bizNo: '838-05-01054',
+                            ceo: '조현진',
+                            address: '부산광역시 사상구 낙동대로 1330번길 67'
+                        },
+                        items: [
+                            {
+                                itemNo: 1,
+                                type: 'PRODUCT',
+                                name: '45E(L)',
+                                rawLine: '45E(L) STS 304-W S/10S ERW 100A',
+                                quantity: 17,
+                                unit: 'EA',
+                                unitPrice: 23460,
+                                amount: 398820,
+                                poNo: 'ES261019-2924',
+                                remarks: '서울재고 발주분 ES261019-2924'
+                            },
+                            {
+                                itemNo: 2,
+                                type: 'FREIGHT',
+                                name: '운임',
+                                spec: '운송료',
+                                quantity: 1,
+                                unit: '건',
+                                unitPrice: 4000,
+                                amount: 4000,
+                                poNo: 'ES261019-2924',
+                                remarks: '서울재고 발주분 박조나단님 910660201850'
+                            }
+                        ],
+                        itemCount: 2,
+                        poNumbers: ['ES261019-2924'],
+                        pricing: {
+                            totalSupplyPrice: 398820,
+                            freightPrice: 4000,
+                            subtotal: 402820,
+                            vat: 40282,
+                            grandTotal: 443102
+                        }
+                    };
+                }
+
+                const result = await daekyungInvoiceService.processAndDispatch(sampleData, 'SIMULATION');
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    message: `전표 [No:${sampleData.invoiceNo}] 매입 확정 및 전사 4개 부서 자율 연계 완료!`,
+                    ...result
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 3. POST /api/inbound/daekyung-invoice/upload : 실제 거래명세서 PDF 파일 업로드 및 파싱
+        if (req.method === 'POST' && url.pathname === '/api/inbound/daekyung-invoice/upload') {
+            uploadMiddleware(req, res, async (err) => {
+                if (err) {
+                    sendJsonResponse(req, res, 400, { success: false, error: err.message });
+                    return;
+                }
+                try {
+                    if (!req.file || !req.file.buffer) {
+                        sendJsonResponse(req, res, 400, { success: false, error: 'PDF 파일이 첨부되지 않았습니다.' });
+                        return;
+                    }
+                    const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+                    const parsedInvoice = await daekyungInvoiceService.parsePdfBuffer(req.file.buffer, originalName);
+                    const result = await daekyungInvoiceService.processAndDispatch(parsedInvoice, 'WEB_UPLOAD');
+                    sendJsonResponse(req, res, 200, {
+                        success: true,
+                        message: `대경벤드 거래명세서 [${parsedInvoice.invoiceNo}] 파싱 및 전사 연계 완료!`,
+                        ...result
+                    });
+                } catch (parseErr) {
+                    sendJsonResponse(req, res, 500, { success: false, error: 'PDF 파싱 실패: ' + parseErr.message });
+                }
+            });
+            return;
+        }
+
+        // 4. GET /api/inbound/telegram/status : 텔레그램 봇 연동 상태
+        if (req.method === 'GET' && url.pathname === '/api/inbound/telegram/status') {
+            sendJsonResponse(req, res, 200, {
+                success: true,
+                ...telegramBotService.getStatus()
+            });
+            return;
+        }
+
+        // 5. POST /api/inbound/telegram/config : 텔레그램 봇 토큰 및 롱폴링 설정
+        if (req.method === 'POST' && url.pathname === '/api/inbound/telegram/config') {
+            try {
+                const body = await parseBody(req);
+                const { botToken, chatId, action } = body || {};
+                if (botToken !== undefined || chatId !== undefined) {
+                    telegramBotService.setConfig({ botToken, chatId });
+                }
+                if (action === 'START_POLLING') {
+                    telegramBotService.startPolling();
+                } else if (action === 'STOP_POLLING') {
+                    telegramBotService.stopPolling();
+                }
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    message: '텔레그램 봇 설정이 저장되었습니다.',
+                    ...telegramBotService.getStatus()
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
         }
     }
 

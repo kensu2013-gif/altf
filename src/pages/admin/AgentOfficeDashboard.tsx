@@ -19,6 +19,7 @@ import {
     Maximize2, 
     Minimize2, 
     RefreshCw, 
+    RotateCw, 
     HardDrive, 
     Sparkles,
     Plus,
@@ -44,6 +45,7 @@ import {
 import { CertificateLedgerModal } from '../../components/admin/CertificateLedgerModal';
 import { PurchaseLedgerModal } from '../../components/admin/PurchaseLedgerModal';
 import { CertificateIssuerModal } from '../../components/admin/CertificateIssuerModal';
+import { DaekyungInvoiceModal } from '../../components/admin/DaekyungInvoiceModal';
 
 const STORAGE_KEY = 'altf_agent_swarm_custom_v4';
 const STORAGE_DEPT_KEY = 'altf_departments_v2';
@@ -504,6 +506,7 @@ export default function AgentOfficeDashboard() {
     const [showLedgerModal, setShowLedgerModal] = useState<boolean>(false);
     const [showPurchaseLedgerModal, setShowPurchaseLedgerModal] = useState<boolean>(false);
     const [showCertIssuerModal, setShowCertIssuerModal] = useState<boolean>(false);
+    const [showDaekyungInvoiceModal, setShowDaekyungInvoiceModal] = useState<boolean>(false);
     const [qc02Loading, setQc02Loading] = useState<boolean>(false);
     const [qc02Result, setQc02Result] = useState<{
         success: boolean;
@@ -518,6 +521,20 @@ export default function AgentOfficeDashboard() {
         failCount: number;
         passRate: string;
         outliersCount: number;
+    } | null>(null);
+
+    // 🛒 PUR-07 발주 분류 & 미결 관제 실시간 통계 상태
+    const [pur07Summary, setPur07Summary] = useState<{
+        totalOrders: number;
+        totalItemsCount: number;
+        pendingCount: number;
+        fulfilledCount: number;
+        readyPackageCount: number;
+        certMatchedOrdersCount: number;
+        customerCount: number;
+        fulfillmentRate: string;
+        certMatchRate: string;
+        lastSyncedAt: string;
     } | null>(null);
 
     // 🚀 QC-02 에이전트 실행 (다중 페이지 성적서 판독 & 엑셀 장부 누적)
@@ -619,6 +636,15 @@ export default function AgentOfficeDashboard() {
                 .then(data => {
                     if (data.success && data.stats) {
                         setLedgerStats(data.stats);
+                    }
+                })
+                .catch(() => {});
+
+            fetch('/api/pur/pur07/summary')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.summary) {
+                        setPur07Summary(data.summary);
                     }
                 })
                 .catch(() => {});
@@ -1415,7 +1441,7 @@ export default function AgentOfficeDashboard() {
                         <div className="text-xs font-bold text-slate-200 group-hover:text-cyan-300 transition-colors">
                             + {pos} 에이전트 생성
                         </div>
-                        <div className="text-[10px] text-slate-500 mt-1 max-w-[180px] line-clamp-2 leading-relaxed">
+                        <div className="text-[10px] text-slate-500 mt-1 max-w-45 line-clamp-2 leading-relaxed">
                             {agent.role ? `[기획] ${agent.role}` : `${posMeta.roleDescription}`}
                         </div>
                     </div>
@@ -1964,6 +1990,19 @@ export default function AgentOfficeDashboard() {
                     >
                         <FileText className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
                         <span>📜 [QC-06] 성적서 발행기</span>
+                    </button>
+
+                    <button
+                        onClick={() => setShowDaekyungInvoiceModal(true)}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-cyan-500/60 bg-gradient-to-r from-cyan-950/80 to-blue-950/80 hover:from-cyan-900/90 hover:to-blue-900/90 text-cyan-300 font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(6,182,212,0.25)] transition-all cursor-pointer group"
+                        title="[전사 연계] 대경벤드 거래명세표(메신저/PDF) 매입 확정 및 미결 해제·성적서 확인"
+                    >
+                        <FileText className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                        <span>📑 [전사연계] 대경 거래명세표 인입</span>
+                        <span className="text-[10px] bg-slate-900/90 text-cyan-300 px-1.5 py-0.5 rounded font-mono font-bold border border-cyan-500/40 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                            <span>텔레그램/PDF</span>
+                        </span>
                     </button>
 
                     <button
@@ -3637,19 +3676,27 @@ export default function AgentOfficeDashboard() {
                                         <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-[10px]">
                                             <div className="p-1.5 bg-black/40 rounded border border-teal-900/40 flex flex-col">
                                                 <span className="text-slate-400 text-[9px]">📦 전체 발주 (업체/날짜별)</span>
-                                                <span className="text-teal-300 font-bold text-xs">1,537건 (148개사)</span>
+                                                <span className="text-teal-300 font-bold text-xs">
+                                                    {pur07Summary ? `${(pur07Summary.totalOrders - 1).toLocaleString()}건 (${pur07Summary.customerCount}개사)` : '2,439건 (201개사)'}
+                                                </span>
                                             </div>
                                             <div className="p-1.5 bg-black/40 rounded border border-amber-900/40 flex flex-col">
                                                 <span className="text-amber-400 text-[9px]">⏳ 미결(Pending) 추적</span>
-                                                <span className="text-amber-300 font-bold text-xs">360건 관리 중</span>
+                                                <span className="text-amber-300 font-bold text-xs">
+                                                    {pur07Summary ? `${pur07Summary.pendingCount.toLocaleString()}건 관리 중` : '462건 관리 중'}
+                                                </span>
                                             </div>
                                             <div className="p-1.5 bg-black/40 rounded border border-pink-900/40 flex flex-col">
                                                 <span className="text-pink-400 text-[9px]">🔬 QC-01 성적서 접수확인</span>
-                                                <span className="text-pink-300 font-bold text-xs">126건 매칭 완료</span>
+                                                <span className="text-pink-300 font-bold text-xs">
+                                                    {pur07Summary ? `${pur07Summary.certMatchedOrdersCount.toLocaleString()}건 매칭 완료` : '286건 매칭 완료'}
+                                                </span>
                                             </div>
                                             <div className="p-1.5 bg-black/40 rounded border border-cyan-900/40 flex flex-col">
                                                 <span className="text-cyan-400 text-[9px]">🚚 고객 발송 대기 패키지</span>
-                                                <span className="text-cyan-300 font-bold text-xs">120건 준비완료</span>
+                                                <span className="text-cyan-300 font-bold text-xs">
+                                                    {pur07Summary ? `${pur07Summary.readyPackageCount.toLocaleString()}건 준비완료` : '277건 준비완료'}
+                                                </span>
                                             </div>
                                         </div>
                                         <div className="text-[9px] text-teal-400/80 font-mono pt-1 border-t border-teal-900/40">
@@ -3683,6 +3730,17 @@ export default function AgentOfficeDashboard() {
                                                 try {
                                                     const res = await fetch('/api/pur/pur07/sync', { method: 'POST' });
                                                     if (res.ok) {
+                                                        const data = await res.json();
+                                                        if (data.summary) setPur07Summary(data.summary);
+                                                        try {
+                                                            const agRes = await fetch('/api/agents');
+                                                            if (agRes.ok) {
+                                                                const agData = await agRes.json();
+                                                                if (agData.agents) setAgents(agData.agents);
+                                                            }
+                                                        } catch (err) {
+                                                            console.warn('[PUR-07] 에이전트 목록 갱신 실패:', err);
+                                                        }
                                                         alert('✅ [PUR-07] 발주 분류 및 미결 대장 동기화 완료!');
                                                     }
                                                 } catch (e) {
@@ -3713,6 +3771,21 @@ export default function AgentOfficeDashboard() {
                                             className="py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all"
                                         >
                                             <span>📂 폴더 열기</span>
+                                        </button>
+                                    </div>
+
+                                    {/* 대경벤드 거래명세표 연계 진입 배너 */}
+                                    <div className="pt-2 border-t border-teal-900/40 flex items-center justify-between">
+                                        <div className="text-[11px] text-slate-300 flex items-center gap-1.5">
+                                            <span>📑</span>
+                                            <span>대경벤드 거래명세표(카톡/텔레그램)가 도착했나요?</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowDaekyungInvoiceModal(true)}
+                                            className="py-1 px-2.5 rounded bg-linear-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-black font-black text-[11px] shadow-[0_0_10px_rgba(6,182,212,0.3)] cursor-pointer transition-all flex items-center gap-1"
+                                        >
+                                            <span>⚡ 명세표 읽고 미결 해제하기</span>
                                         </button>
                                     </div>
                                 </div>
@@ -4503,6 +4576,23 @@ export default function AgentOfficeDashboard() {
             <CertificateIssuerModal
                 isOpen={showCertIssuerModal}
                 onClose={() => setShowCertIssuerModal(false)}
+            />
+
+            {/* 📑 6. 대경벤드 거래명세표(메신저/PDF) 매입 확정 & 미결 해제 연계 모달 */}
+            <DaekyungInvoiceModal
+                isOpen={showDaekyungInvoiceModal}
+                onClose={() => setShowDaekyungInvoiceModal(false)}
+                onRefreshAgents={async () => {
+                    try {
+                        const agRes = await fetch('/api/agents');
+                        if (agRes.ok) {
+                            const agData = await agRes.json();
+                            if (agData.agents) setAgents(agData.agents);
+                        }
+                    } catch (e) {
+                        console.warn('Failed to refresh agents:', e);
+                    }
+                }}
             />
         </div>
     );

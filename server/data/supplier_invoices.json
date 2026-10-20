@@ -1,0 +1,122 @@
+[
+  {
+    "id": "DKB-INV-SAMPLE-0015",
+    "fileName": "20261019_대경벤드_거래명세서_0015.pdf",
+    "invoiceNo": "0015- 1/ 1",
+    "invoiceDate": "2026-10-19",
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "45E(S)",
+        "rawLine": "45E(S) STS 304-W S/20S ERW 300A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 237830,
+        "amount": 475660,
+        "poNo": "ES261019-2915",
+        "remarks": "국제밸브앤드피팅 910660201847ES261019-2915"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2915"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 475660,
+      "freightPrice": 0,
+      "subtotal": 475660,
+      "vat": 47566,
+      "grandTotal": 523226
+    },
+    "source": "SIMULATION",
+    "processedAt": "2026-10-20T05:21:08.341Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T05:21:08.341Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 475660,
+      "vat": 47566,
+      "grandTotal": 523226
+    }
+  },
+  {
+    "id": "DKB-INV-SAMPLE-0031",
+    "fileName": "20261019_대경벤드_거래명세서_0031.pdf",
+    "invoiceNo": "0031- 1/ 1",
+    "invoiceDate": "2026-10-19",
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "45E(L)",
+        "rawLine": "45E(L) STS 304-W S/10S ERW 100A",
+        "quantity": 17,
+        "unit": "EA",
+        "unitPrice": 23460,
+        "amount": 398820,
+        "poNo": "ES261019-2924",
+        "remarks": "서울재고 발주분 ES261019-2924"
+      },
+      {
+        "itemNo": 2,
+        "type": "FREIGHT",
+        "name": "운임",
+        "spec": "운송료",
+        "quantity": 1,
+        "unit": "건",
+        "unitPrice": 4000,
+        "amount": 4000,
+        "poNo": "ES261019-2924",
+        "remarks": "서울재고 발주분 박조나단님 910660201850"
+      }
+    ],
+    "itemCount": 2,
+    "poNumbers": [
+      "ES261019-2924"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 398820,
+      "freightPrice": 4000,
+      "subtotal": 402820,
+      "vat": 40282,
+      "grandTotal": 443102
+    },
+    "source": "SIMULATION",
+    "processedAt": "2026-10-20T05:21:01.613Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T05:21:01.613Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 402820,
+      "vat": 40282,
+      "grandTotal": 443102
+    }
+  }
+]

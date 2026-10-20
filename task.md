@@ -73,21 +73,21 @@
 
 ## 4. [완료] 구매부 (PUR-07) 주문관리 발주서 분류·미결 관제 & 서류 번들링 에이전트
 - `[x]` **PUR-07 (대리 / 주문관리 발주서 분류 및 미결 통합 관제봇)**:
-  - `altf.kr` 뒷단 주문관리의 모든 발주서(`db.orders` 1,537건, 7,030개 품목) 수집 및 148개 거래처별, 날짜별 자동 분류/저장
+  - `altf.kr` 뒷단 주문관리의 모든 발주서(`db.orders` 실서버 연동 2,439건 활성/총 2,440건, 11,204개 품목) 수집 및 201개 거래처별, 날짜별 자동 분류/저장
   - 각 발주 품목에 대응하는 매입발주서(`PUR-PO-...`) 동시 생성 및 매입처(대경벤드 등) 연계 관리
-  - 미결 리스트(Backlog Pending: 360건) 24시간 실시간 추적 및 관리
+  - 미결 리스트(Backlog Pending: 462건) 24시간 실시간 추적 및 관리
 - `[x]` **영업시간(09:00 ~ 18:00) 매 1시간 주기 API 자동 호출 스케줄러**:
   - 평일 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00 (1일 10회) 자동 감지
   - 그 외 영업시간 외/주말은 대기 상태(STANDBY) 유지
 - `[x]` **사무실 출고 완료 연동 & 거래명세표·성적서 자동 1:1 매칭 (고객 발송 패키징)**:
   - 실제 사무실 담당자가 출고 완료(`fulfillOrder`) 처리 시 미결(Pending)에서 즉시 해제
-  - 발주번호 기반 품질부 성적서(`certificates.json` 1,469건 / QC-01) 접수 여부 확인 (126건 매칭 완료)
-  - 거래명세표(`STMT-...`)와 성적서 PDF를 1:1 결합한 고객사 발송 준비 완료 패키지(`READY_TO_DISPATCH` 120건) 자동 번들링
+  - 발주번호 기반 품질부 성적서(`certificates.json` 1,469건 / QC-01) 접수 여부 확인 (286건 매칭 완료)
+  - 거래명세표(`STMT-...`)와 성적서 PDF를 1:1 결합한 고객사 발송 준비 완료 패키지(`READY_TO_DISPATCH` 277건) 자동 번들링
 - `[x]` **영구 백업 및 엑셀 마스터 대장 자동 생성**:
   - `server/data/pur07_order_backlog.json` 및 `storage/purchases/주문관리_발주서_통합대장.xlsx` 2개 시트(미결리스트 / 고객발송준비) 생성
 - `[x]` **REST API & AI Agent Office 대시보드 연동**:
   - `GET /api/pur/pur07/summary`, `GET /api/pur/pur07/backlog`, `POST /api/pur/pur07/sync`, `POST /api/pur/pur07/fulfill`, `GET /api/pur/pur07/packages`, `GET /api/pur/pur07/scheduler-status`, `GET /api/pur/pur07/download-excel`
-  - Agent Office 인스펙터 패널 내 PUR-07 전용 네온 제어반 탑재 완료
+  - Agent Office 인스펙터 패널 내 PUR-07 전용 네온 제어반 실시간 통계 연동 완료
 
 ---
 
@@ -97,3 +97,24 @@
 - `[x]` `src/pages/admin/Customers.tsx`에 `'FLOW_CHART'` 탭 추가 및 라우팅 추가
 - `[x]` `src/components/admin/FlowChartDashboard.tsx` 신규 컴포넌트 개발 (SVG 매출 추세 차트, 이벤트 등록 및 맵핑, 재고 매출 연동, 지역 및 신규/이탈 업체 분석 모듈 통합)
 - `[x]` 컴파일 및 정적 분석 정합성 검증 완료
+
+---
+
+## 5. [완료] 대경벤드 거래명세표(메신저/PDF) 매입 확정 & 전사 자율 연계 (총무/구매/품질/출고)
+- `[x]` **대경벤드 거래명세서 다중 페이지 PDF 정밀 파서 개발 (`server/services/daekyungInvoiceService.js`)**:
+  - `PDFParse` 스트림 기반 일자, 전표번호(No:0031, No:0015), 공급자/공급받는자 사업자등록번호 파싱
+  - 테이블 내 품목(45E, 90E, T, R, CAP 등), 규격(S/10S, S/20S), 재질(STS304-W 등), 수량, 단가, 공급가액, 운임 자동 계산
+  - 비고란 P.O 번호(`ES261019-2924`, `ES261019-2915`) 및 서울재고/고객사(국제밸브앤드피팅 등) 자동 식별
+- `[x]` **4대 부서 동시 자율 연계 트리거 (Cross-Department Dispatcher)**:
+  - 📑 **총무부 (GEN-01/GEN-04)**: 대경벤드 매입 확정 전표 생성, 공급가액/부가세(10%)/총액 계산, `server/data/supplier_invoices.json` 장부 자동 누적
+  - 🛒 **구매부 (PUR-07/PUR-01)**: `storage/purchases/알트에프 재고 발주 대장.xlsx` 엑셀에서 P.O No 행 자동 탐색 ➔ 입고일자/입고수량 갱신, 미결수량 0 차감, 상태 '입고완료(대경발송)'로 엑셀 실시간 저장
+  - 🔬 **품질부 (QC-01/QC-02/QC-08/QC-09)**: 대경 성적서 DB(1,469개)와 품목 규격 사전 교차 조회 및 성적서 누락 시 경보 발령
+  - 🚚 **출고부 (LOG-01/LOG-03)**: 시화 물류센터 서울재고 입고 하차 검수 대기 or 고객사 직배송 운송 상태 자동 전이
+- `[x]` **텔레그램 메신저 봇 수신 엔진 구축 (`server/services/telegramBotService.js`)**:
+  - Telegram Bot API 롱폴링 수신 지원 (메신저에서 PDF 포워딩/전달 시 1초 만에 자동 감지)
+  - 파싱 및 전사 연계 처리 후 텔레그램 채팅방으로 상세 분석 보고서 즉시 회신
+- `[x]` **AI Agent Office 대시보드 UI 및 전용 모달 구축 (`src/components/admin/DaekyungInvoiceModal.tsx`)**:
+  - 상단 글로벌 서브헤더 및 PUR-07 제어반 내 `[📑 대경 거래명세표 인입]` 버튼 신설
+  - PDF 드래그앤드롭 업로드, 텔레그램 봇 토큰 설정 및 가동 토글
+  - 사진으로 제공된 2개 전표(No.0031 서울재고분, No.0015 고객직배분) 원클릭 즉시 시뮬레이션 버튼 탑재
+  - 4대 부서 파이프라인 실시간 결과 카드 및 누적 매입 확정 장부 테이블 제공
