@@ -691,9 +691,10 @@
       "purchase",
       "quality"
     ],
-    "position": "사원",
+    "position": "과장",
     "approvalStatus": "APPROVED",
     "orderIndex": 0,
+    "teamName": "총무1팀",
     "supervisorId": "",
     "connectedAgentIds": [
       "qc-inbound-ingest",
@@ -731,7 +732,8 @@
     "connectedDeptIds": [],
     "position": "과장",
     "approvalStatus": "APPROVED",
-    "orderIndex": 1
+    "orderIndex": 1,
+    "teamName": "총무2팀"
   },
   {
     "id": "gen-statement-dispatcher",
@@ -769,9 +771,10 @@
       "shipping",
       "data"
     ],
-    "position": "과장",
-    "approvalStatus": "APPROVED",
-    "orderIndex": 2
+    "position": "대리",
+    "approvalStatus": "AUTO_RUNNING",
+    "orderIndex": 2,
+    "teamName": "총무1팀"
   },
   {
     "id": "gen-payment-tracker",
@@ -804,7 +807,8 @@
     "connectedDeptIds": [],
     "position": "대리",
     "approvalStatus": "AUTO_RUNNING",
-    "orderIndex": 3
+    "orderIndex": 3,
+    "teamName": "총무2팀"
   },
   {
     "id": "gen-credit-guard",
@@ -836,9 +840,10 @@
     ],
     "isCreated": false,
     "connectedDeptIds": [],
-    "position": "대리",
+    "position": "사원",
     "approvalStatus": "AUTO_RUNNING",
-    "orderIndex": 4
+    "orderIndex": 4,
+    "teamName": "총무2팀"
   },
   {
     "id": "gen-expense-archiver",
@@ -1007,9 +1012,10 @@
       "quote",
       "purchase"
     ],
-    "position": "대리",
+    "position": "사원",
     "approvalStatus": "AUTO_RUNNING",
-    "orderIndex": 9
+    "orderIndex": 9,
+    "teamName": "총무1팀"
   },
   {
     "id": "qc-inbound-ingest",

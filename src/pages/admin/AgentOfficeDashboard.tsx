@@ -42,7 +42,8 @@ import {
     FileText,
     FolderOpen,
     ChevronDown,
-    Zap
+    Zap,
+    Users
 } from 'lucide-react';
 import { CertificateLedgerModal } from '../../components/admin/CertificateLedgerModal';
 import { PurchaseLedgerModal } from '../../components/admin/PurchaseLedgerModal';
@@ -51,6 +52,36 @@ import { DaekyungInvoiceModal } from '../../components/admin/DaekyungInvoiceModa
 
 const STORAGE_KEY = 'altf_agent_swarm_custom_v4';
 const STORAGE_DEPT_KEY = 'altf_departments_v2';
+
+// 👑 에이전트 정렬 규칙:
+// 1. 실제 생성되어 가동 중인 봇(isCreated === true)이 앞, 아직 만들어지지 않은 봇(isCreated !== true)은 항상 맨 뒤
+// 2. 직급 순서: 팀장(4) > 과장(3) > 대리(2) > 사원(1) ➔ "대리는 앞으로, 사원은 뒤로"
+// 3. 동일 직급 내: orderIndex 및 식별 코드(code) 오름차순 정렬
+export function sortAgents(a: AgentUnit, b: AgentUnit): number {
+    const aCreated = a.isCreated === true ? 1 : 0;
+    const bCreated = b.isCreated === true ? 1 : 0;
+    if (aCreated !== bCreated) {
+        return bCreated - aCreated; // 생성된 봇(1)이 앞, 미생성 슬롯(0)은 맨 뒤
+    }
+
+    const rankWeight: Record<string, number> = {
+        '팀장': 4,
+        '과장': 3,
+        '대리': 2,
+        '사원': 1
+    };
+    const aRank = rankWeight[a.position || '사원'] || 1;
+    const bRank = rankWeight[b.position || '사원'] || 1;
+    if (aRank !== bRank) {
+        return bRank - aRank; // 높은 직급(팀장, 과장, 대리)이 앞, 사원은 뒤
+    }
+
+    const aOrder = a.orderIndex !== undefined ? a.orderIndex : 999;
+    const bOrder = b.orderIndex !== undefined ? b.orderIndex : 999;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+
+    return (a.code || '').localeCompare(b.code || '');
+}
 
 // 에이전트 직위 초기화 헬퍼 (팀장 1, 과장 2, 대리 3, 사원 나머지)
 function initAgentPositions(rawAgents: AgentUnit[]): AgentUnit[] {
@@ -67,6 +98,16 @@ function initAgentPositions(rawAgents: AgentUnit[]): AgentUnit[] {
             else pos = '사원';
         }
 
+        // 기본 teamName이 없을 경우의 예시 배정 (총무부 총무1팀 / 총무2팀 등)
+        let team = ag.teamName;
+        if (!team && ag.deptId === 'general') {
+            if (['gen-invoice-creator', 'gen-statement-dispatcher', 'gen-customer-master', 'gen-01', 'gen-03', 'gen-10'].includes(ag.id)) {
+                team = '총무1팀';
+            } else if (['gen-tax-homotax-sync', 'gen-payment-tracker', 'gen-credit-guard', 'gen-02', 'gen-04', 'gen-05'].includes(ag.id)) {
+                team = '총무2팀';
+            }
+        }
+
         // ⚡ 직위별 결재 규칙:
         // 사원(Lv.1) 및 대리(Lv.2): 업무 행동에 결재가 일절 불필요 ➔ 상시 AUTO_RUNNING (무한 반복 자율 루틴)
         // 과장(Lv.3): 결과물 확인/검수 작업 수행 ➔ 이상징후 감지 시에만 결재 상신 (기본: APPROVED)
@@ -79,7 +120,8 @@ function initAgentPositions(rawAgents: AgentUnit[]): AgentUnit[] {
             ...ag,
             position: pos,
             approvalStatus: approval,
-            orderIndex: ag.orderIndex !== undefined ? ag.orderIndex : count
+            orderIndex: ag.orderIndex !== undefined ? ag.orderIndex : count,
+            teamName: team
         };
     });
 }
@@ -87,7 +129,8 @@ function initAgentPositions(rawAgents: AgentUnit[]): AgentUnit[] {
 export default function AgentOfficeDashboard() {
     const [selectedDeptId, setSelectedDeptId] = useState<string>('all');
     const [currentView, setCurrentView] = useState<'office' | 'network' | 'logs' | 'host'>('office');
-    const [officeLayoutMode, setOfficeLayoutMode] = useState<'hierarchy' | 'grid'>('hierarchy');
+    const [officeLayoutMode, setOfficeLayoutMode] = useState<'teams' | 'hierarchy' | 'grid'>('teams');
+    const [activeTeamDropdownAgentId, setActiveTeamDropdownAgentId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'STANDBY' | 'IDLE' | 'UNCREATED'>('ALL');
     const [selectedAgent, setSelectedAgent] = useState<AgentUnit | null>(null);
@@ -131,6 +174,8 @@ export default function AgentOfficeDashboard() {
                             position: a.position,
                             deptId: a.deptId,
                             isCreated: a.isCreated,
+                            teamName: a.teamName,
+                            orderIndex: a.orderIndex,
                             supervisorId: a.supervisorId,
                             connectedDeptIds: a.connectedDeptIds,
                             connectedAgentIds: a.connectedAgentIds
@@ -164,6 +209,8 @@ export default function AgentOfficeDashboard() {
             position: a.position,
             deptId: a.deptId,
             isCreated: a.isCreated,
+            teamName: a.teamName,
+            orderIndex: a.orderIndex,
             supervisorId: a.supervisorId,
             connectedDeptIds: a.connectedDeptIds,
             connectedAgentIds: a.connectedAgentIds
@@ -1092,9 +1139,59 @@ export default function AgentOfficeDashboard() {
         setSimulationLog(prev => [log, ...prev.slice(0, 14)]);
     };
 
-    // 필터링된 에이전트 목록
+    // 👥 팀 관리 핸들러: 에이전트를 특정 팀으로 이동하거나 팀에서 제외(미배정)
+    const handleMoveAgentToTeam = (agentId: string, targetTeamName?: string) => {
+        setAgents(prev => prev.map(a => {
+            if (a.id === agentId) {
+                return {
+                    ...a,
+                    teamName: targetTeamName ? targetTeamName.trim() : undefined
+                };
+            }
+            return a;
+        }));
+        setActiveTeamDropdownAgentId(null);
+    };
+
+    // 👥 새 팀 생성 및 에이전트 즉시 배정
+    const handleCreateTeamAndAssign = (agentId: string, defaultName = '새팀') => {
+        const inputName = window.prompt('새로 생성할 팀 이름을 입력하세요 (예: 총무3팀, 자재관리팀):', defaultName);
+        if (inputName && inputName.trim()) {
+            handleMoveAgentToTeam(agentId, inputName.trim());
+        }
+    };
+
+    // 👥 팀 해체 (해당 팀에 속한 에이전트들을 안전하게 미배정으로 복귀)
+    const handleDeleteTeam = (deptId: string, teamName: string) => {
+        if (!window.confirm(`[${teamName}]을(를) 해체하시겠습니까?\n소속된 모든 에이전트는 미배정 상태로 안전하게 전환됩니다.`)) return;
+        setAgents(prev => prev.map(a => {
+            if (a.deptId === deptId && a.teamName === teamName) {
+                return { ...a, teamName: undefined };
+            }
+            return a;
+        }));
+    };
+
+    // 👥 새 팀 생성 (빈 팀 추가용)
+    const handleAddNewTeam = (deptId: string) => {
+        const deptObj = departments.find(d => d.id === deptId);
+        const deptAgents = agents.filter(a => a.deptId === deptId);
+        const existingTeams = Array.from(new Set(deptAgents.map(a => a.teamName).filter(Boolean)));
+        const defaultName = `${deptObj?.name || '부서'}${existingTeams.length + 1}팀`;
+        const inputName = window.prompt('새로 생성할 팀 이름을 입력하세요:', defaultName);
+        if (!inputName || !inputName.trim()) return;
+
+        const unassignedAgent = deptAgents.find(a => !a.teamName);
+        if (unassignedAgent) {
+            handleMoveAgentToTeam(unassignedAgent.id, inputName.trim());
+        } else {
+            alert(`팀 [${inputName.trim()}]이(가) 등록되었습니다. 에이전트 카드의 [팀 배정] 메뉴에서 해당 팀을 선택하세요.`);
+        }
+    };
+
+    // 필터링 및 정렬된 에이전트 목록 (👑 대리 앞, 사원 뒤, 미생성 슬롯 맨 뒤)
     const filteredAgents = useMemo(() => {
-        return agents.filter(agent => {
+        const list = agents.filter(agent => {
             const matchesDept = selectedDeptId === 'all' || agent.deptId === selectedDeptId;
             let matchesStatus = true;
             if (statusFilter === 'UNCREATED') {
@@ -1107,9 +1204,12 @@ export default function AgentOfficeDashboard() {
                 agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 agent.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 agent.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                agent.currentTask.toLowerCase().includes(searchQuery.toLowerCase());
+                agent.currentTask.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (agent.teamName && agent.teamName.toLowerCase().includes(searchQuery.toLowerCase()));
             return matchesDept && matchesStatus && matchesSearch;
         });
+
+        return list.sort(sortAgents);
     }, [agents, selectedDeptId, statusFilter, searchQuery]);
 
     // 상태 강제 변경 핸들러
@@ -1445,6 +1545,60 @@ export default function AgentOfficeDashboard() {
         const isStaff = pos === '대리' || pos === '사원';
         const isPending = agent.approvalStatus === 'PENDING';
         const isRejected = agent.approvalStatus === 'REJECTED';
+        const deptTeams = Array.from(new Set(agents.filter(a => a.deptId === agent.deptId).map(a => a.teamName).filter(Boolean))) as string[];
+
+        // 👥 팀 선택/이동 드롭다운 팝오버 렌더러
+        const renderTeamDropdown = () => (
+            <div className="absolute left-0 top-full mt-1 w-48 rounded-lg border border-slate-700 bg-[#0C1322] shadow-2xl z-50 p-1.5 text-xs text-slate-200 animate-in fade-in duration-150 text-left font-sans">
+                <div className="text-[10px] font-mono text-slate-400 px-2 py-1 border-b border-slate-800 flex items-center justify-between">
+                    <span>소속 팀 배정/이동</span>
+                    <span className="text-[9px] text-cyan-400 font-bold">{agent.code}</span>
+                </div>
+                
+                {/* 현재 부서 내 등록된 팀 목록 */}
+                <div className="max-h-36 overflow-y-auto py-1 space-y-0.5">
+                    {deptTeams.map(tName => (
+                        <button
+                            key={tName}
+                            onClick={() => handleMoveAgentToTeam(agent.id, tName)}
+                            className={`w-full text-left px-2 py-1 rounded text-[11px] flex items-center justify-between transition-colors ${
+                                agent.teamName === tName
+                                    ? 'bg-indigo-600/30 text-indigo-300 font-bold border border-indigo-500/50'
+                                    : 'hover:bg-slate-800 text-slate-300'
+                            }`}
+                        >
+                            <span>{tName}</span>
+                            {agent.teamName === tName && <Check className="w-3 h-3 text-indigo-400" />}
+                        </button>
+                    ))}
+                    {deptTeams.length === 0 && (
+                        <div className="text-[10px] text-slate-500 px-2 py-1">등록된 세부 팀이 없습니다.</div>
+                    )}
+                </div>
+
+                {/* 팀에서 제외(미배정) 및 새 팀 생성 버튼 */}
+                <div className="border-t border-slate-800 pt-1 mt-1 space-y-0.5">
+                    {agent.teamName && (
+                        <button
+                            onClick={() => handleMoveAgentToTeam(agent.id, undefined)}
+                            className="w-full text-left px-2 py-1 rounded text-[10px] text-rose-400 hover:bg-rose-950/40 flex items-center gap-1 transition-colors"
+                            title="팀에서 제외하여 미배정 풀로 이동"
+                        >
+                            <X className="w-3 h-3 text-rose-400" />
+                            <span>팀에서 제외 (미배정 풀로)</span>
+                        </button>
+                    )}
+                    <button
+                        onClick={() => handleCreateTeamAndAssign(agent.id, `${currentDept?.name || '부서'}팀`)}
+                        className="w-full text-left px-2 py-1 rounded text-[10px] text-cyan-300 hover:bg-cyan-950/40 flex items-center gap-1 transition-colors"
+                        title="새 팀을 만들고 이 카드를 그 팀으로 즉시 배정"
+                    >
+                        <Plus className="w-3 h-3 text-cyan-400" />
+                        <span>+ 새 팀 생성 후 이동</span>
+                    </button>
+                </div>
+            </div>
+        );
 
         // ─────────────────────────────────────────────────────────────
         // CASE A: 아직 생성되지 않은 슬롯 ➔ [+ AGENT 생성] 카드 노출
@@ -1474,9 +1628,28 @@ export default function AgentOfficeDashboard() {
                 >
                     <div className="w-full flex items-center justify-between text-[10px] font-mono text-slate-500">
                         <span className="font-bold">{agent.code}</span>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: posMeta.bg, color: posMeta.color }}>
-                            {posMeta.icon} {pos} 슬롯
-                        </span>
+                        <div className="flex items-center gap-1">
+                            {/* 소속 팀 배정 드롭다운 (미생성 슬롯도 팀에 넣고 빼기 가능) */}
+                            <div className="relative" onClick={e => e.stopPropagation()}>
+                                <button
+                                    onClick={() => setActiveTeamDropdownAgentId(activeTeamDropdownAgentId === agent.id ? null : agent.id)}
+                                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-1 border transition-all ${
+                                        agent.teamName
+                                            ? 'border-indigo-500/70 bg-indigo-950/70 text-indigo-300'
+                                            : 'border-slate-800 bg-slate-900/80 text-slate-500 hover:text-slate-300'
+                                    }`}
+                                    title="소속 팀 배정/이동"
+                                >
+                                    <Users className="w-2.5 h-2.5 text-indigo-400" />
+                                    <span className="max-w-[65px] truncate">{agent.teamName || '미배정'}</span>
+                                    <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                                </button>
+                                {activeTeamDropdownAgentId === agent.id && renderTeamDropdown()}
+                            </div>
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: posMeta.bg, color: posMeta.color }}>
+                                {posMeta.icon} {pos} 슬롯
+                            </span>
+                        </div>
                     </div>
 
                     <div className="my-2 flex flex-col items-center">
@@ -1545,7 +1718,7 @@ export default function AgentOfficeDashboard() {
                     minWidth: isHead ? '280px' : isChief ? '250px' : '230px'
                 }}
             >
-                {/* 상단 직위 뱃지 & 코드 & 상태 컨트롤러 */}
+                {/* 상단 직위 뱃지 & 코드 & 소속팀 & 상태 컨트롤러 */}
                 <div className="flex items-center justify-between text-[10px] mb-2 pb-1.5 border-b border-slate-800/80">
                     <div className="flex items-center gap-1.5 min-w-0">
                         <span 
@@ -1589,6 +1762,24 @@ export default function AgentOfficeDashboard() {
                         <span className="text-[9px] font-mono px-1 rounded opacity-80 shrink-0" style={{ color: currentDept?.color || '#00F0FF' }}>
                             {currentDept?.name || agent.deptName}
                         </span>
+
+                        {/* 👥 소속 팀 배정 및 이동 드롭다운 (카드를 팀에 넣고 빼기) */}
+                        <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
+                            <button
+                                onClick={() => setActiveTeamDropdownAgentId(activeTeamDropdownAgentId === agent.id ? null : agent.id)}
+                                className={`px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-1 border transition-all ${
+                                    agent.teamName
+                                        ? 'border-indigo-500/70 bg-indigo-950/70 text-indigo-300 hover:border-indigo-400'
+                                        : 'border-slate-800 bg-slate-900/80 text-slate-500 hover:text-slate-300'
+                                }`}
+                                title="소속 팀 변경 및 배정/제외 (카드를 팀에 넣고 빼기)"
+                            >
+                                <Users className="w-2.5 h-2.5 text-indigo-400" />
+                                <span className="max-w-[65px] truncate">{agent.teamName || '미배정'}</span>
+                                <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                            </button>
+                            {activeTeamDropdownAgentId === agent.id && renderTeamDropdown()}
+                        </div>
                     </div>
 
                     {/* 카드 위 상태 강제 토글 버튼 */}
@@ -2364,8 +2555,20 @@ export default function AgentOfficeDashboard() {
                                 })()}
                             </div>
 
-                            {/* 🏢 계층형 조직도 (Tree Org Chart) vs ▦ 전체 격자 관제 (Swarm Grid) 토글 스위치 */}
+                            {/* 🏢 3대 뷰 모드 토글: 👥 팀별 모듈 뷰 vs 🏢 직급 계층 뷰 vs ▦ 전체 카드 뷰 */}
                             <div className="flex items-center rounded-lg border border-slate-700 bg-slate-900/90 p-0.5 text-xs shadow-inner">
+                                <button
+                                    onClick={() => setOfficeLayoutMode('teams')}
+                                    className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 font-bold transition-all ${
+                                        officeLayoutMode === 'teams'
+                                            ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/50 shadow-[0_0_12px_rgba(99,102,241,0.35)]'
+                                            : 'text-slate-400 hover:text-white'
+                                    }`}
+                                    title="부서 내 하위 팀(총무1팀, 총무2팀 등) 분할 및 카드 넣고 빼기 모드"
+                                >
+                                    <Users className="w-3.5 h-3.5 text-indigo-400" />
+                                    <span>👥 팀별 모듈 뷰 (Teams)</span>
+                                </button>
                                 <button
                                     onClick={() => setOfficeLayoutMode('hierarchy')}
                                     className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 font-bold transition-all ${
@@ -2376,7 +2579,7 @@ export default function AgentOfficeDashboard() {
                                     title="부서별 팀장-과장-대리-사원 상하 계층 조직도 및 감시·승인 확인 체계"
                                 >
                                     <GitBranch className="w-3.5 h-3.5 text-amber-400" />
-                                    <span>🏢 계층형 조직도 뷰 (Tree Org Chart)</span>
+                                    <span>🏢 직급 계층 뷰 (Tree)</span>
                                 </button>
                                 <button
                                     onClick={() => setOfficeLayoutMode('grid')}
@@ -2385,10 +2588,10 @@ export default function AgentOfficeDashboard() {
                                             ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_12px_rgba(0,240,255,0.35)]'
                                             : 'text-slate-400 hover:text-white'
                                     }`}
-                                    title="전체 75인 에이전트 타일 관제 모드"
+                                    title="모든 조직도를 균일한 바둑판 타일 카드로 배치 (대리 앞, 사원 뒤, 미생성 맨 뒤 정렬)"
                                 >
                                     <LayoutGrid className="w-3.5 h-3.5 text-cyan-400" />
-                                    <span>▦ 격자 관제 뷰 (Grid)</span>
+                                    <span>▦ 전체 카드 뷰 (Cards)</span>
                                 </button>
                             </div>
                         </div>
@@ -2425,13 +2628,233 @@ export default function AgentOfficeDashboard() {
                     </div>
 
                     {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                        VIEW 1: 에이전트 오피스 (계층형 조직도 뷰 vs 격자 관제 뷰)
+                        VIEW 1: 에이전트 오피스 (👥 팀별 모듈 뷰 vs 🏢 직급 계층 뷰 vs ▦ 전체 카드 뷰)
                     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
                     {currentView === 'office' && (
                         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
 
                             {/* ─────────────────────────────────────────────────────────────
-                                MODE 1: 계층형 조직도 뷰 (Tree Org Chart Mode)
+                                MODE 1: 👥 팀별 모듈 뷰 (Team-Based Modular View)
+                                - 부서 내 총무1팀, 총무2팀 등 팀 단위 카드 컨테이너
+                                - 과장, 대리, 사원 등 카드를 팀에 넣고 빼기 지원
+                                - 직급 정렬 규칙: 대리는 앞, 사원은 뒤, 미생성은 맨 뒤
+                            ───────────────────────────────────────────────────────────── */}
+                            {officeLayoutMode === 'teams' && (
+                                <div className="space-y-10">
+                                    {(selectedDeptId === 'all' ? departments : departments.filter(d => d.id === selectedDeptId)).map((dept) => {
+                                        const deptAllAgents = agents.filter(a => a.deptId === dept.id);
+                                        const deptFiltered = filteredAgents.filter(a => a.deptId === dept.id);
+                                        if (selectedDeptId === 'all' && deptFiltered.length === 0 && searchQuery) {
+                                            return null;
+                                        }
+
+                                        // 부서 내 존재하는 모든 고유 팀 목록
+                                        const deptTeams = Array.from(new Set(deptAllAgents.map(a => a.teamName).filter(Boolean))) as string[];
+                                        const unassignedAgents = deptFiltered.filter(a => !a.teamName).sort(sortAgents);
+
+                                        return (
+                                            <div 
+                                                key={dept.id} 
+                                                className="rounded-xl border border-slate-800 bg-[#070C18]/90 p-5 shadow-lg relative overflow-hidden space-y-6"
+                                                style={{ borderTop: `4px solid ${dept.color}` }}
+                                            >
+                                                {/* 부서 헤더 바 */}
+                                                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-2xl">{dept.icon}</span>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <h3 className="text-base font-bold text-white tracking-wide">
+                                                                    {dept.name}
+                                                                </h3>
+                                                                <span className="text-[10px] px-2 py-0.5 rounded border font-mono font-bold" style={{ borderColor: dept.color, color: dept.color }}>
+                                                                    {dept.headRole}
+                                                                </span>
+                                                                <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-950/60 border border-indigo-700/60 text-indigo-300 font-mono font-bold">
+                                                                    {deptTeams.length}개 팀 운용 중
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-xs text-slate-400 mt-0.5">
+                                                                {dept.description}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* 부서 우측 버튼군 (+ 새 팀 추가, 부서 수정/삭제) */}
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => handleAddNewTeam(dept.id)}
+                                                            className="px-3 py-1.5 rounded-lg border border-indigo-500/60 bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-200 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-[0_0_12px_rgba(99,102,241,0.25)] cursor-pointer"
+                                                            title="이 부서 내에 새로운 팀(예: 총무3팀)을 추가합니다"
+                                                        >
+                                                            <Plus className="w-3.5 h-3.5 text-indigo-400" />
+                                                            <span>+ 새 팀 추가</span>
+                                                        </button>
+                                                        <div className="flex items-center gap-1 border-l border-slate-800/80 pl-2">
+                                                            <button
+                                                                onClick={(e) => handleOpenEditDept(dept, e)}
+                                                                className="px-2 py-1 rounded border border-slate-700 hover:border-cyan-400 bg-slate-900/90 text-slate-300 hover:text-cyan-300 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                                            >
+                                                                <Edit2 className="w-3 h-3 text-cyan-400" />
+                                                                <span>수정</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => handleDeleteDept(dept.id, e)}
+                                                                className="px-2 py-1 rounded border border-slate-800 hover:border-red-500/60 bg-slate-900/90 text-slate-400 hover:text-red-300 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                                            >
+                                                                <Trash2 className="w-3 h-3 text-red-400" />
+                                                                <span>삭제</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* 부서 내 각 팀 컨테이너 목록 */}
+                                                <div className="space-y-6">
+                                                    {deptTeams.map((teamName) => {
+                                                        const teamAgents = deptFiltered.filter(a => a.teamName === teamName).sort(sortAgents);
+                                                        const headCount = teamAgents.filter(a => a.position === '팀장').length;
+                                                        const chiefCount = teamAgents.filter(a => a.position === '과장').length;
+                                                        const assistCount = teamAgents.filter(a => a.position === '대리').length;
+                                                        const staffCount = teamAgents.filter(a => a.position === '사원').length;
+
+                                                        return (
+                                                            <div 
+                                                                key={teamName}
+                                                                className="rounded-xl border border-indigo-900/40 bg-[#080E20]/70 p-4 space-y-3 shadow-inner relative group/teambox"
+                                                            >
+                                                                {/* 팀 헤더 바 */}
+                                                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-950/80 pb-2.5">
+                                                                    <div className="flex items-center gap-2.5">
+                                                                        <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 shadow-[0_0_8px_#818CF8] animate-pulse"></div>
+                                                                        <h4 className="text-sm font-bold text-white tracking-wide flex items-center gap-1.5">
+                                                                            <span>👥</span>
+                                                                            <span className="text-indigo-200">{teamName}</span>
+                                                                        </h4>
+                                                                        {/* 인원 및 직급 구성 뱃지 */}
+                                                                        <div className="flex items-center gap-1 text-[10px] font-mono">
+                                                                            <span className="px-2 py-0.5 rounded bg-indigo-950/80 text-indigo-300 font-bold border border-indigo-800/60">
+                                                                                총 {teamAgents.length}명
+                                                                            </span>
+                                                                            {(headCount > 0 || chiefCount > 0 || assistCount > 0 || staffCount > 0) && (
+                                                                                <span className="px-2 py-0.5 rounded bg-slate-900/80 text-slate-400 border border-slate-800">
+                                                                                    {[
+                                                                                        headCount > 0 ? `팀장 ${headCount}` : null,
+                                                                                        chiefCount > 0 ? `과장 ${chiefCount}` : null,
+                                                                                        assistCount > 0 ? `대리 ${assistCount}` : null,
+                                                                                        staffCount > 0 ? `사원 ${staffCount}` : null
+                                                                                    ].filter(Boolean).join(' · ')}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* 팀 제어 버튼군: [+ 봇 배정/추가], [팀 해체] */}
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        {/* 미배정 봇 중 이 팀으로 바로 끌어오기 */}
+                                                                        {unassignedAgents.length > 0 && (
+                                                                            <div className="relative group/addto">
+                                                                                <button
+                                                                                    className="px-2.5 py-1 rounded border border-indigo-600/40 bg-indigo-950/50 hover:bg-indigo-900/60 text-indigo-300 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                                                                    title="미배정된 봇을 이 팀으로 추가 배정합니다"
+                                                                                >
+                                                                                    <Plus className="w-3 h-3 text-indigo-400" />
+                                                                                    <span>+ 봇 배정</span>
+                                                                                    <ChevronDown className="w-3 h-3 opacity-60" />
+                                                                                </button>
+                                                                                <div className="absolute right-0 top-full mt-1 w-52 rounded-lg border border-slate-700 bg-[#0C1322] shadow-2xl z-50 p-1.5 text-xs text-slate-200 hidden group-hover/addto:block">
+                                                                                    <div className="text-[10px] text-slate-400 px-2 py-1 border-b border-slate-800 font-mono">
+                                                                                        미배정 봇을 [{teamName}]에 배정:
+                                                                                    </div>
+                                                                                    <div className="max-h-40 overflow-y-auto py-1 space-y-0.5">
+                                                                                        {unassignedAgents.map(uAg => (
+                                                                                            <button
+                                                                                                key={uAg.id}
+                                                                                                onClick={() => handleMoveAgentToTeam(uAg.id, teamName)}
+                                                                                                className="w-full text-left px-2 py-1 rounded text-[11px] hover:bg-indigo-950/80 hover:text-cyan-300 text-slate-300 flex items-center justify-between transition-colors"
+                                                                                            >
+                                                                                                <span>{uAg.code} {uAg.name}</span>
+                                                                                                <span className="text-[9px] text-slate-500 font-mono">{uAg.position}</span>
+                                                                                            </button>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        <button
+                                                                            onClick={() => handleDeleteTeam(dept.id, teamName)}
+                                                                            className="px-2 py-1 rounded border border-slate-800 hover:border-rose-500/60 bg-slate-900/90 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                                                            title={`[${teamName}] 해체 (소속 봇들은 미배정 상태로 안전하게 전환)`}
+                                                                        >
+                                                                            <X className="w-3 h-3 text-rose-400" />
+                                                                            <span>팀 해체</span>
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* 팀 소속 카드 그리드 (👑 대리 앞, 사원 뒤, 미생성 맨 뒤 정렬!) */}
+                                                                {teamAgents.length > 0 ? (
+                                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3.5">
+                                                                        {teamAgents.map(ag => renderOrgCard(ag, dept))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="p-4 border border-dashed border-indigo-900/50 rounded-lg text-xs text-indigo-300/70 bg-indigo-950/20 text-center flex items-center justify-center gap-2">
+                                                                        <span>현재 [{teamName}]에 배정된 봇이 없습니다. 아래 대기 카드에서 [팀 배정]을 눌러 봇을 넣으세요.</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+
+                                                    {/* 부서에 등록된 팀이 없을 경우 안내 */}
+                                                    {deptTeams.length === 0 && (
+                                                        <div className="p-6 border border-dashed border-slate-800 rounded-xl bg-slate-900/30 text-center space-y-2">
+                                                            <Users className="w-8 h-8 text-indigo-400/60 mx-auto" />
+                                                            <div className="text-sm font-bold text-slate-300">
+                                                                등록된 세부 팀이 없습니다.
+                                                            </div>
+                                                            <p className="text-xs text-slate-500 max-w-md mx-auto">
+                                                                상단의 [+ 새 팀 추가] 버튼을 눌러 팀(예: {dept.name}1팀)을 생성하고 원하는 에이전트 카드를 배치해 보세요.
+                                                            </p>
+                                                            <button
+                                                                onClick={() => handleAddNewTeam(dept.id)}
+                                                                className="px-3 py-1.5 rounded-lg border border-indigo-500 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all inline-flex items-center gap-1 shadow-md cursor-pointer mt-2"
+                                                            >
+                                                                <Plus className="w-3.5 h-3.5" />
+                                                                <span>지금 첫 번째 팀 생성하기</span>
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    {/* 📋 대기 및 미배정 에이전트 / 슬롯 섹션 */}
+                                                    {unassignedAgents.length > 0 && (
+                                                        <div className="rounded-xl border border-slate-800/80 bg-[#070C16]/60 p-4 space-y-3">
+                                                            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-amber-400">📋</span>
+                                                                    <h4 className="text-xs font-bold text-slate-300 tracking-wide">
+                                                                        대기 및 미배정 에이전트 ({unassignedAgents.length}개 슬롯)
+                                                                    </h4>
+                                                                    <span className="text-[10px] text-slate-500">
+                                                                        (각 카드의 [팀 배정] 드롭다운을 눌러 원하는 팀에 넣을 수 있습니다)
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3.5">
+                                                                {unassignedAgents.map(ag => renderOrgCard(ag, dept))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {/* ─────────────────────────────────────────────────────────────
+                                MODE 2: 🏢 직급 계층 뷰 (Tree Org Chart Mode)
                             ───────────────────────────────────────────────────────────── */}
                             {officeLayoutMode === 'hierarchy' && (
                                 <div className="space-y-10">
@@ -2442,10 +2865,10 @@ export default function AgentOfficeDashboard() {
                                             return null;
                                         }
 
-                                        // 직급별 분류
-                                        const headAgents = deptFiltered.filter(a => (a.position || '사원') === '팀장');
-                                        const chiefAgents = deptFiltered.filter(a => (a.position || '사원') === '과장');
-                                        const staffAgents = deptFiltered.filter(a => ['대리', '사원'].includes(a.position || '사원'));
+                                        // 직급별 분류 (각 계층 내에서도 sortAgents로 정렬: 대리 앞, 사원 뒤, 미생성 맨 뒤)
+                                        const headAgents = deptFiltered.filter(a => (a.position || '사원') === '팀장').sort(sortAgents);
+                                        const chiefAgents = deptFiltered.filter(a => (a.position || '사원') === '과장').sort(sortAgents);
+                                        const staffAgents = deptFiltered.filter(a => ['대리', '사원'].includes(a.position || '사원')).sort(sortAgents);
                                         const pendingTasks = deptAllAgents.filter(a => a.isCreated && a.approvalStatus === 'PENDING');
 
                                         return (
@@ -2600,14 +3023,21 @@ export default function AgentOfficeDashboard() {
                             )}
 
                             {/* ─────────────────────────────────────────────────────────────
-                                MODE 2: 격자 관제 뷰 (Swarm Grid Mode)
+                                MODE 3: ▦ 전체 카드 뷰 (Swarm Grid Mode - 카드형태 일괄 배치)
                             ───────────────────────────────────────────────────────────── */}
                             {officeLayoutMode === 'grid' && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                                    {filteredAgents.map((agent) => {
-                                        const dept = departments.find(d => d.id === agent.deptId);
-                                        return renderOrgCard(agent, dept);
-                                    })}
+                                <div className="space-y-6">
+                                    <div className="flex items-center justify-between px-1 text-xs text-slate-400">
+                                        <span>
+                                            모든 조직도 에이전트 카드 배치 (총 {filteredAgents.length}개 슬롯 / 정렬: 대리 앞, 사원 뒤, 미생성 맨 뒤)
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                                        {filteredAgents.map((agent) => {
+                                            const dept = departments.find(d => d.id === agent.deptId);
+                                            return renderOrgCard(agent, dept);
+                                        })}
+                                    </div>
                                 </div>
                             )}
                         </div>

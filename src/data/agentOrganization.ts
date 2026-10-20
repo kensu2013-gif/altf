@@ -90,6 +90,7 @@ export interface AgentUnit {
     supervisorId?: string; // 직속 결재/확인 상위 직위자 에이전트 ID
     approvalStatus?: 'APPROVED' | 'PENDING' | 'REJECTED' | 'AUTO_RUNNING'; // 과장 결재 상태 or 사원/대리 자율반복
     orderIndex?: number; // 조직도 내 서열/배치 순서
+    teamName?: string; // 부서 내 소속 팀 (예: '총무1팀', '총무2팀')
 }
 
 export interface Department {
