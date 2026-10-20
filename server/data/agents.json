@@ -736,32 +736,39 @@
   {
     "id": "gen-statement-dispatcher",
     "code": "GEN-03",
-    "name": "거래명세표 발송봇",
+    "name": "거래명세표·성적서 동시 발송 준비봇",
     "deptId": "general",
     "deptName": "총무부",
-    "tier": 2,
-    "role": "고객사 회계 담당자 앞 거래명세표 자동 메일/팩스 발송",
+    "tier": 3,
+    "role": "웹 발주서 매출 거래명세표와 품질부 성적서 PDF를 1:1 자동 번들링하여 고객 발송 직전 패키지 완성 및 총무팀장 보고",
     "status": "ACTIVE",
     "metrics": {
       "speed": 99,
       "accuracy": 100,
       "load": 28,
       "uptime": "100%",
-      "tasksToday": 86
+      "tasksToday": 353
     },
-    "currentTask": "태형산업 회계팀 앞 명세표 발송 신호 발행",
+    "currentTask": "출고 완료 발주 건 거래명세표·성적서 1:1 번들링 (고객 발송 직전 353건 준비 완료)",
     "lastActive": "방금 전",
     "triggerEvents": [
-      "EVENT_INVOICE_ISSUED"
+      "EVENT_DISPATCH_COMPLETED",
+      "EVENT_CERT_MATCHED"
     ],
     "emittedEvents": [
-      "EVENT_STATEMENT_DISPATCHED"
+      "EVENT_DOCS_PACKAGED_FOR_CUSTOMER",
+      "EVENT_DISPATCH_APPROVAL_REQUESTED"
     ],
     "logs": [
-      "[09:18] 발송 신호 발행 -> 품질부 연계 대기"
+      "[16:25] 발주 PO-20261019-TAEIL-015 거래명세표 + 성적서(YR-26-10009) 번들링 완료",
+      "[16:25] 고객사 발송 직전 서류 패키지(READY_TO_DISPATCH) 총무팀장 승인 대기"
     ],
-    "isCreated": false,
-    "connectedDeptIds": [],
+    "isCreated": true,
+    "connectedDeptIds": [
+      "quality",
+      "shipping",
+      "data"
+    ],
     "position": "과장",
     "approvalStatus": "APPROVED",
     "orderIndex": 2
@@ -964,6 +971,45 @@
     "position": "사원",
     "approvalStatus": "AUTO_RUNNING",
     "orderIndex": 8
+  },
+  {
+    "id": "gen-customer-master",
+    "code": "GEN-10",
+    "name": "웹 거래처 관리 담당봇",
+    "deptId": "general",
+    "deptName": "총무부",
+    "tier": 3,
+    "role": "웹 CRM 1,265개 거래처 대표자, 사업자등록번호, 전화, 팩스, 이메일, 담당자 정보 실시간 수집 및 정제 관리",
+    "status": "ACTIVE",
+    "metrics": {
+      "speed": 98,
+      "accuracy": 99,
+      "load": 32,
+      "uptime": "99.9%",
+      "tasksToday": 1265
+    },
+    "currentTask": "웹 거래처 1,265개사 대표자/사업자번호/이메일/담당자 최신 정제 완료",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_CUSTOMER_REGISTERED",
+      "EVENT_CUSTOMER_PROFILE_UPDATED"
+    ],
+    "emittedEvents": [
+      "EVENT_CUSTOMER_MASTER_SYNCED"
+    ],
+    "logs": [
+      "[16:25] 웹 CRM 1,265개 거래처 데이터 동기화 완료",
+      "[16:25] 매출처 발송용 이메일/팩스/대표자 주소록 100% 매핑"
+    ],
+    "isCreated": true,
+    "connectedDeptIds": [
+      "data",
+      "quote",
+      "purchase"
+    ],
+    "position": "대리",
+    "approvalStatus": "AUTO_RUNNING",
+    "orderIndex": 9
   },
   {
     "id": "qc-inbound-ingest",
@@ -1927,41 +1973,50 @@
     "orderIndex": 8
   },
   {
-    "id": "data-api-gateway-watch",
+    "id": "data-master-supply-ledger",
     "code": "DAT-10",
-    "name": "대경 성적서 이름 및 데이터 관리",
+    "name": "전사 공급망 통합 원장 분석봇",
     "deptId": "data",
     "deptName": "데이터관리부",
-    "tier": 2,
-    "role": "Make.com, 구글시트, 메일플러그 웹훅 인입 트래픽 헬스체크",
+    "tier": 3,
+    "role": "발주서·발주번호·아이템·성적서·거래명세표 전사 데이터 종합 원장 자동 축적 및 경영지원부(EXE) 분석 데이터 파이프라인 총괄",
     "status": "ACTIVE",
     "metrics": {
       "speed": 99,
       "accuracy": 100,
-      "load": 18,
+      "load": 42,
       "uptime": "100%",
-      "tasksToday": 971
+      "tasksToday": 2440
     },
-    "currentTask": "24시간 무한 가동 준비 완료",
+    "currentTask": "발주 2,440건 × 성적서 1,469건 × 거래명세표 종합 원장 동기화 및 경영지원부(EXE) 분석 피드 대기",
     "lastActive": "방금 전",
     "triggerEvents": [
-      "CRON_EVERY_MINUTE"
+      "EVENT_ORDER_RECEIVED",
+      "EVENT_INVOICE_ISSUED",
+      "EVENT_CERT_MATCHED"
     ],
     "emittedEvents": [
-      "EVENT_GATEWAY_HEALTHY"
+      "EVENT_MASTER_LEDGER_UPDATED",
+      "EVENT_EXECUTIVE_ANALYSIS_READY"
     ],
     "logs": [
-      "[00:06:29] [사원] 직위 배정 및 에이전트 신규 배포 완료 (연계: 1개 부서, 1명 담당자)"
+      "[16:25] 전사 발주-성적서-거래명세표 종합 마스터 원장 축적 완료",
+      "[16:25] 경영지원팀(EXE) 손익·단가·거래처 수익성 분석 데이터 파이프라인 가동 대기"
     ],
     "isCreated": true,
     "connectedDeptIds": [
-      "quality"
+      "general",
+      "purchase",
+      "quality",
+      "executive"
     ],
-    "position": "사원",
-    "approvalStatus": "AUTO_RUNNING",
+    "position": "과장",
+    "approvalStatus": "APPROVED",
     "orderIndex": 9,
     "supervisorId": "",
     "connectedAgentIds": [
+      "pur-split-balancer",
+      "gen-statement-dispatcher",
       "qc-inbound-ingest"
     ]
   },

@@ -30,7 +30,7 @@
     "icon": "📑",
     "description": "전자세금계산서, 거래명세표 발행, 입금 대조 및 여신 한도 관리",
     "headRole": "경리/회계 총괄",
-    "totalUnits": 9
+    "totalUnits": 10
   },
   {
     "id": "quality",
