@@ -2,17 +2,14 @@ import React, { useState, useEffect } from 'react';
 import {
     X,
     FileText,
-    CheckCircle2,
     AlertTriangle,
     RotateCw,
     UploadCloud,
-    ArrowRight,
     DollarSign,
     Truck,
     Package,
     MessageSquare,
-    Check,
-    Download
+    Check
 } from 'lucide-react';
 
 interface SupplierInvoiceItem {
@@ -77,7 +74,7 @@ interface DispatchResult {
     departments: {
         general: { status: string; message: string };
         purchase: { status: string; message: string; matchedCount?: number; updatedPos?: string[] };
-        quality: { status: string; message: string; matchedCerts?: any[]; missingItems?: string[] };
+        quality: { status: string; message: string; matchedCerts?: Array<Record<string, unknown>>; missingItems?: string[] };
         shipping: { status: string; message: string; targetLocation?: string };
     };
 }
@@ -96,7 +93,7 @@ export const DaekyungInvoiceModal: React.FC<DaekyungInvoiceModalProps> = ({
     const [invoices, setInvoices] = useState<SupplierInvoice[]>([]);
     const [loading, setLoading] = useState(false);
     const [lastResult, setLastResult] = useState<DispatchResult | null>(null);
-    const [selectedSample, setSelectedSample] = useState<'0031' | '0015'>('0031');
+    const [selectedSample, setSelectedSample] = useState<'0031' | '0015' | null>(null);
 
     // 텔레그램 연동 상태
     const [telegramStatus, setTelegramStatus] = useState({
@@ -165,6 +162,7 @@ export const DaekyungInvoiceModal: React.FC<DaekyungInvoiceModalProps> = ({
             alert('요청 실패: ' + e);
         } finally {
             setLoading(false);
+            setSelectedSample(null);
         }
     };
 
@@ -307,10 +305,15 @@ export const DaekyungInvoiceModal: React.FC<DaekyungInvoiceModalProps> = ({
                                         type="button"
                                         onClick={() => handleSimulate('0031')}
                                         disabled={loading}
-                                        className="p-2 rounded-lg bg-linear-to-r from-teal-900/60 to-cyan-900/60 hover:from-teal-800/80 hover:to-cyan-800/80 border border-teal-500/50 text-left cursor-pointer transition-all group"
+                                        className="p-2 rounded-lg bg-linear-to-r from-teal-900/60 to-cyan-900/60 hover:from-teal-800/80 hover:to-cyan-800/80 border border-teal-500/50 text-left cursor-pointer transition-all group disabled:opacity-50"
                                     >
                                         <div className="text-[11px] font-bold text-teal-300 flex items-center justify-between">
-                                            <span>⚡ No.0031 전표</span>
+                                            <span className="flex items-center gap-1.5">
+                                                {loading && selectedSample === '0031' && (
+                                                    <RotateCw className="w-3 h-3 animate-spin text-teal-300" />
+                                                )}
+                                                <span>⚡ No.0031 전표</span>
+                                            </span>
                                             <span className="text-[9px] bg-teal-500/20 px-1 rounded">서울재고분</span>
                                         </div>
                                         <div className="text-[10px] text-slate-300 truncate">45E(L) 100A (17개) + 운임</div>
@@ -321,10 +324,15 @@ export const DaekyungInvoiceModal: React.FC<DaekyungInvoiceModalProps> = ({
                                         type="button"
                                         onClick={() => handleSimulate('0015')}
                                         disabled={loading}
-                                        className="p-2 rounded-lg bg-linear-to-r from-cyan-900/60 to-blue-900/60 hover:from-cyan-800/80 hover:to-blue-800/80 border border-cyan-500/50 text-left cursor-pointer transition-all group"
+                                        className="p-2 rounded-lg bg-linear-to-r from-cyan-900/60 to-blue-900/60 hover:from-cyan-800/80 hover:to-blue-800/80 border border-cyan-500/50 text-left cursor-pointer transition-all group disabled:opacity-50"
                                     >
                                         <div className="text-[11px] font-bold text-cyan-300 flex items-center justify-between">
-                                            <span>⚡ No.0015 전표</span>
+                                            <span className="flex items-center gap-1.5">
+                                                {loading && selectedSample === '0015' && (
+                                                    <RotateCw className="w-3 h-3 animate-spin text-cyan-300" />
+                                                )}
+                                                <span>⚡ No.0015 전표</span>
+                                            </span>
                                             <span className="text-[9px] bg-cyan-500/20 px-1 rounded">고객직배분</span>
                                         </div>
                                         <div className="text-[10px] text-slate-300 truncate">45E(S) 300A (2개) 47.5만원</div>

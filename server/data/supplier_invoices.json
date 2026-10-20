@@ -1,5 +1,125 @@
 [
   {
+    "id": "DKB-INV-SCANNED-1792478393946-2-00311",
+    "fileName": "TalkFile_알트에프_거래명세표_1019_1서울재고_pdf.pdf",
+    "invoiceNo": "0031-1/",
+    "invoiceDate": "2026-10-19",
+    "pageIndex": 2,
+    "totalPages": 2,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "알트에프",
+    "customerNumber": "838-06-71345",
+    "matchedOrderId": "PO-20261019-TAEIL-015",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "45E(L)",
+        "spec": "S10S STS304-W 100A",
+        "quantity": 17,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261019-2924",
+        "remarks": "알트에프 발주분"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2924"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 402820,
+      "freightPrice": 0,
+      "subtotal": 402820,
+      "vat": 40282,
+      "grandTotal": 0
+    },
+    "rawText": "A EAA\n2026 주 10 A 19 HB                                No:0031- 1/ 1\n공 등록번호        606 - 81 - 75098         공 등록번호 _ 838-05-01054\n상 2 (주)대경벤드    성명 김      상 호 HEWIZ(ALT.F) 성명 조현진\n그\n주 _ 소 경남 양산시 어실로 115            CL 주 . 소 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『&※ 055)364-1800   362-7074       자 &3t/FAX 051 )311-8605     051-328-4012\n1 4560)        5/105                     서울재고 발주분        65261019-2924\nSTS 304          타비       100A                 17            23.460         398.820\n2 29                                        서물재고 232 박조나단님 9\n1 건       4.000        4.000\n**&* (|    하    여    백 xa x\n18       공급가액                402,820\n부가세                   40,282\n[그    계               443,102\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T06:39:53.951Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T06:39:53.951Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 402820,
+      "vat": 40282,
+      "grandTotal": 0
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792478392494-1-00131",
+    "fileName": "TalkFile_알트에프_거래명세표_1019_1서울재고_pdf.pdf",
+    "invoiceNo": "0013-1/",
+    "invoiceDate": "2026-10-19",
+    "pageIndex": 1,
+    "totalPages": 2,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "알트에프 (서울재고)",
+    "customerNumber": "",
+    "matchedOrderId": null,
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "대경 배관 자재",
+        "spec": "대경 규격 출하품",
+        "quantity": 1,
+        "unit": "LOT",
+        "unitPrice": 5005620,
+        "amount": 5005620,
+        "poNo": "",
+        "remarks": "알트에프 (서울재고)"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [],
+    "pricing": {
+      "totalSupplyPrice": 5005620,
+      "freightPrice": 0,
+      "subtotal": 5005620,
+      "vat": 500562,
+      "grandTotal": 0
+    },
+    "rawText": "거래명세서\n2026 주 10 19 H                                No:0013- 1/ 1\nZz 등록번호       606 - 81 - 75098         2 등록번호 _ 838-05-01054\n상 호 (주)대경벤드     성명 |김학       상 호 알트에프(/ㅠ.『) #2 조현진\n들  주   소 경남 양산시 어실로 115            ㄴㄴ 주   A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『&&% 055)364-1800   362-/074       자 MgH/FAX 051 )311-8605     051-328-4012\nNo  =  명 / 재  질 / 7  격   수량 _ 단위  단  Jt   =  of   비 고\n1 906(ㄴ)          5/105                         서울재고 발주분 박조나단님 9 65260910-2561\nSTS 304-W         ERW      300A               18          278.090       5.005.620\nsex Ol    ot    of    TJ\n18      공급가액            5,005,620\n부가 세                  500,562\n합   A            5,506, 182\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T06:39:53.946Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T06:39:53.946Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 5005620,
+      "vat": 500562,
+      "grandTotal": 0
+    }
+  },
+  {
     "id": "DKB-INV-SCANNED-1792475631505-2-00321",
     "fileName": "TalkFile_알트에프_거래명세표_1019_pdf.pdf",
     "invoiceNo": "0032-1/",

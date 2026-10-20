@@ -788,6 +788,15 @@ const server = http.createServer(async (req, res) => {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     if (url.pathname === '/api/agents') {
         if (req.method === 'GET') {
+            try {
+                const fs = await import('fs');
+                const localAgentPath = './server/data/agents.json';
+                if (fs.existsSync(localAgentPath)) {
+                    db.agents = JSON.parse(fs.readFileSync(localAgentPath, 'utf8'));
+                }
+            } catch (readErr) {
+                console.warn('[API] Could not refresh agents from file:', readErr.message);
+            }
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({
                 success: true,
@@ -839,6 +848,15 @@ const server = http.createServer(async (req, res) => {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     if (url.pathname === '/api/departments') {
         if (req.method === 'GET') {
+            try {
+                const fs = await import('fs');
+                const localDeptPath = './server/data/departments.json';
+                if (fs.existsSync(localDeptPath)) {
+                    db.departments = JSON.parse(fs.readFileSync(localDeptPath, 'utf8'));
+                }
+            } catch (readErr) {
+                console.warn('[API] Could not refresh departments from file:', readErr.message);
+            }
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({
                 success: true,
