@@ -58,20 +58,52 @@ export class DaekyungInvoiceService {
     }
 
     /**
-     * PDF 텍스트 파싱 및 거래명세서 데이터 구조화
+     * PDF 텍스트 파싱 및 거래명세서 데이터 구조화 (단면, 수십 장 다중 페이지, 다중 전표 통합 PDF 100% 지원)
      */
     async parsePdfBuffer(pdfBuffer, originalFileName = '대경벤드_거래명세서.pdf') {
         const parser = new PDFParse({ data: pdfBuffer });
         const res = await parser.getText();
-        const fullText = res.text || '';
+        const totalPages = res.total || (res.pages ? res.pages.length : 1);
 
-        return this.parseTextToInvoice(fullText, originalFileName);
+        // 만약 2장 이상의 다중 페이지인 경우:
+        // 1) 여러 개의 서로 다른 전표(No:0015, No:0031 등)가 1개 PDF로 묶여 있는지 판별
+        // 2) 아니면 1개 전표가 1/3, 2/3, 3/3 처럼 여러 장으로 이어진 연속 전표인지 판별
+        if (res.pages && res.pages.length > 1) {
+            const invoiceGroups = {};
+            for (const page of res.pages) {
+                const noMatch = page.text.match(/No\s*:\s*([\d-]+(?:\s*[\d/]+)?)/i);
+                let invKey = 'DEFAULT';
+                if (noMatch) {
+                    const baseNo = noMatch[1].split('-')[0].replace(/\s+/g, '');
+                    if (baseNo) invKey = baseNo;
+                }
+                if (!invoiceGroups[invKey]) invoiceGroups[invKey] = [];
+                invoiceGroups[invKey].push(page);
+            }
+
+            const groupKeys = Object.keys(invoiceGroups);
+            // 만약 서로 다른 전표 번호가 2개 이상 감지되었다면 각각 독립 전표로 분할 파싱
+            if (groupKeys.length > 1 && !groupKeys.includes('DEFAULT')) {
+                const parsedInvoices = [];
+                for (const key of groupKeys) {
+                    const pages = invoiceGroups[key];
+                    const combinedText = pages.map(p => p.text).join('\n');
+                    const inv = this.parseTextToInvoice(combinedText, originalFileName, pages.length);
+                    parsedInvoices.push(inv);
+                }
+                return parsedInvoices;
+            }
+        }
+
+        // 단일 전표 (1페이지 또는 여러 페이지로 이어진 연속 전표)
+        const fullText = res.text || '';
+        return this.parseTextToInvoice(fullText, originalFileName, totalPages);
     }
 
     /**
      * 텍스트로부터 대경벤드 거래명세서 데이터 추출
      */
-    parseTextToInvoice(fullText, originalFileName = '거래명세서.pdf') {
+    parseTextToInvoice(fullText, originalFileName = '거래명세서.pdf', totalPages = 1) {
         const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
 
         // 1. 일자 파싱 (예: 2026 年 10 月 19 日 or 2026-10-19)
@@ -84,7 +116,7 @@ export class DaekyungInvoiceService {
             if (altDateMatch) invoiceDate = `${altDateMatch[1]}-${altDateMatch[2]}-${altDateMatch[3]}`;
         }
 
-        // 2. 전표 번호 (예: No:0015- 1/ 1, No:0031- 1/ 1)
+        // 2. 전표 번호 (예: No:0015- 1/ 1, No:0031- 1/ 2, No:0031- 2/ 2)
         let invoiceNo = '';
         const noMatch = fullText.match(/No\s*:\s*([\d-]+(?:\s*[\d/]+)?)/i);
         if (noMatch) {
@@ -210,6 +242,7 @@ export class DaekyungInvoiceService {
             fileName: originalFileName,
             invoiceNo,
             invoiceDate,
+            totalPages,
             supplier: {
                 name: '(주)대경벤드',
                 bizNo: '606-81-75098',

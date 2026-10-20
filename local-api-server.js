@@ -1702,13 +1702,19 @@ const server = http.createServer(async (req, res) => {
                         sendJsonResponse(req, res, 400, { success: false, error: 'PDF 파일이 첨부되지 않았습니다.' });
                         return;
                     }
-                    const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
-                    const parsedInvoice = await daekyungInvoiceService.parsePdfBuffer(req.file.buffer, originalName);
-                    const result = await daekyungInvoiceService.processAndDispatch(parsedInvoice, 'WEB_UPLOAD');
+                    const parsed = await daekyungInvoiceService.parsePdfBuffer(req.file.buffer, originalName);
+                    const invoiceList = Array.isArray(parsed) ? parsed : [parsed];
+                    const results = [];
+                    for (const inv of invoiceList) {
+                        const r = await daekyungInvoiceService.processAndDispatch(inv, 'WEB_UPLOAD');
+                        results.push(r);
+                    }
                     sendJsonResponse(req, res, 200, {
                         success: true,
-                        message: `대경벤드 거래명세서 [${parsedInvoice.invoiceNo}] 파싱 및 전사 연계 완료!`,
-                        ...result
+                        count: results.length,
+                        message: `대경벤드 거래명세서 [${invoiceList.map(i => i.invoiceNo).join(', ')}] 총 ${results.length}건 파싱 및 전사 연계 완료!`,
+                        results,
+                        ...results[0]
                     });
                 } catch (parseErr) {
                     sendJsonResponse(req, res, 500, { success: false, error: 'PDF 파싱 실패: ' + parseErr.message });

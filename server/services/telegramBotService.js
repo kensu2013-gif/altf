@@ -249,18 +249,23 @@ export class TelegramBotService {
                 // 버퍼 다운로드
                 const buffer = await this.downloadFile(fileInfo.result.file_path);
 
-                // 파싱 & 전사 연계
-                const invoiceData = await daekyungInvoiceService.parsePdfBuffer(buffer, fileName);
-                const dispatchResult = await daekyungInvoiceService.processAndDispatch(invoiceData, 'TELEGRAM_BOT');
+                // 파싱 & 전사 연계 (단면, 수십 장 다중 페이지, 여러 전표 통합 PDF 모두 지원)
+                const rawParsed = await daekyungInvoiceService.parsePdfBuffer(buffer, fileName);
+                const invoicesToProcess = Array.isArray(rawParsed) ? rawParsed : [rawParsed];
 
-                // 텔레그램 결과 보고 회신
-                const replyText = `
-<b>✅ [대경벤드 거래명세표 접수 & 전사 연계 완료]</b>
+                for (const invoiceData of invoicesToProcess) {
+                    const dispatchResult = await daekyungInvoiceService.processAndDispatch(invoiceData, 'TELEGRAM_BOT');
+
+                    const pagesLabel = invoiceData.totalPages && invoiceData.totalPages > 1 ? ` (총 ${invoiceData.totalPages}페이지 파싱)` : '';
+                    // 텔레그램 결과 보고 회신
+                    const replyText = `
+<b>✅ [대경벤드 거래명세표 접수 & 전사 연계 완료]</b>${pagesLabel}
 
 📋 <b>전표 정보</b>
 • 전표번호: <code>${invoiceData.invoiceNo}</code> (발행: ${invoiceData.invoiceDate})
 • 공급자: ${invoiceData.supplier.name} ➔ 공급받는자: ${invoiceData.buyer.name}
 • 비고 P.O 번호: <code>${invoiceData.poNumbers.join(', ') || '없음'}</code>
+• 품목 수: <b>${invoiceData.items.length}개 품목</b> (다중 페이지 전체 누적)
 
 💰 <b>총무부 매입 확정 금액</b>
 • 공급가액: <b>${invoiceData.pricing.subtotal.toLocaleString()}원</b> (자재: ${invoiceData.pricing.totalSupplyPrice.toLocaleString()}원 + 운임: ${invoiceData.pricing.freightPrice.toLocaleString()}원)
@@ -271,10 +276,11 @@ export class TelegramBotService {
 • <b>🛒 구매부(PUR-07)</b>: ${dispatchResult.departments.purchase.message}
 • <b>🔬 품질부(QC-08)</b>: ${dispatchResult.departments.quality.message}
 • <b>🚚 출고부(LOG-01)</b>: ${dispatchResult.departments.shipping.message}
-• <b>📑 총무부(GEN-01)</b>: 10월 대경 매입 전표 DB 등록 완료
-                `.trim();
+• <b>📑 총무부(GEN-01)</b>: 대경 매입 전표 DB 등록 완료
+                    `.trim();
 
-                await this.sendMessage(chatId, replyText);
+                    await this.sendMessage(chatId, replyText);
+                }
 
             } catch (err) {
                 console.error('[TelegramBot] 문서 처리 실패:', err);
