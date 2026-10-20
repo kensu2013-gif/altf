@@ -17,6 +17,7 @@ import { computeDocumentSimilaritySummary } from './similarity-engine.js';
 import { mailplugService } from './server/services/mailplugCollector.js';
 import { certificateParserService } from './server/services/certificateParser.js';
 import { purchaseStockOrderService } from './server/services/purchaseService.js';
+import { purchaseBacklogBotService } from './server/services/purchaseBacklogBotService.js';
 import { certificateIssuerService } from './server/services/certificateIssuer.js';
 
 import multer from 'multer';
@@ -1429,6 +1430,118 @@ const server = http.createServer(async (req, res) => {
                 sendJsonResponse(req, res, 500, { success: false, error: err.message });
             }
             return;
+        }
+
+        // ==========================================
+        // 🛒 구매부 PUR-07 : 주문관리 발주서 분류 및 미결 통합 관제 REST API
+        // ==========================================
+        // 8. GET /api/pur/pur07/summary : 발주 분류 요약 & 미결/패키징 현황
+        if (req.method === 'GET' && url.pathname === '/api/pur/pur07/summary') {
+            try {
+                const summary = purchaseBacklogBotService.cache.summary || purchaseBacklogBotService.classifyAndSyncBacklog(db.orders).summary;
+                sendJsonResponse(req, res, 200, { success: true, summary });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 9. GET /api/pur/pur07/backlog : 미결 목록 및 필터링 조회
+        if (req.method === 'GET' && url.pathname === '/api/pur/pur07/backlog') {
+            try {
+                const urlParams = new URLSearchParams(url.search);
+                const customer = urlParams.get('customer') || '';
+                const date = urlParams.get('date') || '';
+                const status = urlParams.get('status') || 'ALL';
+                const search = urlParams.get('search') || '';
+                const limit = parseInt(urlParams.get('limit') || '100', 10);
+                const offset = parseInt(urlParams.get('offset') || '0', 10);
+
+                const data = purchaseBacklogBotService.getBacklog({ customer, date, status, search, limit, offset });
+                sendJsonResponse(req, res, 200, { success: true, ...data });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 10. POST /api/pur/pur07/sync : 발주서 수동 즉시 동기화
+        if (req.method === 'POST' && url.pathname === '/api/pur/pur07/sync') {
+            try {
+                const result = purchaseBacklogBotService.classifyAndSyncBacklog(db.orders);
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    message: 'PUR-07 발주 분류 및 미결 대장 동기화 완료!',
+                    summary: result.summary
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 11. POST /api/pur/pur07/fulfill : 사무실 담당자 출고 완료 처리 (미결 해제 및 서류 패키징)
+        if (req.method === 'POST' && url.pathname === '/api/pur/pur07/fulfill') {
+            try {
+                const body = await parseBody(req);
+                const { orderId, operatorName } = body || {};
+                if (!orderId) {
+                    sendJsonResponse(req, res, 400, { success: false, error: 'orderId is required' });
+                    return;
+                }
+                const result = purchaseBacklogBotService.fulfillOrder(orderId, operatorName || '사무실 관리자');
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    message: `발주번호 [${orderId}] 출고 완료 처리 (미결 해제 및 거래명세표/성적서 고객 발송 준비 완료)`,
+                    ...result
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 12. GET /api/pur/pur07/packages : 고객 발송 대기 패키지 목록 (출고 완료 + 성적서 + 거래명세표 매칭)
+        if (req.method === 'GET' && url.pathname === '/api/pur/pur07/packages') {
+            try {
+                const packages = purchaseBacklogBotService.cache.readyPackages || [];
+                sendJsonResponse(req, res, 200, { success: true, count: packages.length, packages });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 13. GET /api/pur/pur07/scheduler-status : 9시-18시 1시간 주기 스케줄러 상태
+        if (req.method === 'GET' && url.pathname === '/api/pur/pur07/scheduler-status') {
+            try {
+                const status = purchaseBacklogBotService.getSchedulerStatus();
+                sendJsonResponse(req, res, 200, { success: true, ...status });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 14. GET /api/pur/pur07/download-excel : '주문관리_발주서_통합대장.xlsx' 다운로드
+        if (req.method === 'GET' && url.pathname === '/api/pur/pur07/download-excel') {
+            try {
+                const excelPath = path.join(ROOT_DIR, 'storage/purchases/주문관리_발주서_통합대장.xlsx');
+                if (!fs.existsSync(excelPath)) {
+                    purchaseBacklogBotService.exportToExcel();
+                }
+                const stat = fs.statSync(excelPath);
+                res.writeHead(200, {
+                    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'Content-Length': stat.size,
+                    'Content-Disposition': 'attachment; filename*=UTF-8\'\'%EC%A3%BC%EB%AC%B8%EA%B4%80%EB%A6%AC_%EB%B0%9C%EC%A3%BC%EC%84%9C_%ED%86%B5%ED%95%A9%EB%8C%80%EC%9E%A5.xlsx'
+                });
+                fs.createReadStream(excelPath).pipe(res);
+                return;
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+                return;
+            }
         }
     }
 

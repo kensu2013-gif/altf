@@ -71,6 +71,26 @@
 
 ---
 
+## 4. [완료] 구매부 (PUR-07) 주문관리 발주서 분류·미결 관제 & 서류 번들링 에이전트
+- `[x]` **PUR-07 (대리 / 주문관리 발주서 분류 및 미결 통합 관제봇)**:
+  - `altf.kr` 뒷단 주문관리의 모든 발주서(`db.orders` 1,537건, 7,030개 품목) 수집 및 148개 거래처별, 날짜별 자동 분류/저장
+  - 각 발주 품목에 대응하는 매입발주서(`PUR-PO-...`) 동시 생성 및 매입처(대경벤드 등) 연계 관리
+  - 미결 리스트(Backlog Pending: 360건) 24시간 실시간 추적 및 관리
+- `[x]` **영업시간(09:00 ~ 18:00) 매 1시간 주기 API 자동 호출 스케줄러**:
+  - 평일 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00 (1일 10회) 자동 감지
+  - 그 외 영업시간 외/주말은 대기 상태(STANDBY) 유지
+- `[x]` **사무실 출고 완료 연동 & 거래명세표·성적서 자동 1:1 매칭 (고객 발송 패키징)**:
+  - 실제 사무실 담당자가 출고 완료(`fulfillOrder`) 처리 시 미결(Pending)에서 즉시 해제
+  - 발주번호 기반 품질부 성적서(`certificates.json` 1,469건 / QC-01) 접수 여부 확인 (126건 매칭 완료)
+  - 거래명세표(`STMT-...`)와 성적서 PDF를 1:1 결합한 고객사 발송 준비 완료 패키지(`READY_TO_DISPATCH` 120건) 자동 번들링
+- `[x]` **영구 백업 및 엑셀 마스터 대장 자동 생성**:
+  - `server/data/pur07_order_backlog.json` 및 `storage/purchases/주문관리_발주서_통합대장.xlsx` 2개 시트(미결리스트 / 고객발송준비) 생성
+- `[x]` **REST API & AI Agent Office 대시보드 연동**:
+  - `GET /api/pur/pur07/summary`, `GET /api/pur/pur07/backlog`, `POST /api/pur/pur07/sync`, `POST /api/pur/pur07/fulfill`, `GET /api/pur/pur07/packages`, `GET /api/pur/pur07/scheduler-status`, `GET /api/pur/pur07/download-excel`
+  - Agent Office 인스펙터 패널 내 PUR-07 전용 네온 제어반 탑재 완료
+
+---
+
 ## 2. [완료] CRM Flow Chart 대시보드 및 이벤트 시스템
 - `[x]` `local-api-server.js`에 `crmEvents` 데이터 초기화, S3 저장 로직 추가
 - `[x]` `local-api-server.js`에 `GET /api/crm/events`, `POST /api/crm/events`, `DELETE /api/crm/events/:id` API 추가

@@ -538,35 +538,56 @@
   {
     "id": "pur-split-balancer",
     "code": "PUR-07",
-    "name": "분할 발주 최적화봇",
+    "name": "발주 분류 및 미결 통합 관제봇",
     "deptId": "purchase",
     "deptName": "구매부",
     "tier": 2,
-    "role": "긴급분(시화) vs 양산분(대경) 최적 단가 분할 배분",
-    "status": "STANDBY",
+    "role": "altf.kr 웹 주문 전체 분류 저장, 매입발주서 연동, 미결 리스트 실시간 추적 및 출고 시 거래명세표·성적서 고객 패키징 총괄",
+    "status": "ACTIVE",
     "metrics": {
-      "speed": 93,
-      "accuracy": 97,
-      "load": 18,
-      "uptime": "99.8%",
-      "tasksToday": 22
+      "speed": 98,
+      "accuracy": 99,
+      "load": 100,
+      "uptime": "99.9%",
+      "tasksToday": 1537
     },
-    "currentTask": "분할 발주 비율 최적화 대기",
-    "lastActive": "15분 전",
+    "currentTask": "[영업시간 1시간 주기] 발주 1537건 분류 관리 | 미결 360건 | 고객발송준비 120건 (다음: 오늘 14:00)",
+    "lastActive": "방금 전",
     "triggerEvents": [
-      "EVENT_PO_SPLIT_REQUESTED"
+      "EVENT_ORDER_RECEIVED",
+      "EVENT_HOURLY_BIZ_TIMER",
+      "EVENT_DISPATCH_COMPLETED",
+      "EVENT_QC_CERT_ARRIVED"
     ],
     "emittedEvents": [
-      "EVENT_PO_SPLIT_OPTIMIZED"
+      "EVENT_BACKLOG_UPDATED",
+      "EVENT_PURCHASE_PO_CREATED",
+      "EVENT_CERT_VERIFICATION_REQUESTED",
+      "EVENT_DOCS_PACKAGED_FOR_CUSTOMER"
     ],
     "logs": [
-      "[08:15] 시화 30% / 대경 70% 최적 배분"
+      "[13:32] [PUR-07] altf.kr 발주 1537건 업체/날짜별 분류 완료",
+      "[13:32] 미결(Pending) 360건 추적 중 (매입발주서 자동 매핑)",
+      "[13:32] QC-01 성적서 교차 대조: 126건 접수 확인",
+      "[13:32] 출고 완료 패키징: 거래명세표+성적서 번들 120건 발송 대기"
     ],
-    "isCreated": false,
-    "connectedDeptIds": [],
-    "position": "사원",
+    "isCreated": true,
+    "connectedDeptIds": [
+      "quality",
+      "general",
+      "shipping",
+      "sle"
+    ],
+    "position": "대리",
     "approvalStatus": "AUTO_RUNNING",
-    "orderIndex": 6
+    "orderIndex": 6,
+    "supervisorId": "",
+    "connectedAgentIds": [
+      "qc-inbound-ingest",
+      "qc-cert-builder",
+      "gen-statement-builder",
+      "log-dispatch-signal"
+    ]
   },
   {
     "id": "pur-invoice-verifier",
@@ -1128,7 +1149,7 @@
       "uptime": "100%",
       "tasksToday": 204
     },
-    "currentTask": "발주서 ES260709-1974 성적서 6건 발행 완료 (PDF/엑셀 보관)",
+    "currentTask": "CERT_YR-26-09915_태형산업.xlsx 및 고해상도 PDF 생성 완료",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_MTC_MATCHED"
@@ -1137,31 +1158,22 @@
       "EVENT_MTC_GENERATED"
     ],
     "logs": [
-      "[00:24] [QC-06] 발주번호 ES260709-1974 성적서 발행 성공: YR-26-07015-1, YR-26-07015-2, YR-26-07015-3, YR-26-07015-4, YR-26-07015-5, YR-26-07015-6 (양식: TP304(소재ASTM사용시))",
-      "[00:24] [QC-06] 출고지시서 A202610150 ((주)태양밴드) 재고출고분 성적서 발행 성공: YR-26-07015 (양식: TP316L, 매칭: JCQ4366➔SD34285)",
-      "[00:23] [QC-06] 발주번호 ES260709-1974 성적서 발행 성공: YR-26-07015-1, YR-26-07015-2, YR-26-07015-3, YR-26-07015-4, YR-26-07015-5, YR-26-07015-6 (양식: TP304(소재ASTM사용시))",
-      "[23:54] [QC-06] 출고지시서 A202610150 ((주)태양밴드) 재고출고분 성적서 발행 성공: YR-26-07015 (양식: TP316L, 매칭: JCQ4366➔SD34285)",
-      "[23:52] [QC-06] 출고지시서 A202610150 ((주)태양밴드) 재고출고분 성적서 발행 성공: YR-26-07015 (양식: TP316L, 매칭: JCQ4366➔SD34285)",
-      "[23:52] [QC-06] 출고지시서 A202610150 ((주)태양밴드) 재고출고분 성적서 발행 성공: YR-26-07015 (양식: TP316L, 매칭: JCQ4366➔SD34285)",
-      "[23:27] [QC-06] 출고지시서 A202610150 ((주)태양밴드) 재고출고분 성적서 발행 성공: YR-26-07015 (양식: TP316L, 매칭: JCQ4366➔SD34285)",
-      "[23:24] [QC-06] 출고지시서 A202610150 ((주)태양밴드) 재고출고분 성적서 발행 성공: YR-26-07015 (양식: TP316L, 매칭: JCQ4366➔SD34285)",
-      "[23:23] [QC-06] 출고지시서 A202610150 ((주)태양밴드) 재고출고분 성적서 발행 성공: YR-26-07015 (양식: TP316L, 매칭: JCQ4366➔SD34285)",
-      "[23:19] [QC-06] 출고지시서 A202610150 ((주)태양밴드) 재고출고분 성적서 발행 성공: YR-26-07015 (양식: TP316L, 매칭: JCQ4366➔SD34285)",
-      "[23:18] [QC-06] 발주번호 ES260709-1974 성적서 발행 성공: YR-26-07015-1, YR-26-07015-2, YR-26-07015-3, YR-26-07015-4, YR-26-07015-5, YR-26-07015-6 (양식: TP304(소재ASTM사용시))",
       "[09:20] 공식 성적서 PDF 렌더링 완료"
     ],
     "isCreated": true,
     "connectedDeptIds": [
       "shipping",
       "executive",
-      "quality"
+      "quality",
+      "purchase"
     ],
     "position": "대리",
     "approvalStatus": "AUTO_RUNNING",
     "orderIndex": 5,
     "supervisorId": "",
     "connectedAgentIds": [
-      "qc-inbound-ingest"
+      "qc-inbound-ingest",
+      "pur-stock-reorder"
     ]
   },
   {
@@ -1622,17 +1634,6 @@
       "EVENT_DAEKYUNG_SCRAPED"
     ],
     "logs": [
-      "[00:24] [DAT-10] 발주번호 ES260709-1974 성적서 보관소 저장 완료 (storage/issued_certificates/ES260709-1974/)",
-      "[00:24] [DAT-10] 출고지시서 A202610150 성적서 보관소 저장 완료 (storage/issued_certificates/A202610150/)",
-      "[00:23] [DAT-10] 발주번호 ES260709-1974 성적서 보관소 저장 완료 (storage/issued_certificates/ES260709-1974/)",
-      "[23:54] [DAT-10] 출고지시서 A202610150 성적서 보관소 저장 완료 (storage/issued_certificates/A202610150/)",
-      "[23:52] [DAT-10] 출고지시서 A202610150 성적서 보관소 저장 완료 (storage/issued_certificates/A202610150/)",
-      "[23:52] [DAT-10] 출고지시서 A202610150 성적서 보관소 저장 완료 (storage/issued_certificates/A202610150/)",
-      "[23:27] [DAT-10] 출고지시서 A202610150 성적서 보관소 저장 완료 (storage/issued_certificates/A202610150/)",
-      "[23:24] [DAT-10] 출고지시서 A202610150 성적서 보관소 저장 완료 (storage/issued_certificates/A202610150/)",
-      "[23:23] [DAT-10] 출고지시서 A202610150 성적서 보관소 저장 완료 (storage/issued_certificates/A202610150/)",
-      "[23:19] [DAT-10] 출고지시서 A202610150 성적서 보관소 저장 완료 (storage/issued_certificates/A202610150/)",
-      "[23:18] [DAT-10] 발주번호 ES260709-1974 성적서 보관소 저장 완료 (storage/issued_certificates/ES260709-1974/)",
       "[09:00] 대경벤드 4852개 품목 수집 완료"
     ],
     "isCreated": false,

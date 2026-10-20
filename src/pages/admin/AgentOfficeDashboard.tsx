@@ -3525,7 +3525,7 @@ export default function AgentOfficeDashboard() {
                             </div>
 
                             {/* 🛒 [구매부 PUR-01 전용] 알트에프 재고 발주 List Up & 미결 관리 제어반 */}
-                            {(selectedAgent.deptId === 'purchase' || selectedAgent.code?.startsWith('PUR-')) && (
+                            {selectedAgent.code === 'PUR-01' && (
                                 <div className="border border-emerald-500/40 bg-emerald-950/20 rounded-xl p-3.5 space-y-3.5 shadow-[0_0_20px_rgba(16,185,129,0.2)] my-3">
                                     <div className="flex items-center justify-between border-b border-emerald-900/40 pb-2">
                                         <div className="flex items-center gap-1.5 text-emerald-300 font-bold text-xs">
@@ -3589,6 +3589,115 @@ export default function AgentOfficeDashboard() {
                                             href="/api/pur/download-excel"
                                             download="알트에프_재고_발주_대장.xlsx"
                                             className="py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-emerald-500/50 text-emerald-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                                        >
+                                            <span>📥 엑셀 다운로드</span>
+                                        </a>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                try {
+                                                    await fetch('/api/pur/open-folder', { method: 'POST' });
+                                                } catch (err) {
+                                                    console.error('Failed to open purchase folder:', err);
+                                                }
+                                            }}
+                                            className="py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                                        >
+                                            <span>📂 폴더 열기</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 📋 [구매부 PUR-07 전용] 주문관리 발주서 분류 및 미결 통합 관제 제어반 */}
+                            {selectedAgent.code === 'PUR-07' && (
+                                <div className="border border-teal-500/40 bg-teal-950/20 rounded-xl p-3.5 space-y-3.5 shadow-[0_0_20px_rgba(20,184,166,0.2)] my-3">
+                                    <div className="flex items-center justify-between border-b border-teal-900/40 pb-2">
+                                        <div className="flex items-center gap-1.5 text-teal-300 font-bold text-xs">
+                                            <span>📋</span>
+                                            <span>주문관리 발주서 분류 및 미결 통합 관제기</span>
+                                        </div>
+                                        <span className="text-[9px] px-2 py-0.5 rounded font-black bg-teal-500/20 text-teal-300 font-mono border border-teal-500/40 flex items-center gap-1">
+                                            <span>PUR-07</span>
+                                            <span>대리 (전담 관제)</span>
+                                        </span>
+                                    </div>
+
+                                    {/* 실시간 현황 뱃지 */}
+                                    <div className="p-2.5 rounded-lg border border-teal-500/40 bg-teal-950/30 text-teal-200 text-xs flex flex-col gap-1.5 shadow-sm">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-1.5 font-bold">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-teal-400"></span>
+                                                <span className="text-teal-300">altf.kr API 정기 감시: 대기 중 (STANDBY)</span>
+                                            </div>
+                                            <span className="text-[9px] bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded font-mono font-bold border border-teal-500/40">
+                                                주기: 평일 09:00~18:00 (1시간 간격, 1일 10회)
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-[10px]">
+                                            <div className="p-1.5 bg-black/40 rounded border border-teal-900/40 flex flex-col">
+                                                <span className="text-slate-400 text-[9px]">📦 전체 발주 (업체/날짜별)</span>
+                                                <span className="text-teal-300 font-bold text-xs">1,537건 (148개사)</span>
+                                            </div>
+                                            <div className="p-1.5 bg-black/40 rounded border border-amber-900/40 flex flex-col">
+                                                <span className="text-amber-400 text-[9px]">⏳ 미결(Pending) 추적</span>
+                                                <span className="text-amber-300 font-bold text-xs">360건 관리 중</span>
+                                            </div>
+                                            <div className="p-1.5 bg-black/40 rounded border border-pink-900/40 flex flex-col">
+                                                <span className="text-pink-400 text-[9px]">🔬 QC-01 성적서 접수확인</span>
+                                                <span className="text-pink-300 font-bold text-xs">126건 매칭 완료</span>
+                                            </div>
+                                            <div className="p-1.5 bg-black/40 rounded border border-cyan-900/40 flex flex-col">
+                                                <span className="text-cyan-400 text-[9px]">🚚 고객 발송 대기 패키지</span>
+                                                <span className="text-cyan-300 font-bold text-xs">120건 준비완료</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-[9px] text-teal-400/80 font-mono pt-1 border-t border-teal-900/40">
+                                            * 담당자 출고 완료 시 미결(Pending)에서 자동 해제되며 거래명세표+성적서 번들이 고객 발송 대기로 전환됩니다.
+                                        </div>
+                                    </div>
+
+                                    {/* 대장 저장 위치 안내 */}
+                                    <div className="p-2.5 rounded-lg border border-teal-500/40 bg-[#081817] space-y-1.5 text-[11px]">
+                                        <div className="text-teal-300 font-bold flex items-center gap-1.5">
+                                            <span>📂</span>
+                                            <span>발주 분류 및 미결 대장 파일 위치:</span>
+                                        </div>
+                                        <div className="space-y-1 font-mono text-[10px] text-slate-300 pl-1">
+                                            <div className="flex items-start gap-1">
+                                                <span className="text-teal-400 shrink-0 font-bold">1. 엑셀 마스터 원장:</span>
+                                                <span className="text-slate-200 break-all font-bold">storage/purchases/주문관리_발주서_통합대장.xlsx</span>
+                                            </div>
+                                            <div className="flex items-start gap-1">
+                                                <span className="text-cyan-400 shrink-0 font-bold">2. 통합 분류 JSON:</span>
+                                                <span className="text-slate-300 break-all">server/data/pur07_order_backlog.json</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 3대 실행 액션 버튼 */}
+                                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                try {
+                                                    const res = await fetch('/api/pur/pur07/sync', { method: 'POST' });
+                                                    if (res.ok) {
+                                                        alert('✅ [PUR-07] 발주 분류 및 미결 대장 동기화 완료!');
+                                                    }
+                                                } catch (e) {
+                                                    alert('동기화 실패: ' + e);
+                                                }
+                                            }}
+                                            className="flex-1 py-2 px-3 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(20,184,166,0.3)] cursor-pointer transition-all"
+                                        >
+                                            <RotateCw className="w-3.5 h-3.5" />
+                                            <span>🔄 지금 즉시 수집 & 미결 동기화</span>
+                                        </button>
+                                        <a
+                                            href="/api/pur/pur07/download-excel"
+                                            download="주문관리_발주서_통합대장.xlsx"
+                                            className="py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-teal-500/50 text-teal-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all"
                                         >
                                             <span>📥 엑셀 다운로드</span>
                                         </a>
