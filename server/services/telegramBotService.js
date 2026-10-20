@@ -33,8 +33,12 @@ export class TelegramBotService {
             polling: false,
             lastUpdateId: 0
         };
+        this.isPollingActive = false;
         this.pollingTimer = null;
         this.loadConfig();
+        if (this.config.botToken && this.config.polling !== false) {
+            this.startPolling();
+        }
     }
 
     loadConfig() {
@@ -70,7 +74,7 @@ export class TelegramBotService {
             hasToken: !!this.config.botToken,
             tokenMasked: this.config.botToken ? `${this.config.botToken.slice(0, 6)}...${this.config.botToken.slice(-4)}` : '',
             chatId: this.config.chatId || '',
-            isPolling: !!this.pollingTimer
+            isPolling: this.isPollingActive
         };
     }
 
@@ -147,22 +151,24 @@ export class TelegramBotService {
      * 실시간 롱폴링 시작
      */
     startPolling() {
-        if (this.pollingTimer) return;
+        if (this.isPollingActive) return;
         if (!this.config.botToken) {
             console.log('[TelegramBot] 봇 토큰 미설정으로 폴링을 시작할 수 없습니다.');
             return;
         }
 
-        console.log('[TelegramBot] 🚀 텔레그램 거래명세서 수신 봇 폴링 가동 시작');
+        this.isPollingActive = true;
+        console.log('[TelegramBot] 🚀 텔레그램 거래명세서 수신 봇 폴링 가동 시작 (@Altf_office_auto_bot)');
         this.pollUpdates();
     }
 
     stopPolling() {
+        this.isPollingActive = false;
         if (this.pollingTimer) {
             clearTimeout(this.pollingTimer);
             this.pollingTimer = null;
-            console.log('[TelegramBot] 텔레그램 봇 폴링 중단');
         }
+        console.log('[TelegramBot] 텔레그램 봇 폴링 중단');
     }
 
     async pollUpdates() {
@@ -196,18 +202,32 @@ export class TelegramBotService {
         if (!msg) return;
 
         const chatId = msg.chat.id;
+        if (!this.config.chatId) {
+            this.config.chatId = String(chatId);
+            this.saveConfig();
+        }
 
         // 1. /start 명령어 안내
         if (msg.text && msg.text.startsWith('/start')) {
             await this.sendMessage(chatId, `
-<b>🤖 ALTF 전사 자율 에이전트 관제 봇</b>
-대경벤드 등 공급처에서 전달받은 <b>거래명세서 PDF 파일</b>을 이 채팅방에 그대로 전달(포워딩/업로드)해 주세요!
+<b>🤖 ALTF 전사 자율 에이전트 관제 봇 (@Altf_office_auto_bot)</b>
+안녕하세요 조현진 대표님!
+대경벤드 등 공급처에서 전달받은 <b>거래명세서 PDF 파일</b>을 이 채팅방에 그대로 전달(포워딩/파일 첨부)해 주세요!
 
 <b>자동 처리 파이프라인:</b>
-1. 📑 총무부: 매입 금액/부가세 확정 전표 등록
-2. 🛒 구매부: 발주(P.O) 자동 매칭 및 미결 해제, 엑셀 대장 입고 완료 갱신
-3. 🔬 품질부: 성적서(MTC) 사전 매칭 확인
-4. 🚚 출고부: 시화재고 입고 or 고객 직배송 구분 전이
+1. 📑 <b>총무부</b>: 공급가·부가세·운임 합산 매입 확정 전표 등록
+2. 🛒 <b>구매부</b>: 발주번호(P.O No) 자동 매칭 & 엑셀 재고 발주 대장 미결 해제
+3. 🔬 <b>품질부</b>: 1,469개 MTC 성적서 DB 사전 교차 매칭 확인
+4. 🚚 <b>출고부</b>: 시화재고 입고 하차 검수 or 고객사 직배송 운송 감시
+            `.trim());
+            return;
+        }
+
+        // 사진으로 보냈을 때 친절한 안내
+        if (msg.photo && !msg.document) {
+            await this.sendMessage(chatId, `
+📸 <b>이미지(사진)가 수신되었습니다.</b>
+거래명세서 텍스트와 단가, 수량, P.O 번호를 100% 오차 없이 정밀 파싱하기 위해, 카카오톡/메신저에서 다운로드하신 <b>PDF 문서 원본 파일(Document)</b> 형태로 전송해 주시면 가장 빠르고 정확하게 4개 부서 자율 연계가 실행됩니다!
             `.trim());
             return;
         }
