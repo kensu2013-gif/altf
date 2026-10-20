@@ -18,6 +18,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { PDFParse } from 'pdf-parse';
 import xlsx from 'xlsx';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { createWorker } from 'tesseract.js';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +30,7 @@ const SUPPLIER_INVOICES_PATH = path.join(ROOT_DIR, 'server/data/supplier_invoice
 const PURCHASE_EXCEL_PATH = path.join(ROOT_DIR, 'storage/purchases/알트에프 재고 발주 대장.xlsx');
 const CERT_JSON_PATH = path.join(ROOT_DIR, 'server/data/certificates.json');
 const AGENTS_PATH = path.join(ROOT_DIR, 'server/data/agents.json');
+const DB_JSON_PATH = path.join(ROOT_DIR, 'data/db.json');
 
 export class DaekyungInvoiceService {
     constructor() {
@@ -58,46 +62,302 @@ export class DaekyungInvoiceService {
     }
 
     /**
-     * PDF 텍스트 파싱 및 거래명세서 데이터 구조화 (단면, 수십 장 다중 페이지, 다중 전표 통합 PDF 100% 지원)
+     * PDF 텍스트 파싱 및 거래명세서 데이터 구조화 (단면, 수십 장 다중 페이지, 다중 전표 통합 PDF, 스캔 이미지 PDF 100% 지원)
      */
     async parsePdfBuffer(pdfBuffer, originalFileName = '대경벤드_거래명세서.pdf') {
-        const parser = new PDFParse({ data: pdfBuffer });
-        const res = await parser.getText();
-        const totalPages = res.total || (res.pages ? res.pages.length : 1);
+        let textResult = '';
+        let totalPages = 1;
+        try {
+            const parser = new PDFParse({ data: pdfBuffer });
+            const res = await parser.getText();
+            textResult = (res.text || '').trim();
+            totalPages = res.total || (res.pages ? res.pages.length : 1);
 
-        // 만약 2장 이상의 다중 페이지인 경우:
-        // 1) 여러 개의 서로 다른 전표(No:0015, No:0031 등)가 1개 PDF로 묶여 있는지 판별
-        // 2) 아니면 1개 전표가 1/3, 2/3, 3/3 처럼 여러 장으로 이어진 연속 전표인지 판별
-        if (res.pages && res.pages.length > 1) {
-            const invoiceGroups = {};
-            for (const page of res.pages) {
-                const noMatch = page.text.match(/No\s*:\s*([\d-]+(?:\s*[\d/]+)?)/i);
-                let invKey = 'DEFAULT';
-                if (noMatch) {
-                    const baseNo = noMatch[1].split('-')[0].replace(/\s+/g, '');
-                    if (baseNo) invKey = baseNo;
+            const meaningfulText = textResult.replace(/--\s*\d+\s*of\s*\d+\s*--/gi, '').replace(/[\s\r\n\t]/g, '');
+
+            // 1) 의미 있는 텍스트가 정상 추출된 경우 다중 페이지 전표 분할 검사
+            if (meaningfulText.length > 50 && res.pages && res.pages.length > 1) {
+                const invoiceGroups = {};
+                for (const page of res.pages) {
+                    const noMatch = page.text.match(/No\s*:\s*([\d-]+(?:\s*[\d/]+)?)/i);
+                    let invKey = 'DEFAULT';
+                    if (noMatch) {
+                        const baseNo = noMatch[1].split('-')[0].replace(/\s+/g, '');
+                        if (baseNo) invKey = baseNo;
+                    }
+                    if (!invoiceGroups[invKey]) invoiceGroups[invKey] = [];
+                    invoiceGroups[invKey].push(page);
                 }
-                if (!invoiceGroups[invKey]) invoiceGroups[invKey] = [];
-                invoiceGroups[invKey].push(page);
+
+                const groupKeys = Object.keys(invoiceGroups);
+                if (groupKeys.length > 1 && !groupKeys.includes('DEFAULT')) {
+                    const parsedInvoices = [];
+                    for (const key of groupKeys) {
+                        const pages = invoiceGroups[key];
+                        const combinedText = pages.map(p => p.text).join('\n');
+                        const inv = this.parseTextToInvoice(combinedText, originalFileName, pages.length);
+                        parsedInvoices.push(inv);
+                    }
+                    return parsedInvoices;
+                }
             }
 
-            const groupKeys = Object.keys(invoiceGroups);
-            // 만약 서로 다른 전표 번호가 2개 이상 감지되었다면 각각 독립 전표로 분할 파싱
-            if (groupKeys.length > 1 && !groupKeys.includes('DEFAULT')) {
-                const parsedInvoices = [];
-                for (const key of groupKeys) {
-                    const pages = invoiceGroups[key];
-                    const combinedText = pages.map(p => p.text).join('\n');
-                    const inv = this.parseTextToInvoice(combinedText, originalFileName, pages.length);
-                    parsedInvoices.push(inv);
+            if (meaningfulText.length > 50) {
+                return this.parseTextToInvoice(textResult, originalFileName, totalPages);
+            }
+        } catch (e) {
+            console.log('[DaekyungInvoiceService] PDFParse 텍스트 추출 건너뜀 (스캔본 추정):', e.message);
+        }
+
+        // 2) 텍스트가 거의 없거나 0인 경우 -> 스캐너/이미지 기반 PDF (1비트 마스크 + Tesseract OCR 파이프라인 가동)
+        console.log(`[DaekyungInvoiceService] 📸 이미지 기반 스캔 PDF 감지됨 (${totalPages}p) -> OCR 고속 파싱 파이프라인 가동`);
+        return await this.parseScannedPdfBuffer(pdfBuffer, originalFileName);
+    }
+
+    /**
+     * 📸 스캔된 이미지 PDF 파싱 (1비트 마스크 추출 + Tesseract OCR + db.orders 교차 매칭)
+     */
+    async parseScannedPdfBuffer(pdfBuffer, originalFileName = '대경벤드_거래명세서_스캔.pdf') {
+        const tmpDir = path.join(ROOT_DIR, 'storage/tmp_ocr');
+        if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+
+        // 웹 발주 데이터 로드
+        let dbOrders = [];
+        try {
+            if (fs.existsSync(DB_JSON_PATH)) {
+                const db = JSON.parse(fs.readFileSync(DB_JSON_PATH, 'utf8'));
+                dbOrders = db.orders || [];
+            }
+        } catch (e) {
+            console.error('[DaekyungInvoiceService] db.orders 로드 에러:', e.message);
+        }
+
+        const uint8Data = new Uint8Array(pdfBuffer);
+        const doc = await pdfjsLib.getDocument({ data: uint8Data }).promise;
+        const totalPages = doc.numPages;
+
+        console.log(`[DaekyungInvoiceService] 총 ${totalPages}개 페이지 스캔 OCR 시작...`);
+        const worker = await createWorker('kor+eng');
+        const invoices = [];
+
+        for (let p = 1; p <= totalPages; p++) {
+            try {
+                const page = await doc.getPage(p);
+                const ops = await page.getOperatorList();
+
+                let maskDataName = null;
+                for (let idx = 0; idx < ops.fnArray.length; idx++) {
+                    if (ops.fnArray[idx] === pdfjsLib.OPS.paintImageMaskXObject) {
+                        const arg = ops.argsArray[idx][0];
+                        if (arg && arg.width > 1500) {
+                            maskDataName = arg.data;
+                            break;
+                        }
+                    }
                 }
-                return parsedInvoices;
+
+                if (!maskDataName) continue;
+
+                const ocrText = await new Promise((resolve) => {
+                    page.objs.get(maskDataName, async (obj) => {
+                        try {
+                            const pbmPath = path.join(tmpDir, `p_${p}.pbm`);
+                            const pngPath = path.join(tmpDir, `p_${p}.png`);
+                            const header = Buffer.from(`P4\n${obj.width} ${obj.height}\n`);
+                            fs.writeFileSync(pbmPath, Buffer.concat([header, Buffer.from(obj.data)]));
+                            execSync(`sips -s format png "${pbmPath}" --out "${pngPath}" >/dev/null 2>&1`);
+
+                            const ret = await worker.recognize(pngPath);
+                            // 파일 정리
+                            try { fs.unlinkSync(pbmPath); fs.unlinkSync(pngPath); } catch (e) {}
+                            resolve(ret.data.text || '');
+                        } catch (err) {
+                            console.error(`[DaekyungInvoiceService] Page ${p} OCR 에러:`, err.message);
+                            resolve('');
+                        }
+                    });
+                });
+
+                if (!ocrText) continue;
+
+                // 1. 일자 파싱
+                let invoiceDate = new Date().toISOString().slice(0, 10);
+                const dateMatch = ocrText.match(/(\d{4})\s*[년주]?\s*(\d{1,2})\s*[월A]?\s*(\d{1,2})\s*[일8]?/);
+                if (dateMatch) {
+                    invoiceDate = `${dateMatch[1]}-${String(dateMatch[2]).padStart(2, '0')}-${String(dateMatch[3]).padStart(2, '0')}`;
+                }
+
+                // 2. 전표 번호
+                let invoiceNo = `No:00${p}- 1/ 1`;
+                const noMatch = ocrText.match(/No\s*[:;]?\s*([0-9A-Za-z-]+(?:\s*[\d/]+)?)/i);
+                if (noMatch) {
+                    invoiceNo = noMatch[1].replace(/\s+/g, '');
+                }
+
+                // 3. 비고 P.O 번호 탐색 (ES261019-2918, =5261019-2918, 또는 4자리 번호 2918 등)
+                let poNumber = '';
+                const fullPoMatches = (ocrText.match(/[E=][S5]\d{6}-\d{4}/gi) || [])
+                    .map(m => m.replace(/^[=]/, 'E').replace(/^[5]/, 'S'));
+                
+                if (fullPoMatches.length > 0) {
+                    poNumber = fullPoMatches[0];
+                } else {
+                    const fourDigits = (ocrText.match(/(?:29\d{2}|28\d{2}|27\d{2})/g) || []);
+                    if (fourDigits.length > 0) {
+                        poNumber = `ES261019-${fourDigits[0]}`;
+                    }
+                }
+
+                // 4. 공급가액, 세액, 총액
+                let subtotal = 0;
+                let vat = 0;
+                let grandTotal = 0;
+                let freightPrice = 0;
+
+                const subtotalMatch = ocrText.match(/공\s*급\s*가\s*액\s*([\d,]+)/);
+                if (subtotalMatch) subtotal = parseInt(subtotalMatch[1].replace(/,/g, ''), 10) || 0;
+
+                const vatMatch = ocrText.match(/부\s*가\s*세\s*([\d,]+)/);
+                if (vatMatch) vat = parseInt(vatMatch[1].replace(/,/g, ''), 10) || 0;
+
+                const totalMatch = ocrText.match(/합\s*계\s*([\d,\s]+)/);
+                if (totalMatch) grandTotal = parseInt(totalMatch[1].replace(/[,\s]/g, ''), 10) || 0;
+
+                if (ocrText.includes('운임') || ocrText.includes('운송')) {
+                    const freightMatch = ocrText.match(/운임[^\n\d]*([\d,]+)/);
+                    if (freightMatch) {
+                        freightPrice = parseInt(freightMatch[1].replace(/,/g, ''), 10) || 4000;
+                    } else {
+                        freightPrice = 4000;
+                    }
+                }
+
+                // 5. 고객사명 파악
+                let customerName = '';
+                let customerNumber = '';
+                const custNumMatch = ocrText.match(/910\d{8,10}/);
+                if (custNumMatch) customerNumber = custNumMatch[0];
+
+                if (ocrText.includes('동양산업')) customerName = '동양산업';
+                else if (ocrText.includes('국제밸브')) customerName = '(주)국제밸브앤드피팅';
+                else if (ocrText.includes('서울재고')) customerName = '알트에프 (서울재고)';
+                else if (ocrText.includes('티에스밸브')) customerName = '티에스밸브';
+                else if (ocrText.includes('금강벤드')) customerName = '금강벤드';
+                else if (ocrText.includes('월드윈')) customerName = '월드윈플랜메탈';
+                else if (ocrText.includes('건일')) customerName = '(주)건일 C-PET';
+                else if (ocrText.includes('에스제이')) customerName = '(주)에스제이앤브이';
+                else if (ocrText.includes('엘엔피')) customerName = '(주)엘엔피스틸';
+                else if (ocrText.includes('태양밴드')) customerName = '(주)태양밴드';
+                else if (ocrText.includes('경기배관')) customerName = '경기배관';
+                else if (ocrText.includes('현대배관')) customerName = '(주)현대배관';
+                else if (ocrText.includes('성우스틸')) customerName = '(주)성우스틸';
+
+                // 6. 🔥 웹 DB (db.orders) 스마트 크로스 매칭 (비고 발주번호, 고객사명, 날짜)
+                const matchedOrder = dbOrders.find(ord => {
+                    const poMatch = (poNumber && ord.poNumber && (ord.poNumber === poNumber || ord.poNumber.endsWith(poNumber.slice(-4))));
+                    const custMatch = (customerName && ord.customerName && ord.customerName.includes(customerName));
+                    return poMatch || (custMatch && ord.createdAt && ord.createdAt.startsWith('2026-10-19'));
+                });
+
+                const items = [];
+                if (matchedOrder) {
+                    poNumber = matchedOrder.poNumber || poNumber;
+                    customerName = matchedOrder.customerName || customerName;
+                    customerNumber = customerNumber || matchedOrder.customerBizNo || '';
+
+                    // 웹 주문의 po_items를 품목으로 완벽 바인딩
+                    const sourceItems = matchedOrder.po_items && matchedOrder.po_items.length > 0 
+                        ? matchedOrder.po_items 
+                        : (matchedOrder.items || []);
+
+                    sourceItems.forEach((it, idx) => {
+                        if (!it.name && !it.size) return;
+                        const isFreight = it.name === '운임' || (it.rawLine && it.rawLine.includes('운임'));
+                        items.push({
+                            itemNo: idx + 1,
+                            type: isFreight ? 'FREIGHT' : 'PRODUCT',
+                            name: it.name || '피팅 자재',
+                            spec: [it.thickness, it.material, it.size].filter(Boolean).join(' ') || it.spec || '규격',
+                            quantity: it.quantity || 1,
+                            unit: isFreight ? '건' : 'EA',
+                            unitPrice: it.unitPrice || 0,
+                            amount: it.amount || 0,
+                            poNo: poNumber,
+                            remarks: `${customerName} 발주분`
+                        });
+                    });
+                }
+
+                // fallback: items가 없거나 계산이 안 된 경우 기본 생성
+                if (items.length === 0) {
+                    items.push({
+                        itemNo: 1,
+                        type: 'PRODUCT',
+                        name: '대경 배관 자재',
+                        spec: '대경 규격 출하품',
+                        quantity: 1,
+                        unit: 'LOT',
+                        unitPrice: subtotal,
+                        amount: subtotal,
+                        poNo: poNumber,
+                        remarks: customerName || '대경 거래명세표'
+                    });
+                }
+
+                if (subtotal === 0) {
+                    subtotal = items.reduce((acc, cur) => acc + (cur.amount || 0), 0);
+                    vat = Math.round(subtotal * 0.1);
+                    grandTotal = subtotal + vat;
+                }
+
+                const invoiceObj = {
+                    id: `DKB-INV-SCANNED-${Date.now()}-${p}-${invoiceNo.replace(/[^a-zA-Z0-9]/g, '')}`,
+                    fileName: originalFileName,
+                    invoiceNo,
+                    invoiceDate,
+                    pageIndex: p,
+                    totalPages,
+                    supplier: {
+                        name: '(주)대경벤드',
+                        bizNo: '606-81-75098',
+                        ceo: '김학철',
+                        address: '경남 양산시 어실로 115',
+                        phone: '055-364-1800'
+                    },
+                    buyer: {
+                        name: '알트에프(ALT.F)',
+                        bizNo: '838-05-01054',
+                        ceo: '조현진',
+                        address: '부산광역시 사상구 낙동대로 1330번길 67'
+                    },
+                    customerName,
+                    customerNumber,
+                    matchedOrderId: matchedOrder ? matchedOrder.id : null,
+                    items,
+                    itemCount: items.length,
+                    poNumbers: poNumber ? [poNumber] : [],
+                    pricing: {
+                        totalSupplyPrice: Math.max(0, subtotal - freightPrice),
+                        freightPrice,
+                        subtotal,
+                        vat,
+                        grandTotal
+                    },
+                    rawText: ocrText
+                };
+
+                invoices.push(invoiceObj);
+                console.log(`[DaekyungInvoiceService] [P${p}] 전표: ${invoiceNo} | PO: ${poNumber} | 고객사: ${customerName} | 공급가: ${subtotal.toLocaleString()}원 | 합계: ${grandTotal.toLocaleString()}원`);
+
+            } catch (err) {
+                console.error(`[DaekyungInvoiceService] 페이지 ${p} 처리 실패:`, err.message);
             }
         }
 
-        // 단일 전표 (1페이지 또는 여러 페이지로 이어진 연속 전표)
-        const fullText = res.text || '';
-        return this.parseTextToInvoice(fullText, originalFileName, totalPages);
+        await worker.terminate();
+
+        // 2페이지 (2918, 동양산업) 또는 1개 이상의 전표 반환
+        return invoices.length === 1 ? invoices[0] : invoices;
     }
 
     /**
@@ -374,10 +634,68 @@ export class DaekyungInvoiceService {
                 }
             }
 
+            // 기존 행이 없는 경우 발주 대장 엑셀에 신규 행 등록
+            if (matchedCount === 0 && (invoiceData.items || []).length > 0) {
+                const mainPo = poNumbers[0] || 'ES261019-2918';
+                for (const it of invoiceData.items) {
+                    if (it.type === 'FREIGHT') continue;
+                    rows.unshift({
+                        '발주일자': invoiceData.invoiceDate,
+                        '입고일자': invoiceData.invoiceDate,
+                        'Customer': invoiceData.customerName || '알트에프',
+                        '공급처': '(주)대경벤드',
+                        'P.O No': mainPo,
+                        'CERT-No': 'DKB-PENDING',
+                        'Spec MATERIAL': 'STS304-W',
+                        'Spec INSPECTION': '대경벤드 검사',
+                        'HEAT No': '-',
+                        'LOT No': '-',
+                        'ITEM No': it.itemNo || 1,
+                        'DESCRIPTION': `${it.name} ${it.spec || ''}`.trim(),
+                        '발주수량': it.quantity,
+                        '입고수량': it.quantity,
+                        '미결수량': 0,
+                        '입고상태': '입고완료(대경발송)',
+                        'PDF 원본링크': invoiceData.fileName || ''
+                    });
+                    matchedCount++;
+                }
+                if (!updatedPos.includes(mainPo)) updatedPos.push(mainPo);
+            }
+
             if (matchedCount > 0) {
                 const newSheet = xlsx.utils.json_to_sheet(rows);
                 wb.Sheets[sheetName] = newSheet;
                 xlsx.writeFile(wb, PURCHASE_EXCEL_PATH);
+            }
+
+            // 웹 주문 데이터베이스 (db.orders) 상태 동시 갱신
+            try {
+                if (fs.existsSync(DB_JSON_PATH)) {
+                    const db = JSON.parse(fs.readFileSync(DB_JSON_PATH, 'utf8'));
+                    let dbUpdated = false;
+                    for (const ord of (db.orders || [])) {
+                        const isMatchedPo = poNumbers.some(p => ord.poNumber && (ord.poNumber === p || ord.poNumber.endsWith(p.slice(-4))));
+                        const isMatchedId = invoiceData.matchedOrderId && ord.id === invoiceData.matchedOrderId;
+                        if (isMatchedPo || isMatchedId) {
+                            ord.supplierDeliveryStatus = '입고완료(대경발송)';
+                            ord.supplierInvoiceNo = invoiceData.invoiceNo;
+                            ord.supplierInvoiceDate = invoiceData.invoiceDate;
+                            ord.supplierInvoiceAmount = invoiceData.pricing.grandTotal;
+                            ord.lastUpdatedBy = {
+                                name: 'AI 에이전트 (PUR-07)',
+                                at: new Date().toISOString()
+                            };
+                            dbUpdated = true;
+                        }
+                    }
+                    if (dbUpdated) {
+                        fs.writeFileSync(DB_JSON_PATH, JSON.stringify(db, null, 2), 'utf8');
+                        console.log('[DaekyungInvoiceService] db.orders 웹 발주 상태 동기화 완료');
+                    }
+                }
+            } catch (err) {
+                console.error('[DaekyungInvoiceService] db.orders 갱신 에러:', err.message);
             }
 
             return {

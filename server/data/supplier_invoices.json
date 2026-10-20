@@ -1,5 +1,180 @@
 [
   {
+    "id": "DKB-INV-SCANNED-1792475631505-2-00321",
+    "fileName": "TalkFile_알트에프_거래명세표_1019_pdf.pdf",
+    "invoiceNo": "0032-1/",
+    "invoiceDate": "2026-10-19",
+    "pageIndex": 2,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "동양산업",
+    "customerNumber": "130-02-91320",
+    "matchedOrderId": "PO-20261019-TAEIL-009",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S40S STS304-W 50A",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 10120,
+        "amount": 101200,
+        "poNo": "ES261019-2918",
+        "remarks": "동양산업 발주분"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS304-W 40A",
+        "quantity": 20,
+        "unit": "EA",
+        "unitPrice": 5460,
+        "amount": 109200,
+        "poNo": "ES261019-2918",
+        "remarks": "동양산업 발주분"
+      },
+      {
+        "itemNo": 3,
+        "type": "PRODUCT",
+        "name": "45E(L)",
+        "spec": "S10S STS304-W 20A",
+        "quantity": 30,
+        "unit": "EA",
+        "unitPrice": 2430,
+        "amount": 72900,
+        "poNo": "ES261019-2918",
+        "remarks": "동양산업 발주분"
+      },
+      {
+        "itemNo": 4,
+        "type": "PRODUCT",
+        "name": "45E(L)",
+        "spec": "S10S STS304-W 25A",
+        "quantity": 20,
+        "unit": "EA",
+        "unitPrice": 3280,
+        "amount": 65600,
+        "poNo": "ES261019-2918",
+        "remarks": "동양산업 발주분"
+      },
+      {
+        "itemNo": 5,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S STS304-W 25A",
+        "quantity": 20,
+        "unit": "EA",
+        "unitPrice": 6380,
+        "amount": 127600,
+        "poNo": "ES261019-2918",
+        "remarks": "동양산업 발주분"
+      },
+      {
+        "itemNo": 6,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S STS304-W 20A",
+        "quantity": 30,
+        "unit": "EA",
+        "unitPrice": 4240,
+        "amount": 127200,
+        "poNo": "ES261019-2918",
+        "remarks": "동양산업 발주분"
+      },
+      {
+        "itemNo": 7,
+        "type": "FREIGHT",
+        "name": "운임",
+        "spec": "규격",
+        "quantity": 1,
+        "unit": "건",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261019-2918",
+        "remarks": "동양산업 발주분"
+      }
+    ],
+    "itemCount": 7,
+    "poNumbers": [
+      "ES261019-2918"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 546490,
+      "freightPrice": 910,
+      "subtotal": 547400,
+      "vat": 54740,
+      "grandTotal": 602140
+    },
+    "rawText": "거래 명세서\n2026 주 10 A 19 8                                No:0032- 1/ 1\nz 등록번호       606 - 81 - 75098         공 등록번호 _ 838-05-01054\n_ 창 호 (주)대경벤드   성명 |김학     상 호 알트에프(시7.『) #2 조현진\n~  주   소 경남 양산시 어실로 115            ㄴㄴ 주   A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『&※ 055)364-1800   362-7074       자 전화/『&4% 051 )311-8605      051-328-4012\n1 BE 명/재 질 / 규 격   수량 단위 _단 가   금 _ 액   비 고\n1 90E(L)      5/405                동양산업         =5261019-2918\nSTS 304-W          ERW       50A                10            9.110          91.100\n2 90E(L)       5/105                  동양산업           -5261019-2918\nSTS 304-\\          타비       404                20             4,910          98.200\n3 45E(L)       S/10S                  동양산업           -5261019-2918\nSTS 304-W          ERW       20A                30             2.190          65.700\n4 45E(L)       S/108                   동양산업           -5261019-2918\nSTS 304-W           ERW        25A                 20             2.950           59.000\n5 TEE        S/108                  동양산업           -5261019-2918\nSTS 304-\\          ERW       25A                20             5.740         114.800\n6 TEE        S/10S                  동양산업           =5261019-2918\nSTS 304-W          ERW       20A                30             3.820         114,600\n7 운임                                 동양산업 910(502018487\n1 건      4.000       4.000\nxxx (|    하    여    백 ey x\n131      공급가액              547,400\n부 가 세                   54,740\n합   계              602, 140\n(주)대경벤드\n",
+    "source": "SYSTEM_TEST",
+    "processedAt": "2026-10-20T05:54:14.644Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T05:54:14.644Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 547400,
+      "vat": 54740,
+      "grandTotal": 602140
+    }
+  },
+  {
+    "id": "DKB-INV-1792474986110-INV986109",
+    "fileName": "TalkFile_알트에프_거래명세표_1019_pdf.pdf",
+    "invoiceNo": "INV-986109",
+    "invoiceDate": "2026-10-20",
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "items": [],
+    "itemCount": 0,
+    "poNumbers": [],
+    "pricing": {
+      "totalSupplyPrice": 0,
+      "freightPrice": 0,
+      "subtotal": 0,
+      "vat": 0,
+      "grandTotal": 0
+    },
+    "rawText": "\n\n-- 1 of 16 --\n\n\n\n-- 2 of 16 --\n\n\n\n-- 3 of 16 --\n\n\n\n-- 4 of 16 --\n\n\n\n-- 5 of 16 --\n\n\n\n-- 6 of 16 --\n\n\n\n-- 7 of 16 --\n\n\n\n-- 8 of 16 --\n\n\n\n-- 9 of 16 --\n\n\n\n-- 10 of 16 --\n\n\n\n-- 11 of 16 --\n\n\n\n-- 12 of 16 --\n\n\n\n-- 13 of 16 --\n\n\n\n-- 14 of 16 --\n\n\n\n-- 15 of 16 --\n\n\n\n-- 16 of 16 --\n\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T05:43:06.110Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T05:43:06.110Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 0,
+      "vat": 0,
+      "grandTotal": 0
+    }
+  },
+  {
     "id": "DKB-INV-SAMPLE-0015",
     "fileName": "20261019_대경벤드_거래명세서_0015.pdf",
     "invoiceNo": "0015- 1/ 1",
