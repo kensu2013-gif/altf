@@ -329,14 +329,15 @@ export async function getPreviousDbVersion(cutoffDateStr) {
 
 /**
  * Uploads an arbitrary file (buffer) to S3 at the specified prefix/filename.
- * returns the public S3 URL.
+ * Returns both the direct S3 URL and a presigned download URL (valid for 7 days) to avoid AccessDenied.
  */
 export async function uploadFileToS3(folderPath, fileName, fileBuffer, contentType) {
     if (!hasAwsCredentials()) {
         throw new Error('AWS credentials not configured. S3 upload is disabled in local mode.');
     }
     try {
-        const fullKey = `${folderPath}/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
+        const cleanName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '');
+        const fullKey = `${folderPath}/${Date.now()}_${cleanName}`;
         const command = new PutObjectCommand({
             Bucket: BUCKET_NAME,
             Key: fullKey,
@@ -346,24 +347,42 @@ export async function uploadFileToS3(folderPath, fileName, fileBuffer, contentTy
 
         await sendWithTimeout(command, 10000);
 
-        // Return Virtual Hosted Style URL
-        return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'ap-northeast-2'}.amazonaws.com/${fullKey}`;
+        // Generate 7-day signed download URL so customers never see AccessDenied
+        let presignedUrl = null;
+        try {
+            presignedUrl = await getPresignedUrlToS3(fullKey, {
+                downloadName: fileName,
+                contentType: contentType,
+                expiresIn: 604800 // 7 days
+            });
+        } catch (signErr) {
+            console.warn('[S3] Presigned URL generation failed, falling back to direct URL:', signErr.message);
+        }
+
+        // Return presigned URL as primary if available, otherwise direct S3 URL
+        return presignedUrl || `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'ap-northeast-2'}.amazonaws.com/${fullKey}`;
     } catch (error) {
         console.error('[S3] Failed to upload file:', error);
         throw error;
     }
 }
 
-export async function getPresignedUrlToS3(key) {
+export async function getPresignedUrlToS3(key, options = {}) {
     if (!hasAwsCredentials()) {
         throw new Error('AWS credentials not configured. Cannot generate presigned URL.');
     }
     try {
+        const expiresIn = options.expiresIn || 604800; // 7 days by default
+        const downloadName = options.downloadName || path.basename(key);
+        const encodedFilename = encodeURIComponent(downloadName);
+
         const command = new GetObjectCommand({
             Bucket: BUCKET_NAME,
-            Key: key
+            Key: key,
+            ResponseContentType: options.contentType || 'application/pdf',
+            ResponseContentDisposition: `inline; filename*=UTF-8''${encodedFilename}`
         });
-        const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+        const url = await getSignedUrl(s3Client, command, { expiresIn });
         return url;
     } catch (error) {
         console.error('[S3] Failed to generate presigned URL:', error);

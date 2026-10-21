@@ -1951,16 +1951,16 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             <span>{isDispatching ? '발송 중...' : '💬 0원 카톡 직통 푸시'}</span>
                                         </button>
 
-                                        {/* 2. Solapi MMS/문자 자동 발송 버튼 */}
+                                        {/* 2. Solapi LMS 문자 공식 견적서 발송 버튼 */}
                                         <button
                                             type="button"
                                             disabled={isDispatching}
                                             onClick={handleDispatchKakaoQuote}
                                             className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer disabled:opacity-50"
-                                            title="솔라피(Solapi)를 통해 고객 휴대폰으로 견적서 이미지(MMS)와 직인 PDF 링크를 즉시 전송합니다."
+                                            title="솔라피(Solapi)를 통해 고객 휴대폰으로 알트에프 공식 직인 견적서(PDF) 즉시 열람 및 저장/전달 링크를 전송합니다."
                                         >
                                             <Send className="w-3.5 h-3.5" />
-                                            <span>{isDispatching ? '발송 중...' : '📱 솔라피 견적+첨부 발송'}</span>
+                                            <span>{isDispatching ? '발송 중...' : '📱 솔라피 공식 견적서 발송'}</span>
                                         </button>
 
                                         {/* 3. 클립보드 복사 */}

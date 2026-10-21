@@ -2617,8 +2617,65 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // 📄 GET /quote/view 또는 /api/quote/pdf : 비로그인 고객 모바일 직통 정식 견적서 뷰어 & PDF 인쇄
-    if (req.method === 'GET' && (url.pathname === '/quote/view' || url.pathname === '/api/quote/pdf')) {
+    // 📄 GET /api/quote/pdf : 비로그인 고객 모바일 직통 정식 견적서 PDF 파일 직통 스트리밍 (스마트폰 즉시 열람 및 저장/전달)
+    if (req.method === 'GET' && url.pathname === '/api/quote/pdf') {
+        const quoteId = url.searchParams.get('id');
+        let quote = (db.quotations || []).find(q => q.id === quoteId);
+        if (!quote) {
+            quote = kakaoBotService.draftQuotations.find(q => q.id === quoteId);
+        }
+
+        if (!quote) {
+            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end(`견적번호(${quoteId || '미지정'})를 찾을 수 없습니다. 고객센터(051-303-3751)로 문의해 주세요.`);
+            return;
+        }
+
+        try {
+            console.log(`[PDF Server] 📄 견적서 ${quoteId} 공식 PDF 실시간 스트리밍 요청 수신`);
+            const fs = await import('fs');
+            const path = await import('path');
+            const storageDir = path.resolve('./storage/quotations');
+            if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
+
+            const cachedPdfPath = path.join(storageDir, `${quoteId.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`);
+            let pdfBuffer = null;
+
+            if (fs.existsSync(cachedPdfPath)) {
+                pdfBuffer = fs.readFileSync(cachedPdfPath);
+            } else {
+                const artifacts = await kakaoBotService.generateOfficialQuotationArtifacts(quote);
+                if (artifacts?.pdfBuffer) {
+                    pdfBuffer = artifacts.pdfBuffer;
+                    fs.writeFileSync(cachedPdfPath, pdfBuffer);
+                }
+            }
+
+            if (!pdfBuffer) {
+                throw new Error('PDF 생성에 실패하였습니다.');
+            }
+
+            const downloadFilename = `알트에프_공식견적서_${quoteId}.pdf`;
+            const encodedFilename = encodeURIComponent(downloadFilename);
+
+            res.writeHead(200, {
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': `inline; filename*=UTF-8''${encodedFilename}`,
+                'Content-Length': pdfBuffer.length,
+                'Cache-Control': 'public, max-age=604800' // 7일 캐싱
+            });
+            res.end(pdfBuffer);
+            return;
+        } catch (pdfErr) {
+            console.error('[PDF Server] PDF 스트리밍 실패:', pdfErr);
+            res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end(`PDF 생성 중 오류가 발생했습니다: ${pdfErr.message}`);
+            return;
+        }
+    }
+
+    // 📄 GET /quote/view : 비로그인 고객 모바일 직통 정식 견적서 웹 뷰어 & 인쇄
+    if (req.method === 'GET' && url.pathname === '/quote/view') {
         const quoteId = url.searchParams.get('id');
         let quote = (db.quotations || []).find(q => q.id === quoteId);
         if (!quote) {

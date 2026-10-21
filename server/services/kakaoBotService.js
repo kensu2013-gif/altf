@@ -1045,24 +1045,27 @@ export class KakaoBotService {
             (outCount > 0 ? `• 주문제작/입고필요: ${outCount}개 품목\n` : `• 재고 부족품목: 0개 (전량 즉시 출고)\n`) +
             `• 예상 납기: ${deliverySummary}\n`;
 
-        // 1. [핵심] 알트에프 공식 직인 견적서 PDF & 고해상도 JPG 이미지 즉시 생성 및 S3 업로드
-        let directPdfUrl = quoteUrl;
-        let quotationJpgBuffer = null;
+        // 1. [핵심] 알트에프 공식 직인 견적서 PDF 생성 및 S3 / 로컬 보관
+        let directPdfUrl = `https://altf.kr/api/quote/pdf?id=${quotationId}`;
+        let presignedPdfUrl = null;
 
         try {
-            console.log(`[KakaoBot] 📑 견적서 ${quotationId} 공식 직인 PDF 및 MMS 이미지 생성 착수...`);
+            console.log(`[KakaoBot] 📑 견적서 ${quotationId} 공식 직인 PDF 생성 착수...`);
             const artifacts = await this.generateOfficialQuotationArtifacts(quote);
             if (artifacts?.s3PdfUrl) {
-                directPdfUrl = artifacts.s3PdfUrl;
-                quotationJpgBuffer = artifacts.jpgBuffer;
-                console.log(`[KakaoBot] ☁️ S3 직통 PDF 업로드 성공! URL: ${directPdfUrl}`);
+                presignedPdfUrl = artifacts.s3PdfUrl;
+                // S3 서명 URL이 있으면 우선적으로 직통 다운로드 링크로 사용 (또는 altf.kr 링크)
+                directPdfUrl = presignedPdfUrl;
+                console.log(`[KakaoBot] ☁️ S3 직통 서명 PDF URL 생성 성공: ${directPdfUrl}`);
             }
         } catch (artifactErr) {
-            console.warn('[KakaoBot] 직인 PDF/이미지 자동 생성 실패 (웹 링크로 폴백):', artifactErr.message);
+            console.warn('[KakaoBot] 직인 PDF 자동 생성 실패 (웹 링크로 폴백):', artifactErr.message);
         }
 
         const formattedTotal = quote?.totalAmount ? `₩${quote.totalAmount.toLocaleString()}원 (VAT별도)` : '별도협의';
 
+        // 사용자 요청 반영: "2번째 사진처럼 의미없는 사진은 필요없어. 공식 양식 처럼 전달해주는 방식이어야 해"
+        // 저해상도 MMS 사진 제거 + 공식 견적서 PDF 1초 직통 다운로드 & 공유 링크 제공
         const messageText = customMessage || (
             `[알트에프(AltF) 견적 회신]\n` +
             `${targetName} 담당자님, 요청하신 견적이 완료되었습니다.\n` +
@@ -1071,9 +1074,10 @@ export class KakaoBotService {
             `• 공급가액: ${formattedTotal}\n` +
             stockSummaryText +
             `━━━━━━━━━━━━━━━━━━━━\n` +
-            `📸 첨부사진: 알트에프 정식 직인 견적서\n` +
-            `📥 원본 PDF 즉시 다운로드 (로그인/접속 불필요):\n` +
+            `📄 [알트에프 공식 직인 견적서(PDF) 즉시 열람 및 저장]\n` +
             `${directPdfUrl}\n\n` +
+            `※ 위 링크를 터치하시면 공식 견적서 원본 PDF가 즉시 열립니다.\n` +
+            `※ 우측 상단 '공유/저장'을 누르면 거래처나 카카오톡으로 바로 전달하실 수 있습니다.\n\n` +
             `문의: 051-303-3751 / 알트에프(주)`
         );
 
@@ -1105,56 +1109,17 @@ export class KakaoBotService {
             message: '발송 가능한 수단이 구성되지 않았습니다.' 
         };
 
-        // 2. [우선순위 1] Solapi REST API 직접 연동 (MMS 이미지 첨부 지원)
+        // 2. [우선순위 1] Solapi REST API 직접 연동 (고객 요청: 의미없는 사진 제외, 깔끔한 LMS 텍스트 모드로 신뢰도 극대화)
         if (process.env.SOLAPI_API_KEY && process.env.SOLAPI_API_SECRET && targetPhone) {
             try {
-                console.log(`[KakaoBot] 🚀 Solapi로 견적서 발송 시작: 수신자 ${targetPhone} (${quotationId})`);
+                console.log(`[KakaoBot] 🚀 Solapi로 공식 견적서 발송 시작: 수신자 ${targetPhone} (${quotationId})`);
 
-                // 1순위: 방금 자동 렌더링된 정식 직인 견적서 JPG 이미지
-                // 2순위: 고객이 보낸 의뢰 사진
-                let imageId = null;
-                let attachBuffer = quotationJpgBuffer;
-
-                if (!attachBuffer) {
-                    const attachCandidate = quote?.attachments?.[0];
-                    if (attachCandidate?.data && typeof attachCandidate.data === 'string') {
-                        const base64Data = attachCandidate.data.includes(',') ? attachCandidate.data.split(',')[1] : attachCandidate.data;
-                        attachBuffer = Buffer.from(base64Data, 'base64');
-                    } else if (attachCandidate?.url && attachCandidate.url.startsWith('http')) {
-                        try {
-                            const fetch = (await import('node-fetch')).default;
-                            const imgRes = await fetch(attachCandidate.url);
-                            if (imgRes.ok) {
-                                attachBuffer = Buffer.from(await imgRes.arrayBuffer());
-                            }
-                        } catch (e) {
-                            console.warn('[KakaoBot] 첨부 이미지 다운로드 실패 (텍스트로만 발송):', e.message);
-                        }
-                    }
-                }
-
-                // 이미지가 200KB 이하인 경우 Solapi Storage에 MMS 업로드
-                if (attachBuffer && attachBuffer.length <= 200 * 1024) {
-                    try {
-                        const uploadRes = await this.uploadSolapiFile({
-                            fileBase64: attachBuffer.toString('base64'),
-                            fileName: `quote_${quotationId}.jpg`,
-                            type: 'MMS'
-                        });
-                        if (uploadRes?.fileId) {
-                            imageId = uploadRes.fileId;
-                            console.log(`[KakaoBot] 📸 Solapi MMS 직인 견적서 이미지 업로드 성공! fileId: ${imageId}`);
-                        }
-                    } catch (uploadErr) {
-                        console.warn('[KakaoBot] Solapi 이미지 업로드 실패, 텍스트 LMS로 발송 진행:', uploadErr.message);
-                    }
-                }
-
+                // 사용자가 요청한 대로 의미없는 저화질 MMS 사진은 제외하고 정식 LMS로 발송
                 result = await this.sendSolapiMessage({
                     phone: targetPhone,
                     text: messageText,
                     title: `[알트에프] 견적서 (${quotationId})`,
-                    imageId
+                    imageId: null
                 });
             } catch (solapiErr) {
                 console.error('[KakaoBot] Solapi 발송 중 오류:', solapiErr);
@@ -1489,9 +1454,21 @@ export class KakaoBotService {
             const pdfBuf = fs.readFileSync(tempPdf);
             const jpgBuf = fs.readFileSync(tempJpg);
 
-            // 3. AWS S3 퍼블릭 업로드 (로그인 없이 즉시 다운로드되는 글로벌 직통 URL)
-            const s3FileName = `${quoteId.replace(/[^a-zA-Z0-9_-]/g, '_')}_altf_quotation.pdf`;
-            const s3PdfUrl = await uploadFileToS3('documents/quotations', s3FileName, pdfBuf, 'application/pdf');
+            // 로컬 캐시 스토리지에 영구 저장 (서버 직통 스트리밍용)
+            const cleanId = quoteId.replace(/[^a-zA-Z0-9_-]/g, '_');
+            const storageDir = path.resolve('./storage/quotations');
+            if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
+            fs.writeFileSync(path.join(storageDir, `${cleanId}.pdf`), pdfBuf);
+
+            // 3. AWS S3 서명 업로드 (로그인/AccessDenied 없이 7일간 즉시 열리는 서명 다운로드 URL 발급)
+            const s3FileName = `${cleanId}_altf_quotation.pdf`;
+            let s3PdfUrl = null;
+            try {
+                s3PdfUrl = await uploadFileToS3('documents/quotations', s3FileName, pdfBuf, 'application/pdf');
+            } catch (s3Err) {
+                console.warn('[KakaoBot] S3 업로드 실패 (로컬 스트리밍으로 폴백):', s3Err.message);
+                s3PdfUrl = `https://altf.kr/api/quote/pdf?id=${quoteId}`;
+            }
 
             return {
                 s3PdfUrl,
