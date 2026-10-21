@@ -118,6 +118,17 @@ export interface Quotation {
         relatedDocNo?: string;
         targetCustomer?: string;
     };
+    botUserKey?: string;
+    isKakaoRegistered?: boolean;
+    kakaoUser?: {
+        botUserKey?: string;
+        name?: string;
+        phone?: string;
+        company?: string;
+        email?: string;
+    };
+    dispatchStatus?: 'NOT_SENT' | 'PENDING' | 'SENT' | 'FAILED';
+    dispatchedAt?: string;
 }
 
 export interface User {

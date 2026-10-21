@@ -1928,6 +1928,36 @@ const server = http.createServer(async (req, res) => {
             }
             return;
         }
+
+        // 5. GET /api/kakao/users : 카카오톡 ID 매핑 사용자 대장 조회
+        if (req.method === 'GET' && url.pathname === '/api/kakao/users') {
+            sendJsonResponse(req, res, 200, { success: true, users: kakaoBotService.users || [] });
+            return;
+        }
+
+        // 6. POST /api/kakao/users : 신규 카카오톡 ID 매핑 등록/수정
+        if (req.method === 'POST' && url.pathname === '/api/kakao/users') {
+            try {
+                const body = await parseBody(req);
+                const saved = kakaoBotService.registerUser(body);
+                sendJsonResponse(req, res, 200, { success: true, message: '카카오톡 고객 매칭 정보가 등록되었습니다.', user: saved });
+            } catch (err) {
+                sendJsonResponse(req, res, 400, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 7. POST /api/kakao/dispatch-quote : Make.com 웹훅 또는 Solapi로 정식 견적서 발송
+        if (req.method === 'POST' && url.pathname === '/api/kakao/dispatch-quote') {
+            try {
+                const body = await parseBody(req);
+                const result = await kakaoBotService.dispatchQuotation(body);
+                sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
     }
 
     // ==========================================
@@ -4363,6 +4393,12 @@ const server = http.createServer(async (req, res) => {
                 }
                 if (draft.status && db.quotations[idx].status === 'DRAFT') {
                     db.quotations[idx].status = draft.status;
+                    dbQuotesChanged = true;
+                }
+                if (draft.botUserKey && !db.quotations[idx].botUserKey) {
+                    db.quotations[idx].botUserKey = draft.botUserKey;
+                    db.quotations[idx].isKakaoRegistered = draft.isKakaoRegistered;
+                    db.quotations[idx].kakaoUser = draft.kakaoUser;
                     dbQuotesChanged = true;
                 }
             }

@@ -281,6 +281,22 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const [isApiSubmitting, setIsApiSubmitting] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isKakaoCopied, setIsKakaoCopied] = useState(false);
+    const [isDispatching, setIsDispatching] = useState(false);
+    const [dispatchStatusMsg, setDispatchStatusMsg] = useState<string | null>(null);
+    const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+    const [kakaoUserData, setKakaoUserData] = useState<{
+        botUserKey: string;
+        name: string;
+        phone: string;
+        company: string;
+        email: string;
+    }>({
+        botUserKey: quote.botUserKey || '',
+        name: quote.kakaoUser?.name || quote.customerInfo?.contactName || '',
+        phone: quote.kakaoUser?.phone || quote.customerInfo?.phone || '',
+        company: quote.kakaoUser?.company || quote.customerName || '',
+        email: quote.kakaoUser?.email || quote.customerInfo?.email || ''
+    });
 
     const handleCopyKakaoReply = () => {
         const custName = customerInfo.companyName || quote.customerName || '고객사';
@@ -298,6 +314,71 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         navigator.clipboard.writeText(message);
         setIsKakaoCopied(true);
         setTimeout(() => setIsKakaoCopied(false), 2500);
+    };
+
+    // Make.com 웹훅 및 Solapi 연동 실시간 견적서 발송
+    const handleDispatchKakaoQuote = async () => {
+        setIsDispatching(true);
+        setDispatchStatusMsg(null);
+        try {
+            const custName = customerInfo.companyName || quote.customerName || '고객사';
+            const totalWon = (totalWithCharges || quote.totalAmount || 0).toLocaleString();
+            const quoteUrl = `https://altf.kr/quote/view?id=${quote.id}`;
+            const customMessage = `📋 [알트에프 견적 회신 안내]\n${custName} 귀하, 요청하신 견적 검토가 완료되었습니다.\n\n• 견적번호: ${quote.id}\n• 총 품목수: ${items.length}개\n• 견적금액: ${totalWon}원 (VAT 별도)\n\n아래 링크에서 정식 직인 PDF 견적서를 확인하실 수 있습니다:\n${quoteUrl}`;
+
+            const res = await fetch('/api/kakao/dispatch-quote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    quotationId: quote.id,
+                    botUserKey: quote.botUserKey,
+                    customMessage
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setDispatchStatusMsg(`✅ 발송 완료: ${data.message || 'Make/Solapi 연동 신호 전송 성공'}`);
+            } else {
+                setDispatchStatusMsg(`⚠️ 발송 오류: ${data.error || '발송 실패'}`);
+            }
+        } catch (e: any) {
+            setDispatchStatusMsg(`⚠️ 네트워크 오류: ${e.message}`);
+        } finally {
+            setIsDispatching(false);
+        }
+    };
+
+    // 카카오 고객 매칭 정보 등록/수정
+    const handleRegisterKakaoUser = async () => {
+        if (!kakaoUserData.botUserKey) {
+            alert('카카오톡 고유 식별자(ID)가 없습니다.');
+            return;
+        }
+        try {
+            const res = await fetch('/api/kakao/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(kakaoUserData)
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert('카카오톡 고객 매칭이 등록되었습니다.');
+                setIsRegisterOpen(false);
+                if (data.user) {
+                    setCustomerInfo(prev => ({
+                        ...prev,
+                        companyName: data.user.company || prev.companyName,
+                        contactName: data.user.name || prev.contactName,
+                        phone: data.user.phone || prev.phone,
+                        email: data.user.email || prev.email
+                    }));
+                }
+            } else {
+                alert(`등록 실패: ${data.error}`);
+            }
+        } catch (e: any) {
+            alert(`등록 오류: ${e.message}`);
+        }
     };
     const [bulkDiscountRateInput, setBulkDiscountRateInput] = useState<string>('');
     const [targetDiscountRate, setTargetDiscountRate] = useState<string>('all');
@@ -1688,44 +1769,158 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                             )}
                         </div>
 
-                        {/* NEW: 카카오톡 접수건 원클릭 답변 및 채팅창 전송 패널 */}
+                        {/* NEW: 카카오톡 접수건 고객 매칭 & Make/Solapi 웹훅 자동 회신 패널 */}
                         {(quote.source === 'KAKAO' || quote.id.startsWith('Q-KAKAO')) && (
-                            <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-yellow-300 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-yellow-400 flex items-center justify-center text-slate-900 font-black text-xs shrink-0 shadow-xs">
-                                        TALK
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-bold text-slate-900">카카오톡 채널 회신 지원</span>
-                                            <span className="text-[10px] bg-yellow-200 text-yellow-800 font-bold px-2 py-0.5 rounded-full">@altf 채널</span>
+                            <div className="bg-gradient-to-r from-amber-50/90 via-yellow-50/90 to-amber-50/90 border border-yellow-300 rounded-xl p-4 shadow-sm flex flex-col gap-3">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-yellow-400 flex items-center justify-center text-slate-900 font-black text-xs shrink-0 shadow-xs ring-2 ring-yellow-200">
+                                            TALK
                                         </div>
-                                        <p className="text-xs text-slate-600 mt-0.5">
-                                            단가 및 납기 검토 후 원클릭으로 견적 결과 텍스트와 정식 견적서 링크를 카카오톡 대화방에 회신할 수 있습니다.
-                                        </p>
+                                        <div>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-sm font-bold text-slate-900">카카오톡 채널 연동 & 회신 지원</span>
+                                                <span className="text-[10px] bg-yellow-200 text-yellow-900 font-bold px-2 py-0.5 rounded-full">@altf 채널</span>
+                                                
+                                                {/* 카카오 사용자 식별 매칭 배지 */}
+                                                {(kakaoUserData.name || quote.kakaoUser?.name) ? (
+                                                    <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full border border-emerald-300">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                        고객 매칭: {kakaoUserData.company || quote.kakaoUser?.company || quote.customerName} {kakaoUserData.name || quote.kakaoUser?.name} ({kakaoUserData.phone || quote.kakaoUser?.phone || '연락처'})
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsRegisterOpen(!isRegisterOpen)}
+                                                        className="inline-flex items-center gap-1 text-[11px] bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold px-2.5 py-0.5 rounded-full border border-amber-300 cursor-pointer transition-colors"
+                                                    >
+                                                        <span>⚠️ 미등록 카카오 ID</span>
+                                                        <span className="underline font-extrabold">+ 고객 매칭 등록</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs text-slate-600 mt-0.5">
+                                                <span>카카오 ID: <code className="font-mono text-[11px] bg-white px-1.5 py-0.5 rounded border border-yellow-200 text-slate-700">{quote.botUserKey ? `${quote.botUserKey.slice(0, 10)}...${quote.botUserKey.slice(-6)}` : '미식별'}</code></span>
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setIsRegisterOpen(!isRegisterOpen)} 
+                                                    className="text-[11px] text-blue-600 hover:underline font-bold"
+                                                >
+                                                    [정보 {isRegisterOpen ? '닫기' : '수정/등록'}]
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto flex-wrap">
+                                        {/* 1. Make.com / Solapi 자동 발송 버튼 */}
+                                        <button
+                                            type="button"
+                                            disabled={isDispatching}
+                                            onClick={handleDispatchKakaoQuote}
+                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                                            title="Make.com 웹훅 또는 Solapi를 통해 고객에게 알림톡/견적서 문자를 자동 전송합니다."
+                                        >
+                                            <Send className="w-3.5 h-3.5" />
+                                            <span>{isDispatching ? '발송 중...' : '🚀 Make/Solapi 문자 발송'}</span>
+                                        </button>
+
+                                        {/* 2. 클립보드 복사 */}
+                                        <button
+                                            type="button"
+                                            onClick={handleCopyKakaoReply}
+                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer"
+                                            title="카카오톡 채팅창에 바로 붙여넣을 수 있는 정돈된 견적 요약본을 복사합니다."
+                                        >
+                                            {isKakaoCopied ? <Check className="w-4 h-4 text-emerald-800" /> : <Copy className="w-4 h-4" />}
+                                            <span>{isKakaoCopied ? '복사 완료!' : '카카오톡 답변 복사'}</span>
+                                        </button>
+
+                                        {/* 3. 1:1 채팅창 링크 */}
+                                        <a
+                                            href="https://pf.kakao.com/_jxcxaBn/chat"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-yellow-100 border border-yellow-300 text-yellow-900 font-bold text-xs rounded-lg transition-all shadow-xs"
+                                            title="알트에프 카카오톡 채널 관리자 1:1 채팅창으로 이동합니다."
+                                        >
+                                            <MessageSquare className="w-4 h-4 text-yellow-700" />
+                                            <span>1:1 채팅창</span>
+                                        </a>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
-                                    <button
-                                        type="button"
-                                        onClick={handleCopyKakaoReply}
-                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer"
-                                        title="카카오톡 채팅창에 바로 붙여넣을 수 있는 정돈된 견적 요약본을 복사합니다."
-                                    >
-                                        {isKakaoCopied ? <Check className="w-4 h-4 text-emerald-800" /> : <Copy className="w-4 h-4" />}
-                                        <span>{isKakaoCopied ? '복사 완료!' : '카카오톡 답변 복사'}</span>
-                                    </button>
-                                    <a
-                                        href="https://pf.kakao.com/_jxcxaBn/chat"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white hover:bg-yellow-100 border border-yellow-300 text-yellow-900 font-bold text-xs rounded-lg transition-all shadow-xs"
-                                        title="알트에프 카카오톡 채널 관리자 1:1 채팅창으로 이동합니다."
-                                    >
-                                        <MessageSquare className="w-4 h-4 text-yellow-700" />
-                                        <span>1:1 채팅창 열기</span>
-                                    </a>
-                                </div>
+
+                                {/* 발송 결과 피드백 바 */}
+                                {dispatchStatusMsg && (
+                                    <div className="text-xs font-bold p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 flex items-center justify-between">
+                                        <span>{dispatchStatusMsg}</span>
+                                        <button type="button" onClick={() => setDispatchStatusMsg(null)} className="text-blue-500 hover:text-blue-700">
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* 인라인 고객 매칭 등록/수정 폼 */}
+                                {isRegisterOpen && (
+                                    <div className="bg-white/95 rounded-xl border border-yellow-300 p-3 shadow-inner">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                                <User className="w-3.5 h-3.5 text-yellow-600" />
+                                                카카오톡 ID ↔ 고객사/담당자 영구 매칭 등록
+                                            </span>
+                                            <span className="text-[11px] text-slate-400">최초 1회 등록 시 다음부터 자동 매칭됩니다.</span>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                                            <div>
+                                                <label className="block text-[11px] font-bold text-slate-600 mb-0.5">회사명</label>
+                                                <input
+                                                    type="text"
+                                                    value={kakaoUserData.company}
+                                                    onChange={e => setKakaoUserData(prev => ({ ...prev, company: e.target.value }))}
+                                                    placeholder="예: 태일공업사"
+                                                    className="w-full text-xs p-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-yellow-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[11px] font-bold text-slate-600 mb-0.5">담당자명</label>
+                                                <input
+                                                    type="text"
+                                                    value={kakaoUserData.name}
+                                                    onChange={e => setKakaoUserData(prev => ({ ...prev, name: e.target.value }))}
+                                                    placeholder="예: 조현근"
+                                                    className="w-full text-xs p-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-yellow-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[11px] font-bold text-slate-600 mb-0.5">전화번호 (알림톡/Solapi 수신)</label>
+                                                <input
+                                                    type="text"
+                                                    value={kakaoUserData.phone}
+                                                    onChange={e => setKakaoUserData(prev => ({ ...prev, phone: e.target.value }))}
+                                                    placeholder="예: 01086163751"
+                                                    className="w-full text-xs p-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-yellow-500"
+                                                />
+                                            </div>
+                                            <div className="flex items-end gap-1.5">
+                                                <input
+                                                    type="text"
+                                                    value={kakaoUserData.email}
+                                                    onChange={e => setKakaoUserData(prev => ({ ...prev, email: e.target.value }))}
+                                                    placeholder="이메일 (선택)"
+                                                    className="flex-1 text-xs p-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-yellow-500"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={handleRegisterKakaoUser}
+                                                    className="px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-bold text-xs rounded transition-colors cursor-pointer shrink-0"
+                                                >
+                                                    매칭 저장
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -2464,16 +2659,18 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                 </Button>
                             )}
 
-                            {/* Convert to Order */}
-                            <Button
-                                variant="outline"
-                                onClick={handleConvertOrder}
-                                className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 font-bold gap-1.5 shadow-2xs"
-                                title="이 견적서를 즉시 정식 발주서(주문)로 전환합니다."
-                            >
-                                <ShoppingCart className="w-4 h-4 text-emerald-600" />
-                                발주서로 전환
-                            </Button>
+                            {/* Convert to Order - Only available when PROCESSED or COMPLETED */}
+                            {(quote.status === 'PROCESSED' || quote.status === 'COMPLETED') && (
+                                <Button
+                                    variant="outline"
+                                    onClick={handleConvertOrder}
+                                    className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 font-bold gap-1.5 shadow-2xs"
+                                    title="이 견적서를 즉시 정식 발주서(주문)로 전환합니다."
+                                >
+                                    <ShoppingCart className="w-4 h-4 text-emerald-600" />
+                                    발주서로 전환
+                                </Button>
+                            )}
 
                             <Button variant="outline" onClick={_onClose}>
                                 닫기

@@ -1,0 +1,65 @@
+[
+  {
+    "botUserKey": "15349e9bae1b18d2516d6a2472682d046f94c45f01f034fd60fcd9d888cb2c1e28",
+    "name": "조현근",
+    "phone": "01086163751",
+    "company": "태일공업사",
+    "email": "",
+    "registeredAt": "2026-10-21T09:00:00Z",
+    "notes": "태일공업사 담당자 (구글 시트 연동)"
+  },
+  {
+    "botUserKey": "ae13f2fcaf674c9ced76087384cca24ae64e590c9e8eb31a25ee2c80f84ff89884",
+    "name": "조현진",
+    "phone": "01062223751",
+    "company": "ATLF",
+    "email": "",
+    "registeredAt": "2026-10-21T09:00:00Z",
+    "notes": "알트에프 대표"
+  },
+  {
+    "botUserKey": "b2bae10e228923edbbaffde54926cb7877a5ad11f08894f56bc556ec677179ec86",
+    "name": "이사랑",
+    "phone": "01086155868",
+    "company": "태일공업사",
+    "email": "",
+    "registeredAt": "2026-10-21T09:00:00Z",
+    "notes": "태일공업사 담당자"
+  },
+  {
+    "botUserKey": "e13a77ab4bed3a31d9bd48a3ec949fdbfb481941d738fc56192fbdf6bdc0c4ab49",
+    "name": "정은아",
+    "phone": "01041655791",
+    "company": "태일공업사",
+    "email": "",
+    "registeredAt": "2026-10-21T09:00:00Z",
+    "notes": "태일공업사 담당자"
+  },
+  {
+    "botUserKey": "bbab408ed1c780ff25ec04b60ddc9b2a1609ce0951a7445a2b8f7461fb9ae905b8",
+    "name": "김소현",
+    "phone": "01059237055",
+    "company": "ALTF",
+    "email": "",
+    "registeredAt": "2026-10-21T09:00:00Z",
+    "notes": "알트에프 담당자"
+  },
+  {
+    "botUserKey": "69b2951319a084af2c5fb2d3c2785abe87f70b4a2a42ec122169938bc92797f7bd",
+    "name": "이훈",
+    "phone": "01042534555",
+    "company": "ALTF",
+    "email": "",
+    "registeredAt": "2026-10-21T09:00:00Z",
+    "notes": "알트에프 담당자"
+  },
+  {
+    "botUserKey": "ddcd6d8486a21d80c8991ffb656d7194ed13e6f0b2d8b7b16c5464e157866a3477",
+    "name": "박조나단",
+    "phone": "01032037730",
+    "company": "ALTF",
+    "email": "",
+    "registeredAt": "2026-10-21T09:00:00Z",
+    "notes": "알트에프 담당자"
+  }
+]

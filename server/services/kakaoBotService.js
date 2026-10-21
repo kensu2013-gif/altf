@@ -30,11 +30,13 @@ const DATA_DIR = path.join(ROOT_DIR, 'server/data');
 const INTAKES_FILE = path.join(DATA_DIR, 'kakao_intakes.json');
 const AGENTS_FILE = path.join(DATA_DIR, 'agents.json');
 const DRAFT_QUOTES_FILE = path.join(DATA_DIR, 'kakao_draft_quotations.json');
+const USERS_FILE = path.join(DATA_DIR, 'kakao_users.json');
 
 export class KakaoBotService {
     constructor() {
         this.intakes = [];
         this.draftQuotations = [];
+        this.users = [];
         this.stats = {
             totalReceived: 0,
             textQuotes: 0,
@@ -69,6 +71,13 @@ export class KakaoBotService {
                 this.draftQuotations = [];
                 fs.writeFileSync(DRAFT_QUOTES_FILE, JSON.stringify([], null, 2), 'utf8');
             }
+
+            if (fs.existsSync(USERS_FILE)) {
+                this.users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+            } else {
+                this.users = [];
+                fs.writeFileSync(USERS_FILE, JSON.stringify([], null, 2), 'utf8');
+            }
         } catch (e) {
             console.error('[KakaoBotService] 데이터 로드 실패:', e.message);
             this.intakes = [];
@@ -79,9 +88,46 @@ export class KakaoBotService {
         try {
             fs.writeFileSync(INTAKES_FILE, JSON.stringify(this.intakes.slice(0, 500), null, 2), 'utf8');
             fs.writeFileSync(DRAFT_QUOTES_FILE, JSON.stringify(this.draftQuotations.slice(0, 500), null, 2), 'utf8');
+            fs.writeFileSync(USERS_FILE, JSON.stringify(this.users, null, 2), 'utf8');
         } catch (e) {
             console.error('[KakaoBotService] 데이터 저장 실패:', e.message);
         }
+    }
+
+    /**
+     * 카카오톡 ID(해시 botUserKey)로 사전 등록된 사용자/고객사 매칭 검색
+     */
+    findUserByBotUserKey(botUserKey) {
+        if (!botUserKey || botUserKey === 'unknown_user') return null;
+        return this.users.find(u => u.botUserKey === botUserKey) || null;
+    }
+
+    /**
+     * 카카오톡 ID 매핑 신규 등록 또는 업데이트
+     */
+    registerUser(userData) {
+        if (!userData || !userData.botUserKey) {
+            throw new Error('botUserKey(카카오톡 ID)는 필수입니다.');
+        }
+        const existingIdx = this.users.findIndex(u => u.botUserKey === userData.botUserKey);
+        const record = {
+            botUserKey: userData.botUserKey,
+            name: userData.name || '',
+            phone: (userData.phone || '').replace(/[^0-9]/g, ''),
+            company: userData.company || '',
+            email: userData.email || '',
+            registeredAt: new Date().toISOString(),
+            notes: userData.notes || '관리자 화면에서 등록'
+        };
+
+        if (existingIdx >= 0) {
+            this.users[existingIdx] = { ...this.users[existingIdx], ...record };
+        } else {
+            this.users.push(record);
+        }
+        this.saveData();
+        console.log(`[KakaoBot] 👤 카카오 고객 매칭 저장 완료: ${record.name} (${record.company}, ${record.phone})`);
+        return record;
     }
 
     /**
@@ -146,10 +192,33 @@ export class KakaoBotService {
             }
         }
 
+        // 2. 카카오 사용자 사전 매칭 (구글시트/대장 연동 botUserKey 확인)
+        const matchedUser = this.findUserByBotUserKey(botUserKey);
+        if (matchedUser) {
+            console.log(`[KakaoBot] 🎯 등록된 카카오 고객 매칭 성공: ${matchedUser.name} (${matchedUser.company || '회사미기재'}, ${matchedUser.phone})`);
+            if (!normalized.customer) {
+                normalized.customer = {
+                    name: matchedUser.company || matchedUser.name,
+                    ceo: matchedUser.name,
+                    phone: matchedUser.phone,
+                    email: matchedUser.email || '',
+                    address: ''
+                };
+            } else {
+                normalized.customer.phone = normalized.customer.phone || matchedUser.phone;
+                normalized.customer.contact = matchedUser.name;
+                normalized.customer.email = normalized.customer.email || matchedUser.email;
+            }
+        } else {
+            console.log(`[KakaoBot] ⚠️ 미등록 카카오 사용자 인입: botUserKey=${botUserKey}`);
+        }
+
         const intakeRecord = {
             id: `KAKAO-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
             type: isImage ? 'image' : 'text',
             botUserKey,
+            isRegisteredUser: !!matchedUser,
+            matchedUser: matchedUser || null,
             utterance: utterance || (isImage ? '[견적 요청 사진 첨부]' : '[내용 없음]'),
             imageUrl: imageUrl || null,
             status: normalized.items.length > 0 ? 'QUOTE_DRAFTED' : 'RECEIVED',
@@ -289,6 +358,10 @@ export class KakaoBotService {
             items,
             totalAmount,
             status: 'SUBMITTED', // 🔥 중요: 접수(Submitted) 상태로 설정되어 관리자 목록에서 노란색 '접수' 버튼 활성화 및 필터링
+            botUserKey: intake.botUserKey || null,
+            isKakaoRegistered: !!intake.isRegisteredUser,
+            kakaoUser: intake.matchedUser || null,
+            dispatchStatus: 'NOT_SENT',
             attachments: intake.imageUrl ? [
                 {
                     name: `${custName}_재고의뢰서_사진.jpg`,
@@ -429,6 +502,135 @@ export class KakaoBotService {
             items: this.intakes.slice(offset, offset + limit)
         };
     }
+
+    /**
+     * 답변 완료된 견적서를 Make.com 웹훅 또는 Solapi로 발송
+     */
+    async dispatchQuotation({ quotationId, botUserKey, customMessage, webhookUrl }) {
+        const quote = this.draftQuotations.find(q => q.id === quotationId);
+        const user = this.findUserByBotUserKey(botUserKey) || (quote?.kakaoUser) || null;
+        
+        const targetWebhookUrl = webhookUrl || process.env.MAKE_WEBHOOK_URL || null;
+        const targetPhone = user?.phone || quote?.customerInfo?.phone || '';
+        const targetName = user?.name || quote?.customerInfo?.contactName || '고객';
+        const targetCompany = user?.company || quote?.customerName || '';
+        const quoteUrl = `https://altf.kr/quote/view?id=${quotationId}`;
+
+        const payload = {
+            event: 'QUOTE_DISPATCHED',
+            quotationId,
+            botUserKey: botUserKey || quote?.botUserKey || '',
+            recipient: {
+                name: targetName,
+                company: targetCompany,
+                phone: targetPhone,
+                email: user?.email || quote?.customerInfo?.email || ''
+            },
+            quote: {
+                id: quotationId,
+                totalAmount: quote?.totalAmount || 0,
+                itemCount: quote?.items?.length || 0,
+                quoteUrl,
+                pdfUrl: quote?.attachments?.[0]?.url || quoteUrl,
+                summary: `${targetCompany} ${quote?.items?.length || 0}개 품목 견적서`
+            },
+            message: customMessage || `[알트에프 견적 안내]\n${targetName} 담당자님, 요청하신 견적(견적번호: ${quotationId})이 완료되었습니다.\n상세 확인 및 PDF 다운로드: ${quoteUrl}`,
+            timestamp: new Date().toISOString()
+        };
+
+        let result = { 
+            success: true, 
+            mode: 'SIMULATED', 
+            message: `[시뮬레이션/기본] ${targetName} 담당자 (${targetPhone || '전화번호 미등록'}) 앞으로 발송 신호가 생성되었습니다.` 
+        };
+
+        // 1. Make.com Webhook 연동 (환경변수 또는 인자로 웹훅 URL이 있는 경우)
+        if (targetWebhookUrl) {
+            try {
+                const fetch = (await import('node-fetch')).default;
+                const hookRes = await fetch(targetWebhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                result = {
+                    success: hookRes.ok,
+                    mode: 'MAKE_WEBHOOK',
+                    statusCode: hookRes.status,
+                    message: hookRes.ok 
+                        ? `Make.com 웹훅 전송 성공! (Solapi/알림톡 연계 격발)` 
+                        : `Make.com 웹훅 응답 코드: ${hookRes.status}`
+                };
+            } catch (hookErr) {
+                console.error('[KakaoBot] Make.com 웹훅 전송 실패:', hookErr.message);
+                result = { success: false, mode: 'MAKE_WEBHOOK_ERROR', error: hookErr.message };
+            }
+        } 
+        // 2. Solapi REST API 직접 연동 (환경변수 SOLAPI_API_KEY 설정 시)
+        else if (process.env.SOLAPI_API_KEY && process.env.SOLAPI_API_SECRET && targetPhone) {
+            try {
+                result = await this.sendSolapiMessage({
+                    phone: targetPhone,
+                    text: payload.message,
+                    title: `[알트에프] 견적서 (${quotationId})`
+                });
+            } catch (solapiErr) {
+                result = { success: false, mode: 'SOLAPI_ERROR', error: solapiErr.message };
+            }
+        }
+
+        // 견적서 발송 상태 기록
+        if (quote) {
+            quote.dispatchStatus = result.success ? 'SENT' : 'FAILED';
+            quote.dispatchedAt = new Date().toISOString();
+            quote.dispatchPayload = payload;
+            this.saveData();
+        }
+
+        return { ...result, payload };
+    }
+
+    /**
+     * Solapi 메시지 발송 헬퍼
+     */
+    async sendSolapiMessage({ phone, text, title }) {
+        const apiKey = process.env.SOLAPI_API_KEY;
+        const apiSecret = process.env.SOLAPI_API_SECRET;
+        const sender = process.env.SOLAPI_SENDER_PHONE || '0315031019';
+
+        const crypto = await import('crypto');
+        const fetch = (await import('node-fetch')).default;
+
+        const date = new Date().toISOString();
+        const salt = crypto.randomBytes(16).toString('hex');
+        const signature = crypto.createHmac('sha256', apiSecret).update(date + salt).digest('hex');
+        const authHeader = `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
+
+        const res = await fetch('https://api.solapi.com/messages/v4/send', {
+            method: 'POST',
+            headers: {
+                'Authorization': authHeader,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: {
+                    to: phone.replace(/[^0-9]/g, ''),
+                    from: sender.replace(/[^0-9]/g, ''),
+                    text,
+                    subject: title
+                }
+            })
+        });
+
+        const data = await res.json();
+        return {
+            success: res.ok,
+            mode: 'SOLAPI_DIRECT',
+            data,
+            message: res.ok ? 'Solapi 문자/알림톡 발송 성공' : `Solapi 발송 실패: ${data.message || res.statusText}`
+        };
+    }
 }
 
 export const kakaoBotService = new KakaoBotService();
+
