@@ -458,12 +458,12 @@ ${invoicesToProcess.length > 15 ? `... 외 ${invoicesToProcess.length - 15}건 �
 (카운트다운 종료 즉시 <b>DAT-06 과장</b>이 S3 배포를 완결하고 최종 결재 보고를 올리겠습니다.)
             `.trim());
 
-            // Step 3: 버퍼링 타이머 가동
+            // Step 3: 버퍼링 타이머 가동 & 실패 시 성공할 때까지 3~5분 간격 자동 재시작
             await inventorySyncService.startStep3BufferAndAltfDb(false);
-            // 버퍼링 완료 및 ALTF DB 앱스크립트 실행 완료까지 대기
             await inventorySyncService.waitForStep3Completion();
+            await inventorySyncService.runStep3RetryUntilInventoryJsonReady();
 
-            // Step 4: DAT-06 과장 배포 (중복 정리, S3 업로드, 웹 갱신, 시화 변동량)
+            // Step 4: DAT-06 과장 배포 (중복 다운로드 삭제, S3 업로드, 웹 갱신, 시화 변동량)
             const step4Res = await inventorySyncService.runStep4DeployAndAnalyzeDiff();
 
             // 최종 DAT-06 과장 명의의 완결 결재 보고서 전송!

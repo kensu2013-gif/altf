@@ -376,16 +376,30 @@ export async function uploadInventoryToS3(jsonData) {
         throw new Error('AWS credentials not configured. Cannot upload inventory to S3.');
     }
     try {
+        const ORIGINAL_KEY = 'public/inventory/inventory.json';
         const PROCESSED_KEY = 'public/inventory/processed_inventory.json';
-        const command = new PutObjectCommand({
+        const bodyStr = JSON.stringify(jsonData, null, 2);
+
+        // 1. 사용자 지정 경로 업로드 (s3://altf-web-data-prod/public/inventory/inventory.json)
+        const cmd1 = new PutObjectCommand({
             Bucket: BUCKET_NAME,
-            Key: PROCESSED_KEY,
-            Body: JSON.stringify(jsonData, null, 2),
+            Key: ORIGINAL_KEY,
+            Body: bodyStr,
             ContentType: 'application/json'
         });
+        await sendWithTimeout(cmd1, 15000);
+        console.log(`[S3] Successfully uploaded inventory to (${ORIGINAL_KEY})`);
 
-        await sendWithTimeout(command, 10000);
-        console.log(`[S3] Successfully uploaded processed inventory (${PROCESSED_KEY}) to S3.`);
+        // 2. 가공 인벤토리 동기화 (public/inventory/processed_inventory.json)
+        const cmd2 = new PutObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: PROCESSED_KEY,
+            Body: bodyStr,
+            ContentType: 'application/json'
+        });
+        await sendWithTimeout(cmd2, 15000);
+        console.log(`[S3] Successfully uploaded processed inventory to (${PROCESSED_KEY})`);
+
         return true;
     } catch (error) {
         console.error('[S3] Failed to upload inventory to S3:', error.message);

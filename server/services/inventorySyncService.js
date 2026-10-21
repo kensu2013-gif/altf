@@ -57,6 +57,9 @@ export class InventorySyncService {
     };
 
     this.timerInterval = null;
+    this.schedulerInterval = null;
+    this.lastScheduledRunDate = {};
+    this.initTaeilScheduler();
   }
 
   ensureDirs() {
@@ -75,6 +78,9 @@ export class InventorySyncService {
       daekyungAppsScriptUrl: '',
       altfDbAppsScriptUrl: '',
       bufferWaitMinutes: 3.5, // 3.5분 (210초) 기본
+      retryWaitMinutes: 3.5,  // 실패 시 3~5분 후 재시도
+      maxRetries: 5,          // 최대 재시도 횟수
+      taeilScheduleTimes: ['09:00', '13:00', '17:30'], // 태일/시화 하루 3번
       autoCleanupDownloads: true,
       autoPilotAutoConfirm: false
     };
@@ -112,6 +118,54 @@ export class InventorySyncService {
       state: this.state,
       config: this.config
     };
+  }
+
+  // ==========================================
+  // [DAT-03 스케줄러] 태일/시화 하루 3회 정기 동기화 감시
+  // ==========================================
+  initTaeilScheduler() {
+    if (this.schedulerInterval) clearInterval(this.schedulerInterval);
+    this.schedulerInterval = setInterval(() => {
+      try {
+        const now = new Date();
+        const kstTime = new Intl.DateTimeFormat('ko-KR', {
+          timeZone: 'Asia/Seoul',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }).format(now);
+        const kstDate = new Intl.DateTimeFormat('ko-KR', {
+          timeZone: 'Asia/Seoul',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }).format(now);
+
+        const scheduleList = this.config.taeilScheduleTimes || ['09:00', '13:00', '17:30'];
+        if (scheduleList.includes(kstTime) && this.lastScheduledRunDate[kstTime] !== kstDate) {
+          this.lastScheduledRunDate[kstTime] = kstDate;
+          console.log(`[DAT-03 스케줄러] ⏰ 하루 3회 정기 동기화 시각 도달: ${kstTime}`);
+          this.triggerScheduledTaeilSync(kstTime);
+        }
+      } catch (e) {
+        console.error('[DAT-03 스케줄러] 체크 오류:', e.message);
+      }
+    }, 20000);
+  }
+
+  async triggerScheduledTaeilSync(scheduledTime) {
+    if (this.state.isRunning) {
+      console.log(`[DAT-03 스케줄러] 이미 파이프라인 가동 중으로 예약(${scheduledTime}) 대기`);
+      return;
+    }
+    try {
+      console.log(`[DAT-03 사원] 태일/시화 정기 동기화 시작 (${scheduledTime})`);
+      await this.runStep1TaeilSihwa();
+      console.log(`[DAT-03 사원] 태일/시화 정기 동기화 완료 ➔ DAT-05 대리 호출`);
+      await this.onUpstreamStockUpdated(`TAEIL_SCHEDULE_${scheduledTime}`);
+    } catch (err) {
+      console.error(`[DAT-03 사원] 정기 동기화 실패:`, err.message);
+    }
   }
 
   // ==========================================
@@ -432,6 +486,123 @@ export class InventorySyncService {
       this.state.step3.message = 'ALTF DB 생성 실패: ' + err.message;
       this.state.error = err.message;
       throw err;
+    }
+  }
+
+  // ==========================================
+  // [대리 ➔ 과장 자동 연계 & 재시도 로직]
+  // ==========================================
+  _checkInventoryJsonAvailable() {
+    const homedir = os.homedir();
+    const downloadsDir = path.join(homedir, 'Downloads');
+    const targetFilenames = ['inventory (1).json', 'inventory (2).json', 'inventory.json'];
+
+    for (const fname of targetFilenames) {
+      const p = path.join(downloadsDir, fname);
+      if (fs.existsSync(p)) {
+        try {
+          const raw = fs.readFileSync(p, 'utf8');
+          const parsed = JSON.parse(raw);
+          const count = Array.isArray(parsed) ? parsed.length : (parsed.items?.length || 0);
+          if (count > 0) {
+            return { available: true, path: p, count };
+          }
+        } catch (e) {}
+      }
+    }
+
+    const localInv = path.resolve(process.cwd(), './storage/inventory/inventory.json');
+    if (fs.existsSync(localInv)) {
+      try {
+        const raw = fs.readFileSync(localInv, 'utf8');
+        const parsed = JSON.parse(raw);
+        const count = Array.isArray(parsed) ? parsed.length : (parsed.items?.length || 0);
+        if (count > 0) return { available: true, path: localInv, count };
+      } catch (e) {}
+    }
+
+    if (fs.existsSync(LOCAL_INVENTORY_JSON)) {
+      return { available: true, path: LOCAL_INVENTORY_JSON, count: 0 };
+    }
+
+    return null;
+  }
+
+  /**
+   * 대경 또는 태일/시화 재고 실행 완료 후, 최소 3~5분 대기 후 ALTF DB 앱스크립트 실행
+   * 실패 시 완료될 때까지 3~5분 간격 자동 재시작 루프 수행
+   * 구글드라이브에 inventory.json 만들어지면 DAT-05 역할 종료 및 DAT-06 과장 배포 가동
+   */
+  async onUpstreamStockUpdated(source = 'UPSTREAM') {
+    this.state.isRunning = true;
+    this.state.currentStep = 3;
+
+    try {
+      console.log(`[DAT-05 대리] 상위 재고(${source}) 반응 감지. 수식 안정화를 위해 3~5분 버퍼링 시작...`);
+      await this.startStep3BufferAndAltfDb(false);
+      await this.waitForStep3Completion();
+
+      // 검증 및 실패 시 재시도 루프
+      await this.runStep3RetryUntilInventoryJsonReady();
+
+      this.state.step3.status = 'SUCCESS';
+      this.state.step3.message = '구글 드라이브 inventory.json 생성 확인 완료 (DAT-05 대리 역할 완결)';
+      console.log('[DAT-05 대리] ✅ 구글 드라이브 최신 inventory.json 생성 확인 완료. 역할 완결! DAT-06 과장 바통 터치');
+
+      // DAT-06 과장 가동: 다운로드 ➔ S3 업로드 (s3://altf-web-data-prod/public/inventory/inventory.json) ➔ 다운로드 파일 삭제 ➔ 대기
+      this.state.currentStep = 4;
+      const step4Res = await this.runStep4DeployAndAnalyzeDiff();
+
+      this.state.isRunning = false;
+      this.state.currentStep = 0;
+      console.log('[DAT-06 과장] ✅ S3 배포 및 다운로드 inventory.json 중복 방지 정리 완료. 다음 신호 대기');
+
+      return { success: true, step4: step4Res.step4 };
+    } catch (err) {
+      this.state.isRunning = false;
+      this.state.error = err.message;
+      console.error('[InventorySyncService] 연계 실행 오류:', err);
+      throw err;
+    }
+  }
+
+  async runStep3RetryUntilInventoryJsonReady(maxRetries = 5) {
+    let attempt = 0;
+    while (attempt < maxRetries) {
+      attempt++;
+      const found = this._checkInventoryJsonAvailable();
+      if (found && attempt === 1) return found;
+
+      try {
+        console.log(`[DAT-05 대리] ALTF DB 실행 및 inventory.json 검증 (${attempt}/${maxRetries})...`);
+        await this._executeAltfDbAppsScript();
+        const check = this._checkInventoryJsonAvailable();
+        if (check) return check;
+        throw new Error('구글 드라이브 최신 inventory.json 파일 미확인');
+      } catch (retryErr) {
+        console.warn(`[DAT-05 대리] 실행 실패/미완료 (${attempt}/${maxRetries}): ${retryErr.message}`);
+        if (attempt >= maxRetries) {
+          throw new Error(`최대 재시도(${maxRetries}회) 초과: ${retryErr.message}`);
+        }
+
+        const retryWaitSeconds = Math.round((this.config.retryWaitMinutes || 3.5) * 60);
+        this.state.step3.status = 'BUFFERING';
+        this.state.step3.bufferRemainingSeconds = retryWaitSeconds;
+        this.state.step3.bufferTotalSeconds = retryWaitSeconds;
+        this.state.step3.timerActive = true;
+        this.state.step3.message = `ALTF DB 연산 미완료. 3~5분(${Math.ceil(retryWaitSeconds / 60)}분) 후 자동 재시작 (${attempt}/${maxRetries})...`;
+
+        await new Promise((resolve) => {
+          const t = setInterval(() => {
+            this.state.step3.bufferRemainingSeconds -= 1;
+            if (this.state.step3.bufferRemainingSeconds <= 0) {
+              clearInterval(t);
+              this.state.step3.timerActive = false;
+              resolve(true);
+            }
+          }, 1000);
+        });
+      }
     }
   }
 

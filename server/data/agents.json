@@ -380,10 +380,10 @@
       "EVENT_BACKLOG_SYNCED"
     ],
     "logs": [
-      "[13:01] [PUR-07] altf.kr 발주 2440건 업체/날짜별 분류 완료",
-      "[13:01] 미결(Pending) 462건 추적 중 (매입발주서 자동 매핑)",
-      "[13:01] QC-01 성적서 교차 대조: 432건 접수 확인",
-      "[13:01] 출고 완료 패키징: 거래명세표+성적서 번들 420건 발송 대기"
+      "[14:00] [PUR-07] altf.kr 발주 2440건 업체/날짜별 분류 완료",
+      "[14:00] 미결(Pending) 462건 추적 중 (매입발주서 자동 매핑)",
+      "[14:00] QC-01 성적서 교차 대조: 432건 접수 확인",
+      "[14:00] 출고 완료 패키징: 거래명세표+성적서 번들 420건 발송 대기"
     ],
     "connectedDeptIds": [
       "quality",
@@ -1018,7 +1018,7 @@
     "deptName": "데이터관리팀",
     "teamName": "재고동기화자동화팀",
     "tier": 3,
-    "role": "태일/시화재고 구글시트 Apps Script 실행 및 원격 재고 API 연동 전담",
+    "role": "하루 3회(09:00, 13:00, 17:30) 정기 스케줄 가동 ➔ 태일/시화 구글시트 Apps Script 실행 ➔ DAT-05 대리 호출",
     "status": "ACTIVE",
     "isCreated": true,
     "position": "사원",
@@ -1029,18 +1029,18 @@
       "uptime": "99.9%",
       "tasksToday": 5
     },
-    "currentTask": "[대기] 태일/시화재고 구글시트 동기화 대기 중",
+    "currentTask": "[대기] 하루 3회 정기 스케줄 (09:00 / 13:00 / 17:30) 대기 중",
     "lastActive": "방금 전",
     "triggerEvents": [
-      "SCHEDULED_10_00",
+      "SCHEDULED_3_TIMES_DAILY",
       "MANUAL_TAEIL_SYNC_REQUEST"
     ],
     "emittedEvents": [
       "TAEIL_SIHWA_SYNCED"
     ],
     "logs": [
-      "[대기] 태일/시화재고 Apps Script (importStockData) 연동 파이프라인 가동 완료",
-      "[정상] 8800포트 원격 API (stocklist_get.php) 상태 확인 대기"
+      "[정기] 하루 3회(09:00, 13:00, 17:30) 자동 스케줄러 상시 가동 중",
+      "[연계] 완료 시 DAT-05 대리에게 자동 연계 신호 전달"
     ],
     "connectedDeptIds": [
       "dat"
@@ -1051,17 +1051,19 @@
     "assignedHuman": "조현진 대표",
     "requiresApproval": false,
     "approvalStatus": "APPROVED",
-    "orderIndex": 2
+    "orderIndex": 2,
+    "supervisorId": "",
+    "scheduleInterval": "3_TIMES_A_DAY"
   },
   {
     "id": "dat-slot-4",
     "code": "DAT-04",
-    "name": "대경 재고 파일 수신 & 변환 봇",
+    "name": "대경 재고 텔레그램 수신 & 변환 봇",
     "deptId": "dat",
     "deptName": "데이터관리팀",
     "teamName": "재고동기화자동화팀",
     "tier": 3,
-    "role": "대경재고 엑셀 파일 수신, 대경재고변환 구글시트 전송 및 Apps Script 실행 전담",
+    "role": "텔레그램 엑셀 수신 대기 ➔ 전달받은 엑셀 제목 제외 A4:M1168 정밀 추출 및 대경 시트 반영 ➔ DAT-05 대리 호출",
     "status": "ACTIVE",
     "isCreated": true,
     "position": "사원",
@@ -1072,18 +1074,18 @@
       "uptime": "99.9%",
       "tasksToday": 4
     },
-    "currentTask": "[대기] 대경재고 엑셀 파일 수신 대기 중",
+    "currentTask": "[대기] 텔레그램(@Altf_office_auto_bot) 대경재고 엑셀 신호 대기 중",
     "lastActive": "방금 전",
     "triggerEvents": [
-      "DAEKYUNG_FILE_DROPPED",
+      "TELEGRAM_DAEKYUNG_FILE_RECEIVED",
       "MANUAL_DAEKYUNG_SYNC_REQUEST"
     ],
     "emittedEvents": [
       "DAEKYUNG_STOCK_SYNCED"
     ],
     "logs": [
-      "[대기] 대경재고 파일 간편 업로드 및 대경재고변환 Apps Script 트리거 준비 완료",
-      "[정상] 대경재고 시트(구글 드라이브) 연동 대기"
+      "[대기] 텔레그램 봇 연동 대경 재고장 엑셀 파일 상시 수신 감시 중",
+      "[연계] A4:M1168 추출 후 구글시트 반영 즉시 DAT-05 대리 호출"
     ],
     "connectedDeptIds": [
       "dat"
@@ -1094,7 +1096,9 @@
     "assignedHuman": "조현진 대표",
     "requiresApproval": false,
     "approvalStatus": "APPROVED",
-    "orderIndex": 3
+    "orderIndex": 3,
+    "supervisorId": "",
+    "scheduleInterval": "REALTIME"
   },
   {
     "id": "dat-slot-5",
@@ -1104,7 +1108,7 @@
     "deptName": "데이터관리팀",
     "teamName": "재고동기화자동화팀",
     "tier": 2,
-    "role": "태일/대경 완료 후 3~5분 구글시트 대용량 수식 연산 안정화 대기 및 ALTF 재고 DB Apps Script 실행, inventory.json 추출 총괄",
+    "role": "대경/태일 반응 시 3~5분 버퍼링 후 ALTF DB Apps Script 실행 ➔ 실패 시 완료될 때까지 3~5분 간격 자동 재시작 ➔ 구글드라이브 inventory.json 생성 시 완결 & 과장 호출",
     "status": "ACTIVE",
     "isCreated": true,
     "position": "대리",
@@ -1115,7 +1119,7 @@
       "uptime": "99.9%",
       "tasksToday": 6
     },
-    "currentTask": "[대기] 3~5분 안정화 버퍼링 및 ALTF 재고 DB 연산 관제 대기 중",
+    "currentTask": "[대기] 상위 재고(대경/태일) 반응 시 3~5분 버퍼 및 성공할 때까지 자동 재시작 관제",
     "lastActive": "방금 전",
     "triggerEvents": [
       "TAEIL_SIHWA_SYNCED",
@@ -1125,8 +1129,9 @@
       "INVENTORY_JSON_GENERATED"
     ],
     "logs": [
-      "[대기] 구글시트 연산 안정화 타이머 (기본 3분 30초 카운트다운) 준비 완료",
-      "[연계] ALTF 재고 DATA BASE 시트 Apps Script 연동 대기"
+      "[대기] 대용량 수식 연산(IMPORTRANGE) 3~5분 안정화 버퍼링 타이머 준비 완료",
+      "[재시도] 실행 실패 시 완료될 때까지 3~5분 후 자동 재시작 루프 탑재",
+      "[완결] 구글 드라이브에 최신 inventory.json 생성 확인 시 역할 완결 ➔ DAT-06 과장 호출"
     ],
     "connectedDeptIds": [
       "dat"
@@ -1142,12 +1147,12 @@
   {
     "id": "dat-slot-6",
     "code": "DAT-06",
-    "name": "S3 배포 & 재고 갱신/변동량 감시 봇",
+    "name": "S3 배포 & 중복 정리/감시 총괄 과장 봇",
     "deptId": "dat",
     "deptName": "데이터관리팀",
     "teamName": "재고동기화자동화팀",
     "tier": 1,
-    "role": "구버전 inventory.json 중복 방지 파일 정리, 최신 inventory.json의 AWS S3 업로드, 웹 재고 갱신 및 시화재고 일일 변동량 분석 확정",
+    "role": "구글 드라이브 최신 inventory.json 다운로드 ➔ S3(s3://altf-web-data-prod/public/inventory/inventory.json) 업로드 ➔ 다운받은 로컬 파일 중복 방지 즉시 삭제 ➔ 신호 대기 복귀 & 텔레그램 결재 보고",
     "status": "ACTIVE",
     "isCreated": true,
     "position": "과장",
@@ -1158,7 +1163,7 @@
       "uptime": "99.9%",
       "tasksToday": 8
     },
-    "currentTask": "[대기] S3 클라우드 업로드 및 시화재고 변동량 분석 대기 중",
+    "currentTask": "[대기] DAT-05 완료 신호 수신 대기 (신호 시 S3 업로드 ➔ 다운로드 삭제 ➔ 대기 복귀)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "INVENTORY_JSON_GENERATED"
@@ -1168,8 +1173,9 @@
       "SIHWA_DAILY_DIFF_CONFIRMED"
     ],
     "logs": [
-      "[대기] Downloads 폴더 구버전 파일 중복 방지 정리 및 S3 업로드 파이프라인 가동",
-      "[연동] altf.kr admin 재고 갱신 및 시화재고 변동량 실시간 분석 준비 완료"
+      "[대기] DAT-05 신호 대기 ➔ 새로 다운로드 받아 S3 public/inventory/ 업로드",
+      "[정리] 업로드 완료 즉시 다운받은 inventory.json 중복 방지 삭제",
+      "[보고] 작업 완결 후 조현진 대표님께 텔레그램 결재 보고서 즉시 발송"
     ],
     "connectedDeptIds": [
       "dat",
@@ -1181,6 +1187,8 @@
     "assignedHuman": "조현진 대표",
     "requiresApproval": false,
     "approvalStatus": "APPROVED",
-    "orderIndex": 5
+    "orderIndex": 5,
+    "supervisorId": "",
+    "scheduleInterval": "REALTIME"
   }
 ]
