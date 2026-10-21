@@ -25,6 +25,7 @@ import { makeCredentialService } from './server/services/makeCredentialService.j
 import { makeScenarioService } from './server/services/makeScenarioService.js';
 import { inventorySyncService } from './server/services/inventorySyncService.js';
 import { kakaoBotService } from './server/services/kakaoBotService.js';
+import { sleQuoteReviewService } from './server/services/sleQuoteReviewService.js';
 
 import multer from 'multer';
 
@@ -1952,6 +1953,29 @@ const server = http.createServer(async (req, res) => {
             try {
                 const body = await parseBody(req);
                 const result = await kakaoBotService.dispatchQuotation(body);
+                sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 8. GET /api/kakao/sla-benchmark : 과거 견적서 기반 회신 소요 시간(SLA) 벤치마크 및 이상치 분석
+        if (req.method === 'GET' && url.pathname === '/api/kakao/sla-benchmark') {
+            try {
+                const benchmark = sleQuoteReviewService.calculateSlaBenchmark(db.quotations || []);
+                sendJsonResponse(req, res, 200, { success: true, benchmark });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 9. POST /api/kakao/event-push : 0원 카카오 i 오픈빌더 챗봇 이벤트 푸시 발송
+        if (req.method === 'POST' && url.pathname === '/api/kakao/event-push') {
+            try {
+                const body = await parseBody(req);
+                const result = await sleQuoteReviewService.dispatchKakaoEventPush(body);
                 sendJsonResponse(req, res, 200, result);
             } catch (err) {
                 sendJsonResponse(req, res, 500, { success: false, error: err.message });

@@ -21,6 +21,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { fittingNormalizerService } from './fittingNormalizerService.js';
 import { fittingVisionOcrService } from './fittingVisionOcrService.js';
+import { sleQuoteReviewService } from './sleQuoteReviewService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -192,6 +193,19 @@ export class KakaoBotService {
             }
         }
 
+        // 1-1. 고객 발화 내 추가 지시(요율, 납기, 특이사항) SLE-02 추출
+        const overrides = sleQuoteReviewService.parseUtteranceOverrides(utterance);
+        if (overrides) {
+            if (overrides.rate) {
+                normalized.discountRate = overrides.rate;
+                console.log(`[KakaoBot] 🎯 [SLE-02 감지] 고객 텍스트 요율 지시 자동 반영: -${overrides.rate}%`);
+            }
+            if (overrides.deliveryDate) {
+                normalized.remarks = (normalized.remarks ? `${normalized.remarks} / ` : '') + overrides.deliveryDate;
+                console.log(`[KakaoBot] 🚚 [SLE-02 감지] 고객 납기 지시 반영: ${overrides.deliveryDate}`);
+            }
+        }
+
         // 2. 카카오 사용자 사전 매칭 (구글시트/대장 연동 botUserKey 확인)
         const matchedUser = this.findUserByBotUserKey(botUserKey);
         if (matchedUser) {
@@ -225,7 +239,7 @@ export class KakaoBotService {
             receivedAt,
             channel: '카카오톡 채널 (@altf)',
             assignedTeam: '영업2팀 (인입/표준화)',
-            assignedAgents: isImage ? ['INT-02', 'INT-03', 'INT-05', 'SLE-01'] : ['INT-02', 'INT-05', 'SLE-01'],
+            assignedAgents: isImage ? ['INT-02', 'INT-03', 'INT-05', 'SLE-01', 'SLE-02'] : ['INT-02', 'INT-05', 'SLE-01', 'SLE-02'],
             customer: normalized.customer,
             discountRate: normalized.discountRate,
             remarks: normalized.remarks,
@@ -243,7 +257,20 @@ export class KakaoBotService {
         let draftQuote = null;
         if (normalized.items.length > 0) {
             draftQuote = this.createDraftQuotation(intakeRecord, normalized);
+            
+            // 4-1. SLE-02 (박조나단 과장) 정밀 견적 심사 & 검토 판정 엔진 가동
+            const reviewResult = sleQuoteReviewService.reviewQuotation(draftQuote, this.draftQuotations);
+            draftQuote.sleReview = reviewResult;
+            draftQuote.reviewStatus = reviewResult.status; // 'AUTO_APPROVABLE' | 'ESCALATION_REQUIRED'
             intakeRecord.quotationId = draftQuote.id;
+            intakeRecord.sleReview = reviewResult;
+
+            if (reviewResult.status === 'ESCALATION_REQUIRED') {
+                console.log(`[KakaoBot] ⚠️ [부장 결재 대기] 사유: ${reviewResult.escalationReasons.join(' | ')}`);
+            } else {
+                console.log(`[KakaoBot] ✅ [자동 승인 완료] ${reviewResult.actionNeeded}`);
+            }
+
             this.draftQuotations.unshift(draftQuote);
             console.log(`[KakaoBot] ✅ 견적서 초안 생성 완료 [${draftQuote.id}] 고객사: ${draftQuote.customerName} (${draftQuote.items.length}개 품목, ${draftQuote.totalAmount.toLocaleString()}원)`);
         }
@@ -543,6 +570,20 @@ export class KakaoBotService {
             mode: 'SIMULATED', 
             message: `[시뮬레이션/기본] ${targetName} 담당자 (${targetPhone || '전화번호 미등록'}) 앞으로 발송 신호가 생성되었습니다.` 
         };
+
+        // 0. [0원 카카오 이벤트 푸시] botUserKey가 있는 경우 원래 채팅창으로 카카오 0원 직통 푸시
+        const targetBotUserKey = botUserKey || quote?.botUserKey;
+        if (targetBotUserKey) {
+            const pushRes = await sleQuoteReviewService.dispatchKakaoEventPush({
+                botUserKey: targetBotUserKey,
+                quotationId,
+                totalAmount: quote?.totalAmount,
+                quoteUrl
+            });
+            if (pushRes.success) {
+                result = pushRes;
+            }
+        }
 
         // 1. Make.com Webhook 연동 (환경변수 또는 인자로 웹훅 URL이 있는 경우)
         if (targetWebhookUrl) {

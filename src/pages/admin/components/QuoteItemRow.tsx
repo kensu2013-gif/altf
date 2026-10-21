@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { Trash2 } from 'lucide-react';
 import type { LineItem, Product } from '../../../types';
 import type { CustomPriceRecord } from '../../../store/useStore';
 import { findMatchingProduct, formatThickness } from '../../../lib/productUtils';
@@ -61,6 +62,7 @@ interface QuoteItemRowProps {
     customPriceRecord?: CustomPriceRecord;
     onApplyCustomPrice?: (record: CustomPriceRecord) => void;
     similarityMatchStatus?: 'L1' | 'L2' | 'NONE';
+    onDeleteItem?: (index: number) => void;
 }
 
 export const QuoteItemRow = React.memo(({
@@ -75,7 +77,8 @@ export const QuoteItemRow = React.memo(({
     onItemSelect,
     customPriceRecord,
     onApplyCustomPrice,
-    similarityMatchStatus
+    similarityMatchStatus,
+    onDeleteItem
 }: QuoteItemRowProps) => {
 
     // Memoize product lookup to prevent unnecessary recalcs if inventory/item identity changes but data is same
@@ -423,6 +426,21 @@ export const QuoteItemRow = React.memo(({
             <td className={`px-2 py-2.5 text-right align-middle font-mono text-xs font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-500'} `}>
                 {formatCurrency(profit)}
             </td>
+
+            {/* Delete Item Button */}
+            <td className="px-1.5 py-2.5 text-center align-middle">
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteItem?.(index);
+                    }}
+                    className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-all cursor-pointer"
+                    title="이 품목 견적서에서 삭제"
+                >
+                    <Trash2 className="w-3.5 h-3.5" />
+                </button>
+            </td>
         </tr>
     );
 }, (prev, next) => {
@@ -432,7 +450,8 @@ export const QuoteItemRow = React.memo(({
         prev.item === next.item && // Item identity check (requires immutable updates)
         prev.index === next.index &&
         prev.inventory === next.inventory &&
-        prev.onItemChange === next.onItemChange
+        prev.onItemChange === next.onItemChange &&
+        prev.onDeleteItem === next.onDeleteItem
         // other handlers assumed stable
     );
 });

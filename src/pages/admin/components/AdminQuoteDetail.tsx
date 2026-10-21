@@ -348,6 +348,42 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         }
     };
 
+    // 카카오 i 오픈빌더 0원 이벤트 푸시 직통 발송 (솔라피 비용 0원)
+    const handleDispatchKakaoEventPush = async () => {
+        setIsDispatching(true);
+        setDispatchStatusMsg(null);
+        try {
+            const res = await fetch('/api/kakao/event-push', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    botUserKey: quote.botUserKey,
+                    quotationId: quote.id,
+                    totalAmount: totalWithCharges || quote.totalAmount
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setDispatchStatusMsg(`✅ 0원 카카오 이벤트 푸시 전송 완료: ${data.message || '카카오톡 채팅방에 견적 카드가 바로 전송되었습니다.'}`);
+            } else {
+                setDispatchStatusMsg(`⚠️ 카카오 푸시 오류: ${data.error || '발송 실패'}`);
+            }
+        } catch (e: any) {
+            setDispatchStatusMsg(`⚠️ 네트워크 오류: ${e.message}`);
+        } finally {
+            setIsDispatching(false);
+        }
+    };
+
+    // 경과 시간(SLA) 및 부장 결재 판정
+    const elapsedMinutes = useMemo(() => {
+        if (!quote.createdAt) return 0;
+        const diffMs = Date.now() - new Date(quote.createdAt).getTime();
+        return Math.max(0, Math.floor(diffMs / (1000 * 60)));
+    }, [quote.createdAt]);
+
+
+
     // 카카오 고객 매칭 정보 등록/수정
     const handleRegisterKakaoUser = async () => {
         if (!kakaoUserData.botUserKey) {
@@ -1193,6 +1229,27 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         setItems(prev => prev.map(item => item.convertedToOrder ? item : { ...item, isSelected }));
     }, []);
 
+    // 개별 품목 삭제 핸들러
+    const handleDeleteItem = useCallback((targetIndex: number) => {
+        const targetItem = items[targetIndex];
+        const specName = targetItem ? `${targetItem.name} ${targetItem.size || ''}` : '해당';
+        if (window.confirm(`'${specName}' 품목을 견적서에서 완전히 삭제하시겠습니까?`)) {
+            setItems(prev => prev.filter((_, idx) => idx !== targetIndex));
+        }
+    }, [items]);
+
+    // 선택된 품목 일괄 삭제 핸들러
+    const handleDeleteSelectedItems = useCallback(() => {
+        const selectedCount = items.filter(i => i.isSelected && !i.convertedToOrder).length;
+        if (selectedCount === 0) {
+            alert('삭제할 품목을 체크박스로 선택해 주세요.');
+            return;
+        }
+        if (window.confirm(`선택한 ${selectedCount}개 품목을 견적서에서 완전히 삭제하시겠습니까?`)) {
+            setItems(prev => prev.filter(i => !(i.isSelected && !i.convertedToOrder)));
+        }
+    }, [items]);
+
     const handleConvertStandard = useCallback((targetSystem?: 'ANSI' | 'JIS') => {
         setItems(prev => {
             const hasCheckedSome = prev.some(item => item.isSelected);
@@ -1280,6 +1337,11 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     // Calculate totals for display
     const calculatedTotal = selectedItems.reduce((sum, item) => sum + item.amount, 0);
     const totalWithCharges = calculatedTotal + charges.reduce((sum, c) => sum + c.amount, 0);
+
+    // SLE-02 견적 심사 & 부장 결재 판정 지능
+    const isLargeAmount = (totalWithCharges || quote.totalAmount || 0) >= 20000000;
+    const missingPriceCount = items.filter(it => !it.unitPrice || it.unitPrice <= 0 || !it.base_price).length;
+    const isManagerEscalationNeeded = isLargeAmount || missingPriceCount > 0;
 
     const persistCustomPrices = () => {
         const records = items
@@ -1779,7 +1841,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="text-sm font-bold text-slate-900">카카오톡 채널 연동 & 회신 지원</span>
+                                                <span className="text-sm font-bold text-slate-900">카카오톡 채널 연동 & SLE-02 심사</span>
                                                 <span className="text-[10px] bg-yellow-200 text-yellow-900 font-bold px-2 py-0.5 rounded-full">@altf 채널</span>
                                                 
                                                 {/* 카카오 사용자 식별 매칭 배지 */}
@@ -1798,8 +1860,20 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                         <span className="underline font-extrabold">+ 고객 매칭 등록</span>
                                                     </button>
                                                 )}
+
+                                                {/* SLE-02 견적 심사 & 결재 판정 배지 */}
+                                                {isManagerEscalationNeeded ? (
+                                                    <span className="inline-flex items-center gap-1 text-[11px] bg-rose-100 text-rose-800 font-extrabold px-2.5 py-0.5 rounded-full border border-rose-300">
+                                                        <span>⚠️ [부장 결재 대기]</span>
+                                                        <span>{isLargeAmount ? '2천만원 이상 대형 견적' : '단가표 미등록 품목 포함 (대경벤드 문의)'}</span>
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 text-[11px] bg-blue-100 text-blue-800 font-bold px-2.5 py-0.5 rounded-full border border-blue-300">
+                                                        <span>✅ [SLE-02 박과장 검토완료] 0원 즉시 회신 승인</span>
+                                                    </span>
+                                                )}
                                             </div>
-                                            <div className="flex items-center gap-2 text-xs text-slate-600 mt-0.5">
+                                            <div className="flex items-center gap-3 text-xs text-slate-600 mt-1 flex-wrap">
                                                 <span>카카오 ID: <code className="font-mono text-[11px] bg-white px-1.5 py-0.5 rounded border border-yellow-200 text-slate-700">{quote.botUserKey ? `${quote.botUserKey.slice(0, 10)}...${quote.botUserKey.slice(-6)}` : '미식별'}</code></span>
                                                 <button 
                                                     type="button" 
@@ -1808,25 +1882,43 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                 >
                                                     [정보 {isRegisterOpen ? '닫기' : '수정/등록'}]
                                                 </button>
+                                                <span className="text-slate-300">|</span>
+                                                {/* SLA 회신 소요 시간 벤치마크 */}
+                                                <span className={`inline-flex items-center gap-1 font-bold ${elapsedMinutes > 25 ? 'text-rose-600' : 'text-slate-600'}`}>
+                                                    <span>⏱️ 접수 후 {elapsedMinutes}분 경과</span>
+                                                    <span className="text-[10px] text-slate-400 font-normal">(권장 골든타임: 25분 이내)</span>
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Action Buttons */}
                                     <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto flex-wrap">
-                                        {/* 1. Make.com / Solapi 자동 발송 버튼 */}
+                                        {/* 1. 최신 0원 카카오 이벤트 푸시 직통 발송 버튼 */}
+                                        <button
+                                            type="button"
+                                            disabled={isDispatching}
+                                            onClick={handleDispatchKakaoEventPush}
+                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                                            title="솔라피 비용 없이 카카오 공식 챗봇 이벤트 푸시를 통해 고객 카톡창으로 0원에 견적 카드를 꽂아넣습니다."
+                                        >
+                                            <MessageSquare className="w-3.5 h-3.5" />
+                                            <span>{isDispatching ? '발송 중...' : '💬 0원 카톡 직통 푸시'}</span>
+                                        </button>
+
+                                        {/* 2. Make.com / Solapi 자동 발송 버튼 */}
                                         <button
                                             type="button"
                                             disabled={isDispatching}
                                             onClick={handleDispatchKakaoQuote}
-                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer disabled:opacity-50"
-                                            title="Make.com 웹훅 또는 Solapi를 통해 고객에게 알림톡/견적서 문자를 자동 전송합니다."
+                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                                            title="Make.com 웹훅 또는 Solapi를 통해 고객에게 알림톡/견적서 문자를 전송합니다."
                                         >
                                             <Send className="w-3.5 h-3.5" />
-                                            <span>{isDispatching ? '발송 중...' : '🚀 Make/Solapi 문자 발송'}</span>
+                                            <span>Make/Solapi 문자</span>
                                         </button>
 
-                                        {/* 2. 클립보드 복사 */}
+                                        {/* 3. 클립보드 복사 */}
                                         <button
                                             type="button"
                                             onClick={handleCopyKakaoReply}
@@ -1834,10 +1926,10 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             title="카카오톡 채팅창에 바로 붙여넣을 수 있는 정돈된 견적 요약본을 복사합니다."
                                         >
                                             {isKakaoCopied ? <Check className="w-4 h-4 text-emerald-800" /> : <Copy className="w-4 h-4" />}
-                                            <span>{isKakaoCopied ? '복사 완료!' : '카카오톡 답변 복사'}</span>
+                                            <span>{isKakaoCopied ? '복사 완료!' : '답변 복사'}</span>
                                         </button>
 
-                                        {/* 3. 1:1 채팅창 링크 */}
+                                        {/* 4. 1:1 채팅창 링크 */}
                                         <a
                                             href="https://pf.kakao.com/_jxcxaBn/chat"
                                             target="_blank"
@@ -1846,7 +1938,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             title="알트에프 카카오톡 채널 관리자 1:1 채팅창으로 이동합니다."
                                         >
                                             <MessageSquare className="w-4 h-4 text-yellow-700" />
-                                            <span>1:1 채팅창</span>
+                                            <span>1:1 상담창</span>
                                         </a>
                                     </div>
                                 </div>
@@ -1979,6 +2071,16 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         <span>ANSI ↔ JIS 변환 {selectedItems.length > 0 && `(${selectedItems.length})`}</span>
                                     </button>
 
+                                    {/* NEW: 선택 품목 삭제 버튼 */}
+                                    <button
+                                        type="button"
+                                        onClick={handleDeleteSelectedItems}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                        title="체크된 품목들을 견적서에서 완전히 삭제합니다."
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                                        <span>선택 삭제 {items.filter(i => i.isSelected && !i.convertedToOrder).length > 0 && `(${items.filter(i => i.isSelected && !i.convertedToOrder).length})`}</span>
+                                    </button>
                                 </div>
                             </div>
 
@@ -2071,6 +2173,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         <col className="w-24.5" />   {/* 10. 수정 견적단가 */}
                                         <col className="w-25.5" />  {/* 11. 합계 */}
                                         <col className="w-22.5" />   {/* 12. 이익 */}
+                                        <col className="w-11" />     {/* 13. 삭제 */}
                                     </colgroup>
                                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase select-none">
                                         <tr className="divide-x divide-slate-100/60">
@@ -2335,6 +2438,11 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                     <span className="text-[11px] text-emerald-500 font-normal lowercase tracking-tight">(profit)</span>
                                                 </div>
                                             </th>
+
+                                            {/* Delete Column Header */}
+                                            <th className="px-1 py-3 text-center text-slate-400 align-bottom pb-2.5">
+                                                <span className="text-[12px] font-bold">삭제</span>
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -2357,6 +2465,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                     customPriceRecord={customPrices[[item.name, item.thickness, item.size, item.material].filter(Boolean).join('-').trim()]}
                                                     onApplyCustomPrice={(record) => handleApplyCustomPrice(idx, record)}
                                                     similarityMatchStatus={activeSimilarityCandidate?.itemMatchMap.get(idx)?.matchType ?? undefined}
+                                                    onDeleteItem={handleDeleteItem}
                                                 />
                                             );
                                         })}
@@ -2366,7 +2475,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             <td colSpan={6} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">
                                                 Total Summary (VAT 별도)
                                             </td>
-                                            <td colSpan={6} className="px-4 py-3 text-right font-mono text-sm">
+                                            <td colSpan={7} className="px-4 py-3 text-right font-mono text-sm">
                                                 <div className="flex items-center justify-end gap-4">
                                                     <div className="text-slate-500">
                                                         <span className="text-xs mr-2">매출 합계:</span>
