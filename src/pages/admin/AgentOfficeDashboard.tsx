@@ -2030,16 +2030,9 @@ export default function AgentOfficeDashboard() {
                                 <Edit2 className="w-2.5 h-2.5 text-slate-500 opacity-0 group-hover/code:opacity-100 transition-opacity shrink-0" />
                             </div>
                         )}
-
-                        {/* 소속 1팀/2팀 등 세부 팀명이 설정되어 있을 때만 미니 태그 표시 (부서 전체명 출력 제거) */}
-                        {agent.teamName && (
-                            <span className="text-[9px] font-sans px-1.5 py-0.2 rounded bg-indigo-950/60 border border-indigo-500/30 text-indigo-300 shrink-0 font-medium truncate max-w-[70px]" title={`소속팀: ${agent.teamName}`}>
-                                {agent.teamName}
-                            </span>
-                        )}
                     </div>
 
-                    {/* 카드 위 상태 강제 토글 버튼 (우측 끝 정렬 고정, 코드 및 팀명과 절대 겹치지 않음) */}
+                    {/* 카드 위 상태 강제 토글 버튼 (우측 끝 정렬 고정, 겹침 원천 제거) */}
                     <div className="flex items-center gap-0.5 bg-black/60 p-0.5 rounded border border-slate-800 shrink-0 ml-auto" onClick={e => e.stopPropagation()}>
                         {(['ACTIVE', 'STANDBY', 'IDLE', 'OFFLINE'] as const).map(st => (
                             <button
