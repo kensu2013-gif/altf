@@ -2617,9 +2617,14 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // 📄 GET /api/quote/pdf : 비로그인 고객 모바일 직통 정식 견적서 PDF 파일 직통 스트리밍 (스마트폰 즉시 열람 및 저장/전달)
-    if (req.method === 'GET' && url.pathname === '/api/quote/pdf') {
-        const quoteId = url.searchParams.get('id');
+    // 📄 GET /api/quote/pdf 또는 /q/:id : 초단축 공식 견적서 PDF 파일 직통 스트리밍 (스마트폰 즉시 열람 및 저장/전달)
+    const isShortQuoteUrl = url.pathname.startsWith('/q/') || url.pathname === '/q';
+    if (req.method === 'GET' && (url.pathname === '/api/quote/pdf' || isShortQuoteUrl)) {
+        let quoteId = url.searchParams.get('id');
+        if (!quoteId && url.pathname.startsWith('/q/')) {
+            quoteId = decodeURIComponent(url.pathname.substring(3).trim());
+        }
+
         let quote = (db.quotations || []).find(q => q.id === quoteId);
         if (!quote) {
             quote = kakaoBotService.draftQuotations.find(q => q.id === quoteId);

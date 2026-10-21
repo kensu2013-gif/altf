@@ -1045,18 +1045,16 @@ export class KakaoBotService {
             (outCount > 0 ? `• 주문제작/입고필요: ${outCount}개 품목\n` : `• 재고 부족품목: 0개 (전량 즉시 출고)\n`) +
             `• 예상 납기: ${deliverySummary}\n`;
 
-        // 1. [핵심] 알트에프 공식 직인 견적서 PDF 생성 및 S3 / 로컬 보관
-        let directPdfUrl = `https://altf.kr/api/quote/pdf?id=${quotationId}`;
+        // 1. [핵심] 알트에프 공식 직인 견적서 PDF 생성 및 S3 / 로컬 단일 보관 (Single Source of Truth)
+        let shortPdfUrl = `https://altf.kr/q/${quotationId}`;
         let presignedPdfUrl = null;
 
         try {
-            console.log(`[KakaoBot] 📑 견적서 ${quotationId} 공식 직인 PDF 생성 착수...`);
+            console.log(`[KakaoBot] 📑 견적서 ${quotationId} 공식 직인 PDF 단일 보관 및 생성 착수...`);
             const artifacts = await this.generateOfficialQuotationArtifacts(quote);
             if (artifacts?.s3PdfUrl) {
                 presignedPdfUrl = artifacts.s3PdfUrl;
-                // S3 서명 URL이 있으면 우선적으로 직통 다운로드 링크로 사용 (또는 altf.kr 링크)
-                directPdfUrl = presignedPdfUrl;
-                console.log(`[KakaoBot] ☁️ S3 직통 서명 PDF URL 생성 성공: ${directPdfUrl}`);
+                console.log(`[KakaoBot] ☁️ S3 직통 서명 PDF URL 생성 성공: ${presignedPdfUrl}`);
             }
         } catch (artifactErr) {
             console.warn('[KakaoBot] 직인 PDF 자동 생성 실패 (웹 링크로 폴백):', artifactErr.message);
@@ -1064,8 +1062,10 @@ export class KakaoBotService {
 
         const formattedTotal = quote?.totalAmount ? `₩${quote.totalAmount.toLocaleString()}원 (VAT별도)` : '별도협의';
 
-        // 사용자 요청 반영: "2번째 사진처럼 의미없는 사진은 필요없어. 공식 양식 처럼 전달해주는 방식이어야 해"
-        // 저해상도 MMS 사진 제거 + 공식 견적서 PDF 1초 직통 다운로드 & 공유 링크 제공
+        // 사용자 요청 100% 반영: 
+        // 1) 지저분하고 긴 S3 주소 대신 공식 초단축 URL(https://altf.kr/q/...) 제공
+        // 2) 불필요한 '공유/저장' 안내 문구 완전 삭제
+        // 3) 누르면 138KB 정식 PDF가 스마트폰에 즉시 다운로드
         const messageText = customMessage || (
             `[알트에프(AltF) 견적 회신]\n` +
             `${targetName} 담당자님, 요청하신 견적이 완료되었습니다.\n` +
@@ -1074,10 +1074,8 @@ export class KakaoBotService {
             `• 공급가액: ${formattedTotal}\n` +
             stockSummaryText +
             `━━━━━━━━━━━━━━━━━━━━\n` +
-            `📄 [알트에프 공식 직인 견적서(PDF) 즉시 열람 및 저장]\n` +
-            `${directPdfUrl}\n\n` +
-            `※ 위 링크를 터치하시면 공식 견적서 원본 PDF가 즉시 열립니다.\n` +
-            `※ 우측 상단 '공유/저장'을 누르면 거래처나 카카오톡으로 바로 전달하실 수 있습니다.\n\n` +
+            `📄 공식 견적서(PDF) 다운로드:\n` +
+            `${shortPdfUrl}\n\n` +
             `문의: 051-303-3751 / 알트에프(주)`
         );
 
@@ -1095,8 +1093,9 @@ export class KakaoBotService {
                 id: quotationId,
                 totalAmount: quote?.totalAmount || 0,
                 itemCount: quote?.items?.length || 0,
-                quoteUrl: directPdfUrl,
-                pdfUrl: directPdfUrl,
+                quoteUrl: shortPdfUrl,
+                pdfUrl: shortPdfUrl,
+                s3Url: presignedPdfUrl,
                 summary: `${targetCompany} ${quote?.items?.length || 0}개 품목 견적서`
             },
             message: messageText,
@@ -1460,14 +1459,14 @@ export class KakaoBotService {
             if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
             fs.writeFileSync(path.join(storageDir, `${cleanId}.pdf`), pdfBuf);
 
-            // 3. AWS S3 서명 업로드 (로그인/AccessDenied 없이 7일간 즉시 열리는 서명 다운로드 URL 발급)
+            // 3. AWS S3 서명 업로드 (단일 원본 경로 보관 exactKey=true)
             const s3FileName = `${cleanId}_altf_quotation.pdf`;
             let s3PdfUrl = null;
             try {
-                s3PdfUrl = await uploadFileToS3('documents/quotations', s3FileName, pdfBuf, 'application/pdf');
+                s3PdfUrl = await uploadFileToS3('documents/quotations', s3FileName, pdfBuf, 'application/pdf', true);
             } catch (s3Err) {
                 console.warn('[KakaoBot] S3 업로드 실패 (로컬 스트리밍으로 폴백):', s3Err.message);
-                s3PdfUrl = `https://altf.kr/api/quote/pdf?id=${quoteId}`;
+                s3PdfUrl = `https://altf.kr/q/${quoteId}`;
             }
 
             return {

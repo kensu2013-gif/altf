@@ -331,13 +331,13 @@ export async function getPreviousDbVersion(cutoffDateStr) {
  * Uploads an arbitrary file (buffer) to S3 at the specified prefix/filename.
  * Returns both the direct S3 URL and a presigned download URL (valid for 7 days) to avoid AccessDenied.
  */
-export async function uploadFileToS3(folderPath, fileName, fileBuffer, contentType) {
+export async function uploadFileToS3(folderPath, fileName, fileBuffer, contentType, exactKey = false) {
     if (!hasAwsCredentials()) {
         throw new Error('AWS credentials not configured. S3 upload is disabled in local mode.');
     }
     try {
         const cleanName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '');
-        const fullKey = `${folderPath}/${Date.now()}_${cleanName}`;
+        const fullKey = exactKey ? `${folderPath}/${cleanName}` : `${folderPath}/${Date.now()}_${cleanName}`;
         const command = new PutObjectCommand({
             Bucket: BUCKET_NAME,
             Key: fullKey,
