@@ -1815,7 +1815,6 @@ export default function AgentOfficeDashboard() {
         const posMeta = POSITION_CONFIG[pos] || POSITION_CONFIG['사원'];
         const isHead = pos === '팀장';
         const isChief = pos === '과장';
-        const isStaff = pos === '대리' || pos === '사원';
         const isPending = agent.approvalStatus === 'PENDING';
         const isRejected = agent.approvalStatus === 'REJECTED';
         const deptTeams = Array.from(new Set(agents.filter(a => a.deptId === agent.deptId).map(a => a.teamName).filter(Boolean))) as string[];
@@ -2226,48 +2225,29 @@ export default function AgentOfficeDashboard() {
                             </div>
                         </div>
 
-                        {/* ⏱️ 카드 외부 주기 설정 버튼 & 결재 상태 (원클릭 주기 변경 지원) */}
-                        <div className="flex flex-col items-end gap-1 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
-                            {/* 반복 실행 주기 드롭다운 버튼 */}
-                            <div className="relative">
-                                <button
-                                    onClick={() => setActiveScheduleDropdownAgentId(activeScheduleDropdownAgentId === agent.id ? null : agent.id)}
-                                    className={`text-[9px] px-2 py-0.5 rounded font-black border flex items-center gap-1 transition-all cursor-pointer shadow-xs ${
-                                        schedOpt.id === 'REALTIME'
-                                            ? 'border-emerald-400/80 bg-emerald-950/70 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.3)] hover:border-emerald-300'
-                                            : schedOpt.id === 'MANUAL'
-                                                ? 'border-slate-700 bg-slate-900/80 text-slate-400 hover:border-slate-500'
-                                                : 'border-cyan-500/60 bg-cyan-950/70 text-cyan-300 shadow-[0_0_8px_rgba(0,240,255,0.25)] hover:border-cyan-400'
-                                    }`}
-                                    title={`클릭하여 반복 주기 변경 (현재: ${schedOpt.label})`}
-                                >
-                                    <span className={schedOpt.id === 'REALTIME' ? 'animate-pulse text-[8px]' : 'text-[8px]'}>{schedOpt.icon}</span>
-                                    <span>{schedOpt.shortBadge}</span>
-                                    <ChevronDown className="w-2.5 h-2.5 opacity-70" />
-                                </button>
-                                {activeScheduleDropdownAgentId === agent.id && renderScheduleDropdown()}
+                        {/* 결재선 보조 상태 (과장 이상징후 대기/반려, 팀장 최종결재권자 등 - 가운데 중복 주기 버튼 제거) */}
+                        {(isChief || isHead) && (
+                            <div className="flex flex-col items-end gap-1 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
+                                {isChief && isPending && (
+                                    <span className="text-[8px] px-1.5 py-0.2 rounded font-black border border-amber-500 bg-amber-950/80 text-amber-300 animate-pulse flex items-center gap-0.5 shadow-[0_0_6px_rgba(245,158,11,0.5)]">
+                                        <span>⏳</span>
+                                        <span>결재대기</span>
+                                    </span>
+                                )}
+                                {isChief && isRejected && (
+                                    <span className="text-[8px] px-1.5 py-0.2 rounded font-black border border-rose-600 bg-rose-950/80 text-rose-300 flex items-center gap-0.5">
+                                        <span>⚠️</span>
+                                        <span>반려</span>
+                                    </span>
+                                )}
+                                {isHead && (
+                                    <span className="text-[8px] px-1.5 py-0.2 rounded font-black border border-amber-400/60 bg-amber-950/50 text-amber-300 flex items-center gap-0.5">
+                                        <span>👑</span>
+                                        <span>총괄결재</span>
+                                    </span>
+                                )}
                             </div>
-
-                            {/* 결재선 보조 상태 (과장 이상징후 대기/반려, 팀장 최종결재권자 등) */}
-                            {isChief && isPending && (
-                                <span className="text-[8px] px-1.5 py-0.2 rounded font-black border border-amber-500 bg-amber-950/80 text-amber-300 animate-pulse flex items-center gap-0.5 shadow-[0_0_6px_rgba(245,158,11,0.5)]">
-                                    <span>⏳</span>
-                                    <span>결재대기</span>
-                                </span>
-                            )}
-                            {isChief && isRejected && (
-                                <span className="text-[8px] px-1.5 py-0.2 rounded font-black border border-rose-600 bg-rose-950/80 text-rose-300 flex items-center gap-0.5">
-                                    <span>⚠️</span>
-                                    <span>반려</span>
-                                </span>
-                            )}
-                            {isHead && (
-                                <span className="text-[8px] px-1.5 py-0.2 rounded font-black border border-amber-400/60 bg-amber-950/50 text-amber-300 flex items-center gap-0.5">
-                                    <span>👑</span>
-                                    <span>총괄결재</span>
-                                </span>
-                            )}
-                        </div>
+                        )}
                     </div>
 
                     {/* 부서간 그물망 연계 태그 (연계된 타 부서 담당자의 코드/이름 직접 노출) */}
@@ -2397,23 +2377,21 @@ export default function AgentOfficeDashboard() {
                         </div>
                     </div>
 
-                    {/* 우측: 직위별 행동 권한 (사원/대리: 24h 자율반복 vs 과장: 이상징후 결재상신 vs 팀장: 승인/반려) */}
+                    {/* 우측: 반복 실행 주기 가동 버튼 & 직위별 결재 권한 */}
                     <div className="flex items-center gap-1">
-                        {/* ⚡ 실무자(사원/대리): 반복 주기 자율 가동 버튼 (클릭 시에도 주기 설정 팝오버 토글) */}
-                        {isStaff && (
-                            <div className="relative" onClick={e => e.stopPropagation()}>
-                                <button
-                                    onClick={() => setActiveScheduleDropdownAgentId(activeScheduleDropdownAgentId === agent.id ? null : agent.id)}
-                                    className="text-[9px] px-1.5 py-0.5 rounded font-bold border border-cyan-500/40 bg-cyan-950/40 hover:bg-cyan-900/60 hover:border-cyan-400 text-cyan-300 flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
-                                    title="클릭하여 반복 가동 주기 변경"
-                                >
-                                    <span className="text-[8px]">🔄</span>
-                                    <span>{schedOpt.shortBadge} 가동</span>
-                                    <ChevronDown className="w-2.5 h-2.5 opacity-60" />
-                                </button>
-                                {activeScheduleDropdownAgentId === agent.id && renderScheduleDropdown()}
-                            </div>
-                        )}
+                        {/* ⚡ 반복 주기 가동 버튼 (하단 단일 배치: 클릭 시 주기 변경 팝오버 토글) */}
+                        <div className="relative" onClick={e => e.stopPropagation()}>
+                            <button
+                                onClick={() => setActiveScheduleDropdownAgentId(activeScheduleDropdownAgentId === agent.id ? null : agent.id)}
+                                className="text-[9px] px-1.5 py-0.5 rounded font-bold border border-cyan-500/40 bg-cyan-950/40 hover:bg-cyan-900/60 hover:border-cyan-400 text-cyan-300 flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                                title="클릭하여 반복 가동 주기 변경"
+                            >
+                                <span className="text-[8px]">🔄</span>
+                                <span>{schedOpt.shortBadge} 가동</span>
+                                <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                            </button>
+                            {activeScheduleDropdownAgentId === agent.id && renderScheduleDropdown()}
+                        </div>
 
                         {/* 👔 과장(Chief): 실무 검수 및 이상징후 감지 시 팀장 앞 결재 상신 */}
                         {isChief && !isPending && (
