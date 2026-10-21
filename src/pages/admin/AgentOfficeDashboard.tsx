@@ -667,9 +667,82 @@ export default function AgentOfficeDashboard() {
         }
     };
 
+    // ⚡ DAT-02 : Make.com 시나리오 유지 감시봇 상태
+    const [makeScenarios, setMakeScenarios] = useState<any[]>([]);
+    const [makeScenariosSummary, setMakeScenariosSummary] = useState<any>(null);
+    const [isReactivatingScenario, setIsReactivatingScenario] = useState<string | null>(null);
+    const [makeScenarioActionLogs, setMakeScenarioActionLogs] = useState<string[]>([]);
+
+    const fetchMakeScenarios = async () => {
+        try {
+            const res = await fetch('/api/make/scenarios');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success) {
+                    setMakeScenarios(data.scenarios || []);
+                    setMakeScenariosSummary(data.summary || null);
+                }
+            }
+        } catch (e) {
+            console.error('Make.com 시나리오 조회 실패:', e);
+        }
+    };
+
+    const handleReactivateScenario = async (scenarioId: string = '2312923') => {
+        setIsReactivatingScenario(scenarioId);
+        try {
+            const res = await fetch('/api/make/scenarios/reactivate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scenarioId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                if (data.logs) {
+                    setMakeScenarioActionLogs(prev => [...data.logs, ...prev]);
+                }
+                alert(`[복구 완료] 시나리오 #${scenarioId} Old Data ${data.clearedOldDataCount}건 삭제 및 Active 재활성화가 완료되었습니다.`);
+                fetchMakeScenarios();
+                try {
+                    const agRes = await fetch('/api/agents');
+                    if (agRes.ok) {
+                        const agData = await agRes.json();
+                        if (agData.agents) setAgents(agData.agents);
+                    }
+                } catch {}
+            } else {
+                alert('복구 실패: ' + (data.error || '오류 발생'));
+            }
+        } catch (err) {
+            alert('요청 실패: ' + err);
+        } finally {
+            setIsReactivatingScenario(null);
+        }
+    };
+
+    const handleSimulateScenarioError = async (scenarioId: string = '2312923') => {
+        try {
+            const res = await fetch('/api/make/scenarios/simulate-error', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scenarioId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                fetchMakeScenarios();
+                alert(`[오류 시뮬레이션] 시나리오 #${scenarioId}가 일시 비활성화(Active OFF) 및 Incomplete Execution 3건 적체 상태로 변경되었습니다. 이제 DAT-02 복구 버튼을 눌러보세요.`);
+            }
+        } catch (err) {
+            alert('시뮬레이션 실패: ' + err);
+        }
+    };
+
     useEffect(() => {
         if (selectedAgent?.code === 'DAT-01' || selectedAgent?.id === 'dat-slot-1') {
             fetchMakeConnections();
+        }
+        if (selectedAgent?.code === 'DAT-02' || selectedAgent?.id === 'dat-slot-2') {
+            fetchMakeScenarios();
         }
     }, [selectedAgent]);
 
@@ -5281,6 +5354,140 @@ export default function AgentOfficeDashboard() {
                                 </div>
                             )}
 
+                            {/* ⚡ [데이터관리팀 특화] DAT-02 Make.com 시나리오 유지 감시봇 (Active 감시 & Old Data 자동 삭제 복구) */}
+                            {(selectedAgent.code === 'DAT-02' || selectedAgent.id === 'dat-slot-2') && (
+                                <div className="border border-emerald-500/50 bg-emerald-950/20 rounded-xl p-3.5 space-y-3.5 shadow-[0_0_25px_rgba(16,185,129,0.25)] my-3">
+                                    <div className="flex items-center justify-between border-b border-emerald-900/40 pb-2">
+                                        <div className="flex items-center gap-1.5 text-emerald-300 font-bold text-xs">
+                                            <span>⚡</span>
+                                            <span>DAT-02 Make.com 시나리오 유지 감시봇</span>
+                                        </div>
+                                        <span className="text-[9px] px-2 py-0.5 rounded font-black bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/40 flex items-center gap-1">
+                                            <span>🔄 Active 상시 감시</span>
+                                            <span>Old Data 클리어</span>
+                                        </span>
+                                    </div>
+
+                                    {/* Make.com 시나리오 상태 요약 배너 */}
+                                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                                        <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-2">
+                                            <div className="text-[10px] text-slate-400">감시 시나리오</div>
+                                            <div className="text-base font-black text-white font-mono">{makeScenariosSummary?.total || 3}개</div>
+                                        </div>
+                                        <div className="bg-emerald-950/40 border border-emerald-800/60 rounded-lg p-2">
+                                            <div className="text-[10px] text-emerald-400">정상 가동 (ACTIVE)</div>
+                                            <div className="text-base font-black text-emerald-300 font-mono">{makeScenariosSummary?.active ?? 3}개</div>
+                                        </div>
+                                        <div className="bg-rose-950/40 border border-rose-800/60 rounded-lg p-2">
+                                            <div className="text-[10px] text-rose-400">적체 (Incomplete)</div>
+                                            <div className="text-base font-black text-rose-300 font-mono">{makeScenariosSummary?.totalIncomplete ?? 0}건</div>
+                                        </div>
+                                    </div>
+
+                                    {/* 안내 설명 */}
+                                    <div className="p-2.5 rounded-lg border border-emerald-500/40 bg-emerald-950/30 text-xs space-y-1">
+                                        <div className="flex items-center justify-between text-emerald-200 font-bold">
+                                            <span>Active 비활성화 신호 감지 & 큐 클리어:</span>
+                                            <span className="text-cyan-400 font-mono">상시 감시 중</span>
+                                        </div>
+                                        <p className="text-[11px] text-emerald-300/80 leading-relaxed">
+                                            Make.com 시나리오는 오류 누적 시 Active 스위치가 꺼지거나 Incomplete Executions 큐에 과거 데이터가 남아 활성화가 차단됩니다. 
+                                            <strong>DAT-02가 비활성화 신호를 감지하여 손상된 Old Data를 안전 삭제하고 토글 스위치를 즉시 다시 켭니다.</strong>
+                                        </p>
+                                    </div>
+
+                                    {/* 감시 대상 시나리오 목록 */}
+                                    <div className="space-y-2">
+                                        <div className="text-[10px] text-slate-400 font-bold flex items-center justify-between px-1">
+                                            <span>MAKE.COM SCENARIOS (핵심 감시 파이프라인)</span>
+                                            <button 
+                                                onClick={fetchMakeScenarios} 
+                                                className="text-[9px] text-cyan-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                                            >
+                                                <span>새로고침</span>
+                                            </button>
+                                        </div>
+
+                                        {makeScenarios.map((sc: any) => (
+                                            <div 
+                                                key={sc.id} 
+                                                className={`p-3 rounded-xl border text-xs space-y-2 transition-all ${
+                                                    !sc.isActive || sc.incompleteExecutions > 0
+                                                        ? 'bg-rose-950/30 border-rose-600/70 shadow-[0_0_15px_rgba(244,63,94,0.3)]'
+                                                        : 'bg-black/50 border-emerald-900/60'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${sc.isActive ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
+                                                        <span className="font-bold text-white text-[12px]">{sc.name}</span>
+                                                    </div>
+                                                    
+                                                    {/* Active 상태 토글 인디케이터 */}
+                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${
+                                                            sc.isActive 
+                                                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50' 
+                                                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/50 animate-pulse'
+                                                        }`}>
+                                                            <span>{sc.isActive ? '🟢 Active' : '🔴 Inactive (OFF)'}</span>
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-400 bg-slate-950/60 p-2 rounded-lg border border-slate-900">
+                                                    <div>ID: <span className="text-cyan-300 font-bold">{sc.id}</span></div>
+                                                    <div>누적 실행: <span className="text-white font-bold">{sc.operations?.toLocaleString()} ops</span></div>
+                                                    <div>데이터: <span className="text-slate-300">{sc.dataTransfer}</span></div>
+                                                    <div>Incomplete 큐: <span className={sc.incompleteExecutions > 0 ? 'text-rose-400 font-bold' : 'text-emerald-400'}>{sc.incompleteExecutions}건</span></div>
+                                                </div>
+
+                                                {/* 원클릭 복구 및 테스트 버튼 */}
+                                                <div className="flex items-center gap-2 pt-1">
+                                                    <button
+                                                        type="button"
+                                                        disabled={isReactivatingScenario === sc.id}
+                                                        onClick={() => handleReactivateScenario(sc.id)}
+                                                        className="flex-1 py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-black font-black text-[11px] shadow-[0_0_12px_rgba(16,185,129,0.4)] transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                                    >
+                                                        <span>{isReactivatingScenario === sc.id ? '🔄 복구 진행 중...' : '🗑️ Old Data 삭제 및 Active 재활성화'}</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSimulateScenarioError(sc.id)}
+                                                        className="py-1.5 px-2 rounded-lg border border-slate-700 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-[10px] transition-all cursor-pointer"
+                                                        title="에러 발생 및 적체 상황 시뮬레이션"
+                                                    >
+                                                        <span>🚨 테스트</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* DAT-02 복구 로그 감사 스트림 */}
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] text-slate-400 font-mono font-bold flex items-center justify-between">
+                                            <span>DAT-02 감시 & 복구 감사 터미널</span>
+                                            <span className="text-[9px] text-emerald-400">실시간 기록</span>
+                                        </div>
+                                        <div className="rounded-lg bg-black/80 border border-slate-800 p-2.5 text-[10px] font-mono text-emerald-300/90 space-y-1 max-h-36 overflow-y-auto">
+                                            {makeScenarioActionLogs.length > 0 ? (
+                                                makeScenarioActionLogs.map((log, idx) => (
+                                                    <div key={idx} className="flex items-start gap-1">
+                                                        <span className="text-cyan-400 shrink-0">➔</span>
+                                                        <span>{log}</span>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="text-slate-500">
+                                                    [정상 대기] Make.com 시나리오 Active 상태 실시간 감시 중... 이상 발생 시 자동 클리어 & 재활성화가 즉시 기록됩니다.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* 최근 로그 */}
                             <div className="mt-2">

@@ -961,37 +961,54 @@
     "assignedHuman": "조현진 대표",
     "requiresApproval": false,
     "approvalStatus": "APPROVED",
-    "orderIndex": 0
+    "orderIndex": 0,
+    "scheduleInterval": "24h"
   },
   {
     "id": "dat-slot-2",
     "code": "DAT-02",
-    "name": "데이터관리팀 과장 2",
+    "name": "Make.com 시나리오 유지 감시봇",
     "deptId": "dat",
     "deptName": "데이터관리팀",
-    "tier": 3,
-    "role": "데이터관리팀 과장 실무 에이전트",
-    "status": "OFFLINE",
-    "isCreated": false,
-    "position": "과장",
+    "teamName": "자동화인프라팀",
+    "tier": 2,
+    "role": "Make.com 시나리오 Active 상태 상시 감시, 에러 및 미완료 적체 발생 시 Old Data 안전 삭제 및 Active 재활성화",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "position": "사원",
     "metrics": {
-      "speed": 85,
-      "accuracy": 95,
-      "load": 10,
+      "speed": 99,
+      "accuracy": 100,
+      "load": 20,
       "uptime": "99.9%",
-      "tasksToday": 0
+      "tasksToday": 9
     },
-    "currentTask": "미생성 슬롯 대기 중",
+    "currentTask": "[완결] #2312923 (WEB(ALTF)-AI 아이템 견적) Old Data 0건 삭제 및 Active 재활성화 성공",
     "lastActive": "방금 전",
-    "triggerEvents": [],
-    "emittedEvents": [],
-    "logs": [
-      "[시스템] 데이터관리팀 신규 부서 슬롯 생성됨"
+    "triggerEvents": [
+      "SCENARIO_DEACTIVATED",
+      "INCOMPLETE_EXECUTIONS_DETECTED"
     ],
-    "connectedDeptIds": [],
-    "connectedAgentIds": [],
-    "approvalStatus": "AUTO_RUNNING",
-    "orderIndex": 1
+    "emittedEvents": [
+      "OLD_DATA_PURGED",
+      "SCENARIO_REACTIVATED_HEALTHY"
+    ],
+    "logs": [
+      "[12시 47분 3초] [시나리오 자동복구] #2312923 Old Data 클리어 및 Active 복구 완료",
+      "[12:44:00] [DAT-02] WEB(ALTF)-AI 아이템 견적 (ID: 2312923) Active 정상 유지 확인",
+      "[12:30:00] [DAT-02] Incomplete Executions 적체 큐 정기 점검 (0건 클리어 상태)"
+    ],
+    "connectedDeptIds": [
+      "dat"
+    ],
+    "connectedAgentIds": [
+      "dat-slot-1"
+    ],
+    "assignedHuman": "조현진 대표",
+    "requiresApproval": false,
+    "approvalStatus": "APPROVED",
+    "orderIndex": 1,
+    "scheduleInterval": "REALTIME"
   },
   {
     "id": "dat-slot-3",

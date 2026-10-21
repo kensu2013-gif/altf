@@ -22,6 +22,7 @@ import { certificateIssuerService } from './server/services/certificateIssuer.js
 import { daekyungInvoiceService } from './server/services/daekyungInvoiceService.js';
 import { telegramBotService } from './server/services/telegramBotService.js';
 import { makeCredentialService } from './server/services/makeCredentialService.js';
+import { makeScenarioService } from './server/services/makeScenarioService.js';
 
 import multer from 'multer';
 
@@ -1807,6 +1808,44 @@ const server = http.createServer(async (req, res) => {
                 } else {
                     sendJsonResponse(req, res, 400, { success: false, error: 'connectionId 또는 all:true 파라미터가 필요합니다.' });
                 }
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 3. GET /api/make/scenarios : 전체 시나리오 상태 및 DAT-02 감시 요약 조회
+        if (req.method === 'GET' && url.pathname === '/api/make/scenarios') {
+            const scenarios = makeScenarioService.getScenarios();
+            const summary = makeScenarioService.getStatusSummary();
+            sendJsonResponse(req, res, 200, {
+                success: true,
+                summary,
+                scenarios
+            });
+            return;
+        }
+
+        // 4. POST /api/make/scenarios/reactivate : Incomplete Executions(Old Data) 삭제 및 Active 재활성화
+        if (req.method === 'POST' && url.pathname === '/api/make/scenarios/reactivate') {
+            try {
+                const body = await parseBody(req);
+                const { scenarioId } = body || {};
+                const result = await makeScenarioService.reactivateScenario(scenarioId || '2312923', { clearOldData: true });
+                sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 5. POST /api/make/scenarios/simulate-error : 시나리오 비활성화 및 Old Data 적체 시뮬레이션
+        if (req.method === 'POST' && url.pathname === '/api/make/scenarios/simulate-error') {
+            try {
+                const body = await parseBody(req);
+                const { scenarioId } = body || {};
+                const result = await makeScenarioService.simulateDisruption(scenarioId || '2312923');
+                sendJsonResponse(req, res, 200, result);
             } catch (err) {
                 sendJsonResponse(req, res, 500, { success: false, error: err.message });
             }
