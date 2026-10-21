@@ -583,17 +583,28 @@ export class KakaoBotService {
                 }
 
                 if (matchedUser) {
+                    intakeRecord.matchedUser = matchedUser;
+                    intakeRecord.isRegisteredUser = true;
+
                     if (!normalized.customer) {
                         normalized.customer = {
                             name: matchedUser.company || matchedUser.name,
                             ceo: matchedUser.name,
+                            contact: matchedUser.name,
                             phone: matchedUser.phone,
+                            mobile: matchedUser.phone,
                             email: matchedUser.email || '',
                             address: ''
                         };
                     } else {
-                        normalized.customer.phone = normalized.customer.phone || matchedUser.phone;
+                        // 유선전화는 phone에 보존하되, 실제 문자를 받을 휴대폰은 matchedUser.phone으로 확정!
+                        normalized.customer.mobile = matchedUser.phone;
                         normalized.customer.contact = matchedUser.name;
+                        if (!normalized.customer.phone || !normalized.customer.phone.startsWith('01')) {
+                            // 기존 phone이 유선전화면 백업하고 mobile에 휴대폰 저장
+                            normalized.customer.landline = normalized.customer.phone;
+                            normalized.customer.phone = matchedUser.phone;
+                        }
                         normalized.customer.email = normalized.customer.email || matchedUser.email;
                     }
                 }
@@ -795,6 +806,7 @@ export class KakaoBotService {
                 contactName: normalized.customer.ceo ? `${normalized.customer.ceo} 대표` : '담당자님',
                 email: normalized.customer.email || 'ggbg1019@naver.com',
                 phone: normalized.customer.phone || '031-503-1019',
+                mobile: normalized.customer.mobile || intake.matchedUser?.phone || null,
                 bizNo: normalized.customer.businessNumber || '890-38-01079',
                 address: normalized.customer.address || '경기도 시흥시 시화유통상가'
             } : null,
@@ -804,6 +816,7 @@ export class KakaoBotService {
             botUserKey: intake.botUserKey || null,
             isKakaoRegistered: !!intake.isRegisteredUser,
             kakaoUser: intake.matchedUser || null,
+            sourcePhone: intake.matchedUser?.phone || normalized.customer?.mobile || null,
             dispatchStatus: 'NOT_SENT',
             attachments: rawImgUrl ? [
                 {
@@ -954,9 +967,38 @@ export class KakaoBotService {
         const user = this.findUserByBotUserKey(botUserKey) || (quote?.kakaoUser) || null;
         
         const fallbackPhone = process.env.SOLAPI_SENDER_PHONE || '01062223751';
-        const targetPhone = explicitPhone || user?.phone || quote?.customerInfo?.phone || quote?.sourcePhone || fallbackPhone;
-        const targetName = user?.name || quote?.customerInfo?.contactName || '고객';
-        const targetCompany = user?.company || quote?.customerName || '';
+
+        // 휴대폰 번호(010, 011 등) 판별 헬퍼
+        const isMobile = (num) => {
+            if (!num || typeof num !== 'string') return false;
+            const clean = num.replace(/[^0-9]/g, '');
+            return /^(010|011|016|017|018|019)\d{7,8}$/.test(clean);
+        };
+
+        // 수신 후보 번호 우선순위 배열 (휴대폰 번호 최우선!)
+        const candidatePhones = [
+            explicitPhone,
+            user?.phone,
+            quote?.kakaoUser?.phone,
+            quote?.sourcePhone,
+            quote?.customerInfo?.mobile,
+            quote?.customerInfo?.phone,
+            fallbackPhone
+        ].filter(Boolean);
+
+        // 1순위: 유효한 휴대폰 번호(010-) 탐색
+        let targetPhone = candidatePhones.find(p => isMobile(p));
+
+        // 2순위: 휴대폰이 하나도 없으면 fallback 휴대폰 번호 사용 (유선전화로는 SMS/MMS 발송 불가)
+        if (!targetPhone) {
+            console.warn(`[KakaoBot] ⚠️ 견적서 ${quotationId} 수신 후보 중 휴대폰 번호가 없어 관리자 번호(${fallbackPhone})로 폴백합니다. (후보군: ${candidatePhones.join(', ')})`);
+            targetPhone = fallbackPhone;
+        } else {
+            console.log(`[KakaoBot] 🎯 견적서 ${quotationId} 수신 휴대폰 매칭 성공: ${targetPhone} (카카오사용자: ${user?.name || '미기재'})`);
+        }
+
+        const targetName = user?.name || quote?.kakaoUser?.name || quote?.customerInfo?.contactName || '고객';
+        const targetCompany = user?.company || quote?.kakaoUser?.company || quote?.customerName || '';
         const quoteUrl = `https://altf.kr/quote/view?id=${quotationId}`;
 
         // 품목 요약 텍스트 생성

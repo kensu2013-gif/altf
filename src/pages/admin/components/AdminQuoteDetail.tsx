@@ -326,7 +326,24 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             const quoteUrl = `https://altf.kr/quote/view?id=${quote.id}`;
             const customMessage = `📋 [알트에프 견적 회신 안내]\n${custName} 귀하, 요청하신 견적 검토가 완료되었습니다.\n\n• 견적번호: ${quote.id}\n• 총 품목수: ${items.length}개\n• 견적금액: ${totalWon}원 (VAT 별도)\n\n아래 링크에서 정식 직인 PDF 견적서를 확인하실 수 있습니다:\n${quoteUrl}`;
 
-            const targetPhone = customerInfo.phone || quote.customerInfo?.phone || quote.sourcePhone || '';
+            const isMobile = (num?: string) => {
+                if (!num) return false;
+                const clean = num.replace(/[^0-9]/g, '');
+                return /^(010|011|016|017|018|019)\d{7,8}$/.test(clean);
+            };
+
+            // 유선전화(031, 02 등)가 아닌 실제 수신 가능한 휴대폰 번호(010-) 우선 탐색!
+            const candidateMobile = [
+                quote.kakaoUser?.phone,
+                quote.sourcePhone,
+                customerInfo.mobile,
+                customerInfo.phone,
+                quote.customerInfo?.mobile,
+                quote.customerInfo?.phone
+            ].find(p => isMobile(p));
+
+            const targetPhone = candidateMobile || customerInfo.mobile || customerInfo.phone || quote.sourcePhone || '01062223751';
+
             const res = await fetch('/api/kakao/dispatch-quote', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -339,7 +356,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             });
             const data = await res.json();
             if (data.success) {
-                setDispatchStatusMsg(`✅ 솔라피 발송 완료: ${data.message || 'MMS/문자 발송 성공 및 답변완료 처리'}`);
+                setDispatchStatusMsg(`✅ 솔라피 발송 완료: [수신: ${targetPhone}] ${data.message || 'MMS/문자 발송 성공 및 답변완료 처리'}`);
                 updateQuotation(quote.id, { status: 'PROCESSED' });
                 if (onSuccess) onSuccess();
             } else {
@@ -1893,8 +1910,16 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="flex items-center gap-3 text-xs text-slate-600 mt-1 flex-wrap">
-                                                <span>카카오 ID: <code className="font-mono text-[11px] bg-white px-1.5 py-0.5 rounded border border-yellow-200 text-slate-700">{quote.botUserKey ? `${quote.botUserKey.slice(0, 10)}...${quote.botUserKey.slice(-6)}` : '미식별'}</code></span>
+                                            <div className="flex items-center gap-2.5 text-xs text-slate-600 mt-1 flex-wrap">
+                                                {quote.kakaoUser ? (
+                                                    <span className="inline-flex items-center gap-1.5 bg-yellow-100 text-yellow-950 border border-yellow-300 px-2.5 py-0.5 rounded-md text-[11px] font-bold shadow-xs">
+                                                        <span>💬 카톡 문의자:</span>
+                                                        <span className="font-black text-amber-900">{quote.kakaoUser.name}</span>
+                                                        <span className="text-slate-600 font-mono text-[10px]">({quote.kakaoUser.phone})</span>
+                                                    </span>
+                                                ) : quote.botUserKey ? (
+                                                    <span>카카오 ID: <code className="font-mono text-[11px] bg-white px-1.5 py-0.5 rounded border border-yellow-200 text-slate-700">{`${quote.botUserKey.slice(0, 10)}...${quote.botUserKey.slice(-6)}`}</code></span>
+                                                ) : null}
                                                 <button 
                                                     type="button" 
                                                     onClick={() => setIsRegisterOpen(!isRegisterOpen)} 
