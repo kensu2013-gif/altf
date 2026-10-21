@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { exec } from 'child_process';
+import XLSX from 'xlsx';
 import { uploadInventoryToS3, hasAwsCredentials } from '../../s3-db.js';
 
 const CONFIG_PATH = path.resolve(process.cwd(), './server/data/inventory_sync_config.json');
@@ -172,8 +173,50 @@ export class InventorySyncService {
   }
 
   // ==========================================
-  // [사원 2] DAT-04: 대경재고 파일 수신 & 변환
+  // [사원 2] DAT-04: 대경재고 파일 수신 & 변환 (A4:M1168 실제 데이터 정밀 추출)
   // ==========================================
+  parseDaekyungXlsx(bufferOrPath) {
+    try {
+      const wb = typeof bufferOrPath === 'string'
+        ? XLSX.readFile(bufferOrPath)
+        : XLSX.read(bufferOrPath, { type: 'buffer' });
+      
+      const sheetName = wb.SheetNames[0] || '재고현황';
+      const sheet = wb.Sheets[sheetName];
+      const rows = [];
+
+      // Row 4(헤더)부터 '合 計' 또는 빈 행 전까지 A~M열 추출
+      for (let r = 4; r <= 1500; r++) {
+        const cellA = sheet['A' + r];
+        const valA = cellA ? String(cellA.v).trim() : '';
+        if (valA === '合 計' || valA === '합계') break;
+        if (!valA && r > 10) {
+          const nextCell = sheet['A' + (r + 1)];
+          if (!nextCell || !nextCell.v) break;
+        }
+
+        const rowData = [];
+        for (let c = 0; c < 13; c++) {
+          const col = String.fromCharCode(65 + c);
+          const cell = sheet[col + r];
+          rowData.push(cell !== undefined && cell !== null ? cell.v : '');
+        }
+        rows.push(rowData);
+      }
+
+      return {
+        success: true,
+        sheetName,
+        header: rows[0],
+        itemsCount: Math.max(0, rows.length - 1),
+        rows
+      };
+    } catch (err) {
+      console.error('[InventorySyncService] Daekyung xlsx parse error:', err.message);
+      return { success: false, error: err.message, itemsCount: 0, rows: [] };
+    }
+  }
+
   async runStep2Daekyung(fileData = null) {
     this.state.step2.status = 'RUNNING';
     this.state.step2.message = '대경재고 원장 파일 수신 및 구글시트 변환 트리거 중...';
@@ -181,23 +224,39 @@ export class InventorySyncService {
 
     try {
       let savedPath = null;
-      let rowCount = 0;
+      let parsed = null;
 
-      // 파일이나 데이터가 전달된 경우 storage에 안전 보관
-      if (fileData) {
+      // 1. 전달된 파일 버퍼가 있는 경우
+      if (fileData?.buffer) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const filename = fileData.filename || `daekyung_stock_${timestamp}.xlsx`;
         savedPath = path.join(STORAGE_DIR, filename);
-
-        if (fileData.buffer) {
-          fs.writeFileSync(savedPath, fileData.buffer);
-        } else if (typeof fileData.content === 'string') {
-          fs.writeFileSync(savedPath, fileData.content, 'utf8');
-        }
+        fs.writeFileSync(savedPath, fileData.buffer);
         this.state.step2.fileName = filename;
+        parsed = this.parseDaekyungXlsx(fileData.buffer);
+      } else if (fileData?.content) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = fileData.filename || `daekyung_stock_${timestamp}.txt`;
+        savedPath = path.join(STORAGE_DIR, filename);
+        fs.writeFileSync(savedPath, fileData.content, 'utf8');
+        this.state.step2.fileName = filename;
+      } else {
+        // 2. 전달된 데이터가 없을 경우 루트 디렉터리의 대경벤드 재고장*.xlsx 자동 탐색
+        const rootFiles = fs.readdirSync(process.cwd());
+        const stockFile = rootFiles.find(f => f.startsWith('대경벤드 재고장') && f.endsWith('.xlsx'));
+        if (stockFile) {
+          const fullPath = path.join(process.cwd(), stockFile);
+          this.state.step2.fileName = stockFile;
+          savedPath = fullPath;
+          parsed = this.parseDaekyungXlsx(fullPath);
+          console.log(`[DAT-04 사원] 루트 디렉터리의 최신 대경 파일 감지: ${stockFile} (${parsed.itemsCount}개 품목)`);
+        }
       }
 
-      // Apps Script Webhook URL 호출 (있는 경우)
+      const itemCount = parsed?.itemsCount || 0;
+      this.state.step2.itemCount = itemCount;
+
+      // Apps Script Webhook URL 호출 (있는 경우 2차원 배열 데이터 전달)
       let appsScriptResult = null;
       if (this.config.daekyungAppsScriptUrl && this.config.daekyungAppsScriptUrl.trim()) {
         const controller = new AbortController();
@@ -206,7 +265,13 @@ export class InventorySyncService {
           const res = await fetch(this.config.daekyungAppsScriptUrl.trim(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'import_daekyung', timestamp: new Date().toISOString() }),
+            body: JSON.stringify({
+              action: 'import_daekyung',
+              filename: this.state.step2.fileName,
+              itemCount,
+              rows: parsed?.rows || [],
+              timestamp: new Date().toISOString()
+            }),
             signal: controller.signal
           });
           clearTimeout(timeout);
@@ -220,9 +285,11 @@ export class InventorySyncService {
 
       this.state.step2.status = 'SUCCESS';
       this.state.step2.lastRun = new Date().toISOString();
-      this.state.step2.message = '대경재고 원장 수신 및 대경재고변환 시트 변환 완료';
+      this.state.step2.message = `대경재고 원장 접수 완료 (${itemCount > 0 ? `${itemCount.toLocaleString()}개 품목 A4~M열 추출` : '기존 시트 갱신'})`;
       this.state.step2.details = {
         savedPath: savedPath ? path.basename(savedPath) : '기존 시트 직접 갱신',
+        itemCount,
+        header: parsed?.header,
         appsScriptResult,
         timestamp: new Date().toLocaleTimeString('ko-KR')
       };
@@ -299,6 +366,33 @@ export class InventorySyncService {
     this.state.isRunning = false;
     this.state.autoPilot = false;
     return { success: true, message: '취소 완료' };
+  }
+
+  /**
+   * 대리 버퍼링 및 ALTF DB 앱스크립트 실행이 완료될 때까지 비동기 대기
+   */
+  waitForStep3Completion() {
+    return new Promise((resolve, reject) => {
+      const isStillPending = () => this.state.step3.timerActive || this.state.step3.status === 'BUFFERING' || this.state.step3.status === 'RUNNING';
+
+      if (!isStillPending()) {
+        if (this.state.step3.status === 'ERROR') {
+          return reject(new Error(this.state.step3.message || 'ALTF DB 연산 실패'));
+        }
+        return resolve({ success: true, step3: this.state.step3 });
+      }
+
+      const checkInterval = setInterval(() => {
+        if (!isStillPending()) {
+          clearInterval(checkInterval);
+          if (this.state.step3.status === 'ERROR') {
+            reject(new Error(this.state.step3.message || 'ALTF DB 연산 실패'));
+          } else {
+            resolve({ success: true, step3: this.state.step3 });
+          }
+        }
+      }, 1000);
+    });
   }
 
   async _executeAltfDbAppsScript() {

@@ -1,133 +1,138 @@
-# Task List: ALTF B2B AI Agent Office & CRM 시스템
+# 📋 ALTF B2B AI Agent Office 개발 로드맵 & 작업 현황판 (Task Board)
 
-## 1. [진행 중] 품질부 (QC-01) 외주 성적서 자동 수집 & 검사 AI 에이전트
-- `[x]` **메일플러그(Mailplug) 실제 IMAP 통신 엔진 구축**
-  - 메일플러그 `imap.mailplug.co.kr:993` SSL TLS 소켓 통신 구현
-  - 앱 비밀번호(`Bq%G%Jo(P)&hdX7fsxX7`) 보안 환경설정 연동 (`server/data/mailplug_config.json`)
-  - 한글 메일함 `대경벤드성적서` (`&swCsvbyktNzBMcgBwRw-`) 및 MIME 헤더 한글 디코딩
-  - 505건 메일 실시간 감지 및 배치 수집(Batch Sync) API 구축
-- `[x]` **1시간 주기 백그라운드 자동 수집 스케줄러**
-  - 서버 시작 시 매 1시간마다 신규 성적서 메일 자동 점검 (`startHourlyScheduler`)
-- `[x]` **직급별 자율 행동 및 결재 프로세스 확립**
-  - 사원(Lv.1), 대리(Lv.2): 무결재 100% 자율 수집 및 루틴 반복 (`AUTO_RUNNING`)
-  - 과장(Lv.3): 이상치/오차 발생 시만 선별 검사 및 결재 상신 (`PENDING`)
-  - 팀장(Lv.4): 최종 승인권자
-- `[x]` **ZIP 압축 파일 즉시 폐기 & PDF 단일 보관 체계**
-  - 첨부파일(.zip)은 디스크에 저장하지 않고 메모리 버퍼(`new AdmZip(fileBuffer)`)에서 즉시 압축 해제
-  - CP949 한글 파일명 복원하여 `storage/certificates/` 루트에 순수 `.pdf`로만 저장
-  - 압축파일(.zip)은 100% 버려지고 디스크에 남지 않음
-  - `storage/certificates/대경벤드 성적서.xlsx` 에 26개 컬럼 장부 자동 누적 기록
-- `[x]` **AI Agent Office 대시보드 UI 연동**
-  - `src/pages/admin/AgentOfficeDashboard.tsx` 내 QC-01 전용 수집 카드 & 인스펙터 패널
-  - 윈도우 파일 탐색기 열기 버튼 (`POST /api/certificates/open-folder`)
-  - 실시간 PDF 인라인 미리보기 모달 뷰어 & 전체 파일 보관함 모달
-- `[x]` **다른 컴퓨터 연속 작업 환경 자동화 (Cross-Machine Continuity)**
-  - 윈도우 원클릭 런처: `start-agent-office.bat` (더블클릭 시 백엔드+프론트엔드+브라우저 자동 오픈)
-  - 통합 실행 스크립트: `npm run agent` (`scripts/start-agent-office.js` ➔ `http://localhost:5173/agent-office` 자동 실행)
-  - 규칙 등록: `AGENTS.md`에 `"agent 수정하자"`, `"에이전트 수정하자"`, `"agent 준비"` 등 연속 작업 자동 인지 및 상태 복원 룰 탑재
-  - 서버 핵심 데이터 Git 영구 동기화: `server/data/agents.json`, `server/data/departments.json`, `server/data/certificates.json` (1,424건 마스터), `server/data/mailplug_config.json` 일괄 저장
-- `[x]` **전체 통합부서 관제 부서 CRUD (추가 / 수정 / 삭제) 시스템 구축**
-  - 부서 정적 상수를 동적 반응형 상태 `departments`로 전면 전환
-  - 백엔드 REST API `GET /api/departments`, `POST /api/departments` 및 `server/data/departments.json` 영구 백업 연동
-  - 신규 부서 추가: 부서명, 코드, 23종 이모지 픽커, 10종 네온 컬러 프리셋, 총괄 직책, 슬롯 수 입력 시 자동 슬롯 생성
-  - 부서 정보 수정: 부서명/코드/컬러/직책 수정 시 소속 에이전트 자동 일괄 동기화
-  - 부서 삭제: 소속 에이전트 및 연계 그물망 태그 안전 삭제, 관제 뷰 자동 리셋
-  - 사이드바 호버 퀵 액션, 중앙 서브헤더 및 계층형 조직도 헤더 바에 수정/삭제 직관적 배치
-- `[x]` **성적서 본문 파싱 & 26개 컬럼 장부 자동 누적 & 이상치 검출 엔진 구축**
-  - `server/services/certificateParser.js` 신규 구현: `PDFParse` 기반 전 페이지 텍스트/표 스트림 파싱
-  - HEAT No, LOT No, 품목(Description), 수량, 화학성분(C, Si, Mn, P, S, Ni, Cr, Mo), 기계적 성질(Y.S, T.S, E.L), 외관/치수 추출 완료
-  - 한국산업표준(KS B 1543, KS D 3576) 및 ASTM A312 TP304/TP316L 공차 규격 기반 이상치(Outlier) 자동 판정 엔진 탑재 (PASS / WARN / FAIL)
-  - `storage/certificates/대경벤드 성적서.xlsx` 및 `server/data/certificates.json` 자동 동기화 (총 1,424개 품목 100% 매핑 완료)
-  - `mailplugCollector.js` 연동: 신규 성적서 다운로드 즉시 26개 컬럼 장부 자동 파싱 및 엑셀 누적
-  - `src/components/admin/CertificateLedgerModal.tsx` 26개 컬럼 인터랙티브 대형 데이터 그리드 뷰어 및 엑셀 다운로드(`GET /api/certificates/download-excel`) 연동 완료
-- `[x]` **QC-02 (MTC 비전 판독 에이전트) 및 2개 시트(3열 병합 양식 호환) 엑셀 생성 체계 구축**
-  - `runQC02Agent`: 10~30장 이상의 다중 페이지 및 대용량 PDF 증분(Incremental Upsert) 누적 판독 지원
-  - `storage/certificates/대경벤드 성적서.xlsx` 내 2개 시트 동시 생성:
-    - Sheet 1: `대경벤드성적서` (표준 26개 컬럼 마스터 대장)
-    - Sheet 2: `성적서양식_복사용(3열병합호환)` (화학/기계 성질 3열 병합 간격 매칭)
-  - `POST /api/qc/qc02/run` 및 `GET /api/qc/qc02/status` API 연동
-  - 모달 상단 `📋 양식 복사 (3열 병합)` 원클릭 클립보드 복사 지원 (엑셀 `성적서 양식.xlsx`에 바로 붙여넣기 가능)
-  - `server/data/agents.json` 내 QC-02 에이전트 실시간 지표(Task 처리수, 활성 상태) 자동 동기화
-- `[x]` **발주서(PO) ⟷ 외주 성적서 교차 대조 자동화 & 구매부 SCM 파이프라인 구축 완료**
-  - 알트에프 발주서 데이터베이스(`db.orders` 1,537건, 7,030개 발주품목)와 QC 성적서(`certificates.json` 1,469건) P.O No 및 규격 1:1 자동 매칭
-  - `server/services/purchaseService.js` 신규 구현: 알트에프 재고 구매분(`isStockOrder`) 417건 자동 필터링, 매입발주 대장(`purchase_orders.json`) 및 교차 대장(`purchase_qc_matches.json`) 구축
-  - 발주번호별 입고 완료 / 부분입고 / 미결(Pending) 실시간 상태 판정 및 상급자 통보 체계 확립
+> **안내**: 본 문서는 `docs/agent-office/ALTF_OFFICE_DEV_PROMPTS.md`의 마스터 설계를 기준으로 작성되었으며, 사용자가 어느 컴퓨터(Mac, Windows, 노트북 등)로 이동하더라도 즉시 이전 작업 내용과 다음 최우선 과제를 파악할 수 있도록 상태를 유지합니다.
+>
+> ⚠️ **현재 모드: [로컬 안전 테스트 모드 (Local Test Mode)]**
+> - 실서버(Mac 상시 서버 및 Render/S3)에 배포하기 전까지 모든 테스트는 로컬 환경 및 Mock/Fixture 데이터를 사용합니다.
+> - 실제 고객/매입처 발송은 승인 대기(PENDING_APPROVAL) 또는 테스트 채널로 격리됩니다.
+> - 성적서/주문 데이터는 절대 추정값이나 하드코딩 기본값으로 채우지 않습니다.
 
 ---
 
-## 3. [완료] 구매부 (PUR-01) 알트에프 재고 발주 List Up & QC 성적서 1:1 매칭 에이전트
-- `[x]` **PUR-01 (사원 / 알트에프 재고 발주 List Up 봇 - Lv.1 자율 루틴)**:
-  - `altf.kr` 웹에서 알트에프 재고로 구매한 발주 신호 실시간 감지 (30분 주기 스케줄러 자동 가동)
-  - 발주번호별(`poNo`), 아이템별(`itemNo`)로 완전 자동 List Up (총 624개 재고 발주품목)
-  - QC-01 외주 성적서 List와 1:1 정밀 규격 대조 및 성적서 번호(`certNo`), `heatNo`, `lotNo` 매핑
-  - 입고 상태 판정: 입고완료 159건, 부분입고 12건, 잔여 미결 453건 실시간 추적
-- `[x]` **QC-01과 100% 동일한 26개 컬럼 엑셀 마스터 원장 자동 생성**:
-  - 파일 위치: `storage/purchases/알트에프 재고 발주 대장.xlsx`
-  - 발주일자, 입고일자, Customer, 공급처, P.O No, CERT-No, Spec MAT/INSP, HEAT No, LOT No, ITEM No, DESCRIPTION, 발주수량, 입고수량, 미결수량, 입고상태, 화학성분(C/Si/Mn/P/S/Ni/Cr/Mo), 기계적성질, PDF 링크 26개 컬럼 완전 일치
-- `[x]` **REST API & 대시보드 UI 연동**:
-  - `GET /api/pur/summary`, `GET /api/pur/stock-orders`, `POST /api/pur/sync`, `GET /api/pur/download-excel`, `POST /api/pur/open-folder` 연동
-  - 불필요한 질의응답(QNA) 전면 제거 ➔ 오직 **알트에프 재고 발주 & 성적서 1:1 매칭 대장** 전문 뷰어로 직관적 개편
-  - Agent Office 대시보드 상단 서브헤더 및 PUR-01 인스펙터 패널 연동 완료
+## 📌 전체 진행 상황 요약 (Progress Overview)
+
+| 단계 | 목표 | 상태 | 주요 작업 |
+|---|---|---|---|
+| **0단계** | **기반 정비 (Single Source of Truth & 안전 게이트)** | 🚀 **진행 중 (0-A 완료, 0-B 착수)** | 성적서 기본값 제거(완료), 팀/팀원(+팀원 추가 버튼/모달/배정) 완성, 단일 원장(ledgerClient), 라인 스키마(S/D/M), 발송 게이트 |
+| **1단계** | **접수 창구 하나로 모으기 (카카오 + 대표메일)** | ⏳ 대기 | 접수함(intake), 문서 분류·판독·표준화(itemNormalizer), 견적 초안 자동화 |
+| **2단계** | **견적 회신 자동화** | ⏳ 대기 | 승인 1회 회신, 1회용 토큰 링크, SLE-08 팔로업 |
+| **3단계** | **발주서 접수, 경로 분할, 매입발주** | ⏳ 대기 | PUR-11 등록, PUR-12 견적 대조, PUR-13 S/D/M 제안, PUR-14 회신 |
+| **4단계** | **대경 직송·제작 서류 체인 (D/M 경로)** | ⏳ 대기 | 대경 명세서 정밀 연결, 성적서 매칭, 매출명세표·성적서 번들링 |
+| **5단계** | **시화 재고 출고 & MES 연동 (S 경로)** | ⏳ 대기 | LOG-11 출고지시, LOG-12 포장, MES Mock 어댑터, QC-06 성적서 |
+| **6단계** | **흐름 감시 & 에이전트 오피스 실데이터화** | ⏳ 대기 | 실행 이력 DB, 지표 동적 계산, EXE-11 흐름 감시 |
+| **7단계** | **24시간 사무실 서버 이전** | ⏳ 대기 | worker.js 분리, pm2 데몬, 헬스체크, Chrome 헤드리스 변환 |
 
 ---
 
-## 4. [완료] 구매부 (PUR-07) 주문관리 발주서 분류·미결 관제 & 서류 번들링 에이전트
-- `[x]` **PUR-07 (대리 / 주문관리 발주서 분류 및 미결 통합 관제봇)**:
-  - `altf.kr` 뒷단 주문관리의 모든 발주서(`db.orders` 실서버 연동 2,439건 활성/총 2,440건, 11,204개 품목) 수집 및 201개 거래처별, 날짜별 자동 분류/저장
-  - 각 발주 품목에 대응하는 매입발주서(`PUR-PO-...`) 동시 생성 및 매입처(대경벤드 등) 연계 관리
-  - 미결 리스트(Backlog Pending: 462건) 24시간 실시간 추적 및 관리
-- `[x]` **영업시간(09:00 ~ 18:00) 매 1시간 주기 API 자동 호출 스케줄러**:
-  - 평일 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00 (1일 10회) 자동 감지
-  - 그 외 영업시간 외/주말은 대기 상태(STANDBY) 유지
-- `[x]` **사무실 출고 완료 연동 & 거래명세표·성적서 자동 1:1 매칭 (고객 발송 패키징)**:
-  - 실제 사무실 담당자가 출고 완료(`fulfillOrder`) 처리 시 미결(Pending)에서 즉시 해제
-  - 발주번호 기반 품질부 성적서(`certificates.json` 1,469건 / QC-01) 접수 여부 확인 (286건 매칭 완료)
-  - 거래명세표(`STMT-...`)와 성적서 PDF를 1:1 결합한 고객사 발송 준비 완료 패키지(`READY_TO_DISPATCH` 277건) 자동 번들링
-- `[x]` **영구 백업 및 엑셀 마스터 대장 자동 생성**:
-  - `server/data/pur07_order_backlog.json` 및 `storage/purchases/주문관리_발주서_통합대장.xlsx` 2개 시트(미결리스트 / 고객발송준비) 생성
-- `[x]` **REST API & AI Agent Office 대시보드 연동**:
-  - `GET /api/pur/pur07/summary`, `GET /api/pur/pur07/backlog`, `POST /api/pur/pur07/sync`, `POST /api/pur/pur07/fulfill`, `GET /api/pur/pur07/packages`, `GET /api/pur/pur07/scheduler-status`, `GET /api/pur/pur07/download-excel`
-  - Agent Office 인스펙터 패널 내 PUR-07 전용 네온 제어반 실시간 통계 연동 완료
+## 👥 담당자 배정 원리 & 18개 정예 에이전트 역할 분배표 (Human & Agent Matrix)
+
+> ❓ **"외부 API(카카오톡, 메일, 팩스)를 아직 연결 안 했는데, 로컬에서 어떻게 담당자가 배정되나요?"**
+>
+> 💡 **로컬 모의 접수(Intake Sandbox) 메커니즘**:
+> 1. **거래처 마스터(1,265개사) 자동 매칭**: 접수 시 고객명/사업자번호/이메일을 입력하면, CRM에 이미 등록된 **해당 거래처의 전담 영업자**가 자동으로 1차 배정됩니다. (신규 거래처는 '사무실 총괄'로 배정)
+> 2. **사람(Human)과 봇(Agent)의 2중 분업 체계**:
+>    - **에이전트(Bot)**: 판독, 규격 변환, 재고 대조, 성적서 매칭, 서류 번들링 등 **반복 실무를 100% 자동 수행**.
+>    - **실제 사람 담당자(Human)**: 에이전트가 만든 결과물을 확인하고 **'승인(Approve)' 버튼**을 눌러 최종 통과시키는 결재권자 역할.
+> 3. **로컬 테스트 방법**: 관리자 화면에서 가상 접수(파일 업로드/테스트 인입)를 실행하면, 아래 표에 배정된 담당자 역할별로 승인 대기열에 올라오며, 한 명씩 역할을 직접 분배하고 테스트할 수 있습니다.
+
+### 📋 부서별 에이전트 및 담당자 분배 현황 (총 18개 봇)
+
+| 부서 | 에이전트 코드 | 에이전트명 | 직위 | 세부 역할 (Single Responsibility) | 배정된 사람 담당자 (Human Role) | 필수 승인 여부 |
+|:---:|:---:|:---|:---:|:---|:---|:---:|
+| **영업부 (SLE)** | **INT-01** | 접수 전담봇 | 사원 | 카카오/메일/로컬 수동 접수 등록 및 1,265개 거래처 매칭 | **영업자 / 접수 담당자** | 자동 (무결재) |
+| 영업부 | **INT-02** | 문서 판독·표준화봇 | 대리 | 엑셀/PDF 발주서 파싱 및 ALTF 표준 품목 키(45E...) 변환 | **영업 지원 담당** | 자동 (무결재) |
+| 영업부 | **SLE-01** | 견적 초안 등록봇 | 대리 | 거래처 등급/최근 요율 적용 웹 견적 초안(DRAFT) 등록 | **거래처 담당 영업자** | 자동 (무결재) |
+| 영업부 | **SLE-02** | 견적 승인 회신봇 | 팀장 | 영업자 승인 시 원메일 In-Reply-To PDF 회신 / 모바일 링크 발송 | **담당 영업자** | **필수 승인** 👑 |
+| 영업부 | **SLE-08** | 미주문 팔로업봇 | 과장 | 견적 발송 후 D+2, D+7 미주문 건 담당 영업자에게 알림 | **담당 영업자** | 자동 (무결재) |
+| **구매부 (PUR)** | **PUR-11** | 고객 발주서 등록봇 | 사원 | 고객 발주서(PO) 접수 시 주문 초안 생성 및 PO번호 저장 | **사무실 주문 접수자** | 자동 (무결재) |
+| 구매부 | **PUR-12** | 견적·주문 대조봇 | 대리 | 최근 30일 견적과 품목/수량/단가 라인별 대조 및 차이 표시 | **사무실 담당자** | 자동 (무결재) |
+| 구매부 | **PUR-13** | 경로 판별 제안봇 | 과장 | 라인별 시화(S) / 대경직송(D) / 제작(M) 경로 자동 제안 | **사무실 관리자** | **필수 승인** 👑 |
+| 구매부 | **PUR-14** | 대경 매입발주·회신봇 | 대리 | D/M 라인 대경 매입발주서 생성 및 통화 회신 한줄 메모 기록 | **구매 담당자** | 자동 (무결재) |
+| 구매부 | **PUR-07** | 발주 분류·미결 관제봇 | 대리 | 2,439건 전사 주문 분류 및 미결 백로그 실시간 추적 | **구매팀장** | 자동 (무결재) |
+| **품질부 (QC)** | **QC-01** | 외주 성적서 IMAP 수집봇 | 사원 | 메일플러그 대경 성적서 메일 24시간 감지, ZIP 해제 및 PDF 수집 | **품질 관리자** | 자동 (무결재) |
+| 품질부 | **QC-02** | 성적서 26개컬럼 파싱봇 | 대리 | 성적서 본문 파싱, 화학/기계 성질 추출, KS/ASTM 이상치 검출 | **품질 관리자** | 자동 (무결재) |
+| 품질부 | **QC-06** | 시화 성적서 무결점 발행봇 | 과장 | 시화 출고 LOT 1:1 엄격 매칭 기반 성적서 발행 (추정값 금지) | **품질 총괄 책임자** | **필수 승인** 👑 |
+| 품질부 | **QC-12** | 대경직송 성적서 매칭봇 | 대리 | 대경 거래명세표 수신 시 해당 품목의 성적서 마스터 1:1 확정 | **품질 담당자** | 자동 (무결재) |
+| 품질부 | **QC-13** | 성적서 누락 경보·독촉봇 | 팀장 | 성적서 미입고 건 누락 경보 기록 및 24시간 경과 시 독촉 메일 작성 | **품질 책임자 / 사무실** | 자동 (무결재) |
+| **출고부 (LOG)** | **LOG-11** | 시화 출고지시봇 | 사원 | 시화(S) 경로 라인 창고 작업자에게 픽업 지시서(품목, 랙 위치) 전달 | **창고 출고 작업자** | 자동 (무결재) |
+| 출고부 | **LOG-12** | 포장 완료 확인봇 | 대리 | 창고의 "포장 완료" 신호 접수 시 PACKED 전이 및 검수 사진 기록 | **창고 검수자** | 자동 (무결재) |
+| 출고부 | **LOG-13** | MES 출고 연동봇 | 과장 | MES 출고 데이터 수집 및 원장 S 라인 매칭(MES_SHIPPED) | **물류 총괄 담당자** | 자동 (무결재) |
+| **총무부 (GEN)** | **GEN-01** | 매출 거래명세표 생성봇 | 대리 | 출고 묶음(shipment) 단위 자사 매출 거래명세표 자동 채번/작성 | **사무실 경리/총무** | 자동 (무결재) |
+| 총무부 | **GEN-03** | 서류 패키징·번들링봇 | 과장 | 거래명세표 + 성적서 PDF 1:1 결합 발송 패키지(PACKAGED) 생성 | **사무실 총무 담당자** | 자동 (무결재) |
+| 총무부 | **GEN-10** | CRM 거래처 마스터 연동봇 | 사원 | 1,265개 거래처 사업자번호, 대표자, 이메일, 담당 영업자 동기화 | **영업관리 / 총무** | 자동 (무결재) |
+| **관제부 (EXE)** | **DIS-01** | 단일 발송 게이트 통제봇 | 팀장 | 고객/매입처 발송 단일 창구. 승인 전 발송 원천 차단 및 중복 방지 | **영업자 / 사무실 관리자** | **필수 승인** 👑 |
+| 관제부 | **EXE-11** | 전사 업무 흐름 감시봇 | 팀장 | 매일 08:00, 14:00 지연 건(접수 2시간, 견적 4시간, 성적서 24시간) 보고 | **대표이사 / 총괄 관리자** | 자동 (무결재) |
 
 ---
 
-## 2. [완료] CRM Flow Chart 대시보드 및 이벤트 시스템
-- `[x]` `local-api-server.js`에 `crmEvents` 데이터 초기화, S3 저장 로직 추가
-- `[x]` `local-api-server.js`에 `GET /api/crm/events`, `POST /api/crm/events`, `DELETE /api/crm/events/:id` API 추가
-- `[x]` `src/pages/admin/Customers.tsx`에 `'FLOW_CHART'` 탭 추가 및 라우팅 추가
-- `[x]` `src/components/admin/FlowChartDashboard.tsx` 신규 컴포넌트 개발 (SVG 매출 추세 차트, 이벤트 등록 및 맵핑, 재고 매출 연동, 지역 및 신규/이탈 업체 분석 모듈 통합)
-- `[x]` 컴파일 및 정적 분석 정합성 검증 완료
+## 🛠️ 세부 작업 항목 (Detailed Checklist)
+
+### 0단계 — 기반 정비 (Foundation Setup)
+
+- `[x]` **0-A. 성적서 기본값 대체 제거 (최우선) [완료: 2026-10-20]**
+  - `[x]` `server/services/certificateIssuer.js` 내 임의 대체값(`SD34285`, `JCQ4366`, `(주)태양밴드`, `A202610150`, 화학성분 기본값) 전면 제거
+  - `[x]` 라인별 매칭 결과를 `MATCHED` / `NOT_FOUND` / `AMBIGUOUS` (복수 매칭)로 엄격 분류 (`matchMasterCert`)
+  - `[x]` 하나라도 `NOT_FOUND` 또는 `AMBIGUOUS`면 PDF/엑셀 발행 즉시 중단 및 `{ success: false, missingLines: [...] }` 반환
+  - `[x]` 누락 내역을 `server/data/qc_missing_alerts.json`에 영구 기록하고 QC-13 성적서 누락 경보 로그 생성
+  - `[x]` 고객명, 출고번호 누락 시 예외 throw (기본값 금지)
+  - `[x]` 단위 검증: 없는 LOT 발행 요청 시 중단 확인 & 정상 LOT 발행 시 동일 산출물 확인 (`test_0a_verification.mjs` 100% 통과)
+  - `[x]` Mac/Windows/Linux Chrome 헤드리스 PDF 변환 경로 크로스 플랫폼 지원 추가
+- `[ ]` **0-B. 단일 원장 원칙 — 봇의 파일 직접 쓰기 제거**
+  - `[ ]` `local-api-server.js`에 에이전트 전용 원장 API 추가 (`GET/POST /api/agent/orders`, `PATCH /api/agent/orders/:id/lines/:lineId`, `POST /api/agent/orders/:id/events`)
+  - `[ ]` 서비스 토큰(`.env AGENT_SERVICE_TOKEN`) 인증 가드 구현
+  - `[ ]` `server/services/ledgerClient.js` 원장 클라이언트 모듈 신설 (로컬 내 메모리/DB 주입 vs HTTP 원격 모드 분기)
+  - `[ ]` `daekyungInvoiceService.js`, `purchaseBacklogBotService.js`, `purchaseService.js` 내 `fs.writeFileSync(db.json)` 제거 및 `ledgerClient`로 교체
+  - `[ ]` 엑셀 대장 파일은 원장의 변경을 가하는 원천이 아닌 원장에서 생성하는 '출력물'로만 제한
+- `[ ]` **0-C. 주문 라인 경로(S/D/M)·상태·연결키 스키마**
+  - `[ ]` 주문 품목 `items[]` 스키마 확장 (`lineId`, `route`: S/D/M, `lineStatus`, `keys`: `customerPoNo`, `supplierPoNo`, `supplierStatementNo`, `mesOutboundNo`, `lotNo`, `heatNo`, `certId`, `shipmentId`, `certRequired`)
+  - `[ ]` 주문 레벨 `events[]` 및 `shipments[]` (출고 묶음) 컬렉션 구조 탑재
+  - `[ ]` `server/services/lineStateMachine.js` 상태 전이 검증 엔진 구현 (비정상 전이 차단 및 단위 테스트 10종)
+  - `[ ]` 운임/DC/비품목 라인 식별 함수 (`isNonProductLine`, `certRequired: false`)
+  - `[ ]` 관리자 주문 상세 (`AdminOrderDetail.tsx`)에 라인별 경로/상태 뱃지 읽기 전용 렌더링
+- `[ ]` **0-D. 발송 게이트와 승인 대기열 (Dispatch Gate)**
+  - `[ ]` `server/services/dispatchGate.js` 구현 (`enqueue`, `approve`, `reject`, 중복 발송 방지)
+  - `[ ]` 메일플러그 SMTP 어댑터 (Reply-To 영업자 지정, 로컬 테스트 시 TEST_RECIPIENT 가드)
+  - `[ ]` 팩스/카카오 어댑터 인터페이스 정의
+  - `[ ]` 텔레그램 사내 알림 연동 (`telegramBotService.js`)
+  - `[ ]` 관리자 화면 내 '승인 대기함 (Approval Queue)' UI 신설 및 역할별 승인/반려 모달 제공
 
 ---
 
-## 5. [완료] 대경벤드 거래명세표(메신저/PDF) 매입 확정 & 전사 자율 연계 (총무/구매/품질/출고)
-- `[x]` **대경벤드 거래명세서 다중 페이지 PDF 정밀 파서 개발 (`server/services/daekyungInvoiceService.js`)**:
-  - `PDFParse` 스트림 기반 일자, 전표번호(No:0031, No:0015), 공급자/공급받는자 사업자등록번호 파싱
-  - 테이블 내 품목(45E, 90E, T, R, CAP 등), 규격(S/10S, S/20S), 재질(STS304-W 등), 수량, 단가, 공급가액, 운임 자동 계산
-  - 비고란 P.O 번호(`ES261019-2924`, `ES261019-2915`) 및 서울재고/고객사(국제밸브앤드피팅 등) 자동 식별
-- `[x]` **4대 부서 동시 자율 연계 트리거 (Cross-Department Dispatcher)**:
-  - 📑 **총무부 (GEN-01/GEN-04)**: 대경벤드 매입 확정 전표 생성, 공급가액/부가세(10%)/총액 계산, `server/data/supplier_invoices.json` 장부 자동 누적
-  - 🛒 **구매부 (PUR-07/PUR-01)**: `storage/purchases/알트에프 재고 발주 대장.xlsx` 엑셀에서 P.O No 행 자동 탐색 ➔ 입고일자/입고수량 갱신, 미결수량 0 차감, 상태 '입고완료(대경발송)'로 엑셀 실시간 저장
-  - 🔬 **품질부 (QC-01/QC-02/QC-08/QC-09)**: 대경 성적서 DB(1,469개)와 품목 규격 사전 교차 조회 및 성적서 누락 시 경보 발령
-  - 🚚 **출고부 (LOG-01/LOG-03)**: 시화 물류센터 서울재고 입고 하차 검수 대기 or 고객사 직배송 운송 상태 자동 전이
-- `[x]` **텔레그램 메신저 봇 수신 엔진 구축 (`server/services/telegramBotService.js`)**:
-  - Telegram Bot API 롱폴링 수신 지원 (메신저에서 PDF 포워딩/전달 시 1초 만에 자동 감지)
-  - 파싱 및 전사 연계 처리 후 텔레그램 채팅방으로 상세 분석 보고서 즉시 회신
-- `[x]` **AI Agent Office 대시보드 UI 및 전용 모달 구축 (`src/components/admin/DaekyungInvoiceModal.tsx`)**:
-  - 상단 글로벌 서브헤더 및 PUR-07 제어반 내 `[📑 대경 거래명세표 인입]` 버튼 신설
-  - PDF 드래그앤드롭 업로드, 텔레그램 봇 토큰 설정 및 가동 토글
-  - 사진으로 제공된 2개 전표(No.0031 서울재고분, No.0015 고객직배분) 원클릭 즉시 시뮬레이션 버튼 탑재
-  - 4대 부서 파이프라인 실시간 결과 카드 및 누적 매입 확정 장부 테이블 제공
+### 1단계 — 접수 창구 하나로 모으기 (카카오 + 대표메일)
+
+- `[ ]` **1-A. 접수함(intake)과 카카오 채널 챗봇 수신**
+  - `[ ]` 원장 `intake` 컬렉션 스키마 정의 (`channel`, `sender`, `forwardedBy`, `text`, `attachments`, `status`, `docType`)
+  - `[ ]` 카카오 i 오픈빌더 스킬 수신 웹훅 `POST /api/intake/kakao` 구현 (비동기 즉시 응답 5초 룰 준수)
+  - `[ ]` 영업자 인증 및 대리 접수 매핑 (`kakaoUserKey` ↔ 사번/전화번호)
+  - `[ ]` `server/services/mailplugCollector.js` 대표메일 INBOX 수집기 일반화
+  - `[ ]` 관리자 '접수함(Intake Dashboard)' 뷰어 UI 구현
+- `[ ]` **1-B. 문서 분류·판독·표준화**
+  - `[ ]` `docType` 7종 자동 분류 규칙 (QUOTE_REQUEST, CUSTOMER_PO, SUPPLIER_STATEMENT 등)
+  - `[ ]` `server/services/docReader/` (excelReader, pdfReader) 어댑터
+  - `[ ]` `server/services/itemNormalizer.js` (기존 유사도 엔진 기반 표준 키 변환 및 학습 사전 연동)
+- `[ ]` **1-C. 담당 배정, 영업자 비서, 견적 초안 자동 등록**
+  - `[ ]` 거래처 마스터(1,265건) 매칭 및 담당 영업자 배정
+  - `[ ]` SLE-07 요율 결정 로직 (최근 요율 / 등급 기본 요율)
+  - `[ ]` `db.quotations` 견적 초안 자동 등록 (`source: 'KAKAO'/'EMAIL'`, `status: 'DRAFT_BY_BOT'`)
+  - `[ ]` 영업자 알림 발송 (카카오/텔레그램)
 
 ---
 
-## 6. [완료] 총무부·품질부·데이터관리부 공급망 번들링 & 거래처 마스터 연계 체계
-- `[x]` **총무부 (GEN-10) 웹 거래처 관리 담당봇 신규 생성**:
-  - `altf.kr` 웹 CRM 데이터베이스(1,265개 거래처)에서 대표자, 사업자등록번호, 전화번호, 팩스번호, 이메일 주소, 담당자 정보 실시간 수집 및 정제
-  - 총무부 10번째 에이전트로 등록 완료 (`departments.json` 총무부 정원 10명으로 확대)
-- `[x]` **총무부 (GEN-03) 거래명세표·성적서 동시 발송 준비봇 활성화**:
-  - 웹 발주서 양식에서 매출 거래명세표(`STMT-...`)와 품질부 매칭 성적서(`YR-26-...`)를 1:1 결합하여 고객 발송 직전 서류 패키지(`READY_TO_DISPATCH` 353건) 번들링
-  - 출고 완료 후 총무팀장 및 영업부에 즉시 일괄 보고 체계 확립
-- `[x]` **데이터관리부 (DAT-10) 전사 공급망 통합 원장 분석봇 구축**:
-  - 발주서(PO 2,440건), 발주번호, 아이템(11,204개), 품질부 성적서(1,469건), 매입/매출 거래명세표 및 거래처 정보를 단일 마스터 원장으로 자동 종합
-  - 경영지원부(EXE)의 일일 결산, 마진율 추적, 현금흐름 레이더, 고객 이탈 분석을 위한 사전 정제 데이터 파이프라인 구축 완료
+### 2단계 ~ 7단계 (순차 대기)
+
+- `[ ]` **2단계: 견적 회신 자동화** (관리자 원클릭 승인 ➔ 원메일 In-Reply-To PDF 회신 / 모바일 1회용 링크 / SLE-08 미주문 팔로업)
+- `[ ]` **3단계: 발주서 접수, 경로 분할, 매입발주** (PUR-11 초안, PUR-12 견적 대조, PUR-13 S/D/M 제안, PUR-14 대경 회신 한줄 기록)
+- `[ ]` **4단계: 대경 직송·제작 서류 체인** (ES 발주번호 라인 매칭, DIRECT_SHIPPED, QC-12 성적서 매칭, GEN-01 명세표, GEN-03 패키지 승인 대기)
+- `[ ]` **5단계: 시화 재고 출고 & MES 연동** (LOG-11 출고지시, LOG-12 포장완료, Mock MES 어댑터, LOG-13 출고 매칭, QC-06 성적서)
+- `[ ]` **6단계: 흐름 감시 & 에이전트 오피스 실데이터화** (봇 실행 기록 테이블, EXE-11 지연 감시, 에이전트 오피스 고정값 제거)
+- `[ ]` **7단계: 24시간 사무실 서버 이전** (worker.js 분리, pm2 무중단, 5분 heartbeat, Chrome 헤드리스 PDF)
+
+---
+
+## 🏆 기 구축 완료된 베이스라인 (Completed Prior Work)
+- `[x]` QC-01 메일플러그 IMAP 실제 연동 & 배치 수집기
+- `[x]` 대경벤드 26개 컬럼 성적서 파서 및 이상치 검출 (`certificateParser.js`, 1,424건 마스터)
+- `[x]` PUR-01 알트에프 재고 발주 & QC 성적서 1:1 매칭 엑셀 대장
+- `[x]` PUR-07 주문관리 발주서 분류 및 미결 관제 (2,439건 주문 연동)
+- `[x]` 대경 거래명세표 PDF 파서 (`daekyungInvoiceService.js`)
+- `[x]` AI 에이전트 오피스 대화면 Kiosk HUD UI (`AgentOfficeDashboard.tsx`)
