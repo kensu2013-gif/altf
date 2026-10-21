@@ -1,6 +1,6 @@
 
 import type { Quotation, LineItem, Order } from '../../../types';
-import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User, Image, RefreshCw, Sliders, X, ChevronDown } from 'lucide-react';
+import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User, Image, RefreshCw, Sliders, X, ChevronDown, ShoppingCart, Copy, Check } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { formatCurrency } from '../../../lib/utils';
 import { useState, useCallback, useMemo, useEffect, startTransition, useRef } from 'react';
@@ -280,6 +280,25 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const [orderPayload, setOrderPayload] = useState<DocumentPayload | null>(null);
     const [isApiSubmitting, setIsApiSubmitting] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [isKakaoCopied, setIsKakaoCopied] = useState(false);
+
+    const handleCopyKakaoReply = () => {
+        const custName = customerInfo.companyName || quote.customerName || '고객사';
+        const delivery = response.deliveryDate || '당일/익일 출고';
+        const totalWon = (totalWithCharges || quote.totalAmount || 0).toLocaleString();
+        
+        const lines = items.map((it, idx) => {
+            const spec = `${it.name} ${it.thickness || ''} ${it.size || ''} ${it.material || ''}`.trim();
+            const price = (it.userUnitPrice || it.unitPrice || 0).toLocaleString();
+            return `${idx + 1}. ${spec} x ${it.quantity}EA (단가: ${price}원)`;
+        }).join('\n');
+
+        const message = `📋 [알트에프 견적 회신 안내]\n${custName} 귀하, 요청하신 견적 내용 검토가 완료되었습니다.\n\n• 견적번호: ${quote.id}\n• 총 품목수: ${items.length}개 품목\n• 견적합계: ${totalWon}원 (VAT 별도)\n• 납기안내: ${delivery}\n\n[품목 요약]\n${lines}\n\n📄 정식 견적서 확인 및 주문하기:\nhttps://altf.kr/quote/view?id=${quote.id}\n\n문의사항은 카카오톡으로 말씀해 주시면 담당자가 즉시 안내해 드리겠습니다. 감사합니다.`;
+
+        navigator.clipboard.writeText(message);
+        setIsKakaoCopied(true);
+        setTimeout(() => setIsKakaoCopied(false), 2500);
+    };
     const [bulkDiscountRateInput, setBulkDiscountRateInput] = useState<string>('');
     const [targetDiscountRate, setTargetDiscountRate] = useState<string>('all');
     const [isRateMenuOpen, setIsRateMenuOpen] = useState<boolean>(false);
@@ -1669,6 +1688,47 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                             )}
                         </div>
 
+                        {/* NEW: 카카오톡 접수건 원클릭 답변 및 채팅창 전송 패널 */}
+                        {(quote.source === 'KAKAO' || quote.id.startsWith('Q-KAKAO')) && (
+                            <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-yellow-300 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-yellow-400 flex items-center justify-center text-slate-900 font-black text-xs shrink-0 shadow-xs">
+                                        TALK
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold text-slate-900">카카오톡 채널 회신 지원</span>
+                                            <span className="text-[10px] bg-yellow-200 text-yellow-800 font-bold px-2 py-0.5 rounded-full">@altf 채널</span>
+                                        </div>
+                                        <p className="text-xs text-slate-600 mt-0.5">
+                                            단가 및 납기 검토 후 원클릭으로 견적 결과 텍스트와 정식 견적서 링크를 카카오톡 대화방에 회신할 수 있습니다.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                                    <button
+                                        type="button"
+                                        onClick={handleCopyKakaoReply}
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer"
+                                        title="카카오톡 채팅창에 바로 붙여넣을 수 있는 정돈된 견적 요약본을 복사합니다."
+                                    >
+                                        {isKakaoCopied ? <Check className="w-4 h-4 text-emerald-800" /> : <Copy className="w-4 h-4" />}
+                                        <span>{isKakaoCopied ? '복사 완료!' : '카카오톡 답변 복사'}</span>
+                                    </button>
+                                    <a
+                                        href="https://pf.kakao.com/_jxcxaBn/chat"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white hover:bg-yellow-100 border border-yellow-300 text-yellow-900 font-bold text-xs rounded-lg transition-all shadow-xs"
+                                        title="알트에프 카카오톡 채널 관리자 1:1 채팅창으로 이동합니다."
+                                    >
+                                        <MessageSquare className="w-4 h-4 text-yellow-700" />
+                                        <span>1:1 채팅창 열기</span>
+                                    </a>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Quote Items Table (Negotiation) */}
                         <div className="bg-white rounded-xl border border-slate-200">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 border-b border-slate-200 bg-slate-50/50 rounded-t-xl">
@@ -2405,15 +2465,15 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                             )}
 
                             {/* Convert to Order */}
-                            {(quote.status === 'PROCESSED' || quote.status === 'COMPLETED') && (
-                                <Button
-                                    variant="outline"
-                                    onClick={handleConvertOrder}
-                                    className="text-green-700 border-green-200 hover:bg-green-50 font-medium"
-                                >
-                                    발주서로 전환
-                                </Button>
-                            )}
+                            <Button
+                                variant="outline"
+                                onClick={handleConvertOrder}
+                                className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 font-bold gap-1.5 shadow-2xs"
+                                title="이 견적서를 즉시 정식 발주서(주문)로 전환합니다."
+                            >
+                                <ShoppingCart className="w-4 h-4 text-emerald-600" />
+                                발주서로 전환
+                            </Button>
 
                             <Button variant="outline" onClick={_onClose}>
                                 닫기

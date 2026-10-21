@@ -130,6 +130,14 @@ export class KakaoBotService {
                     }
 
                     if (imgBuf) {
+                        try {
+                            const { uploadFileToS3 } = await import('../../s3-db.js');
+                            const s3Url = await uploadFileToS3('documents/quotes', `kakao_${Date.now()}.jpg`, imgBuf, contentType);
+                            imageUrl = s3Url;
+                            console.log(`[KakaoBot] S3 이미지 영구 보관 완료: ${s3Url}`);
+                        } catch (s3Err) {
+                            console.warn('[KakaoBot] S3 업로드 폴백:', s3Err.message);
+                        }
                         normalized = await fittingVisionOcrService.recognizeAndNormalize(imgBuf, contentType);
                     }
                 }
@@ -280,7 +288,13 @@ export class KakaoBotService {
             } : null,
             items,
             totalAmount,
-            status: 'DRAFT',
+            status: 'SUBMITTED', // 🔥 중요: 접수(Submitted) 상태로 설정되어 관리자 목록에서 노란색 '접수' 버튼 활성화 및 필터링
+            attachments: intake.imageUrl ? [
+                {
+                    name: `${custName}_재고의뢰서_사진.jpg`,
+                    url: intake.imageUrl
+                }
+            ] : [],
             source: 'KAKAO',
             createdAt: new Date().toISOString(),
             memo: `카카오톡 채널 인입 (@altf) - ${normalized.remarks || '내일 발송'}`,

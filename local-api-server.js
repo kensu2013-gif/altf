@@ -4350,12 +4350,24 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
-        const existingDraftIds = new Set(db.quotations.map(q => q.id));
-        const newDrafts = (kakaoBotService.draftQuotations || []).filter(q => !existingDraftIds.has(q.id));
-        
-        // 새로운 카카오 견적 초안이 있으면 db.quotations에도 영구 동기화
-        if (newDrafts.length > 0) {
-            db.quotations.unshift(...newDrafts);
+        let dbQuotesChanged = false;
+        for (const draft of (kakaoBotService.draftQuotations || [])) {
+            const idx = db.quotations.findIndex(q => q.id === draft.id);
+            if (idx === -1) {
+                db.quotations.unshift(draft);
+                dbQuotesChanged = true;
+            } else {
+                if (draft.attachments && draft.attachments.length > 0 && (!db.quotations[idx].attachments || db.quotations[idx].attachments.length === 0)) {
+                    db.quotations[idx].attachments = draft.attachments;
+                    dbQuotesChanged = true;
+                }
+                if (draft.status && db.quotations[idx].status === 'DRAFT') {
+                    db.quotations[idx].status = draft.status;
+                    dbQuotesChanged = true;
+                }
+            }
+        }
+        if (dbQuotesChanged) {
             try { saveData(); } catch (e) {}
         }
 
