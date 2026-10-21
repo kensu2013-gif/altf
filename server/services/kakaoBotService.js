@@ -1045,6 +1045,22 @@ export class KakaoBotService {
             (outCount > 0 ? `• 주문제작/입고필요: ${outCount}개 품목\n` : `• 재고 부족품목: 0개 (전량 즉시 출고)\n`) +
             `• 예상 납기: ${deliverySummary}\n`;
 
+        // 1. [핵심] 알트에프 공식 직인 견적서 PDF & 고해상도 JPG 이미지 즉시 생성 및 S3 업로드
+        let directPdfUrl = quoteUrl;
+        let quotationJpgBuffer = null;
+
+        try {
+            console.log(`[KakaoBot] 📑 견적서 ${quotationId} 공식 직인 PDF 및 MMS 이미지 생성 착수...`);
+            const artifacts = await this.generateOfficialQuotationArtifacts(quote);
+            if (artifacts?.s3PdfUrl) {
+                directPdfUrl = artifacts.s3PdfUrl;
+                quotationJpgBuffer = artifacts.jpgBuffer;
+                console.log(`[KakaoBot] ☁️ S3 직통 PDF 업로드 성공! URL: ${directPdfUrl}`);
+            }
+        } catch (artifactErr) {
+            console.warn('[KakaoBot] 직인 PDF/이미지 자동 생성 실패 (웹 링크로 폴백):', artifactErr.message);
+        }
+
         const formattedTotal = quote?.totalAmount ? `₩${quote.totalAmount.toLocaleString()}원 (VAT별도)` : '별도협의';
 
         const messageText = customMessage || (
@@ -1055,8 +1071,9 @@ export class KakaoBotService {
             `• 공급가액: ${formattedTotal}\n` +
             stockSummaryText +
             `━━━━━━━━━━━━━━━━━━━━\n` +
-            `📄 정식 견적서 확인 및 PDF 다운로드:\n` +
-            `${quoteUrl}\n\n` +
+            `📸 첨부사진: 알트에프 정식 직인 견적서\n` +
+            `📥 원본 PDF 즉시 다운로드 (로그인/접속 불필요):\n` +
+            `${directPdfUrl}\n\n` +
             `문의: 051-303-3751 / 알트에프(주)`
         );
 
@@ -1074,8 +1091,8 @@ export class KakaoBotService {
                 id: quotationId,
                 totalAmount: quote?.totalAmount || 0,
                 itemCount: quote?.items?.length || 0,
-                quoteUrl,
-                pdfUrl: quote?.attachments?.[0]?.url || quoteUrl,
+                quoteUrl: directPdfUrl,
+                pdfUrl: directPdfUrl,
                 summary: `${targetCompany} ${quote?.items?.length || 0}개 품목 견적서`
             },
             message: messageText,
@@ -1088,30 +1105,31 @@ export class KakaoBotService {
             message: '발송 가능한 수단이 구성되지 않았습니다.' 
         };
 
-        // 1. [우선순위 1] Solapi REST API 직접 연동 (MMS 이미지 첨부 지원)
+        // 2. [우선순위 1] Solapi REST API 직접 연동 (MMS 이미지 첨부 지원)
         if (process.env.SOLAPI_API_KEY && process.env.SOLAPI_API_SECRET && targetPhone) {
             try {
                 console.log(`[KakaoBot] 🚀 Solapi로 견적서 발송 시작: 수신자 ${targetPhone} (${quotationId})`);
 
-                // 견적서 첨부 이미지 탐색 (MMS 발송용)
+                // 1순위: 방금 자동 렌더링된 정식 직인 견적서 JPG 이미지
+                // 2순위: 고객이 보낸 의뢰 사진
                 let imageId = null;
-                const attachCandidate = quote?.attachments?.[0];
-                let attachBuffer = null;
+                let attachBuffer = quotationJpgBuffer;
 
-                if (attachCandidate?.data && typeof attachCandidate.data === 'string') {
-                    // Base64 데이터가 직접 들어있는 경우
-                    const base64Data = attachCandidate.data.includes(',') ? attachCandidate.data.split(',')[1] : attachCandidate.data;
-                    attachBuffer = Buffer.from(base64Data, 'base64');
-                } else if (attachCandidate?.url && attachCandidate.url.startsWith('http')) {
-                    // 원격 이미지 URL인 경우 다운로드
-                    try {
-                        const fetch = (await import('node-fetch')).default;
-                        const imgRes = await fetch(attachCandidate.url);
-                        if (imgRes.ok) {
-                            attachBuffer = Buffer.from(await imgRes.arrayBuffer());
+                if (!attachBuffer) {
+                    const attachCandidate = quote?.attachments?.[0];
+                    if (attachCandidate?.data && typeof attachCandidate.data === 'string') {
+                        const base64Data = attachCandidate.data.includes(',') ? attachCandidate.data.split(',')[1] : attachCandidate.data;
+                        attachBuffer = Buffer.from(base64Data, 'base64');
+                    } else if (attachCandidate?.url && attachCandidate.url.startsWith('http')) {
+                        try {
+                            const fetch = (await import('node-fetch')).default;
+                            const imgRes = await fetch(attachCandidate.url);
+                            if (imgRes.ok) {
+                                attachBuffer = Buffer.from(await imgRes.arrayBuffer());
+                            }
+                        } catch (e) {
+                            console.warn('[KakaoBot] 첨부 이미지 다운로드 실패 (텍스트로만 발송):', e.message);
                         }
-                    } catch (e) {
-                        console.warn('[KakaoBot] 첨부 이미지 다운로드 실패 (텍스트로만 발송):', e.message);
                     }
                 }
 
@@ -1125,7 +1143,7 @@ export class KakaoBotService {
                         });
                         if (uploadRes?.fileId) {
                             imageId = uploadRes.fileId;
-                            console.log(`[KakaoBot] 📸 Solapi MMS 이미지 업로드 성공! fileId: ${imageId}`);
+                            console.log(`[KakaoBot] 📸 Solapi MMS 직인 견적서 이미지 업로드 성공! fileId: ${imageId}`);
                         }
                     } catch (uploadErr) {
                         console.warn('[KakaoBot] Solapi 이미지 업로드 실패, 텍스트 LMS로 발송 진행:', uploadErr.message);
@@ -1293,6 +1311,198 @@ export class KakaoBotService {
                 ? `Solapi ${imageId ? 'MMS(포토문자)' : 'LMS/문자'} 발송 성공!` 
                 : `Solapi 발송 실패: ${data.message || res.statusText}`
         };
+    }
+
+    /**
+     * 알트에프 공식 직인 견적서 PDF 및 고해상도 JPG 이미지 자동 생성 & S3 업로드
+     */
+    async generateOfficialQuotationArtifacts(quote) {
+        if (!quote) return null;
+
+        const { execSync } = await import('child_process');
+        const fs = await import('fs');
+        const path = await import('path');
+        const { uploadFileToS3 } = await import('../../s3-db.js');
+
+        // Chrome 실행 경로 탐색 (Mac / Linux / Windows)
+        let chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+        if (!fs.existsSync(chromePath)) {
+            try {
+                chromePath = execSync('which google-chrome || which chromium || which chrome').toString().trim();
+            } catch (e) {
+                chromePath = 'google-chrome';
+            }
+        }
+
+        const quoteId = quote.id || 'Q_TEMP';
+        const custName = quote.customerName || quote.customerInfo?.companyName || '고객사';
+        const contactName = quote.customerInfo?.contactName || '담당자 귀하';
+        const totalAmount = quote.totalAmount || 0;
+        const vat = Math.round(totalAmount * 0.1);
+        const grandTotal = totalAmount + vat;
+        const items = quote.items || [];
+        const dateStr = quote.createdAt ? new Date(quote.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString('ko-KR');
+
+        const rowsHtml = items.map((it, idx) => {
+            const spec = it.spec || `${it.name || '배관자재'} ${it.thickness || ''} ${it.size || ''} ${it.material || ''}`.trim();
+            const qty = it.quantity || it.qty || 1;
+            const unitPrice = it.userUnitPrice || it.unitPrice || 0;
+            const amount = it.amount || (unitPrice * qty);
+            return `
+                <tr>
+                    <td style="text-align:center; padding:7px; border:1px solid #cbd5e1;">${idx + 1}</td>
+                    <td style="padding:7px; border:1px solid #cbd5e1; font-weight:bold;">${spec}</td>
+                    <td style="text-align:center; padding:7px; border:1px solid #cbd5e1;">${it.material || 'STS'}</td>
+                    <td style="text-align:right; padding:7px; border:1px solid #cbd5e1; font-weight:bold;">${qty.toLocaleString()}</td>
+                    <td style="text-align:center; padding:7px; border:1px solid #cbd5e1;">EA</td>
+                    <td style="text-align:right; padding:7px; border:1px solid #cbd5e1;">₩${unitPrice.toLocaleString()}</td>
+                    <td style="text-align:right; padding:7px; border:1px solid #cbd5e1; font-weight:bold; color:#0f172a;">₩${amount.toLocaleString()}</td>
+                    <td style="text-align:center; padding:7px; border:1px solid #cbd5e1; font-size:11px; color:#059669;">당일출고</td>
+                </tr>
+            `;
+        }).join('');
+
+        const html = `
+        <!DOCTYPE html>
+        <html lang="ko">
+        <head>
+            <meta charset="utf-8">
+            <title>견적서 - ${quoteId}</title>
+            <style>
+                * { box-sizing: border-box; }
+                body { 
+                    margin: 0; 
+                    padding: 24px; 
+                    font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", dotum, sans-serif;
+                    background: white;
+                    color: #1e293b;
+                }
+                .container { width: 100%; max-width: 760px; margin: 0 auto; }
+                table { width: 100%; border-collapse: collapse; font-size: 11px; }
+                th { background: #f8fafc; font-weight: bold; }
+                .seal-stamp {
+                    position: absolute;
+                    right: 15px;
+                    bottom: 5px;
+                    width: 60px;
+                    height: 60px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div style="text-align:center; margin-bottom: 20px; border-bottom: 3px double #0f172a; padding-bottom: 8px;">
+                    <h1 style="margin:0; font-size:24px; letter-spacing:8px; color:#0f172a;">견 적 서</h1>
+                    <span style="font-size:11px; letter-spacing:2px; color:#64748b;">QUOTATION</span>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; margin-bottom: 16px; gap:12px;">
+                    <div style="flex:1; border:1px solid #cbd5e1; border-radius:4px; padding:10px; background:#fafafa;">
+                        <div style="font-size:10px; color:#64748b; margin-bottom:2px;">견적번호: <strong>${quoteId}</strong></div>
+                        <div style="font-size:10px; color:#64748b; margin-bottom:6px;">견적일자: ${dateStr}</div>
+                        <div style="font-size:16px; font-weight:800; color:#0f172a; margin-bottom:4px;">
+                            ${custName} <span style="font-size:12px; font-weight:normal; color:#64748b;">귀하</span>
+                        </div>
+                        <div style="font-size:11px; color:#475569; line-height:1.5;">
+                            • 담당자: ${contactName}<br>
+                            • 공급조건: 화물 / 택배 / 상차도<br>
+                            • 유효기간: 견적일로부터 7일간
+                        </div>
+                    </div>
+
+                    <div style="flex:1; border:1px solid #cbd5e1; border-radius:4px; padding:10px; position:relative; background:#fff;">
+                        <table style="width:100%; border:none; font-size:11px; line-height:1.4;">
+                            <tr><td style="width:65px; color:#64748b;">등록번호</td><td style="font-weight:bold;">890-38-01079</td></tr>
+                            <tr><td style="color:#64748b;">상　　호</td><td style="font-weight:bold;">알트에프(주)</td></tr>
+                            <tr><td style="color:#64748b;">대 표 자</td><td style="font-weight:bold;">조 현 진</td></tr>
+                            <tr><td style="color:#64748b;">소 재 지</td><td style="font-size:10px;">부산 사상구 삼락동 / 시흥 시화유통상가</td></tr>
+                            <tr><td style="color:#64748b;">전화/팩스</td><td style="font-weight:bold; color:#2563eb;">051-303-3751 / 051-303-3752</td></tr>
+                        </table>
+                        <div class="seal-stamp">
+                            <svg viewBox="0 0 100 100" width="60" height="60" style="opacity:0.9;">
+                                <circle cx="50" cy="50" r="46" stroke="#dc2626" stroke-width="4" fill="none" />
+                                <circle cx="50" cy="50" r="42" stroke="#dc2626" stroke-width="1.5" fill="none" />
+                                <text x="50" y="42" font-size="16" font-family="sans-serif" font-weight="900" fill="#dc2626" text-anchor="middle">알트에프</text>
+                                <text x="50" y="66" font-size="16" font-family="sans-serif" font-weight="900" fill="#dc2626" text-anchor="middle">주식회사</text>
+                                <text x="50" y="84" font-size="11" font-family="sans-serif" font-weight="bold" fill="#dc2626" text-anchor="middle">인</text>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background:#0f172a; color:white; padding:10px 14px; border-radius:4px; display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <div style="font-size:12px; font-weight:500;">견적 총 합계금액 (VAT 포함)</div>
+                    <div style="font-size:18px; font-weight:900; color:#38bdf8;">₩${grandTotal.toLocaleString()}원</div>
+                </div>
+
+                <table style="border:1px solid #cbd5e1; margin-bottom:14px;">
+                    <thead>
+                        <tr style="background:#f8fafc; border-bottom:2px solid #94a3b8;">
+                            <th style="padding:8px 4px; border:1px solid #cbd5e1; width:30px; text-align:center;">No</th>
+                            <th style="padding:8px 6px; border:1px solid #cbd5e1; text-align:left;">품목 및 규격 (Item & Spec)</th>
+                            <th style="padding:8px 4px; border:1px solid #cbd5e1; width:50px; text-align:center;">재질</th>
+                            <th style="padding:8px 4px; border:1px solid #cbd5e1; width:45px; text-align:right;">수량</th>
+                            <th style="padding:8px 4px; border:1px solid #cbd5e1; width:35px; text-align:center;">단위</th>
+                            <th style="padding:8px 6px; border:1px solid #cbd5e1; width:75px; text-align:right;">단가</th>
+                            <th style="padding:8px 6px; border:1px solid #cbd5e1; width:85px; text-align:right;">공급가액</th>
+                            <th style="padding:8px 4px; border:1px solid #cbd5e1; width:55px; text-align:center;">출고</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background:#f8fafc; font-weight:bold;">
+                            <td colspan="3" style="text-align:center; padding:8px; border:1px solid #cbd5e1;">합 계 (TOTAL)</td>
+                            <td style="text-align:right; padding:8px; border:1px solid #cbd5e1;">${items.reduce((s, it) => s + (it.quantity || it.qty || 1), 0).toLocaleString()}</td>
+                            <td style="text-align:center; padding:8px; border:1px solid #cbd5e1;">EA</td>
+                            <td style="text-align:right; padding:8px; border:1px solid #cbd5e1; font-size:10px; color:#64748b;">공급가 합계</td>
+                            <td style="text-align:right; padding:8px; border:1px solid #cbd5e1; font-size:13px; color:#0f172a;">₩${totalAmount.toLocaleString()}</td>
+                            <td style="text-align:center; padding:8px; border:1px solid #cbd5e1; font-size:10px; color:#059669;">VAT별도</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div style="border:1px solid #e2e8f0; border-radius:4px; padding:10px; font-size:11px; color:#475569; line-height:1.6; background:#fafafa;">
+                    • <strong>예상 납기:</strong> 전 품목 재고 보유 (오후 3시 이전 발주 시 당일/익일 즉시 출고)<br>
+                    • <strong>입금 계좌:</strong> 기업은행 051-303-3751 (예금주: 알트에프 주식회사)<br>
+                    • <strong>견적 및 출고 문의:</strong> 알트에프 영업부 <strong>051-303-3751</strong> (월~금 08:30 ~ 18:00)
+                </div>
+            </div>
+        </body>
+        </html>
+        `;
+
+        const tempHtml = path.resolve(`./temp_quote_${Date.now()}.html`);
+        const tempPdf = path.resolve(`./temp_quote_${Date.now()}.pdf`);
+        const tempJpg = path.resolve(`./temp_quote_${Date.now()}.jpg`);
+
+        fs.writeFileSync(tempHtml, html, 'utf-8');
+
+        try {
+            // 1. PDF 변환
+            execSync(`"${chromePath}" --headless=new --disable-gpu --no-pdf-header-footer --print-to-pdf="${tempPdf}" "${tempHtml}"`);
+            
+            // 2. JPG 스크린샷 렌더링 (MMS 포토문자용)
+            execSync(`"${chromePath}" --headless=new --disable-gpu --screenshot="${tempJpg}" --window-size=800,1050 "${tempHtml}"`);
+
+            const pdfBuf = fs.readFileSync(tempPdf);
+            const jpgBuf = fs.readFileSync(tempJpg);
+
+            // 3. AWS S3 퍼블릭 업로드 (로그인 없이 즉시 다운로드되는 글로벌 직통 URL)
+            const s3FileName = `${quoteId.replace(/[^a-zA-Z0-9_-]/g, '_')}_altf_quotation.pdf`;
+            const s3PdfUrl = await uploadFileToS3('documents/quotations', s3FileName, pdfBuf, 'application/pdf');
+
+            return {
+                s3PdfUrl,
+                jpgBuffer: jpgBuf,
+                pdfBuffer: pdfBuf
+            };
+        } finally {
+            if (fs.existsSync(tempHtml)) fs.unlinkSync(tempHtml);
+            if (fs.existsSync(tempPdf)) fs.unlinkSync(tempPdf);
+            if (fs.existsSync(tempJpg)) fs.unlinkSync(tempJpg);
+        }
     }
 }
 
