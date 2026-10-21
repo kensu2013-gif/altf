@@ -333,16 +333,17 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             };
 
             // 유선전화(031, 02 등)가 아닌 실제 수신 가능한 휴대폰 번호(010-) 우선 탐색!
+            const rawQuote = quote as any;
             const candidateMobile = [
                 quote.kakaoUser?.phone,
-                quote.sourcePhone,
-                customerInfo.mobile,
+                rawQuote.sourcePhone,
                 customerInfo.phone,
-                quote.customerInfo?.mobile,
+                rawQuote.mobile,
+                rawQuote.customerInfo?.mobile,
                 quote.customerInfo?.phone
             ].find(p => isMobile(p));
 
-            const targetPhone = candidateMobile || customerInfo.mobile || customerInfo.phone || quote.sourcePhone || '01062223751';
+            const targetPhone = candidateMobile || customerInfo.phone || rawQuote.sourcePhone || '01062223751';
 
             const res = await fetch('/api/kakao/dispatch-quote', {
                 method: 'POST',
