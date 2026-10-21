@@ -181,7 +181,9 @@ export class FittingVisionOcrService {
      * Gemini Vision 호출
      */
     async callGeminiVision(apiKey, base64Data, mimeType) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
+        const candidateModels = ['gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.5-flash'];
+        let lastErr = null;
+
         const body = {
             systemInstruction: {
                 parts: [{ text: FITTING_OCR_SYSTEM_PROMPT }]
@@ -206,20 +208,37 @@ export class FittingVisionOcrService {
         };
 
         const fetch = (await import('node-fetch')).default;
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
+        for (const model of candidateModels) {
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
 
-        if (!res.ok) {
-            const errText = await res.text();
-            throw new Error(`Gemini Vision HTTP ${res.status}: ${errText}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (text) {
+                        try {
+                            const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                            return JSON.parse(cleaned);
+                        } catch (pErr) {
+                            console.error(`[FittingVisionOCR] ${model} JSON 파싱 실패:`, pErr.message);
+                        }
+                    }
+                } else {
+                    const errText = await res.text();
+                    lastErr = new Error(`Gemini Vision ${model} HTTP ${res.status}: ${errText}`);
+                    console.warn(`[FittingVisionOCR] ${model} 호출 실패 (${res.status}), 다음 모델 시도...`);
+                }
+            } catch (netErr) {
+                lastErr = netErr;
+            }
         }
 
-        const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        return JSON.parse(text);
+        throw lastErr || new Error('모든 Gemini Vision 모델 호출 실패');
     }
 
     /**

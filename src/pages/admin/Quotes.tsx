@@ -640,20 +640,24 @@ export default function AdminQuotes() {
                                         <div className="flex items-center gap-2 shrink-0">
                                             {(quote.attachments && quote.attachments.length > 0) && (
                                                 <div className="flex gap-1.5 shrink-0">
-                                                    {quote.attachments.map((file, i) => (
-                                                        <a 
-                                                            key={i} 
-                                                            href={`${import.meta.env.VITE_API_URL || ''}/api/download?url=${encodeURIComponent(file.url)}`}
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer" 
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 rounded-full text-xs font-bold transition-colors shadow-sm shrink-0 whitespace-nowrap"
-                                                            title={file.name}
-                                                        >
-                                                            <Image className="w-3.5 h-3.5" />
-                                                            사진 보기 {quote.attachments!.length > 1 ? `(${i+1})` : ''}
-                                                        </a>
-                                                    ))}
+                                                    {quote.attachments.map((file, i) => {
+                                                        const anyFile = file as any;
+                                                        const fileUrl = typeof anyFile === 'string' ? anyFile : (typeof anyFile?.url === 'string' ? anyFile.url : (anyFile?.url?.url || ''));
+                                                        return (
+                                                            <a 
+                                                                key={i} 
+                                                                href={`${import.meta.env.VITE_API_URL || ''}/api/download?url=${encodeURIComponent(fileUrl)}`}
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer" 
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 rounded-full text-xs font-bold transition-colors shadow-sm shrink-0 whitespace-nowrap"
+                                                                title={file.name || '첨부 사진'}
+                                                            >
+                                                                <Image className="w-3.5 h-3.5" />
+                                                                사진 보기 {quote.attachments!.length > 1 ? `(${i+1})` : ''}
+                                                            </a>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
                                             <div className="shrink-0">

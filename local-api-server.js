@@ -500,6 +500,23 @@ async function queueSave() {
     }
 }
 
+// 카카오톡 견적 생성 시 db.quotations 실시간 반영 훅
+kakaoBotService.onQuotationCreated = (draftQuote) => {
+    try {
+        if (!db.quotations) db.quotations = [];
+        const idx = db.quotations.findIndex(q => q.id === draftQuote.id);
+        if (idx === -1) {
+            db.quotations.unshift(draftQuote);
+        } else {
+            db.quotations[idx] = { ...db.quotations[idx], ...draftQuote };
+        }
+        queueSave();
+        console.log(`[API] ⚡ 카카오 견적서 db.quotations 실시간 동기화 완료: ${draftQuote.id}`);
+    } catch (e) {
+        console.error('[API] 카카오 견적서 동기화 오류:', e.message);
+    }
+};
+
 async function updateDb(updater) {
     try {
         const result = await updater();

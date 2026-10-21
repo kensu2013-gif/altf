@@ -145,55 +145,138 @@ export class KakaoBotService {
         const action = body?.action || {};
         const params = { ...(userRequest.params || {}), ...(action.params || {}) };
         
-        // 이미지 첨부 감지 (media, secureimage 등)
-        const imageUrl = params.media || params.secureimage || params.image || null;
-        const isImage = !!imageUrl;
+        // 이미지 첨부 감지 (media, secureimage 등 또는 URL 발화)
+        const rawMedia = params.media || params.secureimage || params.image || null;
+        let finalImageUrl = typeof rawMedia === 'string' ? rawMedia : (rawMedia?.url || null);
+        if (!finalImageUrl && utterance && (utterance.startsWith('http://') || utterance.startsWith('https://')) && (utterance.includes('kakaocdn.net') || utterance.match(/\.(jpg|jpeg|png|webp|gif)/i))) {
+            finalImageUrl = utterance;
+        }
+        const isImage = !!finalImageUrl;
 
-        // 2. 영업2팀 INT-05 규격 정규화 엔진 가동 (텍스트 또는 이미지 OCR)
-        let normalized = { customer: null, discountRate: 50, remarks: '', items: [] };
-        if (!isImage && utterance) {
-            normalized = fittingNormalizerService.normalize(utterance);
-        } else if (isImage && imageUrl) {
-            // 🔥 사진인 경우 비전 LLM (대표님 프롬프트 주입) 및 로컬 폴백 비전 OCR 가동
-            try {
-                const imgTargetUrl = typeof imageUrl === 'string' ? imageUrl : (imageUrl.url || '');
-                if (imgTargetUrl) {
-                    let imgBuf = null;
-                    let contentType = 'image/jpeg';
-                    if (imgTargetUrl.startsWith('file://') || imgTargetUrl.startsWith('/')) {
-                        const localPath = imgTargetUrl.replace('file://', '');
-                        if (fs.existsSync(localPath)) {
-                            imgBuf = fs.readFileSync(localPath);
-                            console.log(`[KakaoBot] 로컬 이미지 로드 완료 (${imgBuf.length} bytes), 비전 AI 분석 착수`);
-                        }
-                    } else {
-                        const fetch = (await import('node-fetch')).default;
-                        const imgRes = await fetch(imgTargetUrl);
-                        if (imgRes.ok) {
-                            imgBuf = await imgRes.buffer();
-                            contentType = imgRes.headers.get('content-type') || 'image/jpeg';
-                            console.log(`[KakaoBot] 원격 이미지 다운로드 완료 (${imgBuf.length} bytes), 비전 AI 분석 착수`);
-                        }
-                    }
+        // 2. 카카오 사용자 사전 매칭 (구글시트/대장 연동 botUserKey 확인)
+        const matchedUser = this.findUserByBotUserKey(botUserKey);
+        if (matchedUser) {
+            console.log(`[KakaoBot] 🎯 등록된 카카오 고객 매칭 성공: ${matchedUser.name} (${matchedUser.company || '회사미기재'}, ${matchedUser.phone})`);
+        } else {
+            console.log(`[KakaoBot] ⚠️ 미등록 카카오 사용자 인입: botUserKey=${botUserKey}`);
+        }
 
-                    if (imgBuf) {
-                        try {
-                            const { uploadFileToS3 } = await import('../../s3-db.js');
-                            const s3Url = await uploadFileToS3('documents/quotes', `kakao_${Date.now()}.jpg`, imgBuf, contentType);
-                            imageUrl = s3Url;
-                            console.log(`[KakaoBot] S3 이미지 영구 보관 완료: ${s3Url}`);
-                        } catch (s3Err) {
-                            console.warn('[KakaoBot] S3 업로드 폴백:', s3Err.message);
-                        }
-                        normalized = await fittingVisionOcrService.recognizeAndNormalize(imgBuf, contentType);
+        // 3. 사용자가 "확인", "접수 현황 확인", "현황", "조회" 등의 확인 메시지를 보낸 경우
+        const isStatusQuery = !isImage && (/^(확인|접수\s*현황|견적\s*확인|진행\s*상황|현황|조회|내역)$/i.test(utterance) || utterance.includes('접수 현황') || utterance.includes('견적 확인'));
+        if (isStatusQuery) {
+            // 해당 사용자의 가장 최근 견적서 조회
+            const recentQuote = this.draftQuotations.find(dq => dq.botUserKey === botUserKey || dq.kakaoBotUserKey === botUserKey || (matchedUser && dq.customerInfo?.phone === matchedUser.phone)) || this.draftQuotations[0];
+            const recentIntake = this.intakes.find(it => it.botUserKey === botUserKey);
+
+            if (recentIntake && recentIntake.status === 'PROCESSING') {
+                return {
+                    version: '2.0',
+                    template: {
+                        outputs: [
+                            {
+                                simpleText: {
+                                    text: `⏳ [알트에프 영업2팀]\n현재 비전 AI(INT-03)와 규격표준화(INT-05) 에이전트가 첨부해주신 견적서 사진을 정밀 분석 중입니다.\n\n약 10~15초 후 '📊 접수 현황 확인' 버튼을 다시 한 번 눌러주세요!`
+                                }
+                            }
+                        ],
+                        quickReplies: [
+                            { messageText: '접수 현황 확인', action: 'message', label: '📊 접수 현황 확인' },
+                            { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                        ]
                     }
-                }
-            } catch (imgErr) {
-                console.error('[KakaoBot] 이미지 비전 OCR 처리 실패:', imgErr.message);
+                };
+            }
+
+            if (recentQuote) {
+                const totalFormatted = recentQuote.totalAmount ? recentQuote.totalAmount.toLocaleString() : '0';
+                const firstItem = recentQuote.items?.[0] ? `${recentQuote.items[0].name} ${recentQuote.items[0].size}` : '배관 피팅';
+                const itemCount = recentQuote.items?.length || 0;
+                const statusBadge = recentQuote.reviewStatus === 'ESCALATION_REQUIRED' 
+                    ? '⚠️ [영업부장 결재 대기 중]' 
+                    : '✅ [박조나단 과장 검토 완료 - 출고 준비]';
+
+                const quoteText = `📋 [알트에프 견적 접수 현황]\n\n• 견적번호: ${recentQuote.id}\n• 고객사: ${recentQuote.customerName || '고객사'}\n• 견적품목: ${firstItem} 외 ${Math.max(0, itemCount - 1)}건 (총 ${itemCount}개)\n• 견적합계: ${totalFormatted}원 (VAT 별도)\n• 검토상태: ${statusBadge}\n• 접수일시: ${new Date(recentQuote.createdAt).toLocaleString('ko-KR')}\n\n상세 견적서와 성적서는 아래 버튼을 통해 바로 열람하실 수 있습니다.`;
+
+                return {
+                    version: '2.0',
+                    template: {
+                        outputs: [
+                            {
+                                simpleText: {
+                                    text: quoteText
+                                }
+                            }
+                        ],
+                        quickReplies: [
+                            { messageText: '견적서 보기', action: 'webLink', label: '📄 정식 견적서 보기', webLinkUrl: `https://altf.kr/admin/quotes?id=${recentQuote.id}` },
+                            { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                        ]
+                    }
+                };
             }
         }
 
-        // 1-1. 고객 발화 내 추가 지시(요율, 납기, 특이사항) SLE-02 추출
+        // 4. 🔥 이미지 첨부 인입 처리: 카카오 5초 타임아웃 절대 방지를 위해 즉시 HTTP 200 회신 후 백그라운드 비전 OCR 가동
+        if (isImage) {
+            const intakeRecord = {
+                id: `KAKAO-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+                type: 'image',
+                botUserKey,
+                isRegisteredUser: !!matchedUser,
+                matchedUser: matchedUser || null,
+                utterance: utterance || '[견적 요청 사진 첨부]',
+                imageUrl: finalImageUrl,
+                status: 'PROCESSING',
+                receivedAt,
+                channel: '카카오톡 채널 (@altf)',
+                assignedTeam: '영업2팀 (인입/표준화)',
+                assignedAgents: ['INT-02', 'INT-03', 'INT-05', 'SLE-01', 'SLE-02'],
+                parsedItems: []
+            };
+
+            this.intakes.unshift(intakeRecord);
+            this.stats.totalReceived++;
+            this.stats.imageQuotes++;
+            this.stats.lastReceivedAt = receivedAt;
+            this.saveData();
+
+            // 백그라운드 비동기 비전 OCR 및 견적서 초안 생성 파이프라인 가동 (카카오 5초 타임아웃 방지)
+            setImmediate(async () => {
+                await this.processImageIntakeAsync(intakeRecord, finalImageUrl, utterance, botUserKey, matchedUser);
+            });
+
+            // 카카오톡 대화방에 0.1초 내 즉시 정상 접수 알림 출력
+            return {
+                version: '2.0',
+                template: {
+                    outputs: [
+                        {
+                            simpleText: {
+                                text: `📄 [알트에프 영업2팀]\n견적서 사진이 정상 접수되었습니다!\n\n🤖 INT-03(비전 AI)과 SLE-01/02 에이전트가 14,132개 배관 피팅 규격·재고·단가를 정밀 대조하고 있습니다.\n\n약 10~15초 후 아래 '📊 접수 현황 확인' 버튼을 누르시면 산출된 견적서를 바로 확인하실 수 있습니다.`
+                            }
+                        }
+                    ],
+                    quickReplies: [
+                        {
+                            messageText: '접수 현황 확인',
+                            action: 'message',
+                            label: '📊 접수 현황 확인'
+                        },
+                        {
+                            messageText: '홈페이지 방문',
+                            action: 'webLink',
+                            label: '🌐 알트에프 웹 바로가기',
+                            webLinkUrl: 'https://altf.kr'
+                        }
+                    ]
+                }
+            };
+        }
+
+        // 5. 일반 텍스트 견적 인입 (초고속 즉시 표준화 처리)
+        let normalized = fittingNormalizerService.normalize(utterance);
+
+        // 5-1. 고객 발화 내 추가 지시(요율, 납기, 특이사항) SLE-02 추출
         const overrides = sleQuoteReviewService.parseUtteranceOverrides(utterance);
         if (overrides) {
             if (overrides.rate) {
@@ -206,10 +289,7 @@ export class KakaoBotService {
             }
         }
 
-        // 2. 카카오 사용자 사전 매칭 (구글시트/대장 연동 botUserKey 확인)
-        const matchedUser = this.findUserByBotUserKey(botUserKey);
         if (matchedUser) {
-            console.log(`[KakaoBot] 🎯 등록된 카카오 고객 매칭 성공: ${matchedUser.name} (${matchedUser.company || '회사미기재'}, ${matchedUser.phone})`);
             if (!normalized.customer) {
                 normalized.customer = {
                     name: matchedUser.company || matchedUser.name,
@@ -223,70 +303,60 @@ export class KakaoBotService {
                 normalized.customer.contact = matchedUser.name;
                 normalized.customer.email = normalized.customer.email || matchedUser.email;
             }
-        } else {
-            console.log(`[KakaoBot] ⚠️ 미등록 카카오 사용자 인입: botUserKey=${botUserKey}`);
         }
 
         const intakeRecord = {
             id: `KAKAO-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
-            type: isImage ? 'image' : 'text',
+            type: 'text',
             botUserKey,
             isRegisteredUser: !!matchedUser,
             matchedUser: matchedUser || null,
-            utterance: utterance || (isImage ? '[견적 요청 사진 첨부]' : '[내용 없음]'),
-            imageUrl: imageUrl || null,
+            utterance: utterance || '[내용 없음]',
+            imageUrl: null,
             status: normalized.items.length > 0 ? 'QUOTE_DRAFTED' : 'RECEIVED',
             receivedAt,
             channel: '카카오톡 채널 (@altf)',
             assignedTeam: '영업2팀 (인입/표준화)',
-            assignedAgents: isImage ? ['INT-02', 'INT-03', 'INT-05', 'SLE-01', 'SLE-02'] : ['INT-02', 'INT-05', 'SLE-01', 'SLE-02'],
+            assignedAgents: ['INT-02', 'INT-05', 'SLE-01', 'SLE-02'],
             customer: normalized.customer,
             discountRate: normalized.discountRate,
             remarks: normalized.remarks,
             parsedItems: normalized.items
         };
 
-        // 3. 인입 큐에 추가
         this.intakes.unshift(intakeRecord);
         this.stats.totalReceived++;
-        if (isImage) this.stats.imageQuotes++;
-        else this.stats.textQuotes++;
+        this.stats.textQuotes++;
         this.stats.lastReceivedAt = receivedAt;
 
-        // 4. 품목이 정상 정규화된 경우 견적서 초안(Draft Quotation) 생성
         let draftQuote = null;
         if (normalized.items.length > 0) {
             draftQuote = this.createDraftQuotation(intakeRecord, normalized);
+            draftQuote.botUserKey = botUserKey;
+            draftQuote.kakaoBotUserKey = botUserKey;
             
-            // 4-1. SLE-02 (박조나단 과장) 정밀 견적 심사 & 검토 판정 엔진 가동
             const reviewResult = sleQuoteReviewService.reviewQuotation(draftQuote, this.draftQuotations);
             draftQuote.sleReview = reviewResult;
-            draftQuote.reviewStatus = reviewResult.status; // 'AUTO_APPROVABLE' | 'ESCALATION_REQUIRED'
+            draftQuote.reviewStatus = reviewResult.status;
             intakeRecord.quotationId = draftQuote.id;
             intakeRecord.sleReview = reviewResult;
 
-            if (reviewResult.status === 'ESCALATION_REQUIRED') {
-                console.log(`[KakaoBot] ⚠️ [부장 결재 대기] 사유: ${reviewResult.escalationReasons.join(' | ')}`);
-            } else {
-                console.log(`[KakaoBot] ✅ [자동 승인 완료] ${reviewResult.actionNeeded}`);
-            }
-
             this.draftQuotations.unshift(draftQuote);
             console.log(`[KakaoBot] ✅ 견적서 초안 생성 완료 [${draftQuote.id}] 고객사: ${draftQuote.customerName} (${draftQuote.items.length}개 품목, ${draftQuote.totalAmount.toLocaleString()}원)`);
+
+            if (this.onQuotationCreated) {
+                this.onQuotationCreated(draftQuote);
+            }
         }
 
         this.saveData();
 
-        // 5. 백그라운드에서 에이전트 활동 기록 갱신 (비동기 처리)
         setTimeout(() => {
             this.dispatchToAgents(intakeRecord, draftQuote);
         }, 50);
 
-        // 6. 카카오톡 답변 메시지 조립
         let responseText = '';
-        if (isImage) {
-            responseText = `📄 [알트에프 영업2팀]\n견적서 사진이 정상 접수되었습니다!\n\n🤖 INT-03(비전 OCR) & INT-05(규격 표준화) 에이전트가 품목과 수량을 분석하고 있습니다.\n검토 완료 후 카카오톡으로 견적 결과를 안내해 드리겠습니다.`;
-        } else if (normalized.items.length > 0) {
+        if (normalized.items.length > 0) {
             const custName = normalized.customer ? normalized.customer.name : '고객사';
             const rate = normalized.discountRate;
             let itemLines = normalized.items.map((it, idx) => {
@@ -333,6 +403,116 @@ export class KakaoBotService {
     }
 
     /**
+     * 비동기 백그라운드 이미지 비전 OCR 및 견적서 초안 생성 처리 (카카오 5초 타임아웃 회피)
+     */
+    async processImageIntakeAsync(intakeRecord, finalImageUrl, utterance, botUserKey, matchedUser) {
+        try {
+            console.log(`[KakaoBot] 🚀 백그라운드 이미지 비전 분석 착수: ${finalImageUrl?.slice ? finalImageUrl.slice(0, 80) : ''}...`);
+            let imgBuf = null;
+            let contentType = 'image/jpeg';
+            let uploadedS3Url = null;
+
+            if (typeof finalImageUrl === 'string' && (finalImageUrl.startsWith('file://') || finalImageUrl.startsWith('/'))) {
+                const localPath = finalImageUrl.replace('file://', '');
+                if (fs.existsSync(localPath)) {
+                    imgBuf = fs.readFileSync(localPath);
+                }
+            } else if (finalImageUrl) {
+                const targetUrl = typeof finalImageUrl === 'string' ? finalImageUrl : (finalImageUrl.url || '');
+                if (targetUrl) {
+                    const fetch = (await import('node-fetch')).default;
+                    const imgRes = await fetch(targetUrl);
+                    if (imgRes.ok) {
+                        const arrayBuffer = await imgRes.arrayBuffer();
+                        imgBuf = Buffer.from(arrayBuffer);
+                        contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+                    }
+                }
+            }
+
+            if (imgBuf) {
+                try {
+                    const { uploadFileToS3 } = await import('../../s3-db.js');
+                    uploadedS3Url = await uploadFileToS3('documents/quotes', `kakao_${Date.now()}.jpg`, imgBuf, contentType);
+                    intakeRecord.imageUrl = uploadedS3Url;
+                    console.log(`[KakaoBot] S3 이미지 영구 보관 완료: ${uploadedS3Url}`);
+                } catch (s3Err) {
+                    console.warn('[KakaoBot] S3 업로드 폴백:', s3Err.message);
+                }
+
+                // 비전 OCR 및 규격 표준화 엔진 가동 (Gemini 3.7 Vision + Tesseract Fallback)
+                const normalized = await fittingVisionOcrService.recognizeAndNormalize(imgBuf, contentType);
+
+                // SLE-02 발화 내 추가 지시 반영 (요율, 납기)
+                const overrides = sleQuoteReviewService.parseUtteranceOverrides(utterance);
+                if (overrides) {
+                    if (overrides.rate) normalized.discountRate = overrides.rate;
+                    if (overrides.deliveryDate) normalized.remarks = (normalized.remarks ? `${normalized.remarks} / ` : '') + overrides.deliveryDate;
+                }
+
+                if (matchedUser) {
+                    if (!normalized.customer) {
+                        normalized.customer = {
+                            name: matchedUser.company || matchedUser.name,
+                            ceo: matchedUser.name,
+                            phone: matchedUser.phone,
+                            email: matchedUser.email || '',
+                            address: ''
+                        };
+                    } else {
+                        normalized.customer.phone = normalized.customer.phone || matchedUser.phone;
+                        normalized.customer.contact = matchedUser.name;
+                        normalized.customer.email = normalized.customer.email || matchedUser.email;
+                    }
+                }
+
+                intakeRecord.customer = normalized.customer;
+                intakeRecord.discountRate = normalized.discountRate;
+                intakeRecord.remarks = normalized.remarks;
+                intakeRecord.parsedItems = normalized.items;
+
+                if (normalized.items.length > 0) {
+                    const draftQuote = this.createDraftQuotation(intakeRecord, normalized);
+                    draftQuote.botUserKey = botUserKey;
+                    draftQuote.kakaoBotUserKey = botUserKey;
+
+                    // SLE-02 (박조나단 과장 / 김부장 결재) 견적 심사 판정
+                    const reviewResult = sleQuoteReviewService.reviewQuotation(draftQuote, this.draftQuotations);
+                    draftQuote.sleReview = reviewResult;
+                    draftQuote.reviewStatus = reviewResult.status;
+                    intakeRecord.quotationId = draftQuote.id;
+                    intakeRecord.sleReview = reviewResult;
+                    intakeRecord.status = 'QUOTE_DRAFTED';
+
+                    this.draftQuotations.unshift(draftQuote);
+                    console.log(`[KakaoBot] ✅ 견적서 초안 생성 완료 [${draftQuote.id}] 고객사: ${draftQuote.customerName} (${draftQuote.items.length}개 품목, ${draftQuote.totalAmount.toLocaleString()}원)`);
+
+                    if (this.onQuotationCreated) {
+                        this.onQuotationCreated(draftQuote);
+                    }
+
+                    // 0원 카카오 이벤트 푸시 발송 시도
+                    await sleQuoteReviewService.dispatchKakaoEventPush({
+                        botUserKey,
+                        quotationId: draftQuote.id,
+                        totalAmount: draftQuote.totalAmount,
+                        quoteUrl: `https://altf.kr/admin/quotes?id=${draftQuote.id}`
+                    });
+
+                    this.dispatchToAgents(intakeRecord, draftQuote);
+                } else {
+                    intakeRecord.status = 'FAILED_OCR';
+                }
+                this.saveData();
+            }
+        } catch (err) {
+            console.error('[KakaoBot] 백그라운드 이미지 처리 오류:', err.message);
+            intakeRecord.status = 'ERROR';
+            this.saveData();
+        }
+    }
+
+    /**
      * 알트에프 표준 견적서 초안 생성
      */
     createDraftQuotation(intake, normalized) {
@@ -369,6 +549,8 @@ export class KakaoBotService {
             };
         });
 
+        const rawImgUrl = typeof intake.imageUrl === 'string' ? intake.imageUrl : (intake.imageUrl?.url || '');
+
         return {
             id: quoteId,
             userId: 'c7410ecb-2684-4054-b5b7-2ad060299c63', // 박조나단 과장 (시화)
@@ -389,10 +571,10 @@ export class KakaoBotService {
             isKakaoRegistered: !!intake.isRegisteredUser,
             kakaoUser: intake.matchedUser || null,
             dispatchStatus: 'NOT_SENT',
-            attachments: intake.imageUrl ? [
+            attachments: rawImgUrl ? [
                 {
                     name: `${custName}_재고의뢰서_사진.jpg`,
-                    url: intake.imageUrl
+                    url: rawImgUrl
                 }
             ] : [],
             source: 'KAKAO',

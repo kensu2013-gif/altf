@@ -1814,18 +1814,22 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                 <div className="mt-4 pt-4 border-t border-yellow-200/50">
                                     <h4 className="text-xs font-bold text-yellow-800 mb-2">첨부된 사진/파일</h4>
                                     <div className="flex flex-wrap gap-2">
-                                        {quote.attachments.map((file, i) => (
-                                            <a 
-                                                key={i} 
-                                                href={`${import.meta.env.VITE_API_URL || ''}/api/download?url=${encodeURIComponent(file.url)}`}
-                                                target="_blank" 
-                                                rel="noopener noreferrer" 
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-yellow-300 text-yellow-700 hover:bg-yellow-100 rounded-md text-sm font-bold transition-colors shadow-sm"
-                                            >
-                                                <Image className="w-4 h-4" />
-                                                첨부사진 보기 {quote.attachments!.length > 1 ? `(${i+1})` : ''}
-                                            </a>
-                                        ))}
+                                        {quote.attachments.map((file, i) => {
+                                            const anyFile = file as any;
+                                            const fileUrl = typeof anyFile === 'string' ? anyFile : (typeof anyFile?.url === 'string' ? anyFile.url : (anyFile?.url?.url || ''));
+                                            return (
+                                                <a 
+                                                    key={i} 
+                                                    href={`${import.meta.env.VITE_API_URL || ''}/api/download?url=${encodeURIComponent(fileUrl)}`}
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer" 
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-yellow-300 text-yellow-700 hover:bg-yellow-100 rounded-md text-sm font-bold transition-colors shadow-sm"
+                                                >
+                                                    <Image className="w-4 h-4" />
+                                                    첨부사진 보기 {quote.attachments!.length > 1 ? `(${i+1})` : ''}
+                                                </a>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
