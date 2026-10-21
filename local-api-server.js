@@ -2662,10 +2662,12 @@ const server = http.createServer(async (req, res) => {
 
             const downloadFilename = `알트에프_공식견적서_${quoteId}.pdf`;
             const encodedFilename = encodeURIComponent(downloadFilename);
+            const isViewOnly = url.searchParams.get('view') === '1';
+            const dispositionType = isViewOnly ? 'inline' : 'attachment';
 
             res.writeHead(200, {
                 'Content-Type': 'application/pdf',
-                'Content-Disposition': `inline; filename*=UTF-8''${encodedFilename}`,
+                'Content-Disposition': `${dispositionType}; filename*=UTF-8''${encodedFilename}`,
                 'Content-Length': pdfBuffer.length,
                 'Cache-Control': 'public, max-age=604800' // 7일 캐싱
             });
