@@ -326,18 +326,22 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             const quoteUrl = `https://altf.kr/quote/view?id=${quote.id}`;
             const customMessage = `📋 [알트에프 견적 회신 안내]\n${custName} 귀하, 요청하신 견적 검토가 완료되었습니다.\n\n• 견적번호: ${quote.id}\n• 총 품목수: ${items.length}개\n• 견적금액: ${totalWon}원 (VAT 별도)\n\n아래 링크에서 정식 직인 PDF 견적서를 확인하실 수 있습니다:\n${quoteUrl}`;
 
+            const targetPhone = customerInfo.phone || quote.customerInfo?.phone || quote.sourcePhone || '';
             const res = await fetch('/api/kakao/dispatch-quote', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     quotationId: quote.id,
                     botUserKey: quote.botUserKey,
+                    targetPhone,
                     customMessage
                 })
             });
             const data = await res.json();
             if (data.success) {
-                setDispatchStatusMsg(`✅ 발송 완료: ${data.message || 'Make/Solapi 연동 신호 전송 성공'}`);
+                setDispatchStatusMsg(`✅ 솔라피 발송 완료: ${data.message || 'MMS/문자 발송 성공 및 답변완료 처리'}`);
+                updateQuotation(quote.id, { status: 'PROCESSED' });
+                if (onSuccess) onSuccess();
             } else {
                 setDispatchStatusMsg(`⚠️ 발송 오류: ${data.error || '발송 실패'}`);
             }
@@ -365,6 +369,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             const data = await res.json();
             if (data.success) {
                 setDispatchStatusMsg(`✅ 0원 카카오 이벤트 푸시 전송 완료: ${data.message || '카카오톡 채팅방에 견적 카드가 바로 전송되었습니다.'}`);
+                updateQuotation(quote.id, { status: 'PROCESSED' });
+                if (onSuccess) onSuccess();
             } else {
                 setDispatchStatusMsg(`⚠️ 카카오 푸시 오류: ${data.error || '발송 실패'}`);
             }
@@ -1458,7 +1464,12 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     };
 
     const handleSend = async () => {
-        if (!customerInfo.companyName || !customerInfo.contactName || !customerInfo.phone) {
+        const isKakaoQuote = quote.source === 'KAKAO' || quote.id?.startsWith('Q-KAKAO');
+        const resolvedCompanyName = customerInfo.companyName || quote.customerName || (isKakaoQuote ? '카카오톡 고객사' : '');
+        const resolvedContactName = customerInfo.contactName || (isKakaoQuote ? '담당자님' : '');
+        const resolvedPhone = customerInfo.phone || (isKakaoQuote ? (kakaoUserData.phone || '010-0000-0000') : '');
+
+        if (!resolvedCompanyName || (!isKakaoQuote && (!resolvedContactName || !resolvedPhone))) {
             alert("업체명, 담당자명, 연락처는 최소한 입력해야 합니다.");
             return;
         }
@@ -1499,7 +1510,12 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 id: user.id,
                 email: user.email
             } : undefined),
-            customerInfo: customerInfo // [NEW] Explicitly isolate custom info fields
+            customerInfo: {
+                ...customerInfo,
+                companyName: resolvedCompanyName,
+                contactName: resolvedContactName,
+                phone: resolvedPhone
+            }
         };
 
         // 4. Update Local Store & DB (updateQuotation handles both)
@@ -1910,16 +1926,16 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             <span>{isDispatching ? '발송 중...' : '💬 0원 카톡 직통 푸시'}</span>
                                         </button>
 
-                                        {/* 2. Make.com / Solapi 자동 발송 버튼 */}
+                                        {/* 2. Solapi MMS/문자 자동 발송 버튼 */}
                                         <button
                                             type="button"
                                             disabled={isDispatching}
                                             onClick={handleDispatchKakaoQuote}
-                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer disabled:opacity-50"
-                                            title="Make.com 웹훅 또는 Solapi를 통해 고객에게 알림톡/견적서 문자를 전송합니다."
+                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                                            title="솔라피(Solapi)를 통해 고객 휴대폰으로 견적서 이미지(MMS)와 직인 PDF 링크를 즉시 전송합니다."
                                         >
                                             <Send className="w-3.5 h-3.5" />
-                                            <span>Make/Solapi 문자</span>
+                                            <span>{isDispatching ? '발송 중...' : '📱 솔라피 견적+첨부 발송'}</span>
                                         </button>
 
                                         {/* 3. 클립보드 복사 */}

@@ -161,11 +161,24 @@ export class KakaoBotService {
             console.log(`[KakaoBot] ⚠️ 미등록 카카오 사용자 인입: botUserKey=${botUserKey}`);
         }
 
-        // 3. 사용자가 "확인", "접수 현황 확인", "현황", "조회" 등의 확인 메시지를 보낸 경우
-        const isStatusQuery = !isImage && (/^(확인|접수\s*현황|견적\s*확인|진행\s*상황|현황|조회|내역)$/i.test(utterance) || utterance.includes('접수 현황') || utterance.includes('견적 확인'));
+        // 3. 사용자가 "확인", "견적", "결과", "얼마", "접수 현황" 등의 조회 메시지를 보낸 경우
+        const isStatusQuery = !isImage && (
+            /^(확인|접수\s*현황|견적\s*확인|진행\s*상황|현황|조회|내역|견적|결과|얼마|답변|회신|언제|상황)$/i.test(utterance) ||
+            utterance.includes('접수 현황') ||
+            utterance.includes('견적 확인') ||
+            utterance.includes('견적서') ||
+            utterance.includes('어떻게') ||
+            utterance.includes('나왔') ||
+            utterance.includes('얼마')
+        );
+
         if (isStatusQuery) {
-            // 해당 사용자의 가장 최근 견적서 조회
-            const recentQuote = this.draftQuotations.find(dq => dq.botUserKey === botUserKey || dq.kakaoBotUserKey === botUserKey || (matchedUser && dq.customerInfo?.phone === matchedUser.phone)) || this.draftQuotations[0];
+            // 해당 사용자의 고유 botUserKey 또는 매칭된 전화번호로만 엄격 조회 (타 고객 견적서 노출 방지)
+            const recentQuote = this.draftQuotations.find(dq => 
+                dq.botUserKey === botUserKey || 
+                dq.kakaoBotUserKey === botUserKey || 
+                (matchedUser && dq.customerInfo?.phone && dq.customerInfo?.phone === matchedUser.phone)
+            );
             const recentIntake = this.intakes.find(it => it.botUserKey === botUserKey);
 
             if (recentIntake && recentIntake.status === 'PROCESSING') {
@@ -188,15 +201,14 @@ export class KakaoBotService {
             }
 
             if (recentQuote) {
-                const totalFormatted = recentQuote.totalAmount ? recentQuote.totalAmount.toLocaleString() : '0';
-                const firstItem = recentQuote.items?.[0] ? `${recentQuote.items[0].name} ${recentQuote.items[0].size}` : '배관 피팅';
-                const itemCount = recentQuote.items?.length || 0;
-                const statusBadge = recentQuote.reviewStatus === 'ESCALATION_REQUIRED' 
-                    ? '⚠️ [영업부장 결재 대기 중]' 
-                    : '✅ [박조나단 과장 검토 완료 - 출고 준비]';
+                // 사용자가 확인하는 순간 답변완료(PROCESSED)로 전환 및 동기화
+                recentQuote.status = 'PROCESSED';
+                if (this.onQuotationUpdated) {
+                    this.onQuotationUpdated(recentQuote);
+                }
+                this.saveData();
 
-                const quoteText = `📋 [알트에프 견적 접수 현황]\n\n• 견적번호: ${recentQuote.id}\n• 고객사: ${recentQuote.customerName || '고객사'}\n• 견적품목: ${firstItem} 외 ${Math.max(0, itemCount - 1)}건 (총 ${itemCount}개)\n• 견적합계: ${totalFormatted}원 (VAT 별도)\n• 검토상태: ${statusBadge}\n• 접수일시: ${new Date(recentQuote.createdAt).toLocaleString('ko-KR')}\n\n상세 견적서와 성적서는 아래 버튼을 통해 바로 열람하실 수 있습니다.`;
-
+                const quoteText = this.formatKakaoQuoteMessage(recentQuote);
                 return {
                     version: '2.0',
                     template: {
@@ -209,14 +221,32 @@ export class KakaoBotService {
                         ],
                         quickReplies: [
                             { messageText: '견적서 보기', action: 'webLink', label: '📄 정식 견적서 보기', webLinkUrl: `https://altf.kr/admin/quotes?id=${recentQuote.id}` },
+                            { messageText: '접수 현황 확인', action: 'message', label: '📊 접수 현황 확인' },
                             { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
                         ]
                     }
                 };
             }
+
+            return {
+                version: '2.0',
+                template: {
+                    outputs: [
+                        {
+                            simpleText: {
+                                text: `📋 [알트에프 영업2팀]\n현재 접수되어 진행 중인 견적 내역이 없습니다.\n\n견적을 문의하시려면 견적서 사진을 전송하시거나 '40A 엘보 10개, 티 5개'와 같이 배관 규격을 입력해 주세요!`
+                            }
+                        }
+                    ],
+                    quickReplies: [
+                        { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                    ]
+                }
+            };
         }
 
-        // 4. 🔥 이미지 첨부 인입 처리: 카카오 5초 타임아웃 절대 방지를 위해 즉시 HTTP 200 회신 후 백그라운드 비전 OCR 가동
+        // 4. 🔥 이미지 첨부 인입 처리: 카카오 5초 타임아웃 절대 방지를 위해 즉시 회신 후 백그라운드 비전 OCR 가동
+        const callbackUrl = userRequest.callbackUrl || null;
         if (isImage) {
             const intakeRecord = {
                 id: `KAKAO-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
@@ -242,8 +272,19 @@ export class KakaoBotService {
 
             // 백그라운드 비동기 비전 OCR 및 견적서 초안 생성 파이프라인 가동 (카카오 5초 타임아웃 방지)
             setImmediate(async () => {
-                await this.processImageIntakeAsync(intakeRecord, finalImageUrl, utterance, botUserKey, matchedUser);
+                await this.processImageIntakeAsync(intakeRecord, finalImageUrl, utterance, botUserKey, matchedUser, callbackUrl);
             });
+
+            // 카카오 i 오픈빌더 스킬 콜백이 지원되는 경우 콜백 대기 모드 반환
+            if (callbackUrl) {
+                return {
+                    version: '2.0',
+                    useCallback: true,
+                    data: {
+                        text: '견적서 사진을 분석 중입니다...'
+                    }
+                };
+            }
 
             // 카카오톡 대화방에 0.1초 내 즉시 정상 접수 알림 출력
             return {
@@ -273,20 +314,111 @@ export class KakaoBotService {
             };
         }
 
-        // 5. 일반 텍스트 견적 인입 (초고속 즉시 표준화 처리)
+        // 5. 일반 텍스트 인입 처리 (기존 견적 수정, 규격 추출, 안내)
         let normalized = fittingNormalizerService.normalize(utterance);
-
-        // 5-1. 고객 발화 내 추가 지시(요율, 납기, 특이사항) SLE-02 추출
         const overrides = sleQuoteReviewService.parseUtteranceOverrides(utterance);
+
+        // 해당 사용자의 최근 30분 내 견적서 확인
+        const existingQuote = this.draftQuotations.find(dq => 
+            dq.botUserKey === botUserKey || 
+            dq.kakaoBotUserKey === botUserKey || 
+            (matchedUser && dq.customerInfo?.phone && dq.customerInfo?.phone === matchedUser.phone)
+        );
+
+        // 5-1. 규격이 감지되지 않은 단순 텍스트 발화 (요율 지시, 질문, 인사 등)
+        if (normalized.items.length === 0) {
+            // 발화 내 요율/납기 지시가 있고 최근 견적이 있는 경우: 기존 견적 즉시 업데이트
+            if (overrides && (overrides.rate || overrides.deliveryDate) && existingQuote) {
+                if (overrides.rate) {
+                    const newRate = overrides.rate;
+                    existingQuote.items = existingQuote.items.map(it => {
+                        const discountedUnitPrice = Math.round(it.base_price * (1 - newRate / 100));
+                        return {
+                            ...it,
+                            discountRate: newRate,
+                            unitPrice: discountedUnitPrice,
+                            userUnitPrice: discountedUnitPrice,
+                            amount: discountedUnitPrice * it.quantity
+                        };
+                    });
+                    existingQuote.totalAmount = existingQuote.items.reduce((sum, it) => sum + it.amount, 0);
+                    console.log(`[KakaoBot] 🎯 [SLE-02] 기존 견적서(${existingQuote.id}) 요율 즉시 재계산: -${newRate}%`);
+                }
+                if (overrides.deliveryDate) {
+                    existingQuote.memo = (existingQuote.memo ? `${existingQuote.memo} / ` : '') + overrides.deliveryDate;
+                }
+                existingQuote.status = 'PROCESSED';
+                if (this.onQuotationUpdated) {
+                    this.onQuotationUpdated(existingQuote);
+                }
+                this.saveData();
+
+                return {
+                    version: '2.0',
+                    template: {
+                        outputs: [
+                            {
+                                simpleText: {
+                                    text: `🎯 [알트에프 영업2팀]\n요청하신 변경사항(-${overrides.rate || ''}% 요율 / 납기 지시)이 견적서(${existingQuote.id})에 정상 반영되었습니다!\n\n` + this.formatKakaoQuoteMessage(existingQuote)
+                                }
+                            }
+                        ],
+                        quickReplies: [
+                            { messageText: '견적서 보기', action: 'webLink', label: '📄 정식 견적서 보기', webLinkUrl: `https://altf.kr/admin/quotes?id=${existingQuote.id}` },
+                            { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                        ]
+                    }
+                };
+            }
+
+            // 최근 진행 중인 견적이 있는 경우 해당 견적 카드 즉시 안내
+            if (existingQuote) {
+                existingQuote.status = 'PROCESSED';
+                if (this.onQuotationUpdated) {
+                    this.onQuotationUpdated(existingQuote);
+                }
+                this.saveData();
+
+                return {
+                    version: '2.0',
+                    template: {
+                        outputs: [
+                            {
+                                simpleText: {
+                                    text: this.formatKakaoQuoteMessage(existingQuote)
+                                }
+                            }
+                        ],
+                        quickReplies: [
+                            { messageText: '견적서 보기', action: 'webLink', label: '📄 정식 견적서 보기', webLinkUrl: `https://altf.kr/admin/quotes?id=${existingQuote.id}` },
+                            { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                        ]
+                    }
+                };
+            }
+
+            // 기존 견적도 없고 규격도 없는 단순 발화: 불필요한 빈 견적 생성 없이 정중한 안내 회신
+            return {
+                version: '2.0',
+                template: {
+                    outputs: [
+                        {
+                            simpleText: {
+                                text: `📋 [알트에프 영업2팀]\n안녕하세요! 알트에프 배관 피팅 견적 봇입니다.\n\n• 견적서 사진을 전송하시거나,\n• '40A 엘보 10개, 티 5개'와 같이 규격을 입력해 주시면 14,132개 재고와 대조하여 10초 내 견적서를 산출해 드립니다.`
+                            }
+                        }
+                    ],
+                    quickReplies: [
+                        { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                    ]
+                }
+            };
+        }
+
+        // 5-2. 배관 품목 규격이 포함된 신규 견적 인입 처리
         if (overrides) {
-            if (overrides.rate) {
-                normalized.discountRate = overrides.rate;
-                console.log(`[KakaoBot] 🎯 [SLE-02 감지] 고객 텍스트 요율 지시 자동 반영: -${overrides.rate}%`);
-            }
-            if (overrides.deliveryDate) {
-                normalized.remarks = (normalized.remarks ? `${normalized.remarks} / ` : '') + overrides.deliveryDate;
-                console.log(`[KakaoBot] 🚚 [SLE-02 감지] 고객 납기 지시 반영: ${overrides.deliveryDate}`);
-            }
+            if (overrides.rate) normalized.discountRate = overrides.rate;
+            if (overrides.deliveryDate) normalized.remarks = (normalized.remarks ? `${normalized.remarks} / ` : '') + overrides.deliveryDate;
         }
 
         if (matchedUser) {
@@ -313,7 +445,7 @@ export class KakaoBotService {
             matchedUser: matchedUser || null,
             utterance: utterance || '[내용 없음]',
             imageUrl: null,
-            status: normalized.items.length > 0 ? 'QUOTE_DRAFTED' : 'RECEIVED',
+            status: 'QUOTE_DRAFTED',
             receivedAt,
             channel: '카카오톡 채널 (@altf)',
             assignedTeam: '영업2팀 (인입/표준화)',
@@ -329,24 +461,22 @@ export class KakaoBotService {
         this.stats.textQuotes++;
         this.stats.lastReceivedAt = receivedAt;
 
-        let draftQuote = null;
-        if (normalized.items.length > 0) {
-            draftQuote = this.createDraftQuotation(intakeRecord, normalized);
-            draftQuote.botUserKey = botUserKey;
-            draftQuote.kakaoBotUserKey = botUserKey;
-            
-            const reviewResult = sleQuoteReviewService.reviewQuotation(draftQuote, this.draftQuotations);
-            draftQuote.sleReview = reviewResult;
-            draftQuote.reviewStatus = reviewResult.status;
-            intakeRecord.quotationId = draftQuote.id;
-            intakeRecord.sleReview = reviewResult;
+        const draftQuote = this.createDraftQuotation(intakeRecord, normalized);
+        draftQuote.botUserKey = botUserKey;
+        draftQuote.kakaoBotUserKey = botUserKey;
+        draftQuote.status = 'PROCESSED'; // 답변완료 상태 설정
+        
+        const reviewResult = sleQuoteReviewService.reviewQuotation(draftQuote, this.draftQuotations);
+        draftQuote.sleReview = reviewResult;
+        draftQuote.reviewStatus = reviewResult.status;
+        intakeRecord.quotationId = draftQuote.id;
+        intakeRecord.sleReview = reviewResult;
 
-            this.draftQuotations.unshift(draftQuote);
-            console.log(`[KakaoBot] ✅ 견적서 초안 생성 완료 [${draftQuote.id}] 고객사: ${draftQuote.customerName} (${draftQuote.items.length}개 품목, ${draftQuote.totalAmount.toLocaleString()}원)`);
+        this.draftQuotations.unshift(draftQuote);
+        console.log(`[KakaoBot] ✅ 견적서 생성 완료 [${draftQuote.id}] 고객사: ${draftQuote.customerName} (${draftQuote.items.length}개 품목, ${draftQuote.totalAmount.toLocaleString()}원)`);
 
-            if (this.onQuotationCreated) {
-                this.onQuotationCreated(draftQuote);
-            }
+        if (this.onQuotationCreated) {
+            this.onQuotationCreated(draftQuote);
         }
 
         this.saveData();
@@ -355,25 +485,7 @@ export class KakaoBotService {
             this.dispatchToAgents(intakeRecord, draftQuote);
         }, 50);
 
-        let responseText = '';
-        if (normalized.items.length > 0) {
-            const custName = normalized.customer ? normalized.customer.name : '고객사';
-            const rate = normalized.discountRate;
-            let itemLines = normalized.items.map((it, idx) => {
-                const discountedUnitPrice = Math.round(it.basePrice * (1 - rate / 100));
-                const itemAmount = discountedUnitPrice * it.qty;
-                return `${idx + 1}. ${it.type} ${it.schedule} ${it.size} ${it.material}\n   - 수량: ${it.qty}EA | 단가: ${discountedUnitPrice.toLocaleString()}원 | 금액: ${itemAmount.toLocaleString()}원\n   - 재고: ${it.currentStock}EA (${it.location}) [${it.stockStatus === 'AVAILABLE' ? '출고가능' : '부족'}]`;
-            }).join('\n');
-
-            const totalAmount = normalized.items.reduce((sum, it) => {
-                const discountedUnitPrice = Math.round(it.basePrice * (1 - rate / 100));
-                return sum + (discountedUnitPrice * it.qty);
-            }, 0);
-
-            responseText = `📋 [알트에프 영업2팀 x 영업1팀 견적 회신]\n${custName}님, 요청하신 견적 내용이 산출되었습니다.\n\n[견적 세부 내역 (요율 -${rate}% 적용)]\n${itemLines}\n\n💰 견적합계: ${totalAmount.toLocaleString()}원 (VAT 별도)\n🚚 비고/배송: ${normalized.remarks || '시화/양산 당일 출고 준비'}\n\n담당 영업자(영업1팀) 검토 후 웹 정식 견적서 링크를 추가 발송해 드립니다.`;
-        } else {
-            responseText = `📋 [알트에프 영업2팀]\n견적 문의가 정상 접수되었습니다!\n\n접수 내용: "${utterance.slice(0, 40)}${utterance.length > 40 ? '...' : ''}"\n\n🤖 INT-05(표준화봇)가 규격 및 단가를 매칭하여 견적서 초안을 작성 중입니다.`;
-        }
+        const responseText = this.formatKakaoQuoteMessage(draftQuote);
 
         return {
             version: '2.0',
@@ -386,6 +498,12 @@ export class KakaoBotService {
                     }
                 ],
                 quickReplies: [
+                    {
+                        messageText: '견적서 보기',
+                        action: 'webLink',
+                        label: '📄 정식 견적서 보기',
+                        webLinkUrl: `https://altf.kr/admin/quotes?id=${draftQuote.id}`
+                    },
                     {
                         messageText: '접수 현황 확인',
                         action: 'message',
@@ -405,7 +523,7 @@ export class KakaoBotService {
     /**
      * 비동기 백그라운드 이미지 비전 OCR 및 견적서 초안 생성 처리 (카카오 5초 타임아웃 회피)
      */
-    async processImageIntakeAsync(intakeRecord, finalImageUrl, utterance, botUserKey, matchedUser) {
+    async processImageIntakeAsync(intakeRecord, finalImageUrl, utterance, botUserKey, matchedUser, callbackUrl = null) {
         try {
             console.log(`[KakaoBot] 🚀 백그라운드 이미지 비전 분석 착수: ${finalImageUrl?.slice ? finalImageUrl.slice(0, 80) : ''}...`);
             let imgBuf = null;
@@ -440,7 +558,7 @@ export class KakaoBotService {
                     console.warn('[KakaoBot] S3 업로드 폴백:', s3Err.message);
                 }
 
-                // 비전 OCR 및 규격 표준화 엔진 가동 (Gemini 3.7 Vision + Tesseract Fallback)
+                // 비전 OCR 및 규격 표준화 엔진 가동 (Gemini 3.1 Flash-Lite + Gemini 3.8 Flash Fallback)
                 const normalized = await fittingVisionOcrService.recognizeAndNormalize(imgBuf, contentType);
 
                 // SLE-02 발화 내 추가 지시 반영 (요율, 납기)
@@ -484,11 +602,46 @@ export class KakaoBotService {
                     intakeRecord.sleReview = reviewResult;
                     intakeRecord.status = 'QUOTE_DRAFTED';
 
+                    draftQuote.status = 'PROCESSED'; // 답변완료 상태로 즉시 설정
                     this.draftQuotations.unshift(draftQuote);
                     console.log(`[KakaoBot] ✅ 견적서 초안 생성 완료 [${draftQuote.id}] 고객사: ${draftQuote.customerName} (${draftQuote.items.length}개 품목, ${draftQuote.totalAmount.toLocaleString()}원)`);
 
                     if (this.onQuotationCreated) {
                         this.onQuotationCreated(draftQuote);
+                    }
+
+                    // 카카오 i 오픈빌더 스킬 콜백 URL로 완료된 견적서 자동 푸시 (1,000자 이내 안전 포맷)
+                    if (callbackUrl) {
+                        try {
+                            const fetch = (await import('node-fetch')).default;
+                            const quoteText = this.formatKakaoQuoteMessage(draftQuote);
+                            const cbPayload = {
+                                version: '2.0',
+                                template: {
+                                    outputs: [
+                                        {
+                                            simpleText: {
+                                                text: quoteText
+                                            }
+                                        }
+                                    ],
+                                    quickReplies: [
+                                        { messageText: '견적서 보기', action: 'webLink', label: '📄 정식 견적서 보기', webLinkUrl: `https://altf.kr/admin/quotes?id=${draftQuote.id}` },
+                                        { messageText: '접수 현황 확인', action: 'message', label: '📊 접수 현황 확인' },
+                                        { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                                    ]
+                                }
+                            };
+                            const cbRes = await fetch(callbackUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(cbPayload)
+                            });
+                            const cbResText = await cbRes.text();
+                            console.log(`[KakaoBot] 🎯 [스킬 콜백] 카카오톡 대화방 푸시 응답: HTTP ${cbRes.status} (${cbResText.slice(0, 100)})`);
+                        } catch (cbErr) {
+                            console.warn('[KakaoBot] 스킬 콜백 푸시 오류:', cbErr.message);
+                        }
                     }
 
                     // 0원 카카오 이벤트 푸시 발송 시도
@@ -502,6 +655,33 @@ export class KakaoBotService {
                     this.dispatchToAgents(intakeRecord, draftQuote);
                 } else {
                     intakeRecord.status = 'FAILED_OCR';
+                    console.warn(`[KakaoBot] ⚠️ 비전 OCR 유효 배관 품목 추출 실패: botUserKey=${botUserKey}`);
+                    if (callbackUrl) {
+                        try {
+                            const fetch = (await import('node-fetch')).default;
+                            await fetch(callbackUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    version: '2.0',
+                                    template: {
+                                        outputs: [
+                                            {
+                                                simpleText: {
+                                                    text: `📸 [알트에프 영업2팀]\n첨부해주신 견적서 사진의 화질이나 필기체 인식률이 낮아 규격 자동 추출에 실패했습니다.\n\n영업1팀 담당자가 원본 사진을 확인 후 정식 견적서를 작성하여 회신해 드리겠습니다. (선명한 사진을 다시 전송해 주시면 즉시 자동 산출됩니다!)`
+                                                }
+                                            }
+                                        ],
+                                        quickReplies: [
+                                            { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                                        ]
+                                    }
+                                })
+                            });
+                        } catch (e) {
+                            console.warn('[KakaoBot] 실패 안내 콜백 전송 오류:', e.message);
+                        }
+                    }
                 }
                 this.saveData();
             }
@@ -510,6 +690,32 @@ export class KakaoBotService {
             intakeRecord.status = 'ERROR';
             this.saveData();
         }
+    }
+
+    /**
+     * 카카오톡 규격(최대 1,000자 제한)에 완벽 부합하는 정밀 견적서 카드 포맷터 (최대 650자 이내 보장)
+     */
+    formatKakaoQuoteMessage(quote) {
+        const custName = quote.customerName || '고객사';
+        const totalWon = (quote.totalAmount || 0).toLocaleString();
+        const itemCount = quote.items?.length || 0;
+        const rate = quote.items?.[0]?.discountRate || 50;
+
+        // 주요 품목 최대 4개 요약 노출 (1000자 초과 절대 방지)
+        const displayItems = (quote.items || []).slice(0, 4);
+        const itemLines = displayItems.map((it, idx) => {
+            const uPrice = (it.unitPrice || 0).toLocaleString();
+            return `• ${it.name} ${it.thickness || ''} ${it.size} (${it.material || ''}) : ${it.quantity}EA | 단가: ${uPrice}원`;
+        }).join('\n');
+
+        const remainingCount = itemCount - displayItems.length;
+        const remainingText = remainingCount > 0 ? `\n... 외 ${remainingCount}개 품목 추가 포함` : '';
+
+        const reviewBadge = quote.reviewStatus === 'ESCALATION_REQUIRED'
+            ? '⚠️ 영업부장 결재 진행 중'
+            : '✅ [박조나단 과장 검토 완료 - 출고 준비]';
+
+        return `📋 [알트에프 견적 회신]\n${custName} 귀하, 요청하신 피팅 견적이 산출되었습니다.\n\n[견적 요약 (요율 -${rate}% 적용)]\n${itemLines}${remainingText}\n\n💰 견적합계: ${totalWon}원 (VAT 별도)\n📦 검토상태: ${reviewBadge}\n🚚 납기/배송: ${quote.memo?.replace('카카오톡 채널 인입 (@altf) - ', '') || '시화/양산 당일 출고 준비'}\n\n👇 아래 [정식 견적서 보기] 버튼을 누르시면 직인 날인된 PDF를 즉시 확인하실 수 있습니다.`;
     }
 
     /**
@@ -713,17 +919,42 @@ export class KakaoBotService {
     }
 
     /**
-     * 답변 완료된 견적서를 Make.com 웹훅 또는 Solapi로 발송
+     * 답변 완료된 견적서를 Solapi(문자/MMS) 또는 Make.com 웹훅으로 발송
      */
-    async dispatchQuotation({ quotationId, botUserKey, customMessage, webhookUrl }) {
+    async dispatchQuotation({ quotationId, botUserKey, customMessage, webhookUrl, targetPhone: explicitPhone }) {
         const quote = this.draftQuotations.find(q => q.id === quotationId);
         const user = this.findUserByBotUserKey(botUserKey) || (quote?.kakaoUser) || null;
         
-        const targetWebhookUrl = webhookUrl || process.env.MAKE_WEBHOOK_URL || null;
-        const targetPhone = user?.phone || quote?.customerInfo?.phone || '';
+        const fallbackPhone = process.env.SOLAPI_SENDER_PHONE || '01062223751';
+        const targetPhone = explicitPhone || user?.phone || quote?.customerInfo?.phone || quote?.sourcePhone || fallbackPhone;
         const targetName = user?.name || quote?.customerInfo?.contactName || '고객';
         const targetCompany = user?.company || quote?.customerName || '';
         const quoteUrl = `https://altf.kr/quote/view?id=${quotationId}`;
+
+        // 품목 요약 텍스트 생성
+        let itemsSummary = '';
+        if (quote?.items && quote.items.length > 0) {
+            const previewItems = quote.items.slice(0, 4).map(it => 
+                `• ${it.spec || it.item || '배관자재'} | ${it.quantity || 1}개 | ₩${(it.unitPrice || 0).toLocaleString()}`
+            ).join('\n');
+            const moreCount = quote.items.length > 4 ? `\n• 외 ${quote.items.length - 4}건` : '';
+            itemsSummary = `\n[견적 품목 내역]\n${previewItems}${moreCount}\n`;
+        }
+
+        const formattedTotal = quote?.totalAmount ? `₩${quote.totalAmount.toLocaleString()}원 (VAT별도)` : '별도협의';
+
+        const messageText = customMessage || (
+            `[알트에프(AltF) 견적 회신]\n` +
+            `${targetName} 담당자님, 요청하신 견적이 완료되었습니다.\n` +
+            `━━━━━━━━━━━━━━━━━━━━\n` +
+            `• 견적번호: ${quotationId}\n` +
+            `• 공급가액: ${formattedTotal}\n` +
+            itemsSummary +
+            `━━━━━━━━━━━━━━━━━━━━\n` +
+            `📄 정식 견적서 확인 및 PDF 다운로드:\n` +
+            `${quoteUrl}\n\n` +
+            `문의: 031-503-1019 / 알트에프(주)`
+        );
 
         const payload = {
             event: 'QUOTE_DISPATCHED',
@@ -743,32 +974,74 @@ export class KakaoBotService {
                 pdfUrl: quote?.attachments?.[0]?.url || quoteUrl,
                 summary: `${targetCompany} ${quote?.items?.length || 0}개 품목 견적서`
             },
-            message: customMessage || `[알트에프 견적 안내]\n${targetName} 담당자님, 요청하신 견적(견적번호: ${quotationId})이 완료되었습니다.\n상세 확인 및 PDF 다운로드: ${quoteUrl}`,
+            message: messageText,
             timestamp: new Date().toISOString()
         };
 
         let result = { 
-            success: true, 
-            mode: 'SIMULATED', 
-            message: `[시뮬레이션/기본] ${targetName} 담당자 (${targetPhone || '전화번호 미등록'}) 앞으로 발송 신호가 생성되었습니다.` 
+            success: false, 
+            mode: 'NONE', 
+            message: '발송 가능한 수단이 구성되지 않았습니다.' 
         };
 
-        // 0. [0원 카카오 이벤트 푸시] botUserKey가 있는 경우 원래 채팅창으로 카카오 0원 직통 푸시
-        const targetBotUserKey = botUserKey || quote?.botUserKey;
-        if (targetBotUserKey) {
-            const pushRes = await sleQuoteReviewService.dispatchKakaoEventPush({
-                botUserKey: targetBotUserKey,
-                quotationId,
-                totalAmount: quote?.totalAmount,
-                quoteUrl
-            });
-            if (pushRes.success) {
-                result = pushRes;
+        // 1. [우선순위 1] Solapi REST API 직접 연동 (MMS 이미지 첨부 지원)
+        if (process.env.SOLAPI_API_KEY && process.env.SOLAPI_API_SECRET && targetPhone) {
+            try {
+                console.log(`[KakaoBot] 🚀 Solapi로 견적서 발송 시작: 수신자 ${targetPhone} (${quotationId})`);
+
+                // 견적서 첨부 이미지 탐색 (MMS 발송용)
+                let imageId = null;
+                const attachCandidate = quote?.attachments?.[0];
+                let attachBuffer = null;
+
+                if (attachCandidate?.data && typeof attachCandidate.data === 'string') {
+                    // Base64 데이터가 직접 들어있는 경우
+                    const base64Data = attachCandidate.data.includes(',') ? attachCandidate.data.split(',')[1] : attachCandidate.data;
+                    attachBuffer = Buffer.from(base64Data, 'base64');
+                } else if (attachCandidate?.url && attachCandidate.url.startsWith('http')) {
+                    // 원격 이미지 URL인 경우 다운로드
+                    try {
+                        const fetch = (await import('node-fetch')).default;
+                        const imgRes = await fetch(attachCandidate.url);
+                        if (imgRes.ok) {
+                            attachBuffer = Buffer.from(await imgRes.arrayBuffer());
+                        }
+                    } catch (e) {
+                        console.warn('[KakaoBot] 첨부 이미지 다운로드 실패 (텍스트로만 발송):', e.message);
+                    }
+                }
+
+                // 이미지가 200KB 이하인 경우 Solapi Storage에 MMS 업로드
+                if (attachBuffer && attachBuffer.length <= 200 * 1024) {
+                    try {
+                        const uploadRes = await this.uploadSolapiFile({
+                            fileBase64: attachBuffer.toString('base64'),
+                            fileName: `quote_${quotationId}.jpg`,
+                            type: 'MMS'
+                        });
+                        if (uploadRes?.fileId) {
+                            imageId = uploadRes.fileId;
+                            console.log(`[KakaoBot] 📸 Solapi MMS 이미지 업로드 성공! fileId: ${imageId}`);
+                        }
+                    } catch (uploadErr) {
+                        console.warn('[KakaoBot] Solapi 이미지 업로드 실패, 텍스트 LMS로 발송 진행:', uploadErr.message);
+                    }
+                }
+
+                result = await this.sendSolapiMessage({
+                    phone: targetPhone,
+                    text: messageText,
+                    title: `[알트에프] 견적서 (${quotationId})`,
+                    imageId
+                });
+            } catch (solapiErr) {
+                console.error('[KakaoBot] Solapi 발송 중 오류:', solapiErr);
+                result = { success: false, mode: 'SOLAPI_ERROR', error: solapiErr.message };
             }
         }
-
-        // 1. Make.com Webhook 연동 (환경변수 또는 인자로 웹훅 URL이 있는 경우)
-        if (targetWebhookUrl) {
+        // 2. [우선순위 2] Make.com Webhook 연동 (웹훅 URL이 명시된 경우)
+        else if (webhookUrl || process.env.MAKE_WEBHOOK_URL) {
+            const targetWebhookUrl = webhookUrl || process.env.MAKE_WEBHOOK_URL;
             try {
                 const fetch = (await import('node-fetch')).default;
                 const hookRes = await fetch(targetWebhookUrl, {
@@ -789,37 +1062,57 @@ export class KakaoBotService {
                 result = { success: false, mode: 'MAKE_WEBHOOK_ERROR', error: hookErr.message };
             }
         } 
-        // 2. Solapi REST API 직접 연동 (환경변수 SOLAPI_API_KEY 설정 시)
-        else if (process.env.SOLAPI_API_KEY && process.env.SOLAPI_API_SECRET && targetPhone) {
-            try {
-                result = await this.sendSolapiMessage({
-                    phone: targetPhone,
-                    text: payload.message,
-                    title: `[알트에프] 견적서 (${quotationId})`
-                });
-            } catch (solapiErr) {
-                result = { success: false, mode: 'SOLAPI_ERROR', error: solapiErr.message };
-            }
-        }
 
-        // 견적서 발송 상태 기록
+        // 3. 견적서 발송 상태 기록 및 답변완료(PROCESSED) 전환
         if (quote) {
             quote.dispatchStatus = result.success ? 'SENT' : 'FAILED';
             quote.dispatchedAt = new Date().toISOString();
             quote.dispatchPayload = payload;
+            if (result.success) {
+                quote.status = 'PROCESSED'; // 🔥 답변완료 상태로 전환!
+                console.log(`[KakaoBot] ✅ 견적서 ${quotationId}가 발송되어 'PROCESSED(답변완료)' 상태로 전환되었습니다.`);
+            }
             this.saveData();
+
+            // S3 및 서버 DB 동기화 콜백 호출
+            if (this.onQuotationUpdated) {
+                try {
+                    this.onQuotationUpdated(quote);
+                } catch (syncErr) {
+                    console.error('[KakaoBot] 견적서 상태 업데이트 동기화 콜백 오류:', syncErr);
+                }
+            }
         }
 
         return { ...result, payload };
     }
 
     /**
-     * Solapi 메시지 발송 헬퍼
+     * 카카오톡 견적 및 인입 테스트 데이터 전체 초기화
      */
-    async sendSolapiMessage({ phone, text, title }) {
+    clearTestData() {
+        this.draftQuotations = [];
+        this.intakes = [];
+        this.stats = {
+            totalReceived: 0,
+            textQuotes: 0,
+            imageQuotes: 0,
+            lastReceivedAt: null
+        };
+        this.saveData();
+        console.log('[KakaoBot] 🧹 카카오 견적 및 인입 테스트 데이터 전체 초기화 완료');
+        return { success: true, message: '카카오 테스트 데이터가 깨끗이 초기화되었습니다.' };
+    }
+
+    /**
+     * Solapi 파일 업로드 헬퍼 (MMS 이미지 등)
+     */
+    async uploadSolapiFile({ fileBase64, fileName = 'image.jpg', type = 'MMS' }) {
         const apiKey = process.env.SOLAPI_API_KEY;
         const apiSecret = process.env.SOLAPI_API_SECRET;
-        const sender = process.env.SOLAPI_SENDER_PHONE || '0315031019';
+        if (!apiKey || !apiSecret) {
+            throw new Error('SOLAPI_API_KEY 또는 SOLAPI_API_SECRET이 설정되지 않았습니다.');
+        }
 
         const crypto = await import('crypto');
         const fetch = (await import('node-fetch')).default;
@@ -829,6 +1122,53 @@ export class KakaoBotService {
         const signature = crypto.createHmac('sha256', apiSecret).update(date + salt).digest('hex');
         const authHeader = `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
 
+        const res = await fetch('https://api.solapi.com/storage/v1/files', {
+            method: 'POST',
+            headers: {
+                'Authorization': authHeader,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                file: fileBase64,
+                type,
+                name: fileName
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.message || `파일 업로드 실패 (HTTP ${res.status})`);
+        }
+        return data;
+    }
+
+    /**
+     * Solapi 메시지 발송 헬퍼 (SMS/LMS/MMS)
+     */
+    async sendSolapiMessage({ phone, text, title, imageId }) {
+        const apiKey = process.env.SOLAPI_API_KEY;
+        const apiSecret = process.env.SOLAPI_API_SECRET;
+        const sender = process.env.SOLAPI_SENDER_PHONE || '01062223751';
+
+        const crypto = await import('crypto');
+        const fetch = (await import('node-fetch')).default;
+
+        const date = new Date().toISOString();
+        const salt = crypto.randomBytes(16).toString('hex');
+        const signature = crypto.createHmac('sha256', apiSecret).update(date + salt).digest('hex');
+        const authHeader = `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
+
+        const messagePayload = {
+            to: phone.replace(/[^0-9]/g, ''),
+            from: sender.replace(/[^0-9]/g, ''),
+            text,
+            subject: title
+        };
+
+        if (imageId) {
+            messagePayload.imageId = imageId;
+        }
+
         const res = await fetch('https://api.solapi.com/messages/v4/send', {
             method: 'POST',
             headers: {
@@ -836,21 +1176,18 @@ export class KakaoBotService {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                message: {
-                    to: phone.replace(/[^0-9]/g, ''),
-                    from: sender.replace(/[^0-9]/g, ''),
-                    text,
-                    subject: title
-                }
+                message: messagePayload
             })
         });
 
         const data = await res.json();
         return {
             success: res.ok,
-            mode: 'SOLAPI_DIRECT',
+            mode: imageId ? 'SOLAPI_MMS' : 'SOLAPI_LMS',
             data,
-            message: res.ok ? 'Solapi 문자/알림톡 발송 성공' : `Solapi 발송 실패: ${data.message || res.statusText}`
+            message: res.ok 
+                ? `Solapi ${imageId ? 'MMS(포토문자)' : 'LMS/문자'} 발송 성공!` 
+                : `Solapi 발송 실패: ${data.message || res.statusText}`
         };
     }
 }

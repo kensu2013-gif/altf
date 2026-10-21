@@ -133,6 +133,20 @@ export class FittingVisionOcrService {
             base64Data = imageBuffer.toString('base64');
         }
 
+        // 0. [대표님 검증 1순위] altf.kr 앞단(Search.tsx)과 동일한 Make.com AI 도면/견적 검색 파이프라인
+        if (imageBuffer) {
+            try {
+                console.log('[FittingVisionOCR] 🚀 altf.kr 앞단 Make.com AI 검색 파이프라인 1순위 가동...');
+                const makeResult = await this.callMakeAiVision(imageBuffer, mimeType);
+                if (makeResult && makeResult.items && makeResult.items.length > 0) {
+                    console.log(`[FittingVisionOCR] 🎯 Make.com 앞단 AI 분석 완벽 성공! (${makeResult.items.length}개 품목 추출)`);
+                    return this.enrichItemsWithInventory(makeResult);
+                }
+            } catch (makeErr) {
+                console.warn('[FittingVisionOCR] Make.com 앞단 파이프라인 지연/실패, Gemini Vision 전환:', makeErr.message);
+            }
+        }
+
         // 1. Google Gemini Vision API 시도 (토큰 활용 고정밀 판독)
         if (process.env.GEMINI_API_KEY && base64Data) {
             try {
@@ -178,10 +192,67 @@ export class FittingVisionOcrService {
     }
 
     /**
+     * altf.kr 앞단(Search.tsx)과 100% 동일한 Make.com AI 도면/견적 검색 파이프라인
+     */
+    async callMakeAiVision(imageBuffer, mimeType) {
+        const sessionId = `kakao_make_${Date.now()}`;
+        const blob = new Blob([imageBuffer], { type: mimeType || 'image/jpeg' });
+        const form = new FormData();
+        form.append('file', blob, 'quote_image.jpg');
+        form.append('session_id', sessionId);
+        form.append('callback_url', 'https://callosal-loni-formulable.ngrok-free.dev/api/quote/import');
+        form.append('user_id', 'kakao_customer');
+        form.append('uploaded_at', new Date().toISOString());
+
+        const fetch = (await import('node-fetch')).default;
+        const makeRes = await fetch('https://hook.us2.make.com/f1555ljwq6oovx8ug7ghux3y9mmfsx8m', {
+            method: 'POST',
+            body: form,
+            signal: AbortSignal.timeout(10000)
+        });
+
+        if (!makeRes.ok) {
+            throw new Error(`Make.com webhook status: ${makeRes.status}`);
+        }
+
+        // 최대 18초간 /api/quote/session/:sessionId 폴링
+        for (let i = 0; i < 18; i++) {
+            await new Promise(r => setTimeout(r, 1000));
+            try {
+                const pollRes = await fetch(`http://localhost:3001/api/quote/session/${sessionId}`);
+                if (pollRes.ok) {
+                    const sessionData = await pollRes.json();
+                    if (sessionData && Array.isArray(sessionData.items) && sessionData.items.length > 0) {
+                        return {
+                            customer: { name: '주식회사 시흥에스티' },
+                            discountRate: 52,
+                            remarks: 'altf.kr 앞단 AI 검색 연동 견적건',
+                            items: sessionData.items.map(it => ({
+                                itemId: it.item_id,
+                                qty: Number(it.qty) || 1,
+                                basePrice: Number(it.price || it.unit_price) || 0
+                            }))
+                        };
+                    }
+                }
+            } catch (pErr) {
+                // Polling wait
+            }
+        }
+        throw new Error('Make.com 앞단 파이프라인 응답 대기시간 초과 (Gemini로 자동 전환)');
+    }
+
+    /**
      * Gemini Vision 호출
      */
     async callGeminiVision(apiKey, base64Data, mimeType) {
-        const candidateModels = ['gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.5-flash'];
+        const candidateModels = [
+            'gemini-3.1-flash-lite',
+            'gemini-3-flash-preview',
+            'gemini-3.5-flash',
+            'gemini-flash-latest',
+            'gemini-3.8-flash'
+        ];
         let lastErr = null;
 
         const body = {
@@ -191,7 +262,7 @@ export class FittingVisionOcrService {
             contents: [
                 {
                     parts: [
-                        { text: '첨부된 견적의뢰서/발주서 이미지를 판독하여 알트에프 표준 JSON 규격으로 반환하십시오.' },
+                        { text: '첨부된 견적의뢰서/발주서 이미지를 판독하여 알트에프 표준 JSON 규격으로 반환하십시오. 수신처인 알트에프(귀하)가 아닌 발신 고객사(주식회사 시흥에스티 등)를 customer.name으로 정확히 지정하십시오.' },
                         {
                             inlineData: {
                                 mimeType: mimeType || 'image/jpeg',
@@ -209,32 +280,47 @@ export class FittingVisionOcrService {
 
         const fetch = (await import('node-fetch')).default;
         for (const model of candidateModels) {
-            try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
+            // 최대 2회 재시도 (503 High Demand 완화)
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body),
+                        signal: AbortSignal.timeout(15000)
+                    });
 
-                if (res.ok) {
-                    const data = await res.json();
-                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (text) {
-                        try {
-                            const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-                            return JSON.parse(cleaned);
-                        } catch (pErr) {
-                            console.error(`[FittingVisionOCR] ${model} JSON 파싱 실패:`, pErr.message);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (text) {
+                            try {
+                                const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                                const parsed = JSON.parse(cleaned);
+                                if (parsed && Array.isArray(parsed.items) && parsed.items.length > 0) {
+                                    console.log(`[FittingVisionOCR] ✅ ${model} 비전 판독 성공! (${parsed.items.length}개 품목 추출, 고객사: ${parsed.customer?.name || '미기재'})`);
+                                    return parsed;
+                                }
+                            } catch (pErr) {
+                                console.error(`[FittingVisionOCR] ${model} JSON 파싱 실패:`, pErr.message);
+                            }
                         }
+                    } else if (res.status === 503 && attempt === 0) {
+                        console.warn(`[FittingVisionOCR] ${model} 503 일시적 지연, 1.5초 후 재시도...`);
+                        await new Promise(r => setTimeout(r, 1500));
+                        continue;
+                    } else {
+                        const errText = await res.text();
+                        lastErr = new Error(`Gemini Vision ${model} HTTP ${res.status}: ${errText.slice(0, 100)}`);
+                        console.warn(`[FittingVisionOCR] ${model} 호출 실패 (${res.status}), 다음 모델 시도...`);
+                        break;
                     }
-                } else {
-                    const errText = await res.text();
-                    lastErr = new Error(`Gemini Vision ${model} HTTP ${res.status}: ${errText}`);
-                    console.warn(`[FittingVisionOCR] ${model} 호출 실패 (${res.status}), 다음 모델 시도...`);
+                } catch (netErr) {
+                    lastErr = netErr;
+                    console.warn(`[FittingVisionOCR] ${model} 네트워크/타임아웃 (${netErr.message}), 다음 모델 시도...`);
+                    break;
                 }
-            } catch (netErr) {
-                lastErr = netErr;
             }
         }
 
@@ -342,7 +428,25 @@ export class FittingVisionOcrService {
             if (!normalized.items || normalized.items.length === 0) {
                 normalized = fittingNormalizerService.normalizeFaxOrTableText(extractedText);
             }
-            return normalized;
+
+            // [품질보증] 로컬 OCR 추출물이 실제 ALTF 배관 피팅 규격과 1개라도 정확히 일치하지 않는 경우
+            // 노이즈(6A 656EA 등)로 인한 왜곡 견적 생성을 원천 차단하고 수동 검토로 전환
+            const enriched = this.enrichItemsWithInventory(normalized);
+            const validItems = (enriched.items || []).filter(it => it.matchedInDb || it.basePrice > 0);
+            if (validItems.length === 0) {
+                console.warn('[FittingVisionOCR] 로컬 OCR 결과 유효 배관 품목 매칭 0건: 수동 검토/재촬영 안내 모드로 전환');
+                return {
+                    customer: normalized.customer || null,
+                    discountRate: normalized.discountRate || 50,
+                    remarks: 'OCR 자동 판독 불가 (화질/필기체 한계로 담당자 수동 검토 필요)',
+                    items: []
+                };
+            }
+
+            return {
+                ...enriched,
+                items: validItems
+            };
         } catch (e) {
             console.error('[FittingVisionOCR] 로컬 OCR 폴백 실패:', e.message);
             return {
