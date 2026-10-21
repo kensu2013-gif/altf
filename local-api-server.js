@@ -21,6 +21,7 @@ import { purchaseBacklogBotService } from './server/services/purchaseBacklogBotS
 import { certificateIssuerService } from './server/services/certificateIssuer.js';
 import { daekyungInvoiceService } from './server/services/daekyungInvoiceService.js';
 import { telegramBotService } from './server/services/telegramBotService.js';
+import { makeCredentialService } from './server/services/makeCredentialService.js';
 
 import multer from 'multer';
 
@@ -1768,6 +1769,44 @@ const server = http.createServer(async (req, res) => {
                     message: '텔레그램 봇 설정이 저장되었습니다.',
                     ...telegramBotService.getStatus()
                 });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+    }
+
+    // ==========================================
+    // ⚡ DAT-01 : Make.com 크리덴셜 및 Reauthorize/Verify 자동화 REST API
+    // ==========================================
+    if (url.pathname.startsWith('/api/make/')) {
+        // 1. GET /api/make/connections : 전체 커넥션 및 요약 상태 조회
+        if (req.method === 'GET' && url.pathname === '/api/make/connections') {
+            const connections = makeCredentialService.getConnections();
+            const summary = makeCredentialService.getStatusSummary();
+            sendJsonResponse(req, res, 200, {
+                success: true,
+                summary,
+                connections
+            });
+            return;
+        }
+
+        // 2. POST /api/make/reauthorize : 특정 커넥션 또는 전체 만료 커넥션 Reauthorize & Verify 자동화 실행
+        if (req.method === 'POST' && url.pathname === '/api/make/reauthorize') {
+            try {
+                const body = await parseBody(req);
+                const { connectionId, all } = body || {};
+
+                if (all) {
+                    const result = await makeCredentialService.reauthorizeAllPending();
+                    sendJsonResponse(req, res, 200, result);
+                } else if (connectionId) {
+                    const result = await makeCredentialService.executeReauthorizeAndVerify(connectionId);
+                    sendJsonResponse(req, res, 200, result);
+                } else {
+                    sendJsonResponse(req, res, 400, { success: false, error: 'connectionId 또는 all:true 파라미터가 필요합니다.' });
+                }
             } catch (err) {
                 sendJsonResponse(req, res, 500, { success: false, error: err.message });
             }

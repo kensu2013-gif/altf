@@ -1,14 +1,14 @@
 [
   {
-    "id": "quote",
-    "name": "견적부",
-    "code": "EST",
+    "id": "sle",
+    "name": "영업부",
+    "code": "SLE",
     "color": "#00F0FF",
     "bgGlow": "rgba(0, 240, 255, 0.15)",
-    "icon": "📝",
-    "description": "24시간 견적 인입 파싱, 규격 매핑, 단가/마진 산출 및 고객 회신",
-    "headRole": "견적 총괄 자동화",
-    "totalUnits": 10
+    "icon": "💼",
+    "description": "고객 접수 인입, 문서 표준화, 거래처 요율 적용 견적 초안 및 회신 자동화",
+    "headRole": "영업 총괄 관리",
+    "totalUnits": 5
   },
   {
     "id": "purchase",
@@ -17,20 +17,9 @@
     "color": "#00E676",
     "bgGlow": "rgba(0, 230, 118, 0.15)",
     "icon": "🛒",
-    "description": "대경재고 감시, 안전재고 부족 선매입 발주 및 외주 발주서 생성",
+    "description": "고객 발주서 등록, 견적 대조, S/D/M 경로 판별, 대경 매입발주 및 미결 관제",
     "headRole": "구매/SCM 총괄",
-    "totalUnits": 9
-  },
-  {
-    "id": "general",
-    "name": "총무부",
-    "code": "GEN",
-    "color": "#FFD600",
-    "bgGlow": "rgba(255, 214, 0, 0.15)",
-    "icon": "📑",
-    "description": "전자세금계산서, 거래명세표 발행, 입금 대조 및 여신 한도 관리",
-    "headRole": "경리/회계 총괄",
-    "totalUnits": 10
+    "totalUnits": 5
   },
   {
     "id": "quality",
@@ -39,63 +28,55 @@
     "color": "#FF0055",
     "bgGlow": "rgba(255, 0, 85, 0.15)",
     "icon": "🔬",
-    "description": "외주/재고 성적서(MTC) 판독, 구글시트 DB화, 매칭 및 성적서 자동 발송",
+    "description": "외주 성적서 수집, 26개 컬럼 파싱, 시화 성적서 무결점 발행 및 누락 경보",
     "headRole": "품질 보증(QA) 총괄",
-    "totalUnits": 10
+    "totalUnits": 5
   },
   {
     "id": "shipping",
-    "name": "출고부",
+    "name": "출고물류부",
     "code": "LOG",
     "color": "#7C4DFF",
     "bgGlow": "rgba(124, 77, 255, 0.15)",
     "icon": "🚚",
-    "description": "출고 신호 발행, 미결 관리, 화물 배차 및 운송장 자동 알림",
+    "description": "시화 창고 출고 지시, 포장 완료 신호 감지, MES 출고 번호 및 LOT 연동",
     "headRole": "물류/출고 총괄",
-    "totalUnits": 9
+    "totalUnits": 3
   },
   {
-    "id": "data",
-    "name": "데이터관리부",
-    "code": "DAT",
-    "color": "#00B0FF",
-    "bgGlow": "rgba(0, 176, 255, 0.15)",
-    "icon": "💾",
-    "description": "대경 재고 크롤링, 시화/부산 색인, 유사도 엔진 및 S3 동기화",
-    "headRole": "데이터 아키텍트",
-    "totalUnits": 10
-  },
-  {
-    "id": "material",
-    "name": "자재관리부",
-    "code": "MAT",
-    "color": "#FF6D00",
-    "bgGlow": "rgba(255, 109, 0, 0.15)",
-    "icon": "📦",
-    "description": "창고 랙 위치 추적, 장기 과잉재고 유동화, 실사 오차 보정",
-    "headRole": "창고 자재 총괄",
-    "totalUnits": 9
+    "id": "general",
+    "name": "총무부",
+    "code": "GEN",
+    "color": "#FFD600",
+    "bgGlow": "rgba(255, 214, 0, 0.15)",
+    "icon": "📑",
+    "description": "매출 거래명세표 생성, 성적서 결합 서류 패키징 번들링, CRM 거래처 마스터",
+    "headRole": "경리/총무 총괄",
+    "totalUnits": 3
   },
   {
     "id": "executive",
-    "name": "경영지원부",
+    "name": "관제·게이트부",
     "code": "EXE",
     "color": "#E040FB",
     "bgGlow": "rgba(224, 64, 251, 0.15)",
     "icon": "👑",
-    "description": "CEO 일일 결산 브리핑, 자금 흐름 예측, 이탈 고객 감지 및 최종 승인",
-    "headRole": "CEO 전략실",
-    "totalUnits": 9
+    "description": "고객/매입처 단일 발송 게이트 통제, 승인 대기열 관리, 전사 업무 병목 감시",
+    "headRole": "발송 게이트 & 운영 관제",
+    "totalUnits": 2
   },
   {
-    "id": "sle",
-    "name": "영업부",
-    "code": "SLE",
-    "color": "#7cd4da",
-    "bgGlow": "#7cd4da26",
-    "icon": "🤖",
-    "headRole": "부서 총괄 자동화",
-    "description": "영업부 자율 에이전트 관제",
-    "totalUnits": 6
+    "id": "dat",
+    "name": "데이터관리팀",
+    "code": "DAT",
+    "color": "#F59E0B",
+    "bgGlow": "rgba(245, 158, 11, 0.15)",
+    "icon": "⚡",
+    "headRole": "데이터 인프라 & Make.com 크리덴셜 총괄",
+    "description": "Make.com OAuth 연결 상시 감시, 구글/MS Reauthorize 및 Verify 자동화, 전사 원장 관리",
+    "totalUnits": 5,
+    "teams": [
+      "자동화인프라팀"
+    ]
   }
 ]

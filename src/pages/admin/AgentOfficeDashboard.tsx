@@ -4,6 +4,7 @@ import {
     INITIAL_AGENTS, 
     EVENT_NETWORKS, 
     POSITION_CONFIG,
+    SCHEDULE_INTERVALS,
     type AgentUnit,
     type AgentStatus,
     type AgentPosition,
@@ -43,15 +44,17 @@ import {
     FolderOpen,
     ChevronDown,
     Zap,
-    Users
+    Users,
+    UserPlus,
+    Clock
 } from 'lucide-react';
 import { CertificateLedgerModal } from '../../components/admin/CertificateLedgerModal';
 import { PurchaseLedgerModal } from '../../components/admin/PurchaseLedgerModal';
 import { CertificateIssuerModal } from '../../components/admin/CertificateIssuerModal';
 import { DaekyungInvoiceModal } from '../../components/admin/DaekyungInvoiceModal';
 
-const STORAGE_KEY = 'altf_agent_swarm_custom_v4';
-const STORAGE_DEPT_KEY = 'altf_departments_v2';
+const STORAGE_KEY = 'altf_agent_swarm_core18_v1';
+const STORAGE_DEPT_KEY = 'altf_departments_core6_v1';
 
 // 👑 에이전트 정렬 규칙:
 // 1. 실제 생성되어 가동 중인 봇(isCreated === true)이 앞, 아직 만들어지지 않은 봇(isCreated !== true)은 항상 맨 뒤
@@ -210,10 +213,13 @@ export default function AgentOfficeDashboard() {
             deptId: a.deptId,
             isCreated: a.isCreated,
             teamName: a.teamName,
+            assignedHuman: a.assignedHuman,
+            requiresApproval: a.requiresApproval,
             orderIndex: a.orderIndex,
             supervisorId: a.supervisorId,
             connectedDeptIds: a.connectedDeptIds,
-            connectedAgentIds: a.connectedAgentIds
+            connectedAgentIds: a.connectedAgentIds,
+            scheduleInterval: a.scheduleInterval
         })));
 
         // 구조적 변경이 없으면 백엔드 파일 재작성 및 네트워크 요청을 방지함
@@ -495,12 +501,15 @@ export default function AgentOfficeDashboard() {
         code: '',
         name: '',
         role: '',
+        teamName: '',
         status: 'ACTIVE' as AgentStatus,
-        tier: 3,
+        tier: 2,
         position: '사원' as AgentPosition,
         supervisorId: '',
         connectedDeptIds: [] as string[],
-        connectedAgentIds: [] as string[]
+        connectedAgentIds: [] as string[],
+        assignedHuman: '',
+        requiresApproval: false
     });
 
     // 인스펙터 수정 폼 상태
@@ -514,8 +523,14 @@ export default function AgentOfficeDashboard() {
         position: '사원' as AgentPosition,
         supervisorId: '',
         connectedDeptIds: [] as string[],
-        connectedAgentIds: [] as string[]
+        connectedAgentIds: [] as string[],
+        assignedHuman: '',
+        requiresApproval: false,
+        scheduleInterval: '24h'
     });
+
+    // ⏱️ 카드 외부 주기 설정 드롭다운 팝오버 상태
+    const [activeScheduleDropdownAgentId, setActiveScheduleDropdownAgentId] = useState<string | null>(null);
 
     // 카드 내 인라인 식별 코드(QC-01 등) 및 에이전트 이름 직접 수정 상태
     const [editingCodeAgentId, setEditingCodeAgentId] = useState<string | null>(null);
@@ -598,6 +613,65 @@ export default function AgentOfficeDashboard() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    // ⚡ DAT-01 : Make.com 크리덴셜 및 Reauthorize/Verify 자동화 상태
+    const [makeConnections, setMakeConnections] = useState<any[]>([]);
+    const [makeSummary, setMakeSummary] = useState<any>(null);
+    const [isReauthorizingMake, setIsReauthorizingMake] = useState<string | null>(null);
+    const [makeActionLogs, setMakeActionLogs] = useState<string[]>([]);
+
+    const fetchMakeConnections = async () => {
+        try {
+            const res = await fetch('/api/make/connections');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success) {
+                    setMakeConnections(data.connections || []);
+                    setMakeSummary(data.summary || null);
+                }
+            }
+        } catch (e) {
+            console.error('Make.com 커넥션 조회 실패:', e);
+        }
+    };
+
+    const handleReauthorizeMakeConnection = async (connectionId?: string) => {
+        setIsReauthorizingMake(connectionId || 'ALL');
+        try {
+            const res = await fetch('/api/make/reauthorize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(connectionId ? { connectionId } : { all: true })
+            });
+            const data = await res.json();
+            if (data.success) {
+                if (data.steps) {
+                    setMakeActionLogs(prev => [...data.steps, ...prev]);
+                }
+                alert(data.message || 'Make.com 커넥션 Reauthorize 및 Verify가 완료되었습니다.');
+                fetchMakeConnections();
+                try {
+                    const agRes = await fetch('/api/agents');
+                    if (agRes.ok) {
+                        const agData = await agRes.json();
+                        if (agData.agents) setAgents(agData.agents);
+                    }
+                } catch {}
+            } else {
+                alert('실패: ' + (data.error || '오류 발생'));
+            }
+        } catch (err) {
+            alert('요청 실패: ' + err);
+        } finally {
+            setIsReauthorizingMake(null);
+        }
+    };
+
+    useEffect(() => {
+        if (selectedAgent?.code === 'DAT-01' || selectedAgent?.id === 'dat-slot-1') {
+            fetchMakeConnections();
+        }
+    }, [selectedAgent]);
 
     const [qc02Loading, setQc02Loading] = useState<boolean>(false);
     const [qc02Result, setQc02Result] = useState<{
@@ -881,7 +955,14 @@ export default function AgentOfficeDashboard() {
             position: agent.position || '사원',
             supervisorId: agent.supervisorId || '',
             connectedDeptIds: deptIds,
-            connectedAgentIds: agent.connectedAgentIds || []
+            connectedAgentIds: agent.connectedAgentIds || [],
+            assignedHuman: agent.assignedHuman || '',
+            requiresApproval: !!agent.requiresApproval,
+            scheduleInterval: agent.scheduleInterval || (
+                agent.code === 'QC-01' ? 'REALTIME' :
+                agent.code === 'QC-02' ? '30m' :
+                agent.code === 'DAT-01' ? '8h' : '24h'
+            )
         });
         setActiveDeptForEdit(deptIds.length > 0 ? deptIds[0] : (agent.deptId === 'quote' ? 'quality' : 'quote'));
     };
@@ -890,6 +971,7 @@ export default function AgentOfficeDashboard() {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
+                if (activeScheduleDropdownAgentId) setActiveScheduleDropdownAgentId(null);
                 if (editingCodeAgentId) setEditingCodeAgentId(null);
                 if (editingNameAgentId) setEditingNameAgentId(null);
                 if (creatingSlot) setCreatingSlot(null);
@@ -1238,6 +1320,9 @@ export default function AgentOfficeDashboard() {
                     supervisorId: editForm.supervisorId,
                     connectedDeptIds: editForm.connectedDeptIds,
                     connectedAgentIds: editForm.connectedAgentIds,
+                    assignedHuman: editForm.assignedHuman.trim(),
+                    requiresApproval: editForm.requiresApproval,
+                    scheduleInterval: editForm.scheduleInterval,
                     lastActive: '방금 전'
                 };
             }
@@ -1253,9 +1338,23 @@ export default function AgentOfficeDashboard() {
             position: editForm.position,
             supervisorId: editForm.supervisorId,
             connectedDeptIds: editForm.connectedDeptIds,
-            connectedAgentIds: editForm.connectedAgentIds
+            connectedAgentIds: editForm.connectedAgentIds,
+            assignedHuman: editForm.assignedHuman.trim(),
+            requiresApproval: editForm.requiresApproval,
+            scheduleInterval: editForm.scheduleInterval
         } : null);
-        alert('에이전트 식별 코드, 이름, 직위(서열), 가동 상태 및 연계 담당자가 성공적으로 저장되었습니다.');
+        alert('에이전트 식별 코드, 이름, 직위(서열), 반복 주기(스케줄) 및 연계 정보가 성공적으로 저장되었습니다.');
+    };
+
+    // ⏱️ 카드 외부 주기 설정 원클릭 변경 핸들러
+    const handleSetScheduleInterval = (agentId: string, intervalId: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setAgents(prev => prev.map(a => a.id === agentId ? { ...a, scheduleInterval: intervalId } : a));
+        if (selectedAgent && selectedAgent.id === agentId) {
+            setSelectedAgent(prev => prev ? { ...prev, scheduleInterval: intervalId } : null);
+            setEditForm(prev => ({ ...prev, scheduleInterval: intervalId }));
+        }
+        setActiveScheduleDropdownAgentId(null);
     };
 
     // 직위 승진 (사원 ➔ 대리 ➔ 과장 ➔ 팀장)
@@ -1441,6 +1540,66 @@ export default function AgentOfficeDashboard() {
         setSelectedAgent(null);
     };
 
+    // ➕ 신규 팀원 추가 모달 오픈 핸들러 (특정 부서 및 세부 팀 지정)
+    const handleOpenAddTeamMember = (dept: Department, targetTeamName?: string) => {
+        const existingCodes = agents.filter(a => a.deptId === dept.id).map(a => a.code);
+        let nextNum = 1;
+        const prefix = (dept.code || dept.id).toUpperCase();
+        const regex = new RegExp(`^${prefix}[-_]?0*(\\d+)`, 'i');
+        existingCodes.forEach(c => {
+            const m = c.match(regex);
+            if (m) {
+                const n = parseInt(m[1], 10);
+                if (n >= nextNum) nextNum = n + 1;
+            }
+        });
+        const suggestedCode = `${prefix}-${String(nextNum).padStart(2, '0')}`;
+        const newId = `ag_${dept.id}_${Date.now()}`;
+        const defaultTeam = targetTeamName || (dept.teams && dept.teams.length > 0 ? dept.teams[0] : `${dept.name}팀`);
+
+        const slot: AgentUnit = {
+            id: newId,
+            code: suggestedCode,
+            name: '',
+            deptId: dept.id,
+            deptName: dept.name,
+            teamName: defaultTeam,
+            role: '',
+            status: 'ACTIVE',
+            tier: 2,
+            position: '사원',
+            supervisorId: '',
+            isCreated: false,
+            connectedDeptIds: [dept.id],
+            connectedAgentIds: [],
+            currentTask: '신규 팀원 배포 대기 중',
+            lastActive: '방금 전',
+            metrics: { speed: 95, accuracy: 99, load: 10, uptime: '99.9%', tasksToday: 0 },
+            triggerEvents: [],
+            emittedEvents: [],
+            logs: [],
+            assignedHuman: '',
+            requiresApproval: false
+        };
+
+        setCreatingSlot(slot);
+        setActiveDeptForCreate(dept.id);
+        setCreateForm({
+            code: suggestedCode,
+            name: '',
+            role: '',
+            teamName: defaultTeam,
+            status: 'ACTIVE',
+            tier: 2,
+            position: '사원',
+            supervisorId: '',
+            connectedDeptIds: [dept.id],
+            connectedAgentIds: [],
+            assignedHuman: '',
+            requiresApproval: false
+        });
+    };
+
     // 신규 에이전트 생성 및 활성화
     const handleDeployAgent = () => {
         if (!creatingSlot) return;
@@ -1451,42 +1610,83 @@ export default function AgentOfficeDashboard() {
 
         const deptTags = createForm.connectedDeptIds;
         const agentTags = createForm.connectedAgentIds;
-        setAgents(prev => prev.map(a => {
-            if (a.id === creatingSlot.id) {
-                return {
-                    ...a,
-                    code: createForm.code.trim() || a.code,
-                    name: createForm.name.trim(),
-                    role: createForm.role.trim() || '사용자 정의 자율 에이전트',
-                    status: createForm.status,
-                    tier: createForm.tier,
-                    position: createForm.position,
-                    supervisorId: createForm.supervisorId,
-                    isCreated: true,
-                    connectedDeptIds: deptTags,
-                    connectedAgentIds: agentTags,
-                    currentTask: '24시간 무한 가동 준비 완료',
-                    lastActive: '방금 전',
-                    logs: [
-                        `[${new Date().toTimeString().split(' ')[0]}] [${createForm.position}] 직위 배정 및 에이전트 신규 배포 완료 (연계: ${deptTags.length}개 부서, ${agentTags.length}명 담당자)`
-                    ]
-                };
-            }
-            return a;
-        }));
+        const exists = agents.some(a => a.id === creatingSlot.id);
+        const resolvedTeamName = createForm.teamName || creatingSlot.teamName || '';
+
+        if (exists) {
+            setAgents(prev => prev.map(a => {
+                if (a.id === creatingSlot.id) {
+                    return {
+                        ...a,
+                        code: createForm.code.trim() || a.code,
+                        name: createForm.name.trim(),
+                        role: createForm.role.trim() || '사용자 정의 자율 에이전트',
+                        teamName: resolvedTeamName || a.teamName,
+                        assignedHuman: createForm.assignedHuman || a.assignedHuman || '',
+                        requiresApproval: createForm.requiresApproval ?? a.requiresApproval ?? false,
+                        status: createForm.status,
+                        tier: createForm.tier,
+                        position: createForm.position,
+                        supervisorId: createForm.supervisorId,
+                        isCreated: true,
+                        connectedDeptIds: deptTags,
+                        connectedAgentIds: agentTags,
+                        currentTask: '24시간 무한 가동 준비 완료',
+                        lastActive: '방금 전',
+                        logs: [
+                            `[${new Date().toTimeString().split(' ')[0]}] [${createForm.position}] 직위 배정 및 에이전트 업데이트 완료 (팀: ${resolvedTeamName || '미지정'}, 연계: ${deptTags.length}개 부서, ${agentTags.length}명 담당자)`
+                        ]
+                    };
+                }
+                return a;
+            }));
+        } else {
+            const newAgent: AgentUnit = {
+                id: creatingSlot.id,
+                code: createForm.code.trim() || creatingSlot.code,
+                name: createForm.name.trim(),
+                deptId: creatingSlot.deptId,
+                deptName: creatingSlot.deptName,
+                teamName: resolvedTeamName,
+                assignedHuman: createForm.assignedHuman || '',
+                requiresApproval: createForm.requiresApproval ?? false,
+                role: createForm.role.trim() || '사용자 정의 자율 에이전트',
+                status: createForm.status,
+                tier: createForm.tier,
+                position: createForm.position,
+                supervisorId: createForm.supervisorId,
+                isCreated: true,
+                connectedDeptIds: deptTags,
+                connectedAgentIds: agentTags,
+                currentTask: '24시간 무한 가동 준비 완료',
+                lastActive: '방금 전',
+                orderIndex: agents.filter(a => a.deptId === creatingSlot.deptId).length + 1,
+                metrics: creatingSlot.metrics || { speed: 95, accuracy: 99, load: 10, uptime: '99.9%', tasksToday: 0 },
+                triggerEvents: creatingSlot.triggerEvents || [],
+                emittedEvents: creatingSlot.emittedEvents || [],
+                logs: [
+                    `[${new Date().toTimeString().split(' ')[0]}] [${createForm.position}] 신규 팀원 배포 완료 (소속팀: ${resolvedTeamName || '미지정'}, 연계: ${deptTags.length}개 부서, ${agentTags.length}명 담당자)`
+                ]
+            };
+            setAgents(prev => [...prev, newAgent]);
+        }
+
         setCreatingSlot(null);
         setCreateForm({ 
             code: '',
             name: '', 
             role: '', 
+            teamName: '',
             status: 'ACTIVE', 
-            tier: 3, 
+            tier: 2, 
             position: '사원', 
             supervisorId: '', 
             connectedDeptIds: [], 
-            connectedAgentIds: [] 
+            connectedAgentIds: [],
+            assignedHuman: '',
+            requiresApproval: false
         });
-        alert(`[${createForm.position} ${createForm.name}] 에이전트가 성공적으로 생성 및 조직도에 배치되었습니다!`);
+        alert(`[${createForm.position} ${createForm.name}] 에이전트가 성공적으로 생성 및 [${resolvedTeamName || '조직도'}]에 배치되었습니다!`);
     };
 
     // 전체화면 토글
@@ -1600,6 +1800,67 @@ export default function AgentOfficeDashboard() {
             </div>
         );
 
+        // ⏱️ 봇 업무 반복 주기 선택 팝오버 렌더러 (실시간 신호 감지, 10분, 30분, 1시간, 3시간, 8시간(하루 3번), 12시간(하루 2번), 24시간(하루 1번), 수동)
+        const renderScheduleDropdown = () => {
+            const currentSched = agent.scheduleInterval || (
+                agent.code === 'QC-01' ? 'REALTIME' :
+                agent.code === 'QC-02' ? '30m' :
+                agent.code === 'DAT-01' ? '8h' : '24h'
+            );
+            return (
+                <div 
+                    className="absolute right-0 top-full mt-1.5 w-72 rounded-xl border border-cyan-500/50 bg-[#09101F] shadow-[0_0_25px_rgba(0,240,255,0.35)] z-50 p-2 text-xs text-slate-200 animate-in fade-in duration-150 text-left font-sans backdrop-blur-md"
+                    onClick={e => e.stopPropagation()}
+                >
+                    <div className="text-[10px] font-mono text-cyan-300 px-2 py-1 border-b border-slate-800 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 font-bold">
+                            <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>반복 가동 주기 설정</span>
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-mono font-bold">{agent.code}</span>
+                    </div>
+                    
+                    <div className="max-h-64 overflow-y-auto py-1.5 space-y-1">
+                        {SCHEDULE_INTERVALS.map(opt => {
+                            const isSelected = currentSched === opt.id;
+                            return (
+                                <button
+                                    key={opt.id}
+                                    onClick={(e) => handleSetScheduleInterval(agent.id, opt.id, e)}
+                                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] flex flex-col gap-0.5 transition-all cursor-pointer ${
+                                        isSelected
+                                            ? 'bg-cyan-950/80 text-cyan-300 font-bold border border-cyan-500/70 shadow-[0_0_10px_rgba(0,240,255,0.25)]'
+                                            : 'hover:bg-slate-800/80 text-slate-300 border border-transparent'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className="flex items-center gap-1.5">
+                                            <span>{opt.icon}</span>
+                                            <span className="font-bold">{opt.shortBadge}</span>
+                                        </span>
+                                        {isSelected && <Check className="w-3 h-3 text-cyan-400 shrink-0" />}
+                                    </div>
+                                    <span className="text-[9.5px] text-slate-400 font-normal leading-tight">
+                                        {opt.label}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="border-t border-slate-800 pt-1 mt-1 px-1 flex items-center justify-between text-[9px] text-slate-500 font-mono">
+                        <span>* 즉시 스케줄러에 영구 반영</span>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setActiveScheduleDropdownAgentId(null); }}
+                            className="text-cyan-400 hover:text-cyan-300 font-bold"
+                        >
+                            닫기
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
         // ─────────────────────────────────────────────────────────────
         // CASE A: 아직 생성되지 않은 슬롯 ➔ [+ AGENT 생성] 카드 노출
         // ─────────────────────────────────────────────────────────────
@@ -1614,12 +1875,15 @@ export default function AgentOfficeDashboard() {
                             code: agent.code || '',
                             name: agent.name || '',
                             role: agent.role || '',
-                            status: 'ACTIVE',
+                            teamName: agent.teamName || '',
+                            status: agent.status || 'ACTIVE',
                             tier: agent.tier || 2,
                             position: pos,
                             supervisorId: agent.supervisorId || '',
                             connectedDeptIds: deptIds,
-                            connectedAgentIds: agent.connectedAgentIds || []
+                            connectedAgentIds: agent.connectedAgentIds || [],
+                            assignedHuman: agent.assignedHuman || '',
+                            requiresApproval: agent.requiresApproval ?? false
                         });
                         setActiveDeptForCreate(deptIds.length > 0 ? deptIds[0] : (agent.deptId === 'quote' ? 'quality' : 'quote'));
                     }}
@@ -1699,6 +1963,14 @@ export default function AgentOfficeDashboard() {
         const isStandby = agent.status === 'STANDBY';
         const isIdle = agent.status === 'IDLE';
 
+        // ⏱️ 봇별 개별 반복/감지 주기 판별 (QC-01: 실시간, QC-02: 30분, DAT-01: 8시간, 기본: 24시간)
+        const schedId = agent.scheduleInterval || (
+            agent.code === 'QC-01' ? 'REALTIME' :
+            agent.code === 'QC-02' ? '30m' :
+            agent.code === 'DAT-01' ? '8h' : '24h'
+        );
+        const schedOpt = SCHEDULE_INTERVALS.find(s => s.id === schedId) || SCHEDULE_INTERVALS[7];
+
         return (
             <div
                 key={agent.id}
@@ -1718,8 +1990,8 @@ export default function AgentOfficeDashboard() {
                     minWidth: isHead ? '280px' : isChief ? '250px' : '230px'
                 }}
             >
-                {/* 상단 직위 뱃지 & 코드 & 소속팀 & 상태 컨트롤러 */}
-                <div className="flex items-center justify-between text-[10px] mb-2 pb-1.5 border-b border-slate-800/80">
+                {/* 상단 직위 뱃지 & 코드 & 우측 상태 토글 (ACT/STB/IDL/OFF) - 부서명 텍스트 중첩 문제 완전 해소 */}
+                <div className="flex items-center justify-between text-[10px] mb-1.5 pb-1 border-b border-slate-800/80 gap-1.5">
                     <div className="flex items-center gap-1.5 min-w-0">
                         <span 
                             className="px-1.5 py-0.5 rounded text-[10px] font-black flex items-center gap-1 shadow-sm shrink-0"
@@ -1729,7 +2001,7 @@ export default function AgentOfficeDashboard() {
                             <span>{pos}</span>
                         </span>
 
-                        {/* 담당자 식별 코드 (인라인 직접 수정 지원: QC-01 등 클릭 시 즉시 입력 전환) */}
+                        {/* 담당자 식별 코드 (줄바꿈 없이 한 줄로 고정 표시) */}
                         {editingCodeAgentId === agent.id ? (
                             <input
                                 autoFocus
@@ -1742,48 +2014,33 @@ export default function AgentOfficeDashboard() {
                                 }}
                                 onBlur={() => handleSaveCode(agent.id)}
                                 onClick={(e) => e.stopPropagation()}
-                                className="px-1.5 py-0.5 bg-black text-cyan-300 border border-cyan-400 rounded text-[10px] font-bold w-24 outline-none shadow-[0_0_8px_rgba(0,240,255,0.7)] font-mono"
+                                className="px-1.5 py-0.5 bg-black text-cyan-300 border border-cyan-400 rounded text-[10px] font-bold w-20 outline-none shadow-[0_0_8px_rgba(0,240,255,0.7)] font-mono shrink-0"
                                 placeholder="식별코드"
                                 title="Enter 저장, Esc 취소"
                             />
                         ) : (
                             <div
-                                className="group/code flex items-center gap-1 cursor-pointer hover:bg-slate-800/80 px-1 py-0.5 rounded transition-all"
+                                className="group/code flex items-center gap-1 cursor-pointer hover:bg-slate-800/80 px-1 py-0.5 rounded transition-all shrink-0"
                                 onClick={(e) => handleStartEditCode(agent, e)}
                                 title="클릭하여 담당자 식별코드(QC-01 등) 직접 수정"
                             >
-                                <span className="font-bold text-slate-200 group-hover/code:text-cyan-300 transition-colors">
+                                <span className="font-bold text-slate-200 group-hover/code:text-cyan-300 transition-colors whitespace-nowrap font-mono text-[11px]">
                                     {agent.code}
                                 </span>
-                                <Edit2 className="w-2.5 h-2.5 text-slate-500 opacity-0 group-hover/code:opacity-100 transition-opacity" />
+                                <Edit2 className="w-2.5 h-2.5 text-slate-500 opacity-0 group-hover/code:opacity-100 transition-opacity shrink-0" />
                             </div>
                         )}
 
-                        <span className="text-[9px] font-mono px-1 rounded opacity-80 shrink-0" style={{ color: currentDept?.color || '#00F0FF' }}>
-                            {currentDept?.name || agent.deptName}
-                        </span>
-
-                        {/* 👥 소속 팀 배정 및 이동 드롭다운 (카드를 팀에 넣고 빼기) */}
-                        <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
-                            <button
-                                onClick={() => setActiveTeamDropdownAgentId(activeTeamDropdownAgentId === agent.id ? null : agent.id)}
-                                className={`px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-1 border transition-all ${
-                                    agent.teamName
-                                        ? 'border-indigo-500/70 bg-indigo-950/70 text-indigo-300 hover:border-indigo-400'
-                                        : 'border-slate-800 bg-slate-900/80 text-slate-500 hover:text-slate-300'
-                                }`}
-                                title="소속 팀 변경 및 배정/제외 (카드를 팀에 넣고 빼기)"
-                            >
-                                <Users className="w-2.5 h-2.5 text-indigo-400" />
-                                <span className="max-w-[65px] truncate">{agent.teamName || '미배정'}</span>
-                                <ChevronDown className="w-2.5 h-2.5 opacity-60" />
-                            </button>
-                            {activeTeamDropdownAgentId === agent.id && renderTeamDropdown()}
-                        </div>
+                        {/* 소속 1팀/2팀 등 세부 팀명이 설정되어 있을 때만 미니 태그 표시 (부서 전체명 출력 제거) */}
+                        {agent.teamName && (
+                            <span className="text-[9px] font-sans px-1.5 py-0.2 rounded bg-indigo-950/60 border border-indigo-500/30 text-indigo-300 shrink-0 font-medium truncate max-w-[70px]" title={`소속팀: ${agent.teamName}`}>
+                                {agent.teamName}
+                            </span>
+                        )}
                     </div>
 
-                    {/* 카드 위 상태 강제 토글 버튼 */}
-                    <div className="flex items-center gap-0.5 bg-black/50 p-0.5 rounded border border-slate-800" onClick={e => e.stopPropagation()}>
+                    {/* 카드 위 상태 강제 토글 버튼 (우측 끝 정렬 고정, 코드 및 팀명과 절대 겹치지 않음) */}
+                    <div className="flex items-center gap-0.5 bg-black/60 p-0.5 rounded border border-slate-800 shrink-0 ml-auto" onClick={e => e.stopPropagation()}>
                         {(['ACTIVE', 'STANDBY', 'IDLE', 'OFFLINE'] as const).map(st => (
                             <button
                                 key={st}
@@ -1805,6 +2062,37 @@ export default function AgentOfficeDashboard() {
                             </button>
                         ))}
                     </div>
+                </div>
+
+                {/* 👥 소속 팀 배정 바 (전용 서브라인으로 완전히 분리하여 상태 버튼과 절대 중첩되지 않음) */}
+                <div className="flex items-center justify-between text-[9px] mb-2 px-1.5 py-0.5 rounded bg-slate-900/60 border border-slate-800/80">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                        <Users className="w-2.5 h-2.5 text-indigo-400 shrink-0" />
+                        <span className="text-slate-400 text-[9px] font-mono shrink-0">소속팀:</span>
+                        <div className="relative" onClick={e => e.stopPropagation()}>
+                            <button
+                                onClick={() => setActiveTeamDropdownAgentId(activeTeamDropdownAgentId === agent.id ? null : agent.id)}
+                                className={`px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-1 border transition-all ${
+                                    agent.teamName
+                                        ? 'border-indigo-500/70 bg-indigo-950/80 text-indigo-300 hover:border-indigo-400 hover:bg-indigo-900/60'
+                                        : 'border-slate-700 bg-slate-800/80 text-slate-400 hover:text-slate-200'
+                                }`}
+                                title="소속 팀 변경 및 배정/제외 (클릭하여 다른 팀으로 즉시 이동)"
+                            >
+                                <span className="max-w-[120px] truncate">{agent.teamName || '팀 미배정'}</span>
+                                <ChevronDown className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                            </button>
+                            {activeTeamDropdownAgentId === agent.id && renderTeamDropdown()}
+                        </div>
+                    </div>
+
+                    {/* 배정된 사람 담당자 (1인 1역할) */}
+                    {agent.assignedHuman && (
+                        <div className="flex items-center gap-1 text-amber-300/90 text-[8px] font-mono shrink-0 truncate max-w-[100px]" title={`배정된 실제 사람 담당자: ${agent.assignedHuman}`}>
+                            <span>👤</span>
+                            <span className="truncate">{agent.assignedHuman}</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* 중앙 에이전트 정보 & 레이더 & 승인 상태 배지 */}
@@ -1872,39 +2160,45 @@ export default function AgentOfficeDashboard() {
                             </div>
                         </div>
 
-                        {/* 결재선 확인·승인 상태 (Check & Balance Badge) */}
-                        <div className="shrink-0 ml-2">
-                            {isStaff ? (
-                                <span className="text-[9px] px-2 py-0.5 rounded font-black border border-cyan-500/60 bg-cyan-950/70 text-cyan-300 flex items-center gap-1 shadow-[0_0_8px_rgba(0,240,255,0.25)]">
-                                    <span className="animate-spin text-[8px]">🔄</span>
-                                    <span>24h 자율반복 (무결재)</span>
+                        {/* ⏱️ 카드 외부 주기 설정 버튼 & 결재 상태 (원클릭 주기 변경 지원) */}
+                        <div className="flex flex-col items-end gap-1 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
+                            {/* 반복 실행 주기 드롭다운 버튼 */}
+                            <div className="relative">
+                                <button
+                                    onClick={() => setActiveScheduleDropdownAgentId(activeScheduleDropdownAgentId === agent.id ? null : agent.id)}
+                                    className={`text-[9px] px-2 py-0.5 rounded font-black border flex items-center gap-1 transition-all cursor-pointer shadow-xs ${
+                                        schedOpt.id === 'REALTIME'
+                                            ? 'border-emerald-400/80 bg-emerald-950/70 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.3)] hover:border-emerald-300'
+                                            : schedOpt.id === 'MANUAL'
+                                                ? 'border-slate-700 bg-slate-900/80 text-slate-400 hover:border-slate-500'
+                                                : 'border-cyan-500/60 bg-cyan-950/70 text-cyan-300 shadow-[0_0_8px_rgba(0,240,255,0.25)] hover:border-cyan-400'
+                                    }`}
+                                    title={`클릭하여 반복 주기 변경 (현재: ${schedOpt.label})`}
+                                >
+                                    <span className={schedOpt.id === 'REALTIME' ? 'animate-pulse text-[8px]' : 'text-[8px]'}>{schedOpt.icon}</span>
+                                    <span>{schedOpt.shortBadge}</span>
+                                    <ChevronDown className="w-2.5 h-2.5 opacity-70" />
+                                </button>
+                                {activeScheduleDropdownAgentId === agent.id && renderScheduleDropdown()}
+                            </div>
+
+                            {/* 결재선 보조 상태 (과장 이상징후 대기/반려, 팀장 최종결재권자 등) */}
+                            {isChief && isPending && (
+                                <span className="text-[8px] px-1.5 py-0.2 rounded font-black border border-amber-500 bg-amber-950/80 text-amber-300 animate-pulse flex items-center gap-0.5 shadow-[0_0_6px_rgba(245,158,11,0.5)]">
+                                    <span>⏳</span>
+                                    <span>결재대기</span>
                                 </span>
-                            ) : isChief ? (
-                                isPending ? (
-                                    <span className="text-[9px] px-2 py-0.5 rounded font-black border border-amber-500 bg-amber-950/80 text-amber-300 animate-pulse flex items-center gap-1 shadow-[0_0_8px_rgba(245,158,11,0.5)]">
-                                        <span>⏳</span>
-                                        <span>팀장 결재 대기</span>
-                                    </span>
-                                ) : isRejected ? (
-                                    <span className="text-[9px] px-2 py-0.5 rounded font-black border border-rose-600 bg-rose-950/80 text-rose-300 flex items-center gap-1">
-                                        <span>⚠️</span>
-                                        <span>반려/재검</span>
-                                    </span>
-                                ) : (
-                                    <span className="text-[9px] px-1.5 py-0.5 rounded font-bold border border-purple-500/50 bg-purple-950/40 text-purple-300 flex items-center gap-1">
-                                        <ShieldCheck className="w-2.5 h-2.5 text-purple-400" />
-                                        <span>검수 완료 (정상)</span>
-                                    </span>
-                                )
-                            ) : isHead ? (
-                                <span className="text-[9px] px-2 py-0.5 rounded font-black border border-amber-400/80 bg-amber-950/50 text-amber-300 flex items-center gap-1 shadow-[0_0_8px_rgba(251,191,36,0.3)]">
+                            )}
+                            {isChief && isRejected && (
+                                <span className="text-[8px] px-1.5 py-0.2 rounded font-black border border-rose-600 bg-rose-950/80 text-rose-300 flex items-center gap-0.5">
+                                    <span>⚠️</span>
+                                    <span>반려</span>
+                                </span>
+                            )}
+                            {isHead && (
+                                <span className="text-[8px] px-1.5 py-0.2 rounded font-black border border-amber-400/60 bg-amber-950/50 text-amber-300 flex items-center gap-0.5">
                                     <span>👑</span>
-                                    <span>최종 결재권자</span>
-                                </span>
-                            ) : (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded font-bold border border-emerald-500/50 bg-emerald-950/40 text-emerald-300 flex items-center gap-1">
-                                    <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
-                                    <span>승인 통과</span>
+                                    <span>총괄결재</span>
                                 </span>
                             )}
                         </div>
@@ -2039,12 +2333,20 @@ export default function AgentOfficeDashboard() {
 
                     {/* 우측: 직위별 행동 권한 (사원/대리: 24h 자율반복 vs 과장: 이상징후 결재상신 vs 팀장: 승인/반려) */}
                     <div className="flex items-center gap-1">
-                        {/* ⚡ 실무자(사원/대리): 결재 없이 24시간 자율 루틴 무한 반복 */}
+                        {/* ⚡ 실무자(사원/대리): 반복 주기 자율 가동 버튼 (클릭 시에도 주기 설정 팝오버 토글) */}
                         {isStaff && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded font-bold border border-cyan-500/40 bg-cyan-950/40 text-cyan-300 flex items-center gap-1 shadow-xs">
-                                <span className="animate-spin text-[8px]">🔄</span>
-                                <span>무결재 자율 가동</span>
-                            </span>
+                            <div className="relative" onClick={e => e.stopPropagation()}>
+                                <button
+                                    onClick={() => setActiveScheduleDropdownAgentId(activeScheduleDropdownAgentId === agent.id ? null : agent.id)}
+                                    className="text-[9px] px-1.5 py-0.5 rounded font-bold border border-cyan-500/40 bg-cyan-950/40 hover:bg-cyan-900/60 hover:border-cyan-400 text-cyan-300 flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                                    title="클릭하여 반복 가동 주기 변경"
+                                >
+                                    <span className="text-[8px]">🔄</span>
+                                    <span>{schedOpt.shortBadge} 가동</span>
+                                    <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                                </button>
+                                {activeScheduleDropdownAgentId === agent.id && renderScheduleDropdown()}
+                            </div>
                         )}
 
                         {/* 👔 과장(Chief): 실무 검수 및 이상징후 감지 시 팀장 앞 결재 상신 */}
@@ -2680,8 +2982,16 @@ export default function AgentOfficeDashboard() {
                                                         </div>
                                                     </div>
 
-                                                    {/* 부서 우측 버튼군 (+ 새 팀 추가, 부서 수정/삭제) */}
+                                                    {/* 부서 우측 버튼군 (+ 팀원 추가, + 새 팀 추가, 부서 수정/삭제) */}
                                                     <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => handleOpenAddTeamMember(dept)}
+                                                            className="px-3 py-1.5 rounded-lg border border-cyan-500/60 bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-200 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-[0_0_12px_rgba(6,182,212,0.25)] cursor-pointer"
+                                                            title={`[${dept.name}]에 새로운 팀원(에이전트)을 생성하고 추가합니다`}
+                                                        >
+                                                            <UserPlus className="w-3.5 h-3.5 text-cyan-400" />
+                                                            <span>+ 팀원 추가</span>
+                                                        </button>
                                                         <button
                                                             onClick={() => handleAddNewTeam(dept.id)}
                                                             className="px-3 py-1.5 rounded-lg border border-indigo-500/60 bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-200 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-[0_0_12px_rgba(99,102,241,0.25)] cursor-pointer"
@@ -2749,8 +3059,16 @@ export default function AgentOfficeDashboard() {
                                                                         </div>
                                                                     </div>
 
-                                                                    {/* 팀 제어 버튼군: [+ 봇 배정/추가], [팀 해체] */}
+                                                                    {/* 팀 제어 버튼군: [+ 팀원 추가], [+ 봇 배정/추가], [팀 해체] */}
                                                                     <div className="flex items-center gap-1.5">
+                                                                        <button
+                                                                            onClick={() => handleOpenAddTeamMember(dept, teamName)}
+                                                                            className="px-2.5 py-1 rounded border border-cyan-500/60 bg-cyan-950/60 hover:bg-cyan-900/70 text-cyan-200 hover:text-white text-xs font-bold transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+                                                                            title={`[${teamName}]에 신규 팀원(에이전트)을 즉시 생성하여 배치합니다`}
+                                                                        >
+                                                                            <UserPlus className="w-3 h-3 text-cyan-400" />
+                                                                            <span>+ 팀원 추가</span>
+                                                                        </button>
                                                                         {/* 미배정 봇 중 이 팀으로 바로 끌어오기 */}
                                                                         {unassignedAgents.length > 0 && (
                                                                             <div className="relative group/addto">
@@ -3484,6 +3802,42 @@ export default function AgentOfficeDashboard() {
                                 />
                             </div>
 
+                            {/* 소속 팀 지정 */}
+                            <div>
+                                <label className="block text-[11px] text-indigo-300 mb-1 font-bold flex items-center justify-between">
+                                    <span>소속 팀 지정 (Team Name)</span>
+                                    <span className="text-[10px] text-slate-400 font-normal">부서 내 팀을 선택하거나 직접 입력</span>
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={createForm.teamName}
+                                        onChange={(e) => setCreateForm({ ...createForm, teamName: e.target.value })}
+                                        placeholder="예: 영업지원1팀, 구매SCM팀 등"
+                                        className="flex-1 bg-slate-900 border border-indigo-700/60 rounded px-3 py-2 text-indigo-200 placeholder-slate-500 focus:outline-none focus:border-indigo-400 font-bold"
+                                    />
+                                    {(() => {
+                                        const curDept = departments.find(d => d.id === creatingSlot.deptId);
+                                        const deptTeamList = curDept?.teams || [];
+                                        if (deptTeamList.length === 0) return null;
+                                        return (
+                                            <select
+                                                onChange={(e) => {
+                                                    if (e.target.value) setCreateForm({ ...createForm, teamName: e.target.value });
+                                                }}
+                                                value={createForm.teamName}
+                                                className="bg-slate-900 border border-indigo-800 rounded px-2 text-xs text-indigo-300 focus:outline-none cursor-pointer"
+                                            >
+                                                <option value="">기존 팀 선택...</option>
+                                                {deptTeamList.map(t => (
+                                                    <option key={t} value={t}>{t}</option>
+                                                ))}
+                                            </select>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="block text-[11px] text-cyan-300 mb-1 font-bold">
                                     담당자 식별 코드/별칭 (예: QC-01, 외주성적서접수)
@@ -3517,6 +3871,39 @@ export default function AgentOfficeDashboard() {
                                     rows={2}
                                     className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 resize-none"
                                 />
+                            </div>
+
+                            {/* 담당 인간 및 승인 필수 여부 (1인 1역할) */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg border border-amber-900/50 bg-amber-950/20">
+                                <div>
+                                    <label className="block text-[11px] text-amber-300 mb-1 font-bold">
+                                        👤 배정된 사람 담당자 (1인 1역할)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={createForm.assignedHuman}
+                                        onChange={(e) => setCreateForm({ ...createForm, assignedHuman: e.target.value })}
+                                        placeholder="예: 홍길동 대리 (내선 101)"
+                                        className="w-full bg-slate-900 border border-amber-700/60 rounded px-2.5 py-1.5 text-xs text-amber-200 placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                                    />
+                                </div>
+
+                                <div className="flex flex-col justify-center">
+                                    <label className="text-[11px] text-amber-300 mb-1 font-bold">
+                                        👑 사람 최종 승인 필수
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer mt-1">
+                                        <input
+                                            type="checkbox"
+                                            checked={createForm.requiresApproval}
+                                            onChange={(e) => setCreateForm({ ...createForm, requiresApproval: e.target.checked })}
+                                            className="w-4 h-4 rounded border-amber-600 text-amber-500 focus:ring-0 cursor-pointer"
+                                        />
+                                        <span className="text-xs text-slate-300 font-medium">
+                                            외부 발송/결재 전 사람 승인 필수
+                                        </span>
+                                    </label>
+                                </div>
                             </div>
 
                             {/* 직위(Position) 및 위계 서열 지정 */}
@@ -3842,6 +4229,61 @@ export default function AgentOfficeDashboard() {
                                         onChange={(e) => setEditForm({ ...editForm, currentTask: e.target.value })}
                                         className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-400 font-mono"
                                     />
+                                </div>
+
+                                {/* 👤 배정된 실제 사람 담당자 및 승인 권한 */}
+                                <div className="bg-slate-900/80 border border-cyan-900/50 rounded-lg p-2.5 space-y-2">
+                                    <div>
+                                        <label className="block text-[10px] text-cyan-300 font-bold mb-1 flex items-center justify-between">
+                                            <span>👤 배정된 사람 담당자 (Human Assignee)</span>
+                                            <span className="text-[9px] text-slate-400">예: 영업 담당자, 사무실 총괄 등</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={editForm.assignedHuman}
+                                            onChange={(e) => setEditForm({ ...editForm, assignedHuman: e.target.value })}
+                                            className="w-full bg-slate-950 border border-cyan-800/80 rounded px-2.5 py-1.5 text-xs text-cyan-200 focus:outline-none focus:border-cyan-400 font-bold"
+                                            placeholder="담당자 이름 또는 역할 (예: 김영업, 사무실 관리자)"
+                                        />
+                                    </div>
+                                    <label className="flex items-center gap-2 cursor-pointer pt-1">
+                                        <input
+                                            type="checkbox"
+                                            checked={editForm.requiresApproval}
+                                            onChange={(e) => setEditForm({ ...editForm, requiresApproval: e.target.checked })}
+                                            className="w-3.5 h-3.5 rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-0 cursor-pointer"
+                                        />
+                                        <span className="text-[11px] text-amber-300 font-bold">
+                                            👑 사람의 최종 승인 필수 (Requires Human Approval)
+                                        </span>
+                                    </label>
+                                </div>
+
+                                {/* ⏱️ 봇 업무 반복 실행 / 감지 주기 설정 */}
+                                <div className="bg-slate-900/80 border border-cyan-900/50 rounded-lg p-2.5 space-y-1.5">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] text-cyan-300 font-bold flex items-center gap-1.5">
+                                            <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                                            <span>업무 반복 주기 (Schedule Interval)</span>
+                                        </label>
+                                        <span className="text-[9px] text-slate-400 font-mono">
+                                            외부 인입 및 정기 가동 빈도
+                                        </span>
+                                    </div>
+                                    <select
+                                        value={editForm.scheduleInterval}
+                                        onChange={(e) => setEditForm({ ...editForm, scheduleInterval: e.target.value })}
+                                        className="w-full bg-slate-950 border border-cyan-800/80 rounded px-2.5 py-1.5 text-xs text-cyan-200 focus:outline-none focus:border-cyan-400 font-bold"
+                                    >
+                                        {SCHEDULE_INTERVALS.map(opt => (
+                                            <option key={opt.id} value={opt.id}>
+                                                {opt.icon} {opt.shortBadge} — {opt.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <div className="text-[10px] text-cyan-400/80 pl-1 font-mono">
+                                        {SCHEDULE_INTERVALS.find(s => s.id === editForm.scheduleInterval)?.description}
+                                    </div>
                                 </div>
 
                                 {/* 직위(Position) 변경 */}
@@ -4713,6 +5155,136 @@ export default function AgentOfficeDashboard() {
                                             </button>
                                         </div>
                                     </div>
+                                </div>
+                            )}
+
+                            {/* ⚡ [데이터관리팀 특화] DAT-01 Make.com 크리덴셜 자동 인증봇 (클로드 Computer Use 브라우저 클릭 자동화) */}
+                            {(selectedAgent.code === 'DAT-01' || selectedAgent.id === 'dat-slot-1') && (
+                                <div className="border border-amber-500/50 bg-amber-950/20 rounded-xl p-3.5 space-y-3.5 shadow-[0_0_25px_rgba(245,158,11,0.25)] my-3">
+                                    <div className="flex items-center justify-between border-b border-amber-900/40 pb-2">
+                                        <div className="flex items-center gap-1.5 text-amber-300 font-bold text-xs">
+                                            <span>⚡</span>
+                                            <span>DAT-01 Make.com 크리덴셜 자동 인증봇</span>
+                                        </div>
+                                        <span className="text-[9px] px-2 py-0.5 rounded font-black bg-amber-500/20 text-amber-300 font-mono border border-amber-500/40 flex items-center gap-1">
+                                            <span>🤖 Claude Computer Use</span>
+                                            <span>브라우저 자동화</span>
+                                        </span>
+                                    </div>
+
+                                    {/* Make.com 커넥션 요약 배너 */}
+                                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                                        <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-2">
+                                            <div className="text-[10px] text-slate-400">총 커넥션</div>
+                                            <div className="text-base font-black text-white font-mono">{makeSummary?.total || 8}건</div>
+                                        </div>
+                                        <div className="bg-emerald-950/40 border border-emerald-800/60 rounded-lg p-2">
+                                            <div className="text-[10px] text-emerald-400">정상 연결 (VERIFIED)</div>
+                                            <div className="text-base font-black text-emerald-300 font-mono">{makeSummary?.verified ?? 5}건</div>
+                                        </div>
+                                        <div className="bg-purple-950/40 border border-purple-800/60 rounded-lg p-2">
+                                            <div className="text-[10px] text-purple-400">Reauthorize 필요</div>
+                                            <div className="text-base font-black text-purple-300 font-mono">{makeSummary?.needsReauth ?? 3}건</div>
+                                        </div>
+                                    </div>
+
+                                    {/* 안내 설명 */}
+                                    <div className="p-2.5 rounded-lg border border-purple-500/40 bg-purple-950/30 text-xs space-y-1">
+                                        <div className="flex items-center justify-between text-purple-200 font-bold">
+                                            <span>구글/MS OAuth 세션 만료 자동화:</span>
+                                            <span className="text-emerald-400 font-mono">가동 중</span>
+                                        </div>
+                                        <p className="text-[11px] text-purple-300/80 leading-relaxed">
+                                            Make.com의 구글/마이크로소프트 연결은 세션 만료 시 <strong>Reauthorize 버튼을 눌러 계정 동의 및 권한 허용을 완료해야만 Verify가 성립</strong>됩니다. DAT-01이 클로드 브라우저 클릭 자동화를 통해 이를 전담합니다.
+                                        </p>
+                                    </div>
+
+                                    {/* 만료 커넥션 일괄 자동화 실행 버튼 */}
+                                    {makeSummary?.needsReauth > 0 && (
+                                        <button
+                                            type="button"
+                                            disabled={!!isReauthorizingMake}
+                                            onClick={() => handleReauthorizeMakeConnection()}
+                                            className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                        >
+                                            <Sparkles className="w-4 h-4 text-amber-300" />
+                                            <span>
+                                                {isReauthorizingMake === 'ALL'
+                                                    ? '🤖 클로드 브라우저 자동 클릭(Reauthorize ➔ Verify) 실행 중...'
+                                                    : `⚡ 만료된 구글/MS 커넥션(${makeSummary.needsReauth}건) 일괄 자동 Reauthorize & Verify`}
+                                            </span>
+                                        </button>
+                                    )}
+
+                                    {/* Make.com 8개 실제 커넥션 리스트 */}
+                                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                                        <div className="text-[10px] text-slate-400 font-bold flex items-center justify-between px-1">
+                                            <span>MAKE.COM CONNECTIONS ({makeConnections.length}개)</span>
+                                            <button 
+                                                onClick={fetchMakeConnections} 
+                                                className="text-[9px] text-cyan-400 hover:underline flex items-center gap-0.5"
+                                            >
+                                                <span>새로고침</span>
+                                            </button>
+                                        </div>
+                                        {makeConnections.map((conn: any) => (
+                                            <div 
+                                                key={conn.id} 
+                                                className={`p-2 rounded-lg border text-xs flex items-center justify-between gap-2 transition-all ${
+                                                    conn.needsReauthorize
+                                                        ? 'bg-purple-950/30 border-purple-700/60 shadow-[0_0_10px_rgba(168,85,247,0.2)]'
+                                                        : 'bg-black/50 border-slate-800'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                    <span className="text-base shrink-0">{conn.icon}</span>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="font-bold text-slate-200 truncate flex items-center gap-1.5">
+                                                            <span className="truncate">{conn.name}</span>
+                                                            <span className="text-[9px] text-slate-500 font-mono">ID:{conn.id}</span>
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-400 font-mono truncate">
+                                                            {conn.account} {conn.scenarios ? `· 시나리오 ${conn.scenarios}개 연동` : ''}
+                                                        </div>
+                                                        {conn.reauthorizeReason && (
+                                                            <div className="text-[9px] text-purple-300 font-mono truncate">
+                                                                ⚠️ {conn.reauthorizeReason}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    {conn.needsReauthorize ? (
+                                                        <button
+                                                            type="button"
+                                                            disabled={!!isReauthorizingMake}
+                                                            onClick={() => handleReauthorizeMakeConnection(conn.id)}
+                                                            className="px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded text-[10px] shadow-[0_0_8px_rgba(168,85,247,0.5)] cursor-pointer flex items-center gap-1 transition-all disabled:opacity-50"
+                                                            title="Reauthorize 자동 클릭 후 Verify까지 완결"
+                                                        >
+                                                            <span>{isReauthorizingMake === conn.id ? '⏳' : '⚡'}</span>
+                                                            <span>Reauthorize</span>
+                                                        </button>
+                                                    ) : (
+                                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/70 border border-emerald-600/70 text-emerald-300 font-mono">
+                                                            ✓ Verified
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* 클로드 브라우저 클릭 시뮬레이션 로그 터미널 */}
+                                    {makeActionLogs.length > 0 && (
+                                        <div className="bg-black/80 border border-purple-900/60 rounded-lg p-2 space-y-1 text-[9px] font-mono text-purple-300 max-h-24 overflow-y-auto">
+                                            <div className="text-[8px] text-slate-500 font-bold">CLAUDE COMPUTER USE CLICK STREAM</div>
+                                            {makeActionLogs.slice(0, 5).map((log, i) => (
+                                                <div key={i} className="text-slate-300">{log}</div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
