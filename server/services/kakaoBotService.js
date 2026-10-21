@@ -1191,6 +1191,45 @@ export class KakaoBotService {
     }
 
     /**
+     * 카카오 견적서 소프트 삭제 (휴지통) 상태 동기화
+     */
+    markQuotationDeleted(quotationId, isDeleted = true) {
+        const quote = this.draftQuotations.find(q => q.id === quotationId);
+        if (quote) {
+            quote.isDeleted = isDeleted;
+            if (isDeleted) {
+                quote.deletedAt = new Date().toISOString();
+            } else {
+                delete quote.isDeleted;
+                delete quote.deletedAt;
+            }
+            this.saveData();
+            console.log(`[KakaoBot] 🗑️ 견적서 [${quotationId}] isDeleted=${isDeleted} 상태 동기화 완료`);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 카카오 견적서 영구 삭제 동기화
+     */
+    deleteDraftQuotation(quotationId) {
+        const initialCount = this.draftQuotations.length;
+        this.draftQuotations = this.draftQuotations.filter(q => q.id !== quotationId);
+        this.intakes.forEach(i => {
+            if (i.quotationId === quotationId) {
+                delete i.quotationId;
+            }
+        });
+        if (this.draftQuotations.length !== initialCount) {
+            this.saveData();
+            console.log(`[KakaoBot] ❌ 견적서 [${quotationId}] 영구 삭제 동기화 완료`);
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * Solapi 파일 업로드 헬퍼 (MMS 이미지 등)
      */
     async uploadSolapiFile({ fileBase64, fileName = 'image.jpg', type = 'MMS' }) {

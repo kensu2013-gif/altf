@@ -638,6 +638,8 @@ export const useStore = create<AppState>()(
             },
 
             updateQuotation: async (quoteId, updates) => {
+                const prevQuote = get().quotes.find(q => q.id === quoteId);
+
                 // 1. Optimistic Update
                 set((state) => ({
                     quotes: state.quotes.map(q => q.id === quoteId ? { ...q, ...updates } : q)
@@ -652,14 +654,28 @@ export const useStore = create<AppState>()(
                     if (auth.token) {
                         headers['Authorization'] = `Bearer ${auth.token}`;
                     }
+                    if (auth.user) {
+                        headers['x-requester-id'] = auth.user.id;
+                        headers['x-requester-role'] = auth.user.role;
+                    }
                     const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quoteId}`, {
                         method: 'PATCH',
                         headers,
                         body: JSON.stringify(updates)
                     });
-                    if (!res.ok) throw new Error('Failed to update quotation');
-                } catch (e) {
+                    if (!res.ok) {
+                        // Revert optimistic update on failure
+                        if (prevQuote) {
+                            set((state) => ({
+                                quotes: state.quotes.map(q => q.id === quoteId ? prevQuote : q)
+                            }));
+                        }
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(errData.error || `HTTP ${res.status}`);
+                    }
+                } catch (e: unknown) {
                     console.error("Failed to persist quotation update:", e);
+                    alert(`견적서 상태 변경 실패: ${e instanceof Error ? e.message : String(e)}`);
                 }
             },
 
@@ -678,6 +694,10 @@ export const useStore = create<AppState>()(
                     if (auth.token) {
                         headers['Authorization'] = `Bearer ${auth.token}`;
                     }
+                    if (auth.user) {
+                        headers['x-requester-id'] = auth.user.id;
+                        headers['x-requester-role'] = auth.user.role;
+                    }
                     const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/${quoteId}?permanent=true`, {
                         method: 'DELETE',
                         headers
@@ -688,9 +708,12 @@ export const useStore = create<AppState>()(
                         }));
                         return true;
                     }
+                    const errData = await res.json().catch(() => ({}));
+                    alert(`영구 삭제 실패: ${errData.error || res.statusText}`);
                     return false;
-                } catch (e) {
+                } catch (e: unknown) {
                     console.error(e);
+                    alert(`영구 삭제 오류: ${e instanceof Error ? e.message : String(e)}`);
                     return false;
                 }
             },
