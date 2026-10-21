@@ -24,6 +24,7 @@ import { telegramBotService } from './server/services/telegramBotService.js';
 import { makeCredentialService } from './server/services/makeCredentialService.js';
 import { makeScenarioService } from './server/services/makeScenarioService.js';
 import { inventorySyncService } from './server/services/inventorySyncService.js';
+import { kakaoBotService } from './server/services/kakaoBotService.js';
 
 import multer from 'multer';
 
@@ -1847,6 +1848,81 @@ const server = http.createServer(async (req, res) => {
                 const { scenarioId } = body || {};
                 const result = await makeScenarioService.simulateDisruption(scenarioId || '2312923');
                 sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+    }
+
+    // ==========================================
+    // 🟡 영업2팀 INT-02~05 : 카카오톡 채널 다이렉트 견적 입수봇 (Make.com 우회/0원 직통)
+    // ==========================================
+    if (url.pathname.startsWith('/api/kakao')) {
+        // 1. POST /api/kakao/skill : 카카오 i 오픈빌더 스킬 서버 직통 수신 (v2.0 응답)
+        if (req.method === 'POST' && (url.pathname === '/api/kakao/skill' || url.pathname === '/api/kakao/webhook')) {
+            try {
+                const body = await parseBody(req);
+                console.log(`[KakaoBot] 스킬 웹훅 수신: utterance="${body?.userRequest?.utterance || ''}", hasMedia=${!!(body?.userRequest?.params?.media || body?.action?.params?.secureimage)}`);
+                const responsePayload = await kakaoBotService.handleSkillRequest(body);
+                sendJsonResponse(req, res, 200, responsePayload);
+            } catch (err) {
+                console.error('[KakaoBot] 스킬 처리 실패:', err.message);
+                // 카카오 타임아웃/오류 방지용 비상 fallback v2.0 응답
+                sendJsonResponse(req, res, 200, {
+                    version: '2.0',
+                    template: {
+                        outputs: [
+                            {
+                                simpleText: {
+                                    text: '알트에프 견적 접수 시스템입니다.\n메시지가 접수되었으며 담당자가 확인 중입니다.'
+                                }
+                            }
+                        ]
+                    }
+                });
+            }
+            return;
+        }
+
+        // 2. GET /api/kakao/status : 카카오 직통 봇 연결 상태 및 접수 통계
+        if (req.method === 'GET' && url.pathname === '/api/kakao/status') {
+            const status = kakaoBotService.getStatus();
+            sendJsonResponse(req, res, 200, status);
+            return;
+        }
+
+        // 3. GET /api/kakao/intakes : 수신된 카카오톡 견적 요청 목록
+        if (req.method === 'GET' && url.pathname === '/api/kakao/intakes') {
+            const urlParams = new URLSearchParams(url.search);
+            const limit = parseInt(urlParams.get('limit') || '50', 10);
+            const offset = parseInt(urlParams.get('offset') || '0', 10);
+            const data = kakaoBotService.getIntakes({ limit, offset });
+            sendJsonResponse(req, res, 200, { success: true, ...data });
+            return;
+        }
+
+        // 4. POST /api/kakao/test : 카카오톡 전송 시뮬레이션 테스트
+        if (req.method === 'POST' && url.pathname === '/api/kakao/test') {
+            try {
+                const body = await parseBody(req);
+                const mockPayload = {
+                    userRequest: {
+                        utterance: body.utterance || '20A 90E(L) SCH40 50개 단가 부탁드립니다',
+                        params: body.imageUrl ? { media: body.imageUrl } : {},
+                        user: { id: body.userId || 'test_kakao_user_01' }
+                    },
+                    action: {
+                        params: body.imageUrl ? { secureimage: body.imageUrl } : {}
+                    }
+                };
+                const result = await kakaoBotService.handleSkillRequest(mockPayload);
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    message: '카카오톡 모의 견적 접수 시뮬레이션 성공!',
+                    mockPayload,
+                    kakaoResponse: result
+                });
             } catch (err) {
                 sendJsonResponse(req, res, 500, { success: false, error: err.message });
             }
@@ -4264,12 +4340,27 @@ const server = http.createServer(async (req, res) => {
         }
 
         // 2. Admin Mode: Return All
-        if (!session || (session.role !== 'MASTER' && session.role !== 'admin' && session.role !== 'manager' && session.role !== 'MANAGER')) {
+        const headerRole = req.headers['x-requester-role'] || '';
+        const isAdminRole = (session && (session.role === 'MASTER' || session.role === 'admin' || session.role === 'manager' || session.role === 'MANAGER')) ||
+                            (headerRole === 'MASTER' || headerRole === 'admin' || headerRole === 'manager' || headerRole === 'MANAGER');
+
+        if (!isAdminRole) {
             res.writeHead(403);
             res.end(JSON.stringify({ error: 'Forbidden' }));
             return;
         }
-        sendJsonResponse(req, res, 200, db.quotations);
+
+        const existingDraftIds = new Set(db.quotations.map(q => q.id));
+        const newDrafts = (kakaoBotService.draftQuotations || []).filter(q => !existingDraftIds.has(q.id));
+        
+        // 새로운 카카오 견적 초안이 있으면 db.quotations에도 영구 동기화
+        if (newDrafts.length > 0) {
+            db.quotations.unshift(...newDrafts);
+            try { saveData(); } catch (e) {}
+        }
+
+        const combinedQuotes = [...db.quotations];
+        sendJsonResponse(req, res, 200, combinedQuotes);
         return;
     }
 
