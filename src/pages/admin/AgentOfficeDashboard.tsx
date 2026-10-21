@@ -46,7 +46,10 @@ import {
     Zap,
     Users,
     UserPlus,
-    Clock
+    Clock,
+    UploadCloud,
+    Timer,
+    Settings
 } from 'lucide-react';
 import { CertificateLedgerModal } from '../../components/admin/CertificateLedgerModal';
 import { PurchaseLedgerModal } from '../../components/admin/PurchaseLedgerModal';
@@ -127,6 +130,56 @@ function initAgentPositions(rawAgents: AgentUnit[]): AgentUnit[] {
             teamName: team
         };
     });
+}
+
+interface MakeConnectionItem {
+    id: string;
+    name: string;
+    type: string;
+    icon?: string;
+    account: string;
+    owner?: string;
+    scenarios?: number;
+    warnings?: number;
+    status: string;
+    needsReauthorize: boolean;
+    lastVerified?: string;
+    reauthorizeReason?: string;
+}
+
+interface MakeConnectionsSummary {
+    total: number;
+    verified: number;
+    needsReauth: number;
+    totalScenarios?: number;
+    totalWarnings?: number;
+    hasIssues?: boolean;
+    lastCheckedAt?: string;
+}
+
+interface MakeScenarioItem {
+    id: string;
+    name: string;
+    operations?: number;
+    dataTransfer?: string;
+    createdAt?: string;
+    lastExecutedAt?: string;
+    isActive: boolean;
+    healthStatus?: string;
+    incompleteExecutions: number;
+    autoRecoveryEnabled?: boolean;
+    modules?: string[];
+    lastRecoveredAt?: string | null;
+    recoveryLogs?: string[];
+}
+
+interface MakeScenariosSummary {
+    total: number;
+    active: number;
+    inactive: number;
+    totalIncomplete: number;
+    hasIssues?: boolean;
+    lastCheckedAt?: string;
 }
 
 export default function AgentOfficeDashboard() {
@@ -615,8 +668,8 @@ export default function AgentOfficeDashboard() {
     }, []);
 
     // ⚡ DAT-01 : Make.com 크리덴셜 및 Reauthorize/Verify 자동화 상태
-    const [makeConnections, setMakeConnections] = useState<any[]>([]);
-    const [makeSummary, setMakeSummary] = useState<any>(null);
+    const [makeConnections, setMakeConnections] = useState<MakeConnectionItem[]>([]);
+    const [makeSummary, setMakeSummary] = useState<MakeConnectionsSummary | null>(null);
     const [isReauthorizingMake, setIsReauthorizingMake] = useState<string | null>(null);
     const [makeActionLogs, setMakeActionLogs] = useState<string[]>([]);
 
@@ -656,7 +709,9 @@ export default function AgentOfficeDashboard() {
                         const agData = await agRes.json();
                         if (agData.agents) setAgents(agData.agents);
                     }
-                } catch {}
+                } catch (err) {
+                    console.error('에이전트 목록 갱신 실패:', err);
+                }
             } else {
                 alert('실패: ' + (data.error || '오류 발생'));
             }
@@ -668,8 +723,8 @@ export default function AgentOfficeDashboard() {
     };
 
     // ⚡ DAT-02 : Make.com 시나리오 유지 감시봇 상태
-    const [makeScenarios, setMakeScenarios] = useState<any[]>([]);
-    const [makeScenariosSummary, setMakeScenariosSummary] = useState<any>(null);
+    const [makeScenarios, setMakeScenarios] = useState<MakeScenarioItem[]>([]);
+    const [makeScenariosSummary, setMakeScenariosSummary] = useState<MakeScenariosSummary | null>(null);
     const [isReactivatingScenario, setIsReactivatingScenario] = useState<string | null>(null);
     const [makeScenarioActionLogs, setMakeScenarioActionLogs] = useState<string[]>([]);
 
@@ -709,7 +764,9 @@ export default function AgentOfficeDashboard() {
                         const agData = await agRes.json();
                         if (agData.agents) setAgents(agData.agents);
                     }
-                } catch {}
+                } catch (err) {
+                    console.error('에이전트 목록 갱신 실패:', err);
+                }
             } else {
                 alert('복구 실패: ' + (data.error || '오류 발생'));
             }
@@ -745,6 +802,183 @@ export default function AgentOfficeDashboard() {
             fetchMakeScenarios();
         }
     }, [selectedAgent]);
+
+    // ⚡ [데이터관리팀 DAT-03~06] 4단계 전사 재고 자동 동기화 상태 및 핸들러
+    const [invSyncData, setInvSyncData] = useState<{
+        state: any;
+        config: any;
+    } | null>(null);
+    const [invSyncRunningAction, setInvSyncRunningAction] = useState<string | null>(null);
+    const [showInvSyncConfigModal, setShowInvSyncConfigModal] = useState<boolean>(false);
+    const [showDaekyungUploadModal, setShowDaekyungUploadModal] = useState<boolean>(false);
+    const [daekyungUploadText, setDaekyungUploadText] = useState<string>('');
+    const [daekyungSelectedFile, setDaekyungSelectedFile] = useState<File | null>(null);
+    const [configForm, setConfigForm] = useState({
+        taeilAppsScriptUrl: '',
+        daekyungAppsScriptUrl: '',
+        altfDbAppsScriptUrl: '',
+        bufferWaitMinutes: 3.5,
+        autoCleanupDownloads: true
+    });
+
+    const fetchInventorySyncStatus = async () => {
+        try {
+            const res = await fetch('/api/dat/inventory-sync/status');
+            const data = await res.json();
+            if (data.success) {
+                setInvSyncData(data);
+                if (data.config) {
+                    setConfigForm({
+                        taeilAppsScriptUrl: data.config.taeilAppsScriptUrl || '',
+                        daekyungAppsScriptUrl: data.config.daekyungAppsScriptUrl || '',
+                        altfDbAppsScriptUrl: data.config.altfDbAppsScriptUrl || '',
+                        bufferWaitMinutes: data.config.bufferWaitMinutes || 3.5,
+                        autoCleanupDownloads: data.config.autoCleanupDownloads !== false
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('Failed to fetch inventory sync status:', e);
+        }
+    };
+
+    useEffect(() => {
+        if (selectedAgent?.deptId === 'dat' || selectedAgent?.code?.startsWith('DAT-')) {
+            fetchInventorySyncStatus();
+            const interval = setInterval(fetchInventorySyncStatus, 2000);
+            return () => clearInterval(interval);
+        }
+    }, [selectedAgent]);
+
+    const handleRunInvStep1 = async () => {
+        setInvSyncRunningAction('step1');
+        try {
+            const res = await fetch('/api/dat/inventory-sync/step1', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                await fetchInventorySyncStatus();
+            } else {
+                alert('1단계 실행 실패: ' + (data.error || '알 수 없는 오류'));
+            }
+        } catch (err: any) {
+            alert('1단계 실행 오류: ' + err.message);
+        } finally {
+            setInvSyncRunningAction(null);
+        }
+    };
+
+    const handleRunInvStep2 = async (fileData?: any) => {
+        setInvSyncRunningAction('step2');
+        try {
+            const res = await fetch('/api/dat/inventory-sync/step2', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(fileData || {})
+            });
+            const data = await res.json();
+            if (data.success) {
+                setShowDaekyungUploadModal(false);
+                setDaekyungUploadText('');
+                setDaekyungSelectedFile(null);
+                await fetchInventorySyncStatus();
+            } else {
+                alert('2단계 실행 실패: ' + (data.error || '알 수 없는 오류'));
+            }
+        } catch (err: any) {
+            alert('2단계 실행 오류: ' + err.message);
+        } finally {
+            setInvSyncRunningAction(null);
+        }
+    };
+
+    const handleRunInvStep3 = async (skipBuffer: boolean = false) => {
+        setInvSyncRunningAction('step3');
+        try {
+            const res = await fetch('/api/dat/inventory-sync/step3', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ skipBuffer })
+            });
+            const data = await res.json();
+            if (data.success) {
+                await fetchInventorySyncStatus();
+            } else {
+                alert('3단계 실행 실패: ' + (data.error || '알 수 없는 오류'));
+            }
+        } catch (err: any) {
+            alert('3단계 실행 오류: ' + err.message);
+        } finally {
+            setInvSyncRunningAction(null);
+        }
+    };
+
+    const handleCancelInvStep3 = async () => {
+        try {
+            await fetch('/api/dat/inventory-sync/cancel-step3', { method: 'POST' });
+            await fetchInventorySyncStatus();
+        } catch (err: any) {
+            console.error('Failed to cancel step 3:', err);
+        }
+    };
+
+    const handleRunInvStep4 = async () => {
+        setInvSyncRunningAction('step4');
+        try {
+            const res = await fetch('/api/dat/inventory-sync/step4', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                await fetchInventorySyncStatus();
+            } else {
+                alert('4단계 실행 실패: ' + (data.error || '알 수 없는 오류'));
+            }
+        } catch (err: any) {
+            alert('4단계 실행 오류: ' + err.message);
+        } finally {
+            setInvSyncRunningAction(null);
+        }
+    };
+
+    const handleRunInvAutoPilot = async () => {
+        if (!confirm('사원1(태일/시화) ➔ 사원2(대경) ➔ 대리(3.5분 버퍼) ➔ 과장(S3배포 & 변동량분석) 4단계 전자동 오토파일럿을 시작하시겠습니까?')) {
+            return;
+        }
+        setInvSyncRunningAction('auto-pilot');
+        try {
+            const res = await fetch('/api/dat/inventory-sync/run-all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            const data = await res.json();
+            if (data.success) {
+                await fetchInventorySyncStatus();
+            } else {
+                alert('오토파일럿 실행 실패: ' + (data.error || '알 수 없는 오류'));
+            }
+        } catch (err: any) {
+            alert('오토파일럿 실행 오류: ' + err.message);
+        } finally {
+            setInvSyncRunningAction(null);
+        }
+    };
+
+    const handleSaveInvConfig = async () => {
+        try {
+            const res = await fetch('/api/dat/inventory-sync/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(configForm)
+            });
+            const data = await res.json();
+            if (data.success) {
+                setShowInvSyncConfigModal(false);
+                await fetchInventorySyncStatus();
+                alert('구글시트 연동 및 버퍼 설정이 저장되었습니다.');
+            }
+        } catch (err: any) {
+            alert('설정 저장 오류: ' + err.message);
+        }
+    };
 
     const [qc02Loading, setQc02Loading] = useState<boolean>(false);
     const [qc02Result, setQc02Result] = useState<{
@@ -4645,7 +4879,7 @@ export default function AgentOfficeDashboard() {
                                         <button
                                             type="button"
                                             onClick={() => setShowPurchaseLedgerModal(true)}
-                                            className="flex-1 py-2 px-3 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer transition-all"
+                                            className="flex-1 py-2 px-3 rounded-lg bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer transition-all"
                                         >
                                             <Boxes className="w-3.5 h-3.5" />
                                             <span>📊 재고 발주 & 성적서 대장 열기</span>
@@ -4773,7 +5007,7 @@ export default function AgentOfficeDashboard() {
                                                     alert('동기화 실패: ' + e);
                                                 }
                                             }}
-                                            className="flex-1 py-2 px-3 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(20,184,166,0.3)] cursor-pointer transition-all"
+                                            className="flex-1 py-2 px-3 rounded-lg bg-linear-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(20,184,166,0.3)] cursor-pointer transition-all"
                                         >
                                             <RotateCw className="w-3.5 h-3.5" />
                                             <span>🔄 지금 즉시 수집 & 미결 동기화</span>
@@ -4960,7 +5194,7 @@ export default function AgentOfficeDashboard() {
                                             </div>
                                             <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-700">
                                                 <div 
-                                                    className="bg-gradient-to-r from-cyan-400 to-emerald-400 h-full transition-all duration-300"
+                                                    className="bg-linear-to-r from-cyan-400 to-emerald-400 h-full transition-all duration-300"
                                                     style={{ width: `${batchStatus.progress.total > 0 ? (batchStatus.progress.processed / batchStatus.progress.total) * 100 : 0}%` }}
                                                 ></div>
                                             </div>
@@ -4976,7 +5210,7 @@ export default function AgentOfficeDashboard() {
                                             type="button"
                                             onClick={handleSyncMailplug}
                                             disabled={mailplugLoading || Boolean(batchStatus?.isRunning)}
-                                            className="py-2.5 px-2 rounded-lg bg-gradient-to-r from-slate-800 to-slate-700 hover:from-slate-700 hover:to-slate-600 border border-slate-600 text-white font-bold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                            className="py-2.5 px-2 rounded-lg bg-linear-to-r from-slate-800 to-slate-700 hover:from-slate-700 hover:to-slate-600 border border-slate-600 text-white font-bold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                                         >
                                             <RefreshCw className={`w-3.5 h-3.5 ${mailplugLoading ? 'animate-spin' : ''}`} />
                                             <span>최신 1건 즉시 수집</span>
@@ -4985,7 +5219,7 @@ export default function AgentOfficeDashboard() {
                                             type="button"
                                             onClick={handleBatchSyncMailplug}
                                             disabled={mailplugLoading || Boolean(batchStatus?.isRunning)}
-                                            className="py-2.5 px-2 rounded-lg bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-bold text-xs shadow-[0_0_15px_rgba(255,0,85,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                            className="py-2.5 px-2 rounded-lg bg-linear-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-bold text-xs shadow-[0_0_15px_rgba(255,0,85,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                                         >
                                             <HardDrive className="w-3.5 h-3.5" />
                                             <span>📥 505건 전체 일괄 수집</span>
@@ -5092,7 +5326,7 @@ export default function AgentOfficeDashboard() {
                                             type="button"
                                             onClick={handleRunQC02}
                                             disabled={qc02Loading}
-                                            className="py-2.5 px-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-[0_0_15px_rgba(0,240,255,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                            className="py-2.5 px-2 rounded-lg bg-linear-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-[0_0_15px_rgba(0,240,255,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                                         >
                                             <Sparkles className={`w-3.5 h-3.5 ${qc02Loading ? 'animate-spin' : ''}`} />
                                             <span>{qc02Loading ? '판독 및 누적 중...' : '🚀 QC-02 전수 판독 & 누적'}</span>
@@ -5158,7 +5392,7 @@ export default function AgentOfficeDashboard() {
                                         <button
                                             type="button"
                                             onClick={() => setShowCertIssuerModal(true)}
-                                            className="w-full py-2.5 px-3 rounded-lg bg-gradient-to-r from-indigo-600 via-blue-600 to-indigo-600 hover:from-indigo-500 hover:to-blue-500 text-white font-black text-xs shadow-[0_0_15px_rgba(99,102,241,0.4)] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                                            className="w-full py-2.5 px-3 rounded-lg bg-linear-to-r from-indigo-600 via-blue-600 to-indigo-600 hover:from-indigo-500 hover:to-blue-500 text-white font-black text-xs shadow-[0_0_15px_rgba(99,102,241,0.4)] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                                         >
                                             <FileText className="w-4 h-4" />
                                             <span>🚀 성적서 발행기 열기 (실시간 A4 뷰 & PDF/엑셀)</span>
@@ -5244,12 +5478,12 @@ export default function AgentOfficeDashboard() {
                                     </div>
 
                                     {/* 만료 커넥션 일괄 자동화 실행 버튼 */}
-                                    {makeSummary?.needsReauth > 0 && (
+                                    {makeSummary && makeSummary.needsReauth > 0 && (
                                         <button
                                             type="button"
                                             disabled={!!isReauthorizingMake}
                                             onClick={() => handleReauthorizeMakeConnection()}
-                                            className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                            className="w-full py-2 px-3 rounded-lg bg-linear-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                                         >
                                             <Sparkles className="w-4 h-4 text-amber-300" />
                                             <span>
@@ -5271,7 +5505,7 @@ export default function AgentOfficeDashboard() {
                                                 <span>새로고침</span>
                                             </button>
                                         </div>
-                                        {makeConnections.map((conn: any) => (
+                                        {makeConnections.map((conn: MakeConnectionItem) => (
                                             <div 
                                                 key={conn.id} 
                                                 className={`p-2 rounded-lg border text-xs flex items-center justify-between gap-2 transition-all ${
@@ -5386,7 +5620,7 @@ export default function AgentOfficeDashboard() {
                                             </button>
                                         </div>
 
-                                        {makeScenarios.map((sc: any) => (
+                                        {makeScenarios.map((sc: MakeScenarioItem) => (
                                             <div 
                                                 key={sc.id} 
                                                 className={`p-3 rounded-xl border text-xs space-y-2 transition-all ${
@@ -5462,6 +5696,349 @@ export default function AgentOfficeDashboard() {
                                                     [정상 대기] Make.com 시나리오 Active 상태 실시간 감시 중... 이상 발생 시 자동 클리어 & 재활성화가 즉시 기록됩니다.
                                                 </div>
                                             )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ⚡ [데이터관리팀 특화] DAT-03~06 4단계 전사 재고 자동 동기화 & 관제 파이프라인 */}
+                            {(['DAT-03', 'DAT-04', 'DAT-05', 'DAT-06'].includes(selectedAgent.code) || selectedAgent.teamName === '재고동기화자동화팀') && (
+                                <div className="border border-amber-500/50 bg-gradient-to-b from-amber-950/20 via-[#0B0F19] to-amber-950/20 rounded-xl p-3.5 space-y-3.5 shadow-[0_0_25px_rgba(245,158,11,0.25)] my-3">
+                                    {/* 헤더 */}
+                                    <div className="flex items-center justify-between border-b border-amber-900/40 pb-2">
+                                        <div className="flex items-center gap-1.5 text-amber-300 font-bold text-xs">
+                                            <span>⚡</span>
+                                            <span>데이터관리팀 4단계 전사 재고 자동 동기화 관제단</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowInvSyncConfigModal(true)}
+                                                className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 flex items-center gap-1 cursor-pointer transition-all"
+                                                title="구글 시트 연동 Webhook URL 및 버퍼링 시간 설정"
+                                            >
+                                                <Settings className="w-3 h-3 text-amber-400" />
+                                                <span>연동 설정</span>
+                                            </button>
+                                            <span className="text-[9px] px-2 py-0.5 rounded font-black bg-amber-500/20 text-amber-300 font-mono border border-amber-500/40 flex items-center gap-1">
+                                                <span>4-BOT SWARM</span>
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* 원클릭 전자동 오토파일럿 마스터 실행 바 */}
+                                    <div className="p-3 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-950/40 via-orange-950/30 to-amber-950/40 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <div className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                                                    <span>🚀</span>
+                                                    <span>원클릭 4단계 전자동 오토파일럿 (One-Click Auto-Pilot)</span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                                    사원1(태일/시화) ➔ 사원2(대경) ➔ 대리(3.5분 수식연산 버퍼링) ➔ 과장(S3 배포 & 변동량 분석)을 완전 자동 완결합니다.
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                disabled={invSyncData?.state?.isRunning || invSyncRunningAction !== null}
+                                                onClick={handleRunInvAutoPilot}
+                                                className="py-2.5 px-3.5 rounded-lg bg-linear-to-r from-amber-400 via-orange-400 to-amber-400 hover:from-amber-300 hover:to-orange-300 text-black font-black text-xs shadow-[0_0_20px_rgba(245,158,11,0.5)] transition-all flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+                                            >
+                                                <Sparkles className={`w-4 h-4 ${invSyncData?.state?.isRunning ? 'animate-spin' : ''}`} />
+                                                <span>{invSyncData?.state?.isRunning ? '오토파일럿 파이프라인 가동 중...' : '⚡ 전체 4단계 원클릭 가동'}</span>
+                                            </button>
+                                        </div>
+
+                                        {/* 오토파일럿 진행 상태 배너 */}
+                                        {invSyncData?.state?.isRunning && (
+                                            <div className="pt-2 border-t border-amber-900/40 flex items-center justify-between text-[11px] font-mono text-amber-300">
+                                                <span className="flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                                                    <span>현재 진행 단계: <strong>Step {invSyncData.state.currentStep} / 4</strong></span>
+                                                </span>
+                                                <span className="text-slate-400">오토파일럿 모드 활성</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* 4단계 개별 봇 관제 그리드 */}
+                                    <div className="space-y-2.5">
+                                        <div className="text-[10px] font-bold text-slate-400 px-1 flex items-center justify-between">
+                                            <span>파이프라인 단계별 전담 에이전트 관제 ({selectedAgent.name} 배정)</span>
+                                            <span className="text-[9px] text-amber-400 font-mono">구글시트 ➔ S3 클라우드</span>
+                                        </div>
+
+                                        {/* 1단계: DAT-03 [사원] 태일/시화재고 동기화 봇 */}
+                                        <div className={`p-3 rounded-xl border text-xs space-y-2 transition-all ${
+                                            selectedAgent.code === 'DAT-03'
+                                                ? 'bg-amber-950/30 border-amber-500/80 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                                                : 'bg-black/50 border-slate-800'
+                                        }`}>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-black bg-cyan-950 border border-cyan-500 text-cyan-300">
+                                                        Step 1
+                                                    </span>
+                                                    <span className="font-bold text-slate-200">DAT-03 [사원] 태일·시화 재고 동기화</span>
+                                                    <span className="text-[10px] text-slate-500 font-mono">포트 8800 API & Apps Script</span>
+                                                </div>
+                                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${
+                                                    invSyncData?.state?.step1?.status === 'SUCCESS' ? 'bg-emerald-950 text-emerald-300 border border-emerald-600' :
+                                                    invSyncData?.state?.step1?.status === 'RUNNING' ? 'bg-amber-950 text-amber-300 border border-amber-600 animate-pulse' :
+                                                    invSyncData?.state?.step1?.status === 'ERROR' ? 'bg-rose-950 text-rose-300 border border-rose-600' :
+                                                    'bg-slate-900 text-slate-400 border border-slate-700'
+                                                }`}>
+                                                    {invSyncData?.state?.step1?.status || 'IDLE'}
+                                                </span>
+                                            </div>
+                                            <div className="text-[11px] text-slate-400">
+                                                `http://121.145.79.200:8800/stocklist_get.php?item=`에서 실시간 데이터를 수집하여 `태일,시화재고` 구글시트(B~G, I~K열)를 정규화 갱신합니다.
+                                            </div>
+                                            <div className="flex items-center justify-between pt-1">
+                                                <span className="text-[10px] font-mono text-slate-500">
+                                                    {invSyncData?.state?.step1?.lastRun ? `최근 완료: ${new Date(invSyncData.state.step1.lastRun).toLocaleTimeString('ko-KR')}` : '실행 이력 없음'}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    disabled={invSyncRunningAction === 'step1'}
+                                                    onClick={handleRunInvStep1}
+                                                    className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/50 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all disabled:opacity-50"
+                                                >
+                                                    <RotateCw className={`w-3 h-3 ${invSyncRunningAction === 'step1' ? 'animate-spin' : ''}`} />
+                                                    <span>태일/시화 즉시 실행</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* 2단계: DAT-04 [사원] 대경 재고 파일 수신 & 변환 봇 */}
+                                        <div className={`p-3 rounded-xl border text-xs space-y-2 transition-all ${
+                                            selectedAgent.code === 'DAT-04'
+                                                ? 'bg-amber-950/30 border-amber-500/80 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                                                : 'bg-black/50 border-slate-800'
+                                        }`}>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-black bg-emerald-950 border border-emerald-500 text-emerald-300">
+                                                        Step 2
+                                                    </span>
+                                                    <span className="font-bold text-slate-200">DAT-04 [사원] 대경 재고 파일 수신 & 변환</span>
+                                                    <span className="text-[10px] text-slate-500 font-mono">엑셀 간편 업로드</span>
+                                                </div>
+                                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${
+                                                    invSyncData?.state?.step2?.status === 'SUCCESS' ? 'bg-emerald-950 text-emerald-300 border border-emerald-600' :
+                                                    invSyncData?.state?.step2?.status === 'RUNNING' ? 'bg-amber-950 text-amber-300 border border-amber-600 animate-pulse' :
+                                                    invSyncData?.state?.step2?.status === 'ERROR' ? 'bg-rose-950 text-rose-300 border border-rose-600' :
+                                                    'bg-slate-900 text-slate-400 border border-slate-700'
+                                                }`}>
+                                                    {invSyncData?.state?.step2?.status || 'IDLE'}
+                                                </span>
+                                            </div>
+                                            <div className="text-[11px] text-slate-400">
+                                                대경재고 파일을 수신하면 수동 복사/붙여넣기 없이 원클릭으로 구글시트 `대경재고변환`에 안전 반영하고 변환 스크립트를 작동시킵니다.
+                                            </div>
+                                            <div className="flex items-center justify-between pt-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowDaekyungUploadModal(true)}
+                                                    className="px-2.5 py-1 rounded bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/50 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all"
+                                                >
+                                                    <UploadCloud className="w-3 h-3" />
+                                                    <span>📂 대경재고 파일 드롭 / 붙여넣기</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={invSyncRunningAction === 'step2'}
+                                                    onClick={() => handleRunInvStep2()}
+                                                    className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/50 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all disabled:opacity-50"
+                                                >
+                                                    <Play className={`w-3 h-3 ${invSyncRunningAction === 'step2' ? 'animate-spin' : ''}`} />
+                                                    <span>대경변환 실행</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* 3단계: DAT-05 [대리] ALTF 재고 DB 총괄 & 3~5분 버퍼링 관제 봇 */}
+                                        <div className={`p-3 rounded-xl border text-xs space-y-2.5 transition-all ${
+                                            selectedAgent.code === 'DAT-05'
+                                                ? 'bg-amber-950/30 border-amber-500/80 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                                                : 'bg-black/50 border-slate-800'
+                                        }`}>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-black bg-purple-950 border border-purple-500 text-purple-300">
+                                                        Step 3
+                                                    </span>
+                                                    <span className="font-bold text-slate-200">DAT-05 [대리] ALTF 재고 DB 총괄 & 버퍼링 관제</span>
+                                                    <span className="text-[10px] text-purple-400 font-mono">3~5분 안정화 타이머</span>
+                                                </div>
+                                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${
+                                                    invSyncData?.state?.step3?.timerActive ? 'bg-amber-500 text-black border border-amber-400 animate-pulse font-black' :
+                                                    invSyncData?.state?.step3?.status === 'SUCCESS' ? 'bg-emerald-950 text-emerald-300 border border-emerald-600' :
+                                                    invSyncData?.state?.step3?.status === 'RUNNING' ? 'bg-amber-950 text-amber-300 border border-amber-600 animate-pulse' :
+                                                    invSyncData?.state?.step3?.status === 'ERROR' ? 'bg-rose-950 text-rose-300 border border-rose-600' :
+                                                    'bg-slate-900 text-slate-400 border border-slate-700'
+                                                }`}>
+                                                    {invSyncData?.state?.step3?.timerActive ? 'BUFFERING' : (invSyncData?.state?.step3?.status || 'IDLE')}
+                                                </span>
+                                            </div>
+
+                                            <div className="text-[11px] text-slate-400">
+                                                `ALTF 재고 DATA BASE` 대용량 구글시트의 IMPORTRANGE 및 수식이 완전히 연산될 때까지 대기(기본 {invSyncData?.config?.bufferWaitMinutes || 3.5}분)한 뒤, `inventory.json` 생성 스크립트를 자동 실행합니다.
+                                            </div>
+
+                                            {/* ⚡ 실시간 버퍼링 카운트다운 타이머 HUD */}
+                                            {invSyncData?.state?.step3?.timerActive ? (
+                                                <div className="p-2.5 rounded-lg border border-amber-500/60 bg-amber-950/40 space-y-1.5">
+                                                    <div className="flex items-center justify-between text-xs font-mono">
+                                                        <span className="text-amber-300 font-bold flex items-center gap-1.5">
+                                                            <Timer className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                                                            <span>구글시트 대용량 수식 연산 안정화 대기 중...</span>
+                                                        </span>
+                                                        <span className="text-white font-black text-sm">
+                                                            {Math.floor((invSyncData.state.step3.bufferRemainingSeconds || 0) / 60)}분 {(invSyncData.state.step3.bufferRemainingSeconds || 0) % 60}초 남음
+                                                        </span>
+                                                    </div>
+                                                    {/* 게이지 바 */}
+                                                    <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-amber-900/60">
+                                                        <div 
+                                                            className="bg-linear-to-r from-amber-400 to-orange-400 h-full transition-all duration-1000 shadow-[0_0_10px_rgba(245,158,11,0.8)]"
+                                                            style={{
+                                                                width: `${Math.min(100, Math.max(0, 
+                                                                    ((invSyncData.state.step3.bufferTotalSeconds - invSyncData.state.step3.bufferRemainingSeconds) / (invSyncData.state.step3.bufferTotalSeconds || 1)) * 100
+                                                                ))}%`
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center justify-between pt-1">
+                                                        <span className="text-[9px] text-amber-300/80 font-mono">
+                                                            * 타이머 완료 시 대리 봇이 ALTF DB 앱스크립트를 자동 실행하고 4단계로 연계합니다.
+                                                        </span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleCancelInvStep3}
+                                                                className="px-2 py-0.5 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-700 text-[10px] font-bold cursor-pointer"
+                                                            >
+                                                                <span>취소</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRunInvStep3(true)}
+                                                                className="px-2 py-0.5 rounded bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-black cursor-pointer shadow-sm"
+                                                            >
+                                                                <span>⚡ 지금 즉시 실행 (Skip)</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center justify-between pt-1">
+                                                    <span className="text-[10px] font-mono text-slate-500">
+                                                        설정 대기: {invSyncData?.config?.bufferWaitMinutes || 3.5}분 버퍼링 카운트다운
+                                                    </span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <button
+                                                            type="button"
+                                                            disabled={invSyncRunningAction === 'step3'}
+                                                            onClick={() => handleRunInvStep3(false)}
+                                                            className="px-2.5 py-1 rounded bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-500/50 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all disabled:opacity-50"
+                                                        >
+                                                            <Timer className="w-3 h-3" />
+                                                            <span>⏳ {invSyncData?.config?.bufferWaitMinutes || 3.5}분 버퍼 시작 및 DB실행</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={invSyncRunningAction === 'step3'}
+                                                            onClick={() => handleRunInvStep3(true)}
+                                                            className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all disabled:opacity-50"
+                                                            title="버퍼 없이 즉시 ALTF DB 스크립트 실행"
+                                                        >
+                                                            <Zap className="w-3 h-3 text-amber-400" />
+                                                            <span>즉시 실행</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* 4단계: DAT-06 [과장] S3 배포 & 재고 갱신/변동량 감시 봇 */}
+                                        <div className={`p-3 rounded-xl border text-xs space-y-2.5 transition-all ${
+                                            selectedAgent.code === 'DAT-06'
+                                                ? 'bg-amber-950/30 border-amber-500/80 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                                                : 'bg-black/50 border-slate-800'
+                                        }`}>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-black bg-blue-950 border border-blue-500 text-blue-300">
+                                                        Step 4
+                                                    </span>
+                                                    <span className="font-bold text-slate-200">DAT-06 [과장] S3 배포 & 재고 갱신/변동량 감시</span>
+                                                    <span className="text-[10px] text-blue-400 font-mono">중복방지 정리 & AWS S3</span>
+                                                </div>
+                                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${
+                                                    invSyncData?.state?.step4?.status === 'SUCCESS' ? 'bg-emerald-950 text-emerald-300 border border-emerald-600' :
+                                                    invSyncData?.state?.step4?.status === 'RUNNING' ? 'bg-amber-950 text-amber-300 border border-amber-600 animate-pulse' :
+                                                    invSyncData?.state?.step4?.status === 'ERROR' ? 'bg-rose-950 text-rose-300 border border-rose-600' :
+                                                    'bg-slate-900 text-slate-400 border border-slate-700'
+                                                }`}>
+                                                    {invSyncData?.state?.step4?.status || 'IDLE'}
+                                                </span>
+                                            </div>
+
+                                            {/* 핵심 3대 검증 배너 */}
+                                            <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                                                <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-2">
+                                                    <div className="text-[10px] text-slate-400">중복 방지 클린업</div>
+                                                    <div className="text-xs font-black text-emerald-400 font-mono mt-0.5">
+                                                        {(invSyncData?.state?.step4?.cleanedFiles?.length ?? 0) > 0 ? `🧹 ${invSyncData?.state?.step4?.cleanedFiles?.length}건 정리완료` : '✓ 대기 중'}
+                                                    </div>
+                                                </div>
+                                                <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-2">
+                                                    <div className="text-[10px] text-slate-400">AWS S3 업로드</div>
+                                                    <div className="text-xs font-black text-cyan-300 font-mono mt-0.5">
+                                                        {invSyncData?.state?.step4?.s3Uploaded ? '☁️ S3 배포 성공' : '대기 중'}
+                                                    </div>
+                                                </div>
+                                                <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-2">
+                                                    <div className="text-[10px] text-slate-400">시화재고 일일 변동</div>
+                                                    <div className="text-xs font-black text-amber-300 font-mono mt-0.5">
+                                                        {invSyncData?.state?.step4?.sihwaChangesCount ? `📊 ${invSyncData.state.step4.sihwaChangesCount}건 감지` : '0건 변동'}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* 시화재고 변동량 세부 브리핑 카드 */}
+                                            {invSyncData?.state?.step4?.details?.diffStats && (
+                                                <div className="p-2.5 rounded-lg border border-cyan-500/40 bg-cyan-950/20 text-xs flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-cyan-300 font-bold">📈 시화재고 변동 트렌드:</span>
+                                                        <span className="font-mono text-emerald-300 font-bold">입고 +{invSyncData.state.step4.details.diffStats.inboundCount}건</span>
+                                                        <span className="text-slate-600">|</span>
+                                                        <span className="font-mono text-rose-300 font-bold">출고 -{invSyncData.state.step4.details.diffStats.outboundCount}건</span>
+                                                    </div>
+                                                    <a
+                                                        href="/admin/inventory/sihwa"
+                                                        className="px-2 py-0.5 rounded bg-cyan-500 hover:bg-cyan-400 text-black text-[10px] font-black flex items-center gap-1 cursor-pointer transition-all"
+                                                    >
+                                                        <span>변동 내역 검토 ➔</span>
+                                                    </a>
+                                                </div>
+                                            )}
+
+                                            <div className="flex items-center justify-between pt-1">
+                                                <span className="text-[10px] font-mono text-slate-500">
+                                                    {invSyncData?.state?.step4?.totalItems ? `총 ${invSyncData.state.step4.totalItems.toLocaleString()}건 원장 배포` : '최신 파일 대기'}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    disabled={invSyncRunningAction === 'step4'}
+                                                    onClick={handleRunInvStep4}
+                                                    className="px-3 py-1.5 rounded-lg bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-[11px] shadow-[0_0_15px_rgba(59,130,246,0.4)] transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                                >
+                                                    <UploadCloud className={`w-3.5 h-3.5 ${invSyncRunningAction === 'step4' ? 'animate-spin' : ''}`} />
+                                                    <span>🚀 S3 배포 & 시화 변동량 분석 실행</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -5884,6 +6461,203 @@ export default function AgentOfficeDashboard() {
                     }
                 }}
             />
+
+            {/* ⚡ 구글시트 연동 및 버퍼링 설정 모달 */}
+            {showInvSyncConfigModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="bg-[#090D16] border border-amber-500/50 rounded-2xl w-full max-w-lg p-5 space-y-4 shadow-[0_0_40px_rgba(245,158,11,0.3)]">
+                        <div className="flex items-center justify-between border-b border-amber-900/40 pb-3">
+                            <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
+                                <Settings className="w-4 h-4 text-amber-400" />
+                                <span>데이터관리팀 구글시트 연동 & 버퍼링 관제 설정</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowInvSyncConfigModal(false)}
+                                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-all cursor-pointer"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-3 text-xs">
+                            <div className="space-y-1">
+                                <label className="text-slate-300 font-bold flex items-center gap-1">
+                                    <span>1. 태일/시화재고 구글시트 Apps Script Web App URL (doGet/doPost)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="https://script.google.com/macros/s/.../exec"
+                                    value={configForm.taeilAppsScriptUrl}
+                                    onChange={e => setConfigForm(prev => ({ ...prev, taeilAppsScriptUrl: e.target.value }))}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-amber-400 outline-none"
+                                />
+                                <p className="text-[10px] text-slate-500">배포된 Apps Script의 웹 앱 URL을 등록하면 봇이 자동으로 호출합니다.</p>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-slate-300 font-bold flex items-center gap-1">
+                                    <span>2. 대경재고변환 구글시트 Apps Script Web App URL</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="https://script.google.com/macros/s/.../exec"
+                                    value={configForm.daekyungAppsScriptUrl}
+                                    onChange={e => setConfigForm(prev => ({ ...prev, daekyungAppsScriptUrl: e.target.value }))}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-amber-400 outline-none"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-slate-300 font-bold flex items-center gap-1">
+                                    <span>3. ALTF 재고 DATA BASE 구글시트 Apps Script Web App URL (inventory.json 생성)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="https://script.google.com/macros/s/.../exec"
+                                    value={configForm.altfDbAppsScriptUrl}
+                                    onChange={e => setConfigForm(prev => ({ ...prev, altfDbAppsScriptUrl: e.target.value }))}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-amber-400 outline-none"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 pt-1">
+                                <div className="space-y-1">
+                                    <label className="text-slate-300 font-bold">4. 구글시트 수식 계산 대기 버퍼링 (분)</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="10"
+                                        step="0.5"
+                                        value={configForm.bufferWaitMinutes}
+                                        onChange={e => setConfigForm(prev => ({ ...prev, bufferWaitMinutes: parseFloat(e.target.value) || 3.5 }))}
+                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-amber-400 outline-none"
+                                    />
+                                    <p className="text-[10px] text-slate-500">기본: 3.5분 (3분~5분 추천)</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-slate-300 font-bold">5. 중복 방지 파일 자동 클린업</label>
+                                    <label className="flex items-center gap-2 p-2 rounded-lg bg-slate-900/60 border border-slate-800 cursor-pointer mt-1">
+                                        <input
+                                            type="checkbox"
+                                            checked={configForm.autoCleanupDownloads}
+                                            onChange={e => setConfigForm(prev => ({ ...prev, autoCleanupDownloads: e.target.checked }))}
+                                            className="rounded border-slate-700 text-amber-500 focus:ring-0"
+                                        />
+                                        <span className="text-[11px] text-slate-300">Downloads 구버전 삭제</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setShowInvSyncConfigModal(false)}
+                                className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold cursor-pointer transition-all"
+                            >
+                                취소
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveInvConfig}
+                                className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-black shadow-[0_0_15px_rgba(245,158,11,0.4)] cursor-pointer transition-all"
+                            >
+                                설정 저장
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 📂 대경재고 파일 간편 업로드 / 붙여넣기 모달 */}
+            {showDaekyungUploadModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="bg-[#090D16] border border-emerald-500/50 rounded-2xl w-full max-w-lg p-5 space-y-4 shadow-[0_0_40px_rgba(16,185,129,0.3)]">
+                        <div className="flex items-center justify-between border-b border-emerald-900/40 pb-3">
+                            <div className="flex items-center gap-2 text-emerald-300 font-bold text-sm">
+                                <UploadCloud className="w-4 h-4 text-emerald-400" />
+                                <span>DAT-04 [사원] 대경재고 원장 파일 간편 업로드 & 전송</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowDaekyungUploadModal(false)}
+                                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-all cursor-pointer"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-3 text-xs">
+                            <p className="text-slate-400 text-[11px] leading-relaxed">
+                                매일 전달받는 대경재고 엑셀 파일을 아래에 던지거나, 엑셀 표 내용을 복사하여 붙여넣으시면 DAT-04 사원 봇이 안전하게 수신하여 `대경재고변환` 시트에 반영합니다.
+                            </p>
+
+                            {/* 파일 선택 / 드래그 앤 드롭 */}
+                            <div className="border-2 border-dashed border-emerald-500/40 rounded-xl p-4 text-center hover:bg-emerald-950/20 transition-all cursor-pointer">
+                                <input
+                                    type="file"
+                                    id="daekyung-file-input"
+                                    accept=".xlsx, .xls, .csv, .txt"
+                                    onChange={e => {
+                                        if (e.target.files && e.target.files[0]) {
+                                            setDaekyungSelectedFile(e.target.files[0]);
+                                        }
+                                    }}
+                                    className="hidden"
+                                />
+                                <label htmlFor="daekyung-file-input" className="cursor-pointer block space-y-1.5">
+                                    <UploadCloud className="w-8 h-8 text-emerald-400 mx-auto" />
+                                    <div className="text-xs font-bold text-emerald-200">
+                                        {daekyungSelectedFile ? daekyungSelectedFile.name : '대경재고 엑셀 파일(.xlsx, .csv) 드래그 또는 클릭하여 선택'}
+                                    </div>
+                                    <div className="text-[10px] text-slate-500">
+                                        {daekyungSelectedFile ? `${(daekyungSelectedFile.size / 1024).toFixed(1)} KB 선택됨` : '파일을 선택하면 사원 2가 자동 수신 보관합니다.'}
+                                    </div>
+                                </label>
+                            </div>
+
+                            {/* 또는 텍스트 붙여넣기 */}
+                            <div className="space-y-1">
+                                <label className="text-slate-400 font-bold flex items-center justify-between text-[11px]">
+                                    <span>또는 엑셀에서 복사한 텍스트 직접 붙여넣기 (선택사항)</span>
+                                    {daekyungUploadText && <span className="text-cyan-400 font-mono">{daekyungUploadText.length}자 입력됨</span>}
+                                </label>
+                                <textarea
+                                    rows={4}
+                                    placeholder="엑셀에서 복사(Ctrl+C)한 표 데이터를 여기에 붙여넣기(Ctrl+V) 하셔도 됩니다..."
+                                    value={daekyungUploadText}
+                                    onChange={e => setDaekyungUploadText(e.target.value)}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white font-mono text-[10px] focus:border-emerald-400 outline-none resize-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setShowDaekyungUploadModal(false)}
+                                className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold cursor-pointer transition-all"
+                            >
+                                취소
+                            </button>
+                            <button
+                                type="button"
+                                disabled={!daekyungSelectedFile && !daekyungUploadText.trim()}
+                                onClick={() => {
+                                    handleRunInvStep2({
+                                        filename: daekyungSelectedFile ? daekyungSelectedFile.name : 'daekyung_pasted_data.txt',
+                                        content: daekyungUploadText
+                                    });
+                                }}
+                                className="px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black shadow-[0_0_15px_rgba(16,185,129,0.4)] cursor-pointer transition-all disabled:opacity-50"
+                            >
+                                사원2에게 전송 & 변환 실행
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

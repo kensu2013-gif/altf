@@ -73,10 +73,11 @@
     "bgGlow": "rgba(245, 158, 11, 0.15)",
     "icon": "⚡",
     "headRole": "데이터 인프라 & Make.com 크리덴셜 총괄",
-    "description": "Make.com OAuth 연결 상시 감시, 구글/MS Reauthorize 및 Verify 자동화, 전사 원장 관리",
-    "totalUnits": 5,
+    "description": "Make.com OAuth 감시, 구글드라이브 3대 재고시트 통합, 3~5분 버퍼링 관제 및 AWS S3 실시간 연동 총괄",
+    "totalUnits": 6,
     "teams": [
-      "자동화인프라팀"
+      "자동화인프라팀",
+      "재고동기화자동화팀"
     ]
   }
 ]

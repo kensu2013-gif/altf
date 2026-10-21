@@ -370,7 +370,7 @@
       "uptime": "99.9%",
       "tasksToday": 2440
     },
-    "currentTask": "[영업시간 1시간 주기] 발주 2440건 분류 관리 | 미결 462건 | 고객발송준비 420건 (다음: 오늘 13:00)",
+    "currentTask": "[영업시간 1시간 주기] 발주 2440건 분류 관리 | 미결 462건 | 고객발송준비 420건 (다음: 오늘 14:00)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_ORDER_CREATED",
@@ -380,10 +380,10 @@
       "EVENT_BACKLOG_SYNCED"
     ],
     "logs": [
-      "[12:05] [PUR-07] altf.kr 발주 2440건 업체/날짜별 분류 완료",
-      "[12:05] 미결(Pending) 462건 추적 중 (매입발주서 자동 매핑)",
-      "[12:05] QC-01 성적서 교차 대조: 432건 접수 확인",
-      "[12:05] 출고 완료 패키징: 거래명세표+성적서 번들 420건 발송 대기"
+      "[13:01] [PUR-07] altf.kr 발주 2440건 업체/날짜별 분류 완료",
+      "[13:01] 미결(Pending) 462건 추적 중 (매입발주서 자동 매핑)",
+      "[13:01] QC-01 성적서 교차 대조: 432건 접수 확인",
+      "[13:01] 출고 완료 패키징: 거래명세표+성적서 번들 420건 발송 대기"
     ],
     "connectedDeptIds": [
       "quality",
@@ -1013,94 +1013,174 @@
   {
     "id": "dat-slot-3",
     "code": "DAT-03",
-    "name": "데이터관리팀 과장 3",
+    "name": "태일·시화 재고 동기화 봇",
     "deptId": "dat",
     "deptName": "데이터관리팀",
+    "teamName": "재고동기화자동화팀",
     "tier": 3,
-    "role": "데이터관리팀 과장 실무 에이전트",
-    "status": "OFFLINE",
-    "isCreated": false,
-    "position": "과장",
+    "role": "태일/시화재고 구글시트 Apps Script 실행 및 원격 재고 API 연동 전담",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "position": "사원",
     "metrics": {
-      "speed": 85,
-      "accuracy": 95,
-      "load": 10,
+      "speed": 96,
+      "accuracy": 100,
+      "load": 20,
       "uptime": "99.9%",
-      "tasksToday": 0
+      "tasksToday": 5
     },
-    "currentTask": "미생성 슬롯 대기 중",
+    "currentTask": "[대기] 태일/시화재고 구글시트 동기화 대기 중",
     "lastActive": "방금 전",
-    "triggerEvents": [],
-    "emittedEvents": [],
-    "logs": [
-      "[시스템] 데이터관리팀 신규 부서 슬롯 생성됨"
+    "triggerEvents": [
+      "SCHEDULED_10_00",
+      "MANUAL_TAEIL_SYNC_REQUEST"
     ],
-    "connectedDeptIds": [],
-    "connectedAgentIds": [],
-    "approvalStatus": "AUTO_RUNNING",
+    "emittedEvents": [
+      "TAEIL_SIHWA_SYNCED"
+    ],
+    "logs": [
+      "[대기] 태일/시화재고 Apps Script (importStockData) 연동 파이프라인 가동 완료",
+      "[정상] 8800포트 원격 API (stocklist_get.php) 상태 확인 대기"
+    ],
+    "connectedDeptIds": [
+      "dat"
+    ],
+    "connectedAgentIds": [
+      "dat-slot-5"
+    ],
+    "assignedHuman": "조현진 대표",
+    "requiresApproval": false,
+    "approvalStatus": "APPROVED",
     "orderIndex": 2
   },
   {
     "id": "dat-slot-4",
     "code": "DAT-04",
-    "name": "데이터관리팀 대리 4",
+    "name": "대경 재고 파일 수신 & 변환 봇",
     "deptId": "dat",
     "deptName": "데이터관리팀",
+    "teamName": "재고동기화자동화팀",
     "tier": 3,
-    "role": "데이터관리팀 대리 실무 에이전트",
-    "status": "OFFLINE",
-    "isCreated": false,
-    "position": "대리",
+    "role": "대경재고 엑셀 파일 수신, 대경재고변환 구글시트 전송 및 Apps Script 실행 전담",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "position": "사원",
     "metrics": {
-      "speed": 85,
-      "accuracy": 95,
-      "load": 10,
+      "speed": 98,
+      "accuracy": 100,
+      "load": 15,
       "uptime": "99.9%",
-      "tasksToday": 0
+      "tasksToday": 4
     },
-    "currentTask": "미생성 슬롯 대기 중",
+    "currentTask": "[대기] 대경재고 엑셀 파일 수신 대기 중",
     "lastActive": "방금 전",
-    "triggerEvents": [],
-    "emittedEvents": [],
-    "logs": [
-      "[시스템] 데이터관리팀 신규 부서 슬롯 생성됨"
+    "triggerEvents": [
+      "DAEKYUNG_FILE_DROPPED",
+      "MANUAL_DAEKYUNG_SYNC_REQUEST"
     ],
-    "connectedDeptIds": [],
-    "connectedAgentIds": [],
-    "approvalStatus": "AUTO_RUNNING",
+    "emittedEvents": [
+      "DAEKYUNG_STOCK_SYNCED"
+    ],
+    "logs": [
+      "[대기] 대경재고 파일 간편 업로드 및 대경재고변환 Apps Script 트리거 준비 완료",
+      "[정상] 대경재고 시트(구글 드라이브) 연동 대기"
+    ],
+    "connectedDeptIds": [
+      "dat"
+    ],
+    "connectedAgentIds": [
+      "dat-slot-5"
+    ],
+    "assignedHuman": "조현진 대표",
+    "requiresApproval": false,
+    "approvalStatus": "APPROVED",
     "orderIndex": 3
   },
   {
     "id": "dat-slot-5",
     "code": "DAT-05",
-    "name": "데이터관리팀 사원5",
+    "name": "ALTF 재고 DB 총괄 & 버퍼링 관제 봇",
     "deptId": "dat",
     "deptName": "데이터관리팀",
-    "tier": 3,
-    "role": "make.com verify 실행담당자",
-    "status": "IDLE",
-    "isCreated": false,
-    "position": "사원",
+    "teamName": "재고동기화자동화팀",
+    "tier": 2,
+    "role": "태일/대경 완료 후 3~5분 구글시트 대용량 수식 연산 안정화 대기 및 ALTF 재고 DB Apps Script 실행, inventory.json 추출 총괄",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "position": "대리",
     "metrics": {
-      "speed": 85,
-      "accuracy": 95,
-      "load": 10,
+      "speed": 95,
+      "accuracy": 100,
+      "load": 25,
       "uptime": "99.9%",
-      "tasksToday": 0
+      "tasksToday": 6
     },
-    "currentTask": "에이전트 생성 대기 중",
+    "currentTask": "[대기] 3~5분 안정화 버퍼링 및 ALTF 재고 DB 연산 관제 대기 중",
     "lastActive": "방금 전",
-    "triggerEvents": [],
-    "emittedEvents": [],
-    "logs": [
-      "[12:20:04] [사원] 직위 배정 및 에이전트 업데이트 완료 (팀: 미지정, 연계: 0개 부서, 0명 담당자)"
+    "triggerEvents": [
+      "TAEIL_SIHWA_SYNCED",
+      "DAEKYUNG_STOCK_SYNCED"
     ],
-    "connectedDeptIds": [],
-    "connectedAgentIds": [],
-    "approvalStatus": "AUTO_RUNNING",
-    "orderIndex": 4,
-    "assignedHuman": "",
+    "emittedEvents": [
+      "INVENTORY_JSON_GENERATED"
+    ],
+    "logs": [
+      "[대기] 구글시트 연산 안정화 타이머 (기본 3분 30초 카운트다운) 준비 완료",
+      "[연계] ALTF 재고 DATA BASE 시트 Apps Script 연동 대기"
+    ],
+    "connectedDeptIds": [
+      "dat"
+    ],
+    "connectedAgentIds": [
+      "dat-slot-6"
+    ],
+    "assignedHuman": "조현진 대표",
     "requiresApproval": false,
-    "supervisorId": ""
+    "approvalStatus": "APPROVED",
+    "orderIndex": 4
+  },
+  {
+    "id": "dat-slot-6",
+    "code": "DAT-06",
+    "name": "S3 배포 & 재고 갱신/변동량 감시 봇",
+    "deptId": "dat",
+    "deptName": "데이터관리팀",
+    "teamName": "재고동기화자동화팀",
+    "tier": 1,
+    "role": "구버전 inventory.json 중복 방지 파일 정리, 최신 inventory.json의 AWS S3 업로드, 웹 재고 갱신 및 시화재고 일일 변동량 분석 확정",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "position": "과장",
+    "metrics": {
+      "speed": 99,
+      "accuracy": 100,
+      "load": 30,
+      "uptime": "99.9%",
+      "tasksToday": 8
+    },
+    "currentTask": "[대기] S3 클라우드 업로드 및 시화재고 변동량 분석 대기 중",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "INVENTORY_JSON_GENERATED"
+    ],
+    "emittedEvents": [
+      "INVENTORY_S3_DEPLOYED",
+      "SIHWA_DAILY_DIFF_CONFIRMED"
+    ],
+    "logs": [
+      "[대기] Downloads 폴더 구버전 파일 중복 방지 정리 및 S3 업로드 파이프라인 가동",
+      "[연동] altf.kr admin 재고 갱신 및 시화재고 변동량 실시간 분석 준비 완료"
+    ],
+    "connectedDeptIds": [
+      "dat",
+      "purchase"
+    ],
+    "connectedAgentIds": [
+      "PUR-01"
+    ],
+    "assignedHuman": "조현진 대표",
+    "requiresApproval": false,
+    "approvalStatus": "APPROVED",
+    "orderIndex": 5
   }
 ]

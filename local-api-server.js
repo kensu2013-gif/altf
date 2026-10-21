@@ -23,6 +23,7 @@ import { daekyungInvoiceService } from './server/services/daekyungInvoiceService
 import { telegramBotService } from './server/services/telegramBotService.js';
 import { makeCredentialService } from './server/services/makeCredentialService.js';
 import { makeScenarioService } from './server/services/makeScenarioService.js';
+import { inventorySyncService } from './server/services/inventorySyncService.js';
 
 import multer from 'multer';
 
@@ -1845,6 +1846,96 @@ const server = http.createServer(async (req, res) => {
                 const body = await parseBody(req);
                 const { scenarioId } = body || {};
                 const result = await makeScenarioService.simulateDisruption(scenarioId || '2312923');
+                sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+    }
+
+    // ==========================================
+    // ⚡ 데이터관리팀 DAT-03~06 : 4단계 전사 재고 자동 동기화 & S3/변동량 관제 파이프라인
+    // ==========================================
+    if (url.pathname.startsWith('/api/dat/inventory-sync')) {
+        // 1. GET /api/dat/inventory-sync/status
+        if (req.method === 'GET' && url.pathname === '/api/dat/inventory-sync/status') {
+            const data = inventorySyncService.getStatus();
+            sendJsonResponse(req, res, 200, { success: true, ...data });
+            return;
+        }
+
+        // 2. POST /api/dat/inventory-sync/config
+        if (req.method === 'POST' && url.pathname === '/api/dat/inventory-sync/config') {
+            try {
+                const body = await parseBody(req);
+                const result = inventorySyncService.saveConfig(body);
+                sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 3. POST /api/dat/inventory-sync/step1 : 사원1 태일/시화 실행
+        if (req.method === 'POST' && url.pathname === '/api/dat/inventory-sync/step1') {
+            try {
+                const result = await inventorySyncService.runStep1TaeilSihwa();
+                sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 4. POST /api/dat/inventory-sync/step2 : 사원2 대경재고 파일 수신/변환
+        if (req.method === 'POST' && url.pathname === '/api/dat/inventory-sync/step2') {
+            try {
+                const body = await parseBody(req);
+                const result = await inventorySyncService.runStep2Daekyung(body);
+                sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 5. POST /api/dat/inventory-sync/step3 : 대리 3~5분 버퍼링 & ALTF DB 실행
+        if (req.method === 'POST' && url.pathname === '/api/dat/inventory-sync/step3') {
+            try {
+                const body = await parseBody(req);
+                const skipBuffer = body?.skipBuffer === true;
+                const result = await inventorySyncService.startStep3BufferAndAltfDb(skipBuffer);
+                sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 6. POST /api/dat/inventory-sync/cancel-step3 : 대리 버퍼링 취소
+        if (req.method === 'POST' && url.pathname === '/api/dat/inventory-sync/cancel-step3') {
+            const result = inventorySyncService.cancelStep3Buffer();
+            sendJsonResponse(req, res, 200, result);
+            return;
+        }
+
+        // 7. POST /api/dat/inventory-sync/step4 : 과장 S3 배포 & 중복파일 정리 & 변동량 분석
+        if (req.method === 'POST' && url.pathname === '/api/dat/inventory-sync/step4') {
+            try {
+                const result = await inventorySyncService.runStep4DeployAndAnalyzeDiff();
+                sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 8. POST /api/dat/inventory-sync/run-all : 4단계 전자동 오토파일럿
+        if (req.method === 'POST' && url.pathname === '/api/dat/inventory-sync/run-all') {
+            try {
+                const body = await parseBody(req);
+                const result = await inventorySyncService.runAutoPilot(body || {});
                 sendJsonResponse(req, res, 200, result);
             } catch (err) {
                 sendJsonResponse(req, res, 500, { success: false, error: err.message });

@@ -1,0 +1,8 @@
+{
+  "taeilAppsScriptUrl": "",
+  "daekyungAppsScriptUrl": "",
+  "altfDbAppsScriptUrl": "",
+  "bufferWaitMinutes": 3.5,
+  "autoCleanupDownloads": true,
+  "autoPilotAutoConfirm": false
+}
