@@ -111,12 +111,25 @@ export class KakaoBotService {
             try {
                 const imgTargetUrl = typeof imageUrl === 'string' ? imageUrl : (imageUrl.url || '');
                 if (imgTargetUrl) {
-                    const fetch = (await import('node-fetch')).default;
-                    const imgRes = await fetch(imgTargetUrl);
-                    if (imgRes.ok) {
-                        const imgBuf = await imgRes.buffer();
-                        const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
-                        console.log(`[KakaoBot] 이미지 다운로드 완료 (${imgBuf.length} bytes), 비전 AI 분석 착수`);
+                    let imgBuf = null;
+                    let contentType = 'image/jpeg';
+                    if (imgTargetUrl.startsWith('file://') || imgTargetUrl.startsWith('/')) {
+                        const localPath = imgTargetUrl.replace('file://', '');
+                        if (fs.existsSync(localPath)) {
+                            imgBuf = fs.readFileSync(localPath);
+                            console.log(`[KakaoBot] 로컬 이미지 로드 완료 (${imgBuf.length} bytes), 비전 AI 분석 착수`);
+                        }
+                    } else {
+                        const fetch = (await import('node-fetch')).default;
+                        const imgRes = await fetch(imgTargetUrl);
+                        if (imgRes.ok) {
+                            imgBuf = await imgRes.buffer();
+                            contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+                            console.log(`[KakaoBot] 원격 이미지 다운로드 완료 (${imgBuf.length} bytes), 비전 AI 분석 착수`);
+                        }
+                    }
+
+                    if (imgBuf) {
                         normalized = await fittingVisionOcrService.recognizeAndNormalize(imgBuf, contentType);
                     }
                 }
@@ -239,6 +252,7 @@ export class KakaoBotService {
                 material: it.material,
                 quantity: it.qty,
                 unitPrice: discountedUnitPrice,
+                userUnitPrice: discountedUnitPrice,
                 amount,
                 base_price: it.basePrice,
                 discountRate: rate,

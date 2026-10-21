@@ -181,7 +181,7 @@ export class FittingVisionOcrService {
      * Gemini Vision 호출
      */
     async callGeminiVision(apiKey, base64Data, mimeType) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
         const body = {
             systemInstruction: {
                 parts: [{ text: FITTING_OCR_SYSTEM_PROMPT }]
@@ -349,6 +349,21 @@ export class FittingVisionOcrService {
                     if (key.replace(/\s+/g, '') === itemId.replace(/\s+/g, '')) {
                         matched = inv;
                         break;
+                    }
+                }
+            }
+
+            // WP -> STS 호환 매칭 (한국 피팅 재고 DB는 대경/태일 JIS STS 기준 등록)
+            if (!matched && item.material && item.material.startsWith('WP')) {
+                const altMat = item.material.replace(/^WP/, 'STS');
+                const altId = `${item.type}-${item.schedule}-${item.size}-${altMat}`;
+                matched = fittingNormalizerService.inventoryMap.get(altId);
+                if (!matched) {
+                    for (const [key, inv] of fittingNormalizerService.inventoryMap.entries()) {
+                        if (key.replace(/\s+/g, '') === altId.replace(/\s+/g, '')) {
+                            matched = inv;
+                            break;
+                        }
                     }
                 }
             }
