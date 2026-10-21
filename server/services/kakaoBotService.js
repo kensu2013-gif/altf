@@ -44,7 +44,21 @@ export class KakaoBotService {
             imageQuotes: 0,
             lastReceivedAt: null
         };
+        // 🔥 중복 수신 및 무한 루프 격발 차단용 캐시 (60초 TTL)
+        this.recentRequests = new Map();
         this.loadData();
+    }
+
+    /**
+     * 만료된 중복 요청 캐시 청소 (2분 초과 삭제)
+     */
+    cleanupRecentRequests() {
+        const now = Date.now();
+        for (const [key, value] of this.recentRequests.entries()) {
+            if (now - value.timestamp > 120000) {
+                this.recentRequests.delete(key);
+            }
+        }
     }
 
     loadData() {
@@ -165,6 +179,7 @@ export class KakaoBotService {
         const isStatusQuery = !isImage && (
             /^(확인|접수\s*현황|견적\s*확인|진행\s*상황|현황|조회|내역|견적|결과|얼마|답변|회신|언제|상황)$/i.test(utterance) ||
             utterance.includes('접수 현황') ||
+            utterance.includes('접수 결과') ||
             utterance.includes('견적 확인') ||
             utterance.includes('견적서') ||
             utterance.includes('어떻게') ||
@@ -172,12 +187,76 @@ export class KakaoBotService {
             utterance.includes('얼마')
         );
 
+        // 🔥 [중복 요청 차단 (Deduplication)]: 카카오 오픈빌더 재시도 및 연타로 인한 무한루프 백엔드 격발 방지
+        this.cleanupRecentRequests();
+        const cleanImageUrl = finalImageUrl ? finalImageUrl.split('?')[0] : '';
+        const dedupKey = isImage
+            ? `IMG:${botUserKey}:${cleanImageUrl}`
+            : (isStatusQuery ? null : `TXT:${botUserKey}:${utterance.toLowerCase()}`);
+
+        if (dedupKey && this.recentRequests.has(dedupKey)) {
+            const cached = this.recentRequests.get(dedupKey);
+            const elapsed = Date.now() - cached.timestamp;
+            if (elapsed < 45000) { // 45초 이내 동일 신호 중복 차단
+                console.log(`[KakaoBot] ⚡ [중복 신호 차단] ${dedupKey} (경과: ${elapsed}ms) - 단 1회 업로드 및 처리 원칙 준수`);
+                if (cached.inProgress) {
+                    return {
+                        version: '2.0',
+                        template: {
+                            outputs: [
+                                {
+                                    simpleText: {
+                                        text: '⏳ [알트에프 영업2팀]\n현재 전송해주신 견적서 사진을 비전 AI가 정밀 분석 중입니다.\n\n잠시만 기다려주시면 분석 완료 즉시 견적 결과가 자동으로 회신됩니다. (중복 업로드 방지)'
+                                    }
+                                }
+                            ],
+                            quickReplies: [
+                                { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                            ]
+                        }
+                    };
+                }
+
+                if (cached.quoteId) {
+                    const finishedQuote = this.draftQuotations.find(q => q.id === cached.quoteId && !q.isDeleted);
+                    if (finishedQuote) {
+                        return {
+                            version: '2.0',
+                            template: {
+                                outputs: [
+                                    {
+                                        simpleText: {
+                                            text: `✅ [알트에프 영업2팀]\n이미 정상 완료된 견적 건입니다.\n\n` + this.formatKakaoQuoteMessage(finishedQuote)
+                                        }
+                                    }
+                                ],
+                                quickReplies: [
+                                    { messageText: '견적서 보기', action: 'webLink', label: '📄 정식 견적서 보기', webLinkUrl: `https://altf.kr/admin/quotes?id=${finishedQuote.id}` },
+                                    { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                                ]
+                            }
+                        };
+                    }
+                }
+            }
+        }
+
+        if (dedupKey) {
+            this.recentRequests.set(dedupKey, {
+                timestamp: Date.now(),
+                inProgress: isImage,
+                quoteId: null
+            });
+        }
+
         if (isStatusQuery) {
-            // 해당 사용자의 고유 botUserKey 또는 매칭된 전화번호로만 엄격 조회 (타 고객 견적서 노출 방지)
+            // 해당 사용자의 고유 botUserKey 또는 매칭된 전화번호로만 엄격 조회 (삭제된 견적 및 타 고객 견적 배제)
             const recentQuote = this.draftQuotations.find(dq => 
-                dq.botUserKey === botUserKey || 
-                dq.kakaoBotUserKey === botUserKey || 
-                (matchedUser && dq.customerInfo?.phone && dq.customerInfo?.phone === matchedUser.phone)
+                !dq.isDeleted && (
+                    dq.botUserKey === botUserKey || 
+                    dq.kakaoBotUserKey === botUserKey || 
+                    (matchedUser && dq.customerInfo?.phone && dq.customerInfo?.phone === matchedUser.phone)
+                )
             );
             const recentIntake = this.intakes.find(it => it.botUserKey === botUserKey);
 
@@ -188,12 +267,12 @@ export class KakaoBotService {
                         outputs: [
                             {
                                 simpleText: {
-                                    text: `⏳ [알트에프 영업2팀]\n현재 비전 AI(INT-03)와 규격표준화(INT-05) 에이전트가 첨부해주신 견적서 사진을 정밀 분석 중입니다.\n\n약 10~15초 후 '📊 접수 현황 확인' 버튼을 다시 한 번 눌러주세요!`
+                                    text: `⏳ [알트에프 영업2팀]\n현재 비전 AI(INT-03)와 규격표준화(INT-05) 에이전트가 견적서 사진을 정밀 분석 중입니다.\n\n분석이 완료되면 견적서가 자동으로 대화방에 도착합니다 (약 10~15초 소요). 잠시만 기다려주세요!`
                                 }
                             }
                         ],
                         quickReplies: [
-                            { messageText: '접수 현황 확인', action: 'message', label: '📊 접수 현황 확인' },
+                            { messageText: '접수 현황 확인', action: 'message', label: '📊 접수 결과 확인' },
                             { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
                         ]
                     }
@@ -201,12 +280,14 @@ export class KakaoBotService {
             }
 
             if (recentQuote) {
-                // 사용자가 확인하는 순간 답변완료(PROCESSED)로 전환 및 동기화
-                recentQuote.status = 'PROCESSED';
-                if (this.onQuotationUpdated) {
-                    this.onQuotationUpdated(recentQuote);
+                // 이미 답변완료(PROCESSED) 상태라면 불필요한 백엔드 S3 동기화/재저장 트리거 스킵 (무한 저장 차단)
+                if (recentQuote.status !== 'PROCESSED') {
+                    recentQuote.status = 'PROCESSED';
+                    if (this.onQuotationUpdated) {
+                        this.onQuotationUpdated(recentQuote);
+                    }
+                    this.saveData();
                 }
-                this.saveData();
 
                 const quoteText = this.formatKakaoQuoteMessage(recentQuote);
                 return {
@@ -219,9 +300,9 @@ export class KakaoBotService {
                                 }
                             }
                         ],
+                        // 🚫 무한루프의 주범이었던 '접수 현황 확인' 버튼 영구 제거! 정식 견적서 확인 및 웹 바로가기만 노출
                         quickReplies: [
                             { messageText: '견적서 보기', action: 'webLink', label: '📄 정식 견적서 보기', webLinkUrl: `https://altf.kr/admin/quotes?id=${recentQuote.id}` },
-                            { messageText: '접수 현황 확인', action: 'message', label: '📊 접수 현황 확인' },
                             { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
                         ]
                     }
@@ -245,7 +326,7 @@ export class KakaoBotService {
             };
         }
 
-        // 4. 🔥 이미지 첨부 인입 처리: 카카오 5초 타임아웃 절대 방지를 위해 즉시 회신 후 백그라운드 비전 OCR 가동
+        // 4. 🔥 이미지 첨부 인입 처리: 단 1회의 신호는 단 1회의 인입 및 단 1회의 업로드로 완결
         const callbackUrl = userRequest.callbackUrl || null;
         if (isImage) {
             const intakeRecord = {
@@ -256,6 +337,7 @@ export class KakaoBotService {
                 matchedUser: matchedUser || null,
                 utterance: utterance || '[견적 요청 사진 첨부]',
                 imageUrl: finalImageUrl,
+                originalKakaoUrl: cleanImageUrl,
                 status: 'PROCESSING',
                 receivedAt,
                 channel: '카카오톡 채널 (@altf)',
@@ -286,14 +368,14 @@ export class KakaoBotService {
                 };
             }
 
-            // 카카오톡 대화방에 0.1초 내 즉시 정상 접수 알림 출력
+            // 카카오톡 대화방에 0.1초 내 즉시 정상 접수 알림 출력 (안내 문구 정돈)
             return {
                 version: '2.0',
                 template: {
                     outputs: [
                         {
                             simpleText: {
-                                text: `📄 [알트에프 영업2팀]\n견적서 사진이 정상 접수되었습니다!\n\n🤖 INT-03(비전 AI)과 SLE-01/02 에이전트가 14,132개 배관 피팅 규격·재고·단가를 정밀 대조하고 있습니다.\n\n약 10~15초 후 아래 '📊 접수 현황 확인' 버튼을 누르시면 산출된 견적서를 바로 확인하실 수 있습니다.`
+                                text: `📄 [알트에프 영업2팀]\n견적서 사진이 정상 접수되었습니다!\n\n🤖 INT-03(비전 AI)과 SLE-01/02 에이전트가 14,132개 배관 피팅 규격·재고·단가를 정밀 대조하고 있습니다.\n\n약 10~15초 후 분석이 완료되면 결과가 자동으로 도착합니다.`
                             }
                         }
                     ],
@@ -301,7 +383,7 @@ export class KakaoBotService {
                         {
                             messageText: '접수 현황 확인',
                             action: 'message',
-                            label: '📊 접수 현황 확인'
+                            label: '📊 접수 결과 확인'
                         },
                         {
                             messageText: '홈페이지 방문',
@@ -511,17 +593,13 @@ export class KakaoBotService {
                         }
                     }
                 ],
+                // 🚫 '접수 현황 확인' 제거: 이미 결과가 나왔으므로 정식 견적서 보기 및 홈페이지 링크만 제공
                 quickReplies: [
                     {
                         messageText: '견적서 보기',
                         action: 'webLink',
                         label: '📄 정식 견적서 보기',
                         webLinkUrl: `https://altf.kr/admin/quotes?id=${draftQuote.id}`
-                    },
-                    {
-                        messageText: '접수 현황 확인',
-                        action: 'message',
-                        label: '📊 접수 현황 확인'
                     },
                     {
                         messageText: '홈페이지 방문',
@@ -564,10 +642,26 @@ export class KakaoBotService {
 
             if (imgBuf) {
                 try {
-                    const { uploadFileToS3 } = await import('../../s3-db.js');
-                    uploadedS3Url = await uploadFileToS3('documents/quotes', `kakao_${Date.now()}.jpg`, imgBuf, contentType);
-                    intakeRecord.imageUrl = uploadedS3Url;
-                    console.log(`[KakaoBot] S3 이미지 영구 보관 완료: ${uploadedS3Url}`);
+                    // 🔥 중복 S3 업로드 방지: 동일 원본 카카오 CDN URL에 대한 S3 업로드 이력이 있다면 재사용
+                    const cleanKakaoUrl = typeof finalImageUrl === 'string' ? finalImageUrl.split('?')[0] : '';
+                    const existingIntake = this.intakes.find(i => 
+                        (i.originalKakaoUrl === cleanKakaoUrl || i.imageUrl === finalImageUrl) && 
+                        i.s3UploadedUrl
+                    );
+
+                    if (existingIntake && existingIntake.s3UploadedUrl) {
+                        uploadedS3Url = existingIntake.s3UploadedUrl;
+                        intakeRecord.imageUrl = uploadedS3Url;
+                        intakeRecord.s3UploadedUrl = uploadedS3Url;
+                        console.log(`[KakaoBot] ⚡ 기존 S3 이미지 URL 재사용 (중복 업로드 방지): ${uploadedS3Url}`);
+                    } else {
+                        const { uploadFileToS3 } = await import('../../s3-db.js');
+                        uploadedS3Url = await uploadFileToS3('documents/quotes', `kakao_${Date.now()}.jpg`, imgBuf, contentType);
+                        intakeRecord.imageUrl = uploadedS3Url;
+                        intakeRecord.s3UploadedUrl = uploadedS3Url;
+                        console.log(`[KakaoBot] S3 이미지 단 1회 보관 완료: ${uploadedS3Url}`);
+                    }
+                    intakeRecord.originalKakaoUrl = cleanKakaoUrl;
                 } catch (s3Err) {
                     console.warn('[KakaoBot] S3 업로드 폴백:', s3Err.message);
                 }
@@ -631,6 +725,15 @@ export class KakaoBotService {
                     this.draftQuotations.unshift(draftQuote);
                     console.log(`[KakaoBot] ✅ 견적서 초안 생성 완료 [${draftQuote.id}] 고객사: ${draftQuote.customerName} (${draftQuote.items.length}개 품목, ${draftQuote.totalAmount.toLocaleString()}원)`);
 
+                    // 캐시 상태를 완료로 업데이트
+                    const cleanKakaoUrl = typeof finalImageUrl === 'string' ? finalImageUrl.split('?')[0] : '';
+                    const dedupKey = `IMG:${botUserKey}:${cleanKakaoUrl}`;
+                    if (this.recentRequests.has(dedupKey)) {
+                        const cached = this.recentRequests.get(dedupKey);
+                        cached.inProgress = false;
+                        cached.quoteId = draftQuote.id;
+                    }
+
                     if (this.onQuotationCreated) {
                         this.onQuotationCreated(draftQuote);
                     }
@@ -650,9 +753,9 @@ export class KakaoBotService {
                                             }
                                         }
                                     ],
+                                    // 🚫 콜백 시에도 무한루프를 유발하는 '접수 현황 확인' 버튼 삭제!
                                     quickReplies: [
                                         { messageText: '견적서 보기', action: 'webLink', label: '📄 정식 견적서 보기', webLinkUrl: `https://altf.kr/admin/quotes?id=${draftQuote.id}` },
-                                        { messageText: '접수 현황 확인', action: 'message', label: '📊 접수 현황 확인' },
                                         { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
                                     ]
                                 }
@@ -669,19 +772,21 @@ export class KakaoBotService {
                         }
                     }
 
-                    // 🔥 [솔라피 사진 견적 자동 발송] 분석 완료 즉시 솔라피 MMS(포토+견적서 링크) 자동 발송!
-                    setTimeout(async () => {
-                        try {
-                            console.log(`[KakaoBot] ⚡ [사진 견적 자동 발송] 솔라피를 통한 견적서 ${draftQuote.id} 자동 발송 시도...`);
-                            await this.dispatchQuotation({
-                                quotationId: draftQuote.id,
-                                botUserKey,
-                                targetPhone: normalized.customer?.phone || draftQuote.customerInfo?.phone
-                            });
-                        } catch (autoDispatchErr) {
-                            console.error('[KakaoBot] 솔라피 사진 견적 자동 발송 오류:', autoDispatchErr.message);
-                        }
-                    }, 100);
+                    // 🔥 [솔라피 사진 견적 자동 발송] 단 1회만 발송되도록 가드 (SENT 상태 중복 방지)
+                    if (draftQuote.dispatchStatus !== 'SENT') {
+                        setTimeout(async () => {
+                            try {
+                                console.log(`[KakaoBot] ⚡ [사진 견적 자동 발송] 솔라피를 통한 견적서 ${draftQuote.id} 자동 발송 시도...`);
+                                await this.dispatchQuotation({
+                                    quotationId: draftQuote.id,
+                                    botUserKey,
+                                    targetPhone: normalized.customer?.phone || draftQuote.customerInfo?.phone
+                                });
+                            } catch (autoDispatchErr) {
+                                console.error('[KakaoBot] 솔라피 사진 견적 자동 발송 오류:', autoDispatchErr.message);
+                            }
+                        }, 100);
+                    }
 
                     // 0원 카카오 이벤트 푸시 발송 시도
                     await sleQuoteReviewService.dispatchKakaoEventPush({
@@ -979,6 +1084,10 @@ export class KakaoBotService {
      */
     async dispatchQuotation({ quotationId, botUserKey, customMessage, webhookUrl, targetPhone: explicitPhone }) {
         const quote = this.draftQuotations.find(q => q.id === quotationId);
+        if (quote && (quote.dispatchStatus === 'SENT' || quote.dispatched === true)) {
+            console.log(`[KakaoBot] ⚡ 견적서 ${quotationId}는 이미 발송 완료(SENT)되었습니다. 중복 발송을 차단합니다.`);
+            return { success: true, mode: 'ALREADY_SENT', message: '이미 발송 완료된 견적서입니다.' };
+        }
         const user = this.findUserByBotUserKey(botUserKey) || (quote?.kakaoUser) || null;
         
         const fallbackPhone = process.env.SOLAPI_SENDER_PHONE || '01062223751';

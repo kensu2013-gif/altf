@@ -522,7 +522,12 @@ kakaoBotService.onQuotationUpdated = (updatedQuote) => {
         if (!db.quotations) db.quotations = [];
         const idx = db.quotations.findIndex(q => q.id === updatedQuote.id);
         if (idx !== -1) {
-            db.quotations[idx] = { ...db.quotations[idx], ...updatedQuote };
+            const wasDeleted = db.quotations[idx].isDeleted;
+            db.quotations[idx] = { 
+                ...db.quotations[idx], 
+                ...updatedQuote,
+                isDeleted: updatedQuote.isDeleted !== undefined ? updatedQuote.isDeleted : wasDeleted
+            };
             queueSave();
             console.log(`[API] ⚡ 카카오 견적서 상태 업데이트 동기화: ${updatedQuote.id} (${updatedQuote.status})`);
         }
