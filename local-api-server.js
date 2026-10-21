@@ -511,9 +511,23 @@ kakaoBotService.onQuotationCreated = (draftQuote) => {
             db.quotations[idx] = { ...db.quotations[idx], ...draftQuote };
         }
         queueSave();
-        console.log(`[API] ⚡ 카카오 견적서 db.quotations 실시간 동기화 완료: ${draftQuote.id}`);
+        console.log(`[API] ⚡ 카카오 견적서 db.quotations 실시간 동기화 완료: ${draftQuote.id} (${draftQuote.status || 'SUBMITTED'})`);
     } catch (e) {
         console.error('[API] 카카오 견적서 동기화 오류:', e.message);
+    }
+};
+
+kakaoBotService.onQuotationUpdated = (updatedQuote) => {
+    try {
+        if (!db.quotations) db.quotations = [];
+        const idx = db.quotations.findIndex(q => q.id === updatedQuote.id);
+        if (idx !== -1) {
+            db.quotations[idx] = { ...db.quotations[idx], ...updatedQuote };
+            queueSave();
+            console.log(`[API] ⚡ 카카오 견적서 상태 업데이트 동기화: ${updatedQuote.id} (${updatedQuote.status})`);
+        }
+    } catch (e) {
+        console.error('[API] 카카오 견적서 업데이트 동기화 오류:', e.message);
     }
 };
 
@@ -1970,6 +1984,18 @@ const server = http.createServer(async (req, res) => {
             try {
                 const body = await parseBody(req);
                 const result = await kakaoBotService.dispatchQuotation(body);
+                
+                // db.quotations 상태도 'PROCESSED'로 즉시 동기화
+                if (result.success && body.quotationId) {
+                    const qIdx = (db.quotations || []).findIndex(q => q.id === body.quotationId);
+                    if (qIdx >= 0) {
+                        db.quotations[qIdx].status = 'PROCESSED';
+                        db.quotations[qIdx].dispatchStatus = 'SENT';
+                        db.quotations[qIdx].dispatchedAt = new Date().toISOString();
+                        queueSave();
+                    }
+                }
+                
                 sendJsonResponse(req, res, 200, result);
             } catch (err) {
                 sendJsonResponse(req, res, 500, { success: false, error: err.message });
@@ -1993,7 +2019,47 @@ const server = http.createServer(async (req, res) => {
             try {
                 const body = await parseBody(req);
                 const result = await sleQuoteReviewService.dispatchKakaoEventPush(body);
+                
+                // db.quotations 및 draftQuotations 상태도 'PROCESSED'(답변완료)로 즉시 전환
+                if (body.quotationId) {
+                    const qIdx = (db.quotations || []).findIndex(q => q.id === body.quotationId);
+                    if (qIdx >= 0) {
+                        db.quotations[qIdx].status = 'PROCESSED';
+                        db.quotations[qIdx].dispatchStatus = 'SENT';
+                        db.quotations[qIdx].dispatchedAt = new Date().toISOString();
+                        queueSave();
+                    }
+                    const dq = kakaoBotService.draftQuotations.find(q => q.id === body.quotationId);
+                    if (dq) {
+                        dq.status = 'PROCESSED';
+                        dq.dispatchStatus = 'SENT';
+                        dq.dispatchedAt = new Date().toISOString();
+                        kakaoBotService.saveData();
+                    }
+                }
+                
                 sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 10. DELETE /api/kakao/clear-test-data : 카카오 테스트 견적 및 인입 데이터 전체 초기화
+        if ((req.method === 'DELETE' || req.method === 'POST') && url.pathname === '/api/kakao/clear-test-data') {
+            try {
+                // 1) kakaoBotService 인스턴스 초기화
+                const result = kakaoBotService.clearTestData();
+
+                // 2) db.quotations에서 카카오 테스트 견적서(Q-KAKAO-) 전체 제거
+                if (db.quotations) {
+                    const beforeCount = db.quotations.length;
+                    db.quotations = db.quotations.filter(q => !q.id.startsWith('Q-KAKAO-'));
+                    console.log(`[API] 🧹 db.quotations 내 카카오 견적서 ${beforeCount - db.quotations.length}건 제거 완료`);
+                    queueSave();
+                }
+
+                sendJsonResponse(req, res, 200, { success: true, message: '카카오 테스트 데이터가 성공적으로 초기화되었습니다.' });
             } catch (err) {
                 sendJsonResponse(req, res, 500, { success: false, error: err.message });
             }
@@ -2548,6 +2614,257 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Not found' }));
         }
+        return;
+    }
+
+    // 📄 GET /quote/view 또는 /api/quote/pdf : 비로그인 고객 모바일 직통 정식 견적서 뷰어 & PDF 인쇄
+    if (req.method === 'GET' && (url.pathname === '/quote/view' || url.pathname === '/api/quote/pdf')) {
+        const quoteId = url.searchParams.get('id');
+        let quote = (db.quotations || []).find(q => q.id === quoteId);
+        if (!quote) {
+            quote = kakaoBotService.draftQuotations.find(q => q.id === quoteId);
+        }
+
+        if (!quote) {
+            res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(`
+                <!DOCTYPE html>
+                <html><head><meta charset="utf-8"><title>견적서를 찾을 수 없습니다</title></head>
+                <body style="font-family:sans-serif; text-align:center; padding:50px;">
+                    <h2>⚠️ 요청하신 견적서를 찾을 수 없습니다.</h2>
+                    <p>견적번호(${quoteId || '미지정'})가 정확한지 확인해 주시거나 고객센터(051-303-3751)로 문의해 주세요.</p>
+                </body></html>
+            `);
+            return;
+        }
+
+        const custName = quote.customerName || quote.customerInfo?.companyName || '고객사';
+        const contactName = quote.customerInfo?.contactName || '담당자 귀하';
+        const totalAmount = quote.totalAmount || 0;
+        const vat = Math.round(totalAmount * 0.1);
+        const grandTotal = totalAmount + vat;
+        const items = quote.items || [];
+        const dateStr = quote.createdAt ? new Date(quote.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString('ko-KR');
+
+        const rowsHtml = items.map((it, idx) => {
+            const spec = it.spec || `${it.name || '배관자재'} ${it.thickness || ''} ${it.size || ''} ${it.material || ''}`.trim();
+            const qty = it.quantity || it.qty || 1;
+            const unitPrice = it.userUnitPrice || it.unitPrice || 0;
+            const amount = it.amount || (unitPrice * qty);
+            return `
+                <tr>
+                    <td style="text-align:center; padding:8px; border:1px solid #cbd5e1;">${idx + 1}</td>
+                    <td style="padding:8px; border:1px solid #cbd5e1; font-weight:bold;">${spec}</td>
+                    <td style="text-align:center; padding:8px; border:1px solid #cbd5e1;">${it.material || 'STS'}</td>
+                    <td style="text-align:right; padding:8px; border:1px solid #cbd5e1; font-weight:bold;">${qty.toLocaleString()}</td>
+                    <td style="text-align:center; padding:8px; border:1px solid #cbd5e1;">EA</td>
+                    <td style="text-align:right; padding:8px; border:1px solid #cbd5e1;">₩${unitPrice.toLocaleString()}</td>
+                    <td style="text-align:right; padding:8px; border:1px solid #cbd5e1; font-weight:bold; color:#0f172a;">₩${amount.toLocaleString()}</td>
+                    <td style="text-align:center; padding:8px; border:1px solid #cbd5e1; font-size:11px; color:#059669;">당일출고</td>
+                </tr>
+            `;
+        }).join('');
+
+        const attachImgUrl = quote.attachments?.[0]?.url || quote.attachments?.[0]?.data || null;
+
+        const html = `
+        <!DOCTYPE html>
+        <html lang="ko">
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>견적서 - ${quote.id} (${custName})</title>
+            <style>
+                @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+                * { box-sizing: border-box; }
+                body { 
+                    margin: 0; 
+                    padding: 0; 
+                    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+                    background-color: #f1f5f9;
+                    color: #1e293b;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+                .floating-bar {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    background: rgba(15, 23, 42, 0.95);
+                    backdrop-filter: blur(8px);
+                    color: white;
+                    padding: 12px 20px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    z-index: 1000;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                }
+                .btn {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 9px 16px;
+                    border-radius: 8px;
+                    font-weight: bold;
+                    font-size: 13px;
+                    text-decoration: none;
+                    cursor: pointer;
+                    border: none;
+                    transition: all 0.2s;
+                }
+                .btn-primary { background: #2563eb; color: white; }
+                .btn-primary:hover { background: #1d4ed8; }
+                .btn-call { background: #10b981; color: white; }
+                .btn-call:hover { background: #059669; }
+                .page {
+                    width: 100%;
+                    max-width: 820px;
+                    margin: 70px auto 40px;
+                    background: white;
+                    padding: 40px;
+                    border-radius: 8px;
+                    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
+                }
+                table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                th { background: #f8fafc; font-weight: bold; }
+                .seal-stamp {
+                    position: absolute;
+                    right: 15px;
+                    bottom: 5px;
+                    width: 65px;
+                    height: 65px;
+                    pointer-events: none;
+                }
+                @media print {
+                    .floating-bar { display: none !important; }
+                    body { background: white; }
+                    .page { margin: 0; padding: 15mm; max-width: none; box-shadow: none; border-radius: 0; }
+                }
+                @media screen and (max-width: 640px) {
+                    .page { padding: 20px 14px; margin-top: 60px; }
+                    .floating-bar { padding: 10px 14px; }
+                    .btn { padding: 7px 12px; font-size: 12px; }
+                    table { font-size: 11px; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="floating-bar">
+                <div style="font-weight:bold; font-size:14px; display:flex; align-items:center; gap:8px;">
+                    <span style="background:#2563eb; padding:2px 8px; border-radius:4px; font-size:11px;">AltF</span>
+                    <span>정식 직인 견적서</span>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <a href="tel:051-303-3751" class="btn btn-call">📞 051-303-3751 문의</a>
+                    <button onclick="window.print()" class="btn btn-primary">📥 PDF 저장 / 인쇄</button>
+                </div>
+            </div>
+
+            <div class="page">
+                <div style="text-align:center; margin-bottom: 25px; border-bottom: 3px double #0f172a; padding-bottom: 12px;">
+                    <h1 style="margin:0; font-size:26px; letter-spacing:8px; color:#0f172a;">견 적 서</h1>
+                    <span style="font-size:12px; letter-spacing:3px; color:#64748b;">QUOTATION</span>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; margin-bottom: 20px; flex-wrap:wrap; gap:16px;">
+                    <!-- 수신처 (고객사) -->
+                    <div style="flex:1; min-width:280px; border:1px solid #cbd5e1; border-radius:6px; padding:14px; background:#fafafa;">
+                        <div style="font-size:11px; color:#64748b; margin-bottom:4px;">견적번호: <strong>${quote.id}</strong></div>
+                        <div style="font-size:11px; color:#64748b; margin-bottom:10px;">견적일자: ${dateStr}</div>
+                        <div style="font-size:18px; font-weight:800; color:#0f172a; margin-bottom:6px;">
+                            ${custName} <span style="font-size:14px; font-weight:normal; color:#64748b;">귀하</span>
+                        </div>
+                        <div style="font-size:12px; color:#475569; line-height:1.6;">
+                            • 담당자: ${contactName}<br>
+                            • 공급조건: 화물 / 택배 / 상차도<br>
+                            • 유효기간: 견적일로부터 7일간
+                        </div>
+                    </div>
+
+                    <!-- 공급자 (알트에프) -->
+                    <div style="flex:1; min-width:280px; border:1px solid #cbd5e1; border-radius:6px; padding:14px; position:relative; background:#fff;">
+                        <table style="width:100%; border:none; font-size:12px; line-height:1.5;">
+                            <tr><td style="width:70px; color:#64748b; padding:2px 0;">등록번호</td><td style="font-weight:bold; color:#0f172a;">890-38-01079</td></tr>
+                            <tr><td style="color:#64748b; padding:2px 0;">상　　호</td><td style="font-weight:bold; color:#0f172a;">알트에프(주)</td></tr>
+                            <tr><td style="color:#64748b; padding:2px 0;">대 표 자</td><td style="font-weight:bold; color:#0f172a;">조 현 진</td></tr>
+                            <tr><td style="color:#64748b; padding:2px 0;">사업장소재지</td><td style="font-size:11px;">부산시 사상구 삼락동 / 시흥시 시화유통상가</td></tr>
+                            <tr><td style="color:#64748b; padding:2px 0;">전화 / 팩스</td><td style="font-weight:bold; color:#2563eb;">051-303-3751 <span style="color:#64748b; font-weight:normal;">/ 051-303-3752</span></td></tr>
+                            <tr><td style="color:#64748b; padding:2px 0;">업태 / 종목</td><td style="font-size:11px;">도소매, 전자상거래 / 배관자재, 피팅, 플랜지</td></tr>
+                        </table>
+                        <!-- 알트에프 빨간 원형 직인 날인 -->
+                        <div class="seal-stamp">
+                            <svg viewBox="0 0 100 100" width="65" height="65" style="opacity:0.85;">
+                                <circle cx="50" cy="50" r="46" stroke="#dc2626" stroke-width="4" fill="none" />
+                                <circle cx="50" cy="50" r="42" stroke="#dc2626" stroke-width="1.5" fill="none" />
+                                <text x="50" y="42" font-size="16" font-family="'Pretendard', sans-serif" font-weight="900" fill="#dc2626" text-anchor="middle">알트에프</text>
+                                <text x="50" y="66" font-size="16" font-family="'Pretendard', sans-serif" font-weight="900" fill="#dc2626" text-anchor="middle">주식회사</text>
+                                <text x="50" y="84" font-size="11" font-family="'Pretendard', sans-serif" font-weight="bold" fill="#dc2626" text-anchor="middle">인</text>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 합계 금액 바 -->
+                <div style="background:#0f172a; color:white; padding:12px 18px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <div style="font-size:13px; font-weight:500;">견적 총 합계금액 (VAT 포함)</div>
+                    <div style="font-size:20px; font-weight:900; color:#38bdf8;">₩${grandTotal.toLocaleString()}원</div>
+                </div>
+
+                <!-- 품목 상세 테이블 -->
+                <div style="overflow-x:auto; margin-bottom:20px;">
+                    <table style="border:1px solid #cbd5e1;">
+                        <thead>
+                            <tr style="background:#f8fafc; border-bottom:2px solid #94a3b8;">
+                                <th style="padding:10px 6px; border:1px solid #cbd5e1; width:35px; text-align:center;">No</th>
+                                <th style="padding:10px 8px; border:1px solid #cbd5e1; text-align:left;">품목 및 규격 (Item & Spec)</th>
+                                <th style="padding:10px 6px; border:1px solid #cbd5e1; width:55px; text-align:center;">재질</th>
+                                <th style="padding:10px 6px; border:1px solid #cbd5e1; width:50px; text-align:right;">수량</th>
+                                <th style="padding:10px 6px; border:1px solid #cbd5e1; width:40px; text-align:center;">단위</th>
+                                <th style="padding:10px 8px; border:1px solid #cbd5e1; width:85px; text-align:right;">단가</th>
+                                <th style="padding:10px 8px; border:1px solid #cbd5e1; width:95px; text-align:right;">금액(공급가)</th>
+                                <th style="padding:10px 6px; border:1px solid #cbd5e1; width:65px; text-align:center;">출고상태</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:#f8fafc; font-weight:bold;">
+                                <td colspan="3" style="text-align:center; padding:10px; border:1px solid #cbd5e1;">합 계 (TOTAL)</td>
+                                <td style="text-align:right; padding:10px; border:1px solid #cbd5e1;">${items.reduce((s, it) => s + (it.quantity || it.qty || 1), 0).toLocaleString()}</td>
+                                <td style="text-align:center; padding:10px; border:1px solid #cbd5e1;">EA</td>
+                                <td style="text-align:right; padding:10px; border:1px solid #cbd5e1; font-size:11px; color:#64748b;">공급가 합계</td>
+                                <td style="text-align:right; padding:10px; border:1px solid #cbd5e1; font-size:14px; color:#0f172a;">₩${totalAmount.toLocaleString()}</td>
+                                <td style="text-align:center; padding:10px; border:1px solid #cbd5e1; font-size:11px; color:#059669;">VAT 별도</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- 특기사항 및 납기 안내 -->
+                <div style="border:1px solid #e2e8f0; border-radius:6px; padding:14px; font-size:12px; color:#475569; line-height:1.7; background:#fafafa; margin-bottom:20px;">
+                    <strong>[납기 및 특기사항]</strong><br>
+                    • <strong>예상 납기:</strong> 전 품목 재고 보유 (오후 3시 이전 발주 시 당일/익일 즉시 출고)<br>
+                    • <strong>입금 계좌:</strong> 기업은행 051-303-3751 (예금주: 알트에프 주식회사)<br>
+                    • <strong>기타 사항:</strong> 정식 밀시트(MTC 성적서)는 제품 출고 시 전자문서로 함께 자동 발급됩니다.<br>
+                    • <strong>견적 및 출고 문의:</strong> 알트에프 영업부 <strong>051-303-3751</strong> (월~금 08:30 ~ 18:00)
+                </div>
+
+                ${attachImgUrl ? `
+                <div style="margin-top:25px; border-top:1px dashed #cbd5e1; padding-top:15px;">
+                    <div style="font-size:12px; font-weight:bold; color:#475569; margin-bottom:8px;">📎 고객 의뢰 원본 첨부사진</div>
+                    <img src="${attachImgUrl}" style="max-width:100%; height:auto; border-radius:6px; border:1px solid #e2e8f0;" alt="의뢰서 사진" />
+                </div>
+                ` : ''}
+            </div>
+        </body>
+        </html>
+        `;
+
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(html);
         return;
     }
 

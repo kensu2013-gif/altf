@@ -52,6 +52,10 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
+      '/quote/view': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
     },
   },
 })

@@ -758,12 +758,27 @@ export class KakaoBotService {
     }
 
     /**
+     * 알트에프 표준 견적번호 생성 규칙 (Q + YYMMDD + -001, 002...)
+     */
+    generateQuotationId() {
+        const now = new Date();
+        const yy = String(now.getFullYear()).slice(-2);
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const datePrefix = `Q${yy}${mm}${dd}`;
+
+        const todayQuotes = this.draftQuotations.filter(q => q.id && q.id.startsWith(datePrefix));
+        const seq = String(todayQuotes.length + 1).padStart(3, '0');
+        return `${datePrefix}-${seq}`;
+    }
+
+    /**
      * 알트에프 표준 견적서 초안 생성
      */
     createDraftQuotation(intake, normalized) {
         const rate = normalized.discountRate || 50;
         const custName = normalized.customer ? normalized.customer.name : '카카오톡 고객';
-        const quoteId = `Q-KAKAO-${Date.now().toString().slice(-6)}`;
+        const quoteId = this.generateQuotationId();
 
         let totalAmount = 0;
         const items = normalized.items.map((it, idx) => {
@@ -1001,15 +1016,34 @@ export class KakaoBotService {
         const targetCompany = user?.company || quote?.kakaoUser?.company || quote?.customerName || '';
         const quoteUrl = `https://altf.kr/quote/view?id=${quotationId}`;
 
-        // 품목 요약 텍스트 생성
-        let itemsSummary = '';
+        // 1. 재고 보유 여부 및 납기 산출 (고객 요구사항: 헛갈리는 품목 나열 대신 명확한 재고/납기 요약)
+        const totalItemsCount = quote?.items?.length || 0;
+        let readyCount = 0;
+        let outCount = 0;
+
         if (quote?.items && quote.items.length > 0) {
-            const previewItems = quote.items.slice(0, 4).map(it => 
-                `• ${it.spec || it.item || '배관자재'} | ${it.quantity || 1}개 | ₩${(it.unitPrice || 0).toLocaleString()}`
-            ).join('\n');
-            const moreCount = quote.items.length > 4 ? `\n• 외 ${quote.items.length - 4}건` : '';
-            itemsSummary = `\n[견적 품목 내역]\n${previewItems}${moreCount}\n`;
+            quote.items.forEach(it => {
+                const stock = it.currentStock !== undefined ? it.currentStock : (it.stock !== undefined ? it.stock : 999);
+                const reqQty = it.quantity || it.qty || 1;
+                const isReady = stock >= reqQty || it.stockStatus === 'READY' || it.stockStatus !== 'OUT_OF_STOCK';
+                if (isReady) {
+                    readyCount++;
+                } else {
+                    outCount++;
+                }
+            });
         }
+
+        const deliverySummary = outCount === 0 
+            ? '전 품목 재고 보유 (당일/익일 즉시 출고)'
+            : `3~5일 이내 출고 (일부 품목 주문생산/입고 후 발송)`;
+
+        const stockSummaryText = 
+            `\n[재고 및 납기 현황]\n` +
+            `• 총 의뢰품목: ${totalItemsCount}개 품목\n` +
+            `• 즉시 출고가능: ${readyCount}개 품목\n` +
+            (outCount > 0 ? `• 주문제작/입고필요: ${outCount}개 품목\n` : `• 재고 부족품목: 0개 (전량 즉시 출고)\n`) +
+            `• 예상 납기: ${deliverySummary}\n`;
 
         const formattedTotal = quote?.totalAmount ? `₩${quote.totalAmount.toLocaleString()}원 (VAT별도)` : '별도협의';
 
@@ -1019,11 +1053,11 @@ export class KakaoBotService {
             `━━━━━━━━━━━━━━━━━━━━\n` +
             `• 견적번호: ${quotationId}\n` +
             `• 공급가액: ${formattedTotal}\n` +
-            itemsSummary +
+            stockSummaryText +
             `━━━━━━━━━━━━━━━━━━━━\n` +
             `📄 정식 견적서 확인 및 PDF 다운로드:\n` +
             `${quoteUrl}\n\n` +
-            `문의: 031-503-1019 / 알트에프(주)`
+            `문의: 051-303-3751 / 알트에프(주)`
         );
 
         const payload = {
