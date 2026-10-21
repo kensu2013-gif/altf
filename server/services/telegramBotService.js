@@ -506,6 +506,9 @@ ${invoicesToProcess.length > 15 ? `... 외 ${invoicesToProcess.length - 15}건 �
 
         const nowStr = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
 
+        const adminTimeRaw = step4Res?.step4?.adminSyncTime || step4Res?.step4?.details?.adminSyncTime || new Date().toISOString();
+        const adminDateStr = new Date(adminTimeRaw).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+
         const report = `
 📋 <b>[결재/완료 보고] 전사 재고 동기화 및 S3 배포 완결</b>
 <b>보고자:</b> 데이터관리팀 재고배포·감시 총괄 <b>DAT-06 과장</b>
@@ -531,7 +534,7 @@ ${invoicesToProcess.length > 15 ? `... 외 ${invoicesToProcess.length - 15}건 �
 
 • <b>[DAT-06 과장] S3 배포 및 시스템 갱신</b>:
   - ☁️ <b>AWS S3 업로드</b>: 총 <b>${totalItems.toLocaleString()}개</b> 품목 클라우드 적재 완료
-  - 🌐 <b>altf.kr 쇼핑몰 웹 재고</b>: 실시간 갱신 완료
+  - 🖥️ <b>altf.kr admin 재고 화면</b>: <b>${adminDateStr}</b> (오른쪽 하단 기준 일시 최신화 완료)
   - 🧹 <b>다운로드 정리</b>: ${cleanedFiles.length > 0 ? `${cleanedFiles.join(', ')} 중복 파일 정리 완료` : '잔여 파일 정리 완료'}
 
 ━━━━━━━━━━━━━━━━━━━

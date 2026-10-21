@@ -713,19 +713,38 @@ export class InventorySyncService {
         });
       });
 
+      // 4-1. altf.kr admin 재고 API 캐시 강제 무효화 & 오른쪽 하단 기준 일시 최신화 트리거
+      let adminSyncTime = new Date().toISOString();
+      try {
+        const refreshRes = await fetch('http://localhost:3001/api/inventory/inventory.json?refresh=true', {
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        if (refreshRes.ok) {
+          const freshData = await refreshRes.json();
+          if (freshData?.lastModified) {
+            adminSyncTime = freshData.lastModified;
+          }
+          console.log('[Step 4 과장봇] ✅ altf.kr admin 재고 캐시 무효화 및 기준 일시 최신화 완료:', adminSyncTime);
+        }
+      } catch (fErr) {
+        console.warn('[Step 4 과장봇] admin API refresh 호출 경고:', fErr.message);
+      }
+      this.state.step4.adminSyncTime = adminSyncTime;
+
       // 5. 시화재고 일일 변동량 분석
       this.state.step4.message = '시화재고 일일 변동량 및 출고/입고 트렌드 분석 중...';
       const diffStats = await this._analyzeSihwaDiffs();
 
       this.state.step4.status = 'SUCCESS';
       this.state.step4.lastRun = new Date().toISOString();
-      this.state.step4.message = `성공 완결: S3 업로드(${itemsArray.length.toLocaleString()}건) + 웹 갱신 + 시화 변동(${diffStats.totalChanges}건) 산출`;
+      this.state.step4.message = `성공 완결: S3 업로드(${itemsArray.length.toLocaleString()}건) + admin 기준일시 최신화 + 시화 변동(${diffStats.totalChanges}건) 산출`;
       this.state.step4.sihwaChangesCount = diffStats.totalChanges;
       this.state.step4.sihwaInboundCount = diffStats.inboundCount;
       this.state.step4.sihwaOutboundCount = diffStats.outboundCount;
       this.state.step4.details = {
         diffStats,
         cleanedFiles,
+        adminSyncTime,
         timestamp: new Date().toLocaleTimeString('ko-KR')
       };
 
