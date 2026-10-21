@@ -485,6 +485,20 @@ export class KakaoBotService {
             this.dispatchToAgents(intakeRecord, draftQuote);
         }, 50);
 
+        // 🔥 [솔라피 자동 견적 발송] 수동 버튼 클릭 없이도 즉시 솔라피로 견적서 발송!
+        setTimeout(async () => {
+            try {
+                console.log(`[KakaoBot] ⚡ [자동 발송] 솔라피를 통한 견적서 ${draftQuote.id} 자동 발송 시도...`);
+                await this.dispatchQuotation({
+                    quotationId: draftQuote.id,
+                    botUserKey,
+                    targetPhone: normalized.customer?.phone || draftQuote.customerInfo?.phone
+                });
+            } catch (autoDispatchErr) {
+                console.error('[KakaoBot] 솔라피 자동 견적 발송 오류:', autoDispatchErr.message);
+            }
+        }, 100);
+
         const responseText = this.formatKakaoQuoteMessage(draftQuote);
 
         return {
@@ -643,6 +657,20 @@ export class KakaoBotService {
                             console.warn('[KakaoBot] 스킬 콜백 푸시 오류:', cbErr.message);
                         }
                     }
+
+                    // 🔥 [솔라피 사진 견적 자동 발송] 분석 완료 즉시 솔라피 MMS(포토+견적서 링크) 자동 발송!
+                    setTimeout(async () => {
+                        try {
+                            console.log(`[KakaoBot] ⚡ [사진 견적 자동 발송] 솔라피를 통한 견적서 ${draftQuote.id} 자동 발송 시도...`);
+                            await this.dispatchQuotation({
+                                quotationId: draftQuote.id,
+                                botUserKey,
+                                targetPhone: normalized.customer?.phone || draftQuote.customerInfo?.phone
+                            });
+                        } catch (autoDispatchErr) {
+                            console.error('[KakaoBot] 솔라피 사진 견적 자동 발송 오류:', autoDispatchErr.message);
+                        }
+                    }, 100);
 
                     // 0원 카카오 이벤트 푸시 발송 시도
                     await sleQuoteReviewService.dispatchKakaoEventPush({
