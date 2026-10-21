@@ -383,14 +383,31 @@ ${(targetInv.items?.length || 0) > 10 ? `... 외 ${targetInv.items.length - 10}�
                     const totalGrand = invoicesToProcess.reduce((sum, inv) => sum + (inv.pricing?.grandTotal || 0), 0);
                     const totalSub = invoicesToProcess.reduce((sum, inv) => sum + (inv.pricing?.subtotal || 0), 0);
 
+                    // 초과/과소 청구 및 발주 미일치 건 추출
+                    const discrepancies = invoicesToProcess.filter(inv => inv.crossCheck && (inv.crossCheck.discrepancyType === 'OVER_BILLED' || inv.crossCheck.discrepancyType === 'UNDER_BILLED'));
+                    const unmatched = invoicesToProcess.filter(inv => inv.crossCheck && inv.crossCheck.discrepancyType === 'UNMATCHED_PO');
+
+                    let alertBlock = '';
+                    if (discrepancies.length > 0) {
+                        alertBlock += `\n🚨 <b>[금액 이상치(초과/과소) 감지 건 - 사무실 확인 필요]:</b>\n`;
+                        discrepancies.forEach(inv => {
+                            const icon = inv.crossCheck.discrepancyType === 'OVER_BILLED' ? '🔺 [초과 청구]' : '🔻 [과소/분할]';
+                            alertBlock += `• [P${inv.pageIndex}] <b>${inv.customerName}</b>: ${icon} ${inv.crossCheck.statusText} (전표: ${(inv.pricing?.subtotal || 0).toLocaleString()}원 vs 발주약정: ${(inv.crossCheck.expectedPurchaseSubtotal || 0).toLocaleString()}원)\n`;
+                        });
+                    }
+
                     const matchedOrdersList = invoicesToProcess
                         .map(inv => {
                             const po = inv.poNumbers?.length > 0 ? inv.poNumbers.join(', ') : '발주번호 없음';
                             const cust = inv.customerName || (inv.isWarehouse ? '알트에프 (서울재고)' : '고객사 미지정');
                             const grand = (inv.pricing?.grandTotal || 0).toLocaleString();
-                            return `• [P${inv.pageIndex || '?'}] <code>${po}</code> | <b>${cust}</b>: ${grand}원`;
+                            let badge = '✅';
+                            if (inv.crossCheck?.discrepancyType === 'OVER_BILLED') badge = '🚨 초과';
+                            else if (inv.crossCheck?.discrepancyType === 'UNDER_BILLED') badge = '📉 분할';
+                            else if (inv.crossCheck?.discrepancyType === 'UNMATCHED_PO') badge = '⚠️ 미등록';
+                            return `• [P${inv.pageIndex || '?'}] [${badge}] <code>${po}</code> | <b>${cust}</b>: ${grand}원`;
                         })
-                        .slice(0, 15)
+                        .slice(0, 16)
                         .join('\n');
 
                     const summaryText = `
@@ -398,10 +415,9 @@ ${(targetInv.items?.length || 0) > 10 ? `... 외 ${targetInv.items.length - 10}�
 📄 총 문서: <b>${totalPages}페이지</b> 스캔 분석 완료
 🏢 총 전표 수: <b>${invoicesToProcess.length}건</b> 매칭 완료
 💰 총 매입 합계: <b>${totalGrand.toLocaleString()}원</b> (공급가: ${totalSub.toLocaleString()}원)
-
-📋 <b>전표별 매칭 목록 (${invoicesToProcess.length}건):</b>
+${alertBlock}
+📋 <b>전표별 검증 상태 목록 (${invoicesToProcess.length}건):</b>
 ${matchedOrdersList}
-${invoicesToProcess.length > 15 ? `... 외 ${invoicesToProcess.length - 15}건 전표 전사 처리 완료` : ''}
 
 🏢 <b>4대 부서 자율 조치:</b>
 • 📑 총무부(GEN-01): ${invoicesToProcess.length}건 매입 전표 DB 일괄 등록 확정

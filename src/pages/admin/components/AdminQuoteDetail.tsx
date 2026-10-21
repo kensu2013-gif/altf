@@ -333,17 +333,16 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             };
 
             // 유선전화(031, 02 등)가 아닌 실제 수신 가능한 휴대폰 번호(010-) 우선 탐색!
-            const rawQuote = quote as any;
             const candidateMobile = [
                 quote.kakaoUser?.phone,
-                rawQuote.sourcePhone,
+                quote.sourcePhone,
                 customerInfo.phone,
-                rawQuote.mobile,
-                rawQuote.customerInfo?.mobile,
+                quote.mobile,
+                quote.customerInfo?.mobile,
                 quote.customerInfo?.phone
             ].find(p => isMobile(p));
 
-            const targetPhone = candidateMobile || customerInfo.phone || rawQuote.sourcePhone || '01062223751';
+            const targetPhone = candidateMobile || customerInfo.phone || quote.sourcePhone || '01062223751';
 
             const res = await fetch('/api/kakao/dispatch-quote', {
                 method: 'POST',
@@ -363,8 +362,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             } else {
                 setDispatchStatusMsg(`⚠️ 발송 오류: ${data.error || '발송 실패'}`);
             }
-        } catch (e: any) {
-            setDispatchStatusMsg(`⚠️ 네트워크 오류: ${e.message}`);
+        } catch (e: unknown) {
+            setDispatchStatusMsg(`⚠️ 네트워크 오류: ${e instanceof Error ? e.message : String(e)}`);
         } finally {
             setIsDispatching(false);
         }
@@ -392,8 +391,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             } else {
                 setDispatchStatusMsg(`⚠️ 카카오 푸시 오류: ${data.error || '발송 실패'}`);
             }
-        } catch (e: any) {
-            setDispatchStatusMsg(`⚠️ 네트워크 오류: ${e.message}`);
+        } catch (e: unknown) {
+            setDispatchStatusMsg(`⚠️ 네트워크 오류: ${e instanceof Error ? e.message : String(e)}`);
         } finally {
             setIsDispatching(false);
         }
@@ -436,8 +435,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             } else {
                 alert(`등록 실패: ${data.error}`);
             }
-        } catch (e: any) {
-            alert(`등록 오류: ${e.message}`);
+        } catch (e: unknown) {
+            alert(`등록 오류: ${e instanceof Error ? e.message : String(e)}`);
         }
     };
     const [bulkDiscountRateInput, setBulkDiscountRateInput] = useState<string>('');
@@ -1849,8 +1848,8 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                     <h4 className="text-xs font-bold text-yellow-800 mb-2">첨부된 사진/파일</h4>
                                     <div className="flex flex-wrap gap-2">
                                         {quote.attachments.map((file, i) => {
-                                            const anyFile = file as any;
-                                            const fileUrl = typeof anyFile === 'string' ? anyFile : (typeof anyFile?.url === 'string' ? anyFile.url : (anyFile?.url?.url || ''));
+                                            const fileItem = file as { name?: string; url?: string | { url?: string } } | string;
+                                            const fileUrl = typeof fileItem === 'string' ? fileItem : (typeof fileItem?.url === 'string' ? fileItem.url : (typeof fileItem?.url === 'object' && fileItem.url ? fileItem.url.url || '' : ''));
                                             return (
                                                 <a 
                                                     key={i} 

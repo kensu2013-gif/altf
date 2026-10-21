@@ -37,14 +37,24 @@ const ISSUED_JSON_PATH = path.join(ROOT_DIR, 'server/data/issued_certificates.js
 const CERT_JSON_PATH = path.join(ROOT_DIR, 'server/data/certificates.json');
 const AGENTS_PATH = path.join(ROOT_DIR, 'server/data/agents.json');
 const DB_PATH = path.join(ROOT_DIR, 'data/db.json');
+const QC_MISSING_ALERTS_PATH = path.join(ROOT_DIR, 'server/data/qc_missing_alerts.json');
 
 // 시스템 내 Chrome 또는 Edge 브라우저 실행 파일 경로 탐색
 function getBrowserExecutablePath() {
     const candidatePaths = [
+        // Mac
+        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+        '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+        '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+        // Windows
         'C:/Program Files/Google/Chrome/Application/chrome.exe',
         'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
         'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-        'C:/Program Files/Microsoft/Edge/Application/msedge.exe'
+        'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
+        // Linux
+        '/usr/bin/google-chrome',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium'
     ];
     for (const p of candidatePaths) {
         if (fs.existsSync(p)) return p;
@@ -119,40 +129,113 @@ export class CertificateIssuerService {
     }
 
     /**
-     * QC-02 성적서 마스터에서 LotNo 최우선 기반 품질 시험값 검색
-     * (LOT NO에 따라 HeatNo, Description, SpecMaterial, SpecInspection, 화학값, 기계값이 결정됨!)
+     * QC-13 성적서 누락/모호 경보 기록
      */
-    findMasterCertData(lotNo, heatNo, poNo, description) {
-        if (!fs.existsSync(CERT_JSON_PATH)) return null;
+     recordMissingAlert(alertData) {
+        try {
+            let alerts = [];
+            if (fs.existsSync(QC_MISSING_ALERTS_PATH)) {
+                alerts = JSON.parse(fs.readFileSync(QC_MISSING_ALERTS_PATH, 'utf8'));
+                if (!Array.isArray(alerts)) alerts = [];
+            }
+            const record = {
+                id: `alert_qc13_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                detectedAt: new Date().toISOString(),
+                ...alertData
+            };
+            alerts.unshift(record);
+            fs.writeFileSync(QC_MISSING_ALERTS_PATH, JSON.stringify(alerts.slice(0, 500), null, 2), 'utf8');
+            console.warn(`[QC-13 성적서 누락 경보 발령]`, JSON.stringify(record));
+            return record;
+        } catch (err) {
+            console.error('Failed to write qc_missing_alerts.json:', err);
+        }
+    }
+
+    /**
+     * QC-02 성적서 마스터 엄격 매칭 (MATCHED / NOT_FOUND / AMBIGUOUS)
+     * - 복수 일치 시 임의의 첫 번째 항목 반환을 금지하고 AMBIGUOUS로 분류
+     * - 미존재 시 NOT_FOUND
+     * - 1건 완전 일치 시 MATCHED
+     */
+    matchMasterCert(lotNo, heatNo, poNo, description) {
+        if (!fs.existsSync(CERT_JSON_PATH)) {
+            return { status: 'NOT_FOUND', cert: null, reason: 'certificates.json 파일이 존재하지 않습니다.' };
+        }
         try {
             const certs = JSON.parse(fs.readFileSync(CERT_JSON_PATH, 'utf8'));
 
-            // 1. LOT NO 최우선 검색 (가장 중요한 마스터 키!)
+            // 1. LOT NO 최우선 검색
             if (lotNo) {
                 const cleanLot = String(lotNo).toUpperCase().trim();
-                const byLot = certs.find(c => String(c.lotNo || '').toUpperCase().trim() === cleanLot);
-                if (byLot) return byLot;
+                const byLot = certs.filter(c => String(c.lotNo || '').toUpperCase().trim() === cleanLot);
+                if (byLot.length > 1) {
+                    return {
+                        status: 'AMBIGUOUS',
+                        cert: null,
+                        candidateCount: byLot.length,
+                        reason: `LOT [${lotNo}]에 일치하는 성적서가 ${byLot.length}건 존재하여 특정할 수 없습니다.`
+                    };
+                }
+                if (byLot.length === 1) {
+                    return { status: 'MATCHED', cert: byLot[0], candidateCount: 1 };
+                }
             }
 
             // 2. PO와 Description 동시 일치
             if (poNo && description) {
                 const cleanPo = String(poNo).toUpperCase().trim();
                 const cleanDesc = String(description).toUpperCase().replace(/\s+/g, '');
-                const byPoDesc = certs.find(c => 
+                const byPoDesc = certs.filter(c => 
                     String(c.poNo || '').toUpperCase().trim() === cleanPo &&
                     String(c.description || '').toUpperCase().replace(/\s+/g, '') === cleanDesc
                 );
-                if (byPoDesc) return byPoDesc;
+                if (byPoDesc.length > 1) {
+                    return {
+                        status: 'AMBIGUOUS',
+                        cert: null,
+                        candidateCount: byPoDesc.length,
+                        reason: `PO [${poNo}] 및 품명에 일치하는 성적서가 ${byPoDesc.length}건 존재하여 특정할 수 없습니다.`
+                    };
+                }
+                if (byPoDesc.length === 1) {
+                    return { status: 'MATCHED', cert: byPoDesc[0], candidateCount: 1 };
+                }
             }
 
             // 3. HeatNo 일치
             if (heatNo) {
                 const cleanHeat = String(heatNo).toUpperCase().trim();
-                const byHeat = certs.find(c => String(c.heatNo || '').toUpperCase().trim() === cleanHeat);
-                if (byHeat) return byHeat;
+                const byHeat = certs.filter(c => String(c.heatNo || '').toUpperCase().trim() === cleanHeat);
+                if (byHeat.length > 1) {
+                    return {
+                        status: 'AMBIGUOUS',
+                        cert: null,
+                        candidateCount: byHeat.length,
+                        reason: `HEAT [${heatNo}]에 일치하는 성적서가 ${byHeat.length}건 존재하여 특정할 수 없습니다.`
+                    };
+                }
+                if (byHeat.length === 1) {
+                    return { status: 'MATCHED', cert: byHeat[0], candidateCount: 1 };
+                }
             }
-        } catch {}
-        return null;
+        } catch (err) {
+            console.error('Error reading cert master:', err);
+        }
+        return {
+            status: 'NOT_FOUND',
+            cert: null,
+            candidateCount: 0,
+            reason: `일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다.`
+        };
+    }
+
+    /**
+     * 하위 호환용 헬퍼 (MATCHED인 경우에만 cert 반환)
+     */
+    findMasterCertData(lotNo, heatNo, poNo, description) {
+        const res = this.matchMasterCert(lotNo, heatNo, poNo, description);
+        return res.status === 'MATCHED' ? res.cert : null;
     }
 
     /**
@@ -200,9 +283,9 @@ export class CertificateIssuerService {
         }
 
         // 1. 헤더 기입 (기존 셀 서식 100% 유지)
-        ws.getCell('K6').value = certMeta.customer || '월드원플랜트';
-        ws.getCell('AJ6').value = certMeta.certNo || 'YR-26-07015';
-        ws.getCell('K7').value = certMeta.poNo || 'ES260709-1974';
+        ws.getCell('K6').value = certMeta.customer || '';
+        ws.getCell('AJ6').value = certMeta.certNo || '';
+        ws.getCell('K7').value = certMeta.poNo || '';
         ws.getCell('AJ7').value = certMeta.issueDate || new Date().toISOString().slice(0, 10).replace(/-/g, '.');
         ws.getCell('K8').value = 'N/A';
         ws.getCell('AJ8').value = 'GOOD';
@@ -942,105 +1025,104 @@ try {
 
     /**
      * 4. 발주번호(poNo) 기반 성적서 일괄 자동 발행 & DAT-10 아카이빙
+     * - 기본값 대체 전면 금지: 일치하지 않거나 모호(AMBIGUOUS)하면 즉시 중단 및 누락 경보 기록
      */
     async issueCertificatesForPo(poNo, options = {}) {
         this.ensureDirectories();
-        console.log(`[QC-06 성적서 발행봇] 발주번호 ${poNo} 성적서 발행 프로세스 시작...`);
+        if (!poNo) {
+            throw new Error('발주번호(poNo)가 유효하지 않습니다.');
+        }
+
+        console.log(`[QC-06 성적서 발행봇] 발주번호 ${poNo} 성적서 검증 및 발행 프로세스 시작...`);
 
         const { order, relatedCerts } = this.getOrderItemsForPo(poNo);
+        const customerName = options.customer || order?.targetCustomerName || order?.customerName;
+        if (!customerName) {
+            throw new Error('고객사명(customer)이 누락되었습니다. 기본값 주입은 금지되어 있습니다.');
+        }
 
-        let itemsToIssue = [];
+        const items = (order && Array.isArray(order.items) && order.items.length > 0)
+            ? order.items
+            : (relatedCerts && relatedCerts.length > 0 ? relatedCerts : []);
 
-        // 1. 발주서 내 아이템 기반 목록화
-        if (order && Array.isArray(order.items) && order.items.length > 0) {
-            order.items.forEach((it, idx) => {
-                const desc = it.productId || it.name || '';
-                // QC-02 대경벤드 성적서 대장 매칭 (LOT NO 최우선!)
-                const matchedCert = this.findMasterCertData(it.lotNo, it.heatNo, poNo, desc)
-                    || relatedCerts.find(c => (c.description || '').toUpperCase().trim() === desc.toUpperCase().trim()) 
-                    || relatedCerts[idx]
-                    || relatedCerts[0];
+        if (items.length === 0) {
+            throw new Error(`발주번호 ${poNo}에 해당하는 발주 품목 및 관련 성적서 데이터가 없습니다.`);
+        }
 
-                itemsToIssue.push({
-                    itemNo: idx + 1,
-                    description: matchedCert?.description || desc,
-                    qty: it.quantity || matchedCert?.qty || 1,
-                    heatNo: matchedCert?.heatNo || it.heatNo || 'SE51511',
-                    lotNo: matchedCert?.lotNo || it.lotNo || 'KGA0589',
-                    specMaterial: matchedCert?.specMaterial || 'ASTM A312 TP304',
-                    specInspection: matchedCert?.specInspection || 'KS B1543 STS304-W /B1500',
-                    startingMaterial: matchedCert?.material || 'WELDED PIPE',
-                    chem: {
-                        C: matchedCert?.chemC ?? '0.023',
-                        Si: matchedCert?.chemSi ?? '0.42',
-                        Mn: matchedCert?.chemMn ?? '1.47',
-                        P: matchedCert?.chemP ?? '0.032',
-                        S: matchedCert?.chemS ?? '0.002',
-                        Ni: matchedCert?.chemNi ?? '8.09',
-                        Cr: matchedCert?.chemCr ?? '18.12',
-                        Mo: matchedCert?.chemMo ?? ''
-                    },
-                    mech: {
-                        ys: matchedCert?.mechYs ?? '288',
-                        ts: matchedCert?.mechTs ?? '654',
-                        el: matchedCert?.mechEl ?? '55'
-                    }
+        const matchedItems = [];
+        const missingLines = [];
+
+        // 1. 발주 품목별 성적서 엄격 매칭 검증
+        for (let idx = 0; idx < items.length; idx++) {
+            const it = items[idx];
+            const desc = it.productId || it.name || it.description || '';
+            const lot = (it.lotNo || it.vendorLot || '').trim();
+            const heat = (it.heatNo || '').trim();
+
+            const matchResult = this.matchMasterCert(lot, heat, poNo, desc);
+
+            if (matchResult.status !== 'MATCHED' || !matchResult.cert) {
+                missingLines.push({
+                    itemIndex: idx + 1,
+                    poNo,
+                    lotNo: lot || null,
+                    heatNo: heat || null,
+                    description: desc,
+                    status: matchResult.status,
+                    reason: matchResult.reason || '성적서 마스터 매칭 실패'
                 });
-            });
-        } else if (relatedCerts.length > 0) {
-            // 성적서 매칭 데이터 직접 기반
-            relatedCerts.forEach((c, idx) => {
-                itemsToIssue.push({
-                    itemNo: idx + 1,
-                    description: c.description,
-                    qty: c.qty || 1,
-                    heatNo: c.heatNo || 'SE51511',
-                    lotNo: c.lotNo || 'KGA0589',
-                    specMaterial: c.specMaterial || 'ASTM A312 TP304',
-                    specInspection: c.specInspection || 'KS B1543 STS304-W /B1500',
-                    startingMaterial: 'WELDED PIPE',
-                    chem: {
-                        C: c.chemC ?? '0.023',
-                        Si: c.chemSi ?? '0.42',
-                        Mn: c.chemMn ?? '1.47',
-                        P: c.chemP ?? '0.032',
-                        S: c.chemS ?? '0.002',
-                        Ni: c.chemNi ?? '8.09',
-                        Cr: c.chemCr ?? '18.12',
-                        Mo: c.chemMo ?? ''
-                    },
-                    mech: {
-                        ys: c.mechYs ?? '288',
-                        ts: c.mechTs ?? '654',
-                        el: c.mechEl ?? '55'
-                    }
-                });
-            });
-        } else {
-            // 샘플 테스트 데이터 (사용자 첨부 사진과 100% 동일한 기본 샘플)
-            itemsToIssue.push({
-                itemNo: 1,
-                description: '90E(L) S/10S 150A B.W',
-                qty: 6,
-                heatNo: 'SE51511',
-                lotNo: 'KGA0589',
-                specMaterial: 'ASTM A312 TP304',
-                specInspection: 'KS B1543 STS304-W /B1500',
-                startingMaterial: 'WELDED PIPE',
-                chem: { C: '0.023', Si: '0.42', Mn: '1.47', P: '0.032', S: '0.002', Ni: '8.09', Cr: '18.12' },
-                mech: { ys: '288', ts: '654', el: '55' }
+                continue;
+            }
+
+            const matchedCert = matchResult.cert;
+            matchedItems.push({
+                itemNo: idx + 1,
+                description: matchedCert.description || desc,
+                qty: Number(it.quantity || it.qty || matchedCert.qty || 1),
+                heatNo: matchedCert.heatNo,
+                lotNo: matchedCert.lotNo,
+                specMaterial: matchedCert.specMaterial,
+                specInspection: matchedCert.specInspection,
+                startingMaterial: matchedCert.material || 'WELDED PIPE',
+                chem: {
+                    C: matchedCert.chemC,
+                    Si: matchedCert.chemSi,
+                    Mn: matchedCert.chemMn,
+                    P: matchedCert.chemP,
+                    S: matchedCert.chemS,
+                    Ni: matchedCert.chemNi,
+                    Cr: matchedCert.chemCr,
+                    Mo: matchedCert.chemMo ?? ''
+                },
+                mech: {
+                    ys: matchedCert.mechYs,
+                    ts: matchedCert.mechTs,
+                    el: matchedCert.mechEl
+                }
             });
         }
 
-        // 규격 및 재질에 따른 그룹핑 & 최대 6개 아이템 단위 패킹 (6 Items per Sheet)
-        const chunks = [];
-        for (let i = 0; i < itemsToIssue.length; i += 6) {
-            chunks.push(itemsToIssue.slice(i, i + 6));
+        // 2. 단 1건이라도 누락/모호(AMBIGUOUS)한 라인이 있으면 즉시 발행 중단!
+        if (missingLines.length > 0) {
+            this.recordMissingAlert({
+                kind: 'PO_CERT_MISSING',
+                poNo,
+                customer: customerName,
+                totalItems: items.length,
+                missingCount: missingLines.length,
+                missingLines
+            });
+            return {
+                success: false,
+                reason: 'MISSING_OR_AMBIGUOUS_CERTIFICATE',
+                poNo,
+                customer: customerName,
+                missingLines
+            };
         }
 
         const issuedResults = [];
-        const customerName = options.customer || order?.targetCustomerName || order?.customerName || '월드원플랜트';
-        const poDate = order?.createdAt?.slice(0, 10)?.replace(/-/g, '.') || '2026.07.09';
+        const poDate = order?.createdAt?.slice(0, 10)?.replace(/-/g, '.') || new Date().toISOString().slice(0, 10).replace(/-/g, '.');
 
         for (let pIdx = 0; pIdx < chunks.length; pIdx++) {
             const pageItems = chunks[pIdx];
@@ -1135,75 +1217,94 @@ try {
             throw new Error('출고지시서 데이터가 유효하지 않습니다.');
         }
 
-        const outboundNo = outboundOrder.outboundNo || outboundOrder.id || 'A202610150';
-        const customer = outboundOrder.customer || options.customer || '(주)태양밴드';
+        const outboundNo = outboundOrder.outboundNo || outboundOrder.id;
+        if (!outboundNo) {
+            throw new Error('출고번호(outboundNo)가 누락되었습니다. 기본값 대체는 금지되어 있습니다.');
+        }
+
+        const customer = outboundOrder.customer || options.customer;
+        if (!customer) {
+            throw new Error('고객사명(customer)이 누락되었습니다. 기본값 대체는 금지되어 있습니다.');
+        }
+
         const requestDate = outboundOrder.requestDate || new Date().toISOString().slice(0, 10).replace(/-/g, '.');
         const items = outboundOrder.items || [];
+        if (!items || items.length === 0) {
+            throw new Error('출고 품목(items) 데이터가 없습니다.');
+        }
 
-        // 1. 각 출고 품목별로 업체LOT(대경벤드 LOT) 기준 마스터 성적서 매칭
+        // 1. 각 출고 품목별로 업체LOT(대경벤드 LOT) 기준 마스터 성적서 엄격 매칭
         const matchedItems = [];
+        const missingLines = [];
+
         for (let i = 0; i < items.length; i++) {
             const it = items[i];
             const vendorLot = (it.vendorLot || it.lotNo || it.altfLotNo || '').trim();
-            const matchedCert = this.findMasterCertData(vendorLot, null, null, it.productType || it.itemType);
+            const matchResult = this.matchMasterCert(vendorLot, it.heatNo, it.poNo, it.productType || it.itemType || it.description);
 
-            // LOT 번호에 따라 Heat No, Spec Material, Spec Inspection, Description이 결정됨!
-            const heatNo = matchedCert?.heatNo || it.heatNo || 'SD34285';
-            const lotNo = matchedCert?.lotNo || vendorLot || 'JCQ4366';
-            const specMaterial = matchedCert?.specMaterial || (it.material?.includes('316L') ? 'ASTM A312 TP316L' : 'KS D3576 STS304 TP');
-            const specInspection = matchedCert?.specInspection || (it.material?.includes('316L') ? 'KS B1543 STS316L-W' : 'KS B1543 STS304-W');
-            const description = matchedCert?.description || `${it.productType || it.itemType || 'R(C)'} ${it.schedule || 'S/10S'} ${it.size || '32A*15A'} B.W`;
-            const startingMaterial = matchedCert?.material || (it.method === 'PLATE' ? 'PLATE' : 'WELDED PIPE');
+            if (matchResult.status !== 'MATCHED' || !matchResult.cert) {
+                missingLines.push({
+                    itemIndex: i + 1,
+                    lineNo: it.lineNo || `${i + 1}-1`,
+                    vendorLot: vendorLot || null,
+                    heatNo: it.heatNo || null,
+                    description: it.productType || it.itemType || it.description || '',
+                    status: matchResult.status,
+                    reason: matchResult.reason || '성적서 마스터 불일치'
+                });
+                continue;
+            }
 
+            const matchedCert = matchResult.cert;
             matchedItems.push({
                 itemNo: i + 1,
                 lineNo: it.lineNo || `${i + 1}-1`,
                 altfLotNo: it.altfLotNo || '',
-                lotNo,
-                heatNo,
-                description,
+                lotNo: matchedCert.lotNo,
+                heatNo: matchedCert.heatNo,
+                description: matchedCert.description || `${it.productType || it.itemType || 'FITTING'} ${it.size || ''}`,
                 qty: Number(it.qty) || 1,
-                specMaterial,
-                specInspection,
-                startingMaterial,
+                specMaterial: matchedCert.specMaterial,
+                specInspection: matchedCert.specInspection,
+                startingMaterial: matchedCert.material || (it.method === 'PLATE' ? 'PLATE' : 'WELDED PIPE'),
                 chem: {
-                    C: matchedCert?.chemC ?? (it.material?.includes('316L') ? '0.017' : '0.023'),
-                    Si: matchedCert?.chemSi ?? (it.material?.includes('316L') ? '0.6' : '0.42'),
-                    Mn: matchedCert?.chemMn ?? (it.material?.includes('316L') ? '1.06' : '1.47'),
-                    P: matchedCert?.chemP ?? (it.material?.includes('316L') ? '0.029' : '0.032'),
-                    S: matchedCert?.chemS ?? (it.material?.includes('316L') ? '0.002' : '0.002'),
-                    Ni: matchedCert?.chemNi ?? (it.material?.includes('316L') ? '10.03' : '8.09'),
-                    Cr: matchedCert?.chemCr ?? (it.material?.includes('316L') ? '16.16' : '18.12'),
-                    Mo: matchedCert?.chemMo ?? (it.material?.includes('316L') ? '2.07' : '')
+                    C: matchedCert.chemC,
+                    Si: matchedCert.chemSi,
+                    Mn: matchedCert.chemMn,
+                    P: matchedCert.chemP,
+                    S: matchedCert.chemS,
+                    Ni: matchedCert.chemNi,
+                    Cr: matchedCert.chemCr,
+                    Mo: matchedCert.chemMo ?? ''
                 },
                 mech: {
-                    ys: matchedCert?.mechYs ?? (it.material?.includes('316L') ? '285' : '288'),
-                    ts: matchedCert?.mechTs ?? (it.material?.includes('316L') ? '594' : '654'),
-                    el: matchedCert?.mechEl ?? (it.material?.includes('316L') ? '50' : '55')
+                    ys: matchedCert.mechYs,
+                    ts: matchedCert.mechTs,
+                    el: matchedCert.mechEl
                 }
             });
         }
 
-        // 아이템이 없는 경우 3번 사진 기본 샘플 주입
-        if (matchedItems.length === 0) {
-            const sampleMatch = this.findMasterCertData('JCQ4366');
-            matchedItems.push({
-                itemNo: 1,
-                lineNo: '1 - 1',
-                altfLotNo: 'DKB260313108',
-                lotNo: 'JCQ4366',
-                heatNo: sampleMatch?.heatNo || 'SD34285',
-                description: sampleMatch?.description || 'R(C) S/10S 32A * 15A B.W',
-                qty: 2,
-                specMaterial: sampleMatch?.specMaterial || 'ASTM A312 TP316L',
-                specInspection: sampleMatch?.specInspection || 'KS B1543 STS316L-W',
-                startingMaterial: 'WELDED PIPE',
-                chem: { C: sampleMatch?.chemC ?? 0.017, Si: sampleMatch?.chemSi ?? 0.6, Mn: sampleMatch?.chemMn ?? 1.06, P: sampleMatch?.chemP ?? 0.029, S: sampleMatch?.chemS ?? 0.002, Ni: sampleMatch?.chemNi ?? 10.03, Cr: sampleMatch?.chemCr ?? 16.16, Mo: sampleMatch?.chemMo ?? 2.07 },
-                mech: { ys: sampleMatch?.mechYs ?? 285, ts: sampleMatch?.mechTs ?? 594, el: sampleMatch?.mechEl ?? 50 }
+        // 2. 단 1건이라도 누락/모호(AMBIGUOUS)한 라인이 있으면 즉시 발행 중단!
+        if (missingLines.length > 0) {
+            this.recordMissingAlert({
+                kind: 'OUTBOUND_CERT_MISSING',
+                outboundNo,
+                customer,
+                totalItems: items.length,
+                missingCount: missingLines.length,
+                missingLines
             });
+            return {
+                success: false,
+                reason: 'MISSING_OR_AMBIGUOUS_CERTIFICATE',
+                outboundNo,
+                customer,
+                missingLines
+            };
         }
 
-        // 2. 최대 6개 아이템 단위 패킹 & 규격별 분할
+        // 3. 최대 6개 아이템 단위 패킹 & 규격별 분할
         const chunks = [];
         for (let i = 0; i < matchedItems.length; i += 6) {
             chunks.push(matchedItems.slice(i, i + 6));

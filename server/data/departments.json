@@ -6,9 +6,13 @@
     "color": "#00F0FF",
     "bgGlow": "rgba(0, 240, 255, 0.15)",
     "icon": "💼",
-    "description": "고객 접수 인입, 문서 표준화, 거래처 요율 적용 견적 초안 및 회신 자동화",
+    "description": "메일·카카오톡·OCR·엑셀 다채널 견적 인입, AI 표준화 및 전사 재고·요율 반영 웹 견적서 자동화",
     "headRole": "영업 총괄 관리",
-    "totalUnits": 5
+    "totalUnits": 8,
+    "teams": [
+      "영업1팀",
+      "영업2팀"
+    ]
   },
   {
     "id": "purchase",

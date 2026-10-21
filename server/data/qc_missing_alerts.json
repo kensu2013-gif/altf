@@ -1,0 +1,379 @@
+[
+  {
+    "id": "alert_qc13_1792508054662_8cg3m",
+    "detectedAt": "2026-10-20T14:54:14.662Z",
+    "kind": "PO_CERT_MISSING",
+    "poNo": "ES260709-1974",
+    "customer": "월드원플랜에탈",
+    "totalItems": 34,
+    "missingCount": 34,
+    "missingLines": [
+      {
+        "itemIndex": 1,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "90E(L)-S10S-150A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 2,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "90E(L)-S10S-15A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 3,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "90E(L)-S10S-40A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 4,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "90E(L)-S10S-40A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 5,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "90E(L)-S10S-50A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 6,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "90E(L)-S10S-65A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 7,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "90E(L)-S10S-25A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 8,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "R(C)-S10S-50A X 15A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 9,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "R(C)-S10S-50A X 20A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 10,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "R(C)-S10S-50A X 40A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 11,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "R(C)-S10S-50A X 25A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 12,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "T(S)-S10S-15A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 13,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "T(R)-S10S-25A X 15A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 14,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "T(R)-S10S-40A X 15A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 15,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "T(S)-S10S-40A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 16,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "T(R)-S10S-50A X 15A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 17,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "T(R)-S10S-50A X 40A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 18,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "T(S)-S10S-50A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 19,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "T(S)-S10S-25A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 20,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "T(R)-S10S-50A X 15A-STS304-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 21,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "45E(L)-S10S-65A-STS316L-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 22,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "R(C)-S10S-125A X 50A-STS316L-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 23,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "R(C)-S10S-50A X 25A-STS316L-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 24,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "R(C)-S10S-50A X 40A-STS316L-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 25,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "R(C)-S10S-65A X 50A-STS316L-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 26,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "R(C)-S10S-80A X 40A-STS316L-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 27,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "T(R)-S10S-50A X 25A-STS316L-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 28,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "T(S)-S10S-50A-STS316L-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 29,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "T(S)-S10S-25A-STS316L-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 30,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "T(S)-S10S-40A-STS316L-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 31,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "T(R)-S10S-50A X 15A-STS316L-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 32,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "90E(L)-S10S-25A-STS316L-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 33,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "90E(L)-S10S-40A-STS316L-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      },
+      {
+        "itemIndex": 34,
+        "poNo": "ES260709-1974",
+        "lotNo": null,
+        "heatNo": null,
+        "description": "90E(L)-S10S-50A-STS316L-W",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      }
+    ]
+  },
+  {
+    "id": "alert_qc13_1792488317077_4hns5",
+    "detectedAt": "2026-10-20T09:25:17.077Z",
+    "kind": "OUTBOUND_CERT_MISSING",
+    "outboundNo": "TEST_OUT_99999",
+    "customer": "(주)테스트엔지니어링",
+    "totalItems": 1,
+    "missingCount": 1,
+    "missingLines": [
+      {
+        "itemIndex": 1,
+        "lineNo": "1-1",
+        "vendorLot": "NON_EXISTENT_LOT_XYZ_9999",
+        "heatNo": null,
+        "description": "90E(L)",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      }
+    ]
+  },
+  {
+    "id": "alert_qc13_1792488301299_2u8mr",
+    "detectedAt": "2026-10-20T09:25:01.299Z",
+    "kind": "OUTBOUND_CERT_MISSING",
+    "outboundNo": "TEST_OUT_99999",
+    "customer": "(주)테스트엔지니어링",
+    "totalItems": 1,
+    "missingCount": 1,
+    "missingLines": [
+      {
+        "itemIndex": 1,
+        "lineNo": "1-1",
+        "vendorLot": "NON_EXISTENT_LOT_XYZ_9999",
+        "heatNo": null,
+        "description": "90E(L)",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      }
+    ]
+  },
+  {
+    "id": "alert_qc13_1792488291856_nygfx",
+    "detectedAt": "2026-10-20T09:24:51.856Z",
+    "kind": "OUTBOUND_CERT_MISSING",
+    "outboundNo": "TEST_OUT_99999",
+    "customer": "(주)테스트엔지니어링",
+    "totalItems": 1,
+    "missingCount": 1,
+    "missingLines": [
+      {
+        "itemIndex": 1,
+        "lineNo": "1-1",
+        "vendorLot": "NON_EXISTENT_LOT_XYZ_9999",
+        "heatNo": null,
+        "description": "90E(L)",
+        "status": "NOT_FOUND",
+        "reason": "일치하는 성적서 데이터를 마스터(certificates.json)에서 찾을 수 없습니다."
+      }
+    ]
+  }
+]

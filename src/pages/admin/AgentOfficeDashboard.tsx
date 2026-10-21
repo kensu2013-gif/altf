@@ -182,6 +182,89 @@ interface MakeScenariosSummary {
     lastCheckedAt?: string;
 }
 
+interface InventorySyncStep1 {
+    status?: string;
+    lastRun?: string | number | null;
+    message?: string;
+    details?: unknown;
+}
+
+interface InventorySyncStep2 {
+    status?: string;
+    lastRun?: string | number | null;
+    message?: string;
+    fileName?: string | null;
+    itemCount?: number;
+    details?: unknown;
+}
+
+interface InventorySyncStep3 {
+    status?: string;
+    lastRun?: string | number | null;
+    message?: string;
+    bufferTotalSeconds: number;
+    bufferRemainingSeconds: number;
+    timerActive?: boolean;
+    details?: unknown;
+}
+
+interface InventorySyncStep4Details {
+    diffStats?: {
+        inboundCount: number;
+        outboundCount: number;
+        changedCount?: number;
+        [key: string]: unknown;
+    };
+    [key: string]: unknown;
+}
+
+interface InventorySyncStep4 {
+    status?: string;
+    lastRun?: string | number | null;
+    message?: string;
+    s3Uploaded?: boolean;
+    totalItems?: number;
+    sihwaChangesCount?: number;
+    sihwaInboundCount?: number;
+    sihwaOutboundCount?: number;
+    cleanedFiles?: string[];
+    details?: InventorySyncStep4Details | null;
+}
+
+interface InventorySyncState {
+    isRunning?: boolean;
+    currentStep?: number;
+    autoPilot?: boolean;
+    step1?: InventorySyncStep1;
+    step2?: InventorySyncStep2;
+    step3?: InventorySyncStep3;
+    step4?: InventorySyncStep4;
+    lastFullRun?: string | number | null;
+    error?: string | null;
+    [key: string]: unknown;
+}
+
+interface InventorySyncConfig {
+    taeilAppsScriptUrl?: string;
+    daekyungAppsScriptUrl?: string;
+    altfDbAppsScriptUrl?: string;
+    bufferWaitMinutes?: number;
+    retryWaitMinutes?: number;
+    maxRetries?: number;
+    taeilScheduleTimes?: string[];
+    autoCleanupDownloads?: boolean;
+    autoPilotAutoConfirm?: boolean;
+    [key: string]: unknown;
+}
+
+interface InventorySyncData {
+    state?: InventorySyncState;
+    config?: InventorySyncConfig;
+    success?: boolean;
+    error?: string;
+    [key: string]: unknown;
+}
+
 export default function AgentOfficeDashboard() {
     const [selectedDeptId, setSelectedDeptId] = useState<string>('all');
     const [currentView, setCurrentView] = useState<'office' | 'network' | 'logs' | 'host'>('office');
@@ -804,10 +887,7 @@ export default function AgentOfficeDashboard() {
     }, [selectedAgent]);
 
     // ⚡ [데이터관리팀 DAT-03~06] 4단계 전사 재고 자동 동기화 상태 및 핸들러
-    const [invSyncData, setInvSyncData] = useState<{
-        state: any;
-        config: any;
-    } | null>(null);
+    const [invSyncData, setInvSyncData] = useState<InventorySyncData | null>(null);
     const [invSyncRunningAction, setInvSyncRunningAction] = useState<string | null>(null);
     const [showInvSyncConfigModal, setShowInvSyncConfigModal] = useState<boolean>(false);
     const [showDaekyungUploadModal, setShowDaekyungUploadModal] = useState<boolean>(false);
@@ -860,14 +940,14 @@ export default function AgentOfficeDashboard() {
             } else {
                 alert('1단계 실행 실패: ' + (data.error || '알 수 없는 오류'));
             }
-        } catch (err: any) {
-            alert('1단계 실행 오류: ' + err.message);
+        } catch (err) {
+            alert('1단계 실행 오류: ' + (err instanceof Error ? err.message : String(err)));
         } finally {
             setInvSyncRunningAction(null);
         }
     };
 
-    const handleRunInvStep2 = async (fileData?: any) => {
+    const handleRunInvStep2 = async (fileData?: Record<string, unknown>) => {
         setInvSyncRunningAction('step2');
         try {
             const res = await fetch('/api/dat/inventory-sync/step2', {
@@ -884,8 +964,8 @@ export default function AgentOfficeDashboard() {
             } else {
                 alert('2단계 실행 실패: ' + (data.error || '알 수 없는 오류'));
             }
-        } catch (err: any) {
-            alert('2단계 실행 오류: ' + err.message);
+        } catch (err) {
+            alert('2단계 실행 오류: ' + (err instanceof Error ? err.message : String(err)));
         } finally {
             setInvSyncRunningAction(null);
         }
@@ -905,8 +985,8 @@ export default function AgentOfficeDashboard() {
             } else {
                 alert('3단계 실행 실패: ' + (data.error || '알 수 없는 오류'));
             }
-        } catch (err: any) {
-            alert('3단계 실행 오류: ' + err.message);
+        } catch (err) {
+            alert('3단계 실행 오류: ' + (err instanceof Error ? err.message : String(err)));
         } finally {
             setInvSyncRunningAction(null);
         }
@@ -916,7 +996,7 @@ export default function AgentOfficeDashboard() {
         try {
             await fetch('/api/dat/inventory-sync/cancel-step3', { method: 'POST' });
             await fetchInventorySyncStatus();
-        } catch (err: any) {
+        } catch (err) {
             console.error('Failed to cancel step 3:', err);
         }
     };
@@ -931,8 +1011,8 @@ export default function AgentOfficeDashboard() {
             } else {
                 alert('4단계 실행 실패: ' + (data.error || '알 수 없는 오류'));
             }
-        } catch (err: any) {
-            alert('4단계 실행 오류: ' + err.message);
+        } catch (err) {
+            alert('4단계 실행 오류: ' + (err instanceof Error ? err.message : String(err)));
         } finally {
             setInvSyncRunningAction(null);
         }
@@ -955,8 +1035,8 @@ export default function AgentOfficeDashboard() {
             } else {
                 alert('오토파일럿 실행 실패: ' + (data.error || '알 수 없는 오류'));
             }
-        } catch (err: any) {
-            alert('오토파일럿 실행 오류: ' + err.message);
+        } catch (err) {
+            alert('오토파일럿 실행 오류: ' + (err instanceof Error ? err.message : String(err)));
         } finally {
             setInvSyncRunningAction(null);
         }
@@ -975,8 +1055,8 @@ export default function AgentOfficeDashboard() {
                 await fetchInventorySyncStatus();
                 alert('구글시트 연동 및 버퍼 설정이 저장되었습니다.');
             }
-        } catch (err: any) {
-            alert('설정 저장 오류: ' + err.message);
+        } catch (err) {
+            alert('설정 저장 오류: ' + (err instanceof Error ? err.message : String(err)));
         }
     };
 
@@ -3228,8 +3308,14 @@ export default function AgentOfficeDashboard() {
                                             return null;
                                         }
 
-                                        // 부서 내 존재하는 모든 고유 팀 목록
-                                        const deptTeams = Array.from(new Set(deptAllAgents.map(a => a.teamName).filter(Boolean))) as string[];
+                                        // 부서 내 존재하는 모든 고유 팀 목록 (부서 메타데이터 순서 우선 보장)
+                                        const allUniqueTeams = Array.from(new Set(deptAllAgents.map(a => a.teamName).filter(Boolean))) as string[];
+                                        const deptTeams = (dept.teams && dept.teams.length > 0)
+                                            ? [
+                                                ...dept.teams.filter(t => allUniqueTeams.includes(t)),
+                                                ...allUniqueTeams.filter(t => !dept.teams?.includes(t))
+                                            ]
+                                            : allUniqueTeams;
                                         const unassignedAgents = deptFiltered.filter(a => !a.teamName).sort(sortAgents);
 
                                         return (

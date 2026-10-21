@@ -1,5 +1,4880 @@
 [
   {
+    "id": "DKB-INV-SCANNED-1792569655122-16-00021",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0002-1/",
+    "invoiceDate": "2026-10-21",
+    "pageIndex": 16,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "부산밸브",
+    "customerNumber": "",
+    "matchedOrderId": null,
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/80S WP 304L-S 4\"",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 100890,
+        "amount": 100890,
+        "poNo": "ES261020-2938",
+        "remarks": "부산밸브 ES261020-2938"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261020-2938"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 100890,
+      "freightPrice": 0,
+      "subtotal": 100890,
+      "vat": 0,
+      "grandTotal": 0,
+      "itemCount": 1,
+      "totalQuantity": 1
+    },
+    "rawText": "거래명세서\n2026 주 10 A 21 H                                No:0002- 1/ 1\n공 등록번호     606 - 81 - 75098      공 등록번호 _ 838-05-01054\n상 _ 호 (주)대경벤드   성명 김학     상 _ 호 알트에프(/[ㅠ.『) 성명_ 조현진\n= 주 _ 소 경남 양산시 어실로 115           ㄴ 주 A SATAA 사상구 낙동대로 1330번길 67(심\n자 전화/『&6% 055)364-1800   362-7074       자 &3H/FAX 051 )311-8605     051-328-4012\nNo 품 g/m BB / 7 격 수량 단위 _단 J 금 _ 액 비 고\n1 TEE       S/80S                부산밸브 910¢ 502018643   ES261020-2938\nWP 304/L-S    SML'S  4          1     100,890     100.890\n*** 0]    하    여    Hak\n1     공급가액           100,890\n2 가 세                   10,089\n[그]  계          110,979\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:58.977Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:58.977Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 100890,
+      "vat": 0,
+      "grandTotal": 0,
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "부산밸브 [0002-1/] 전표가: 100,890원 vs 발주가: 0원 (발주서 미등록 (ES261020-2938))"
+      }
+    },
+    "customer": {
+      "name": "부산밸브",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": false,
+      "matchedOrdersCount": 0,
+      "matchedPoNumbers": [],
+      "customerName": "부산밸브",
+      "invoiceSubtotal": 100890,
+      "expectedPurchaseSubtotal": 0,
+      "diffAmount": 0,
+      "discrepancyType": "UNMATCHED_PO",
+      "statusText": "발주서 미등록 (ES261020-2938)",
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "부산밸브 [0002-1/] 전표가: 100,890원 vs 발주가: 0원 (발주서 미등록 (ES261020-2938))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569653586-15-00031",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0003-1/",
+    "invoiceDate": "2026-10-21",
+    "pageIndex": 15,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "엘엔피스틸",
+    "customerNumber": "9106602018644",
+    "matchedOrderId": "PO-20261019-TAEIL-014",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S/105 WP 304-S 1/2\"",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 35720,
+        "amount": 35720,
+        "poNo": "ES261020-2936",
+        "remarks": "엘엔피스틸 ES261020-2936"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/105 WP 304-S 2\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 28320,
+        "amount": 56640,
+        "poNo": "ES261020-2936",
+        "remarks": "엘엔피스틸 ES261020-2936"
+      },
+      {
+        "itemNo": 3,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/10S STS 304-S 4A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 61180,
+        "amount": 61180,
+        "poNo": "ES261020-2936",
+        "remarks": "엘엔피스틸 ES261020-2936"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2923"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 153540,
+      "freightPrice": 0,
+      "subtotal": 153540,
+      "vat": 15354,
+      "grandTotal": 0,
+      "itemCount": 3,
+      "totalQuantity": 4
+    },
+    "rawText": "거래 명세서\n2026 주 10 A 21 H                                No:0003- 1/ 1\n< 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 _ 호 (주)대경벤드     성명           상 _ 호 알트에프(시1.『) 88 조현진\n그\n주 _소 경남 양산시 어실로 115            ㄴㄴ 주 4 부산광역시 사상구 낙동대로 1330번길 67(\n자 전화/『&※ 055)364-1800   362-7074       자 &3H/FAX 051 )311-8605      051-328-4012\nNo    = 명 / 재 2 / RA   격     수량 _ 단위   단 가     금   액     비 고\n1 806)         5/105                    엘엔피스틸 9106602018644   ES261020-2936\nWP 304-S         SML'S    4\" x 1-1/2\"         1          35.720        35.720\n2 TEE        5/105                  AAT AE          ES261020-2936\nWP 304-S           SML'S     2                    2            28.320          56.640\n3 TEE        S/10S                  don AE         ES261020-2936\nWP 304-8           SML'S    4                   1            61.180          61.180\n**& (|     하     여     백 xy x\n4      공급가액               153,540\n부가세                   15,354\n그   계               168,894\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:58.629Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:58.629Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 153540,
+      "vat": 15354,
+      "grandTotal": 0,
+      "discrepancy": {
+        "type": "UNDER_BILLED",
+        "diff": -49260,
+        "detail": "엘엔피스틸 [0003-1/] 전표가: 153,540원 vs 발주가: 202,800원 (과소 청구 (-49,260원))"
+      }
+    },
+    "customer": {
+      "name": "엘엔피스틸",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": true,
+      "matchedOrdersCount": 1,
+      "matchedPoNumbers": [
+        "ES261019-2923"
+      ],
+      "customerName": "엘엔피스틸",
+      "invoiceSubtotal": 153540,
+      "expectedPurchaseSubtotal": 202800,
+      "diffAmount": -49260,
+      "discrepancyType": "UNDER_BILLED",
+      "statusText": "과소 청구 (-49,260원)",
+      "discrepancy": {
+        "type": "UNDER_BILLED",
+        "diff": -49260,
+        "detail": "엘엔피스틸 [0003-1/] 전표가: 153,540원 vs 발주가: 202,800원 (과소 청구 (-49,260원))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569651510-14-00041",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0004-1/",
+    "invoiceDate": "1330-82-67",
+    "pageIndex": 14,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "일신프랜지",
+    "customerNumber": "140-81-57324",
+    "matchedOrderId": "PO-20261012-TAEIL-011",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/261 STS 304-W 350A X 150A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 758240,
+        "amount": 758240,
+        "poNo": "ES261012-2830",
+        "remarks": "일신프랜지 ES261012-2830"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/205 STS 304-W 350A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 758240,
+        "amount": 758240,
+        "poNo": "",
+        "remarks": "일신프랜지"
+      },
+      {
+        "itemNo": 3,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S/205 STS 304-S 350A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 224850,
+        "amount": 224850,
+        "poNo": "",
+        "remarks": "일신프랜지"
+      },
+      {
+        "itemNo": 4,
+        "type": "PRODUCT",
+        "name": "45E(L)",
+        "spec": "S/108 STS 304-W 15A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 2190,
+        "amount": 2190,
+        "poNo": "",
+        "remarks": "일신프랜지"
+      },
+      {
+        "itemNo": 5,
+        "type": "PRODUCT",
+        "name": "45E(L)",
+        "spec": "S/105 STS 304-W 2.950",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 44,
+        "amount": 250,
+        "poNo": "",
+        "remarks": "일신프랜지"
+      },
+      {
+        "itemNo": 6,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S/105 STS 304-W 156A",
+        "quantity": 16,
+        "unit": "EA",
+        "unitPrice": 2190,
+        "amount": 35040,
+        "poNo": "",
+        "remarks": "일신프랜지"
+      },
+      {
+        "itemNo": 7,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S/10S STS 304-W 100A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 23460,
+        "amount": 23460,
+        "poNo": "",
+        "remarks": "일신프랜지"
+      },
+      {
+        "itemNo": 8,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S/10S STS 304-W 200A",
+        "quantity": 8,
+        "unit": "EA",
+        "unitPrice": 101120,
+        "amount": 808960,
+        "poNo": "",
+        "remarks": "일신프랜지"
+      },
+      {
+        "itemNo": 9,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S/105 STS 304-W 6A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 134950,
+        "amount": 269900,
+        "poNo": "ES261012-2839",
+        "remarks": "일신프랜지 ES261012-2839"
+      },
+      {
+        "itemNo": 10,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/10 STS 304-W 25A X 156",
+        "quantity": 4,
+        "unit": "EA",
+        "unitPrice": 5740,
+        "amount": 22960,
+        "poNo": "",
+        "remarks": "일신프랜지"
+      },
+      {
+        "itemNo": 11,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/105 STS 304-W 256A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 5740,
+        "amount": 11480,
+        "poNo": "",
+        "remarks": "일신프랜지"
+      },
+      {
+        "itemNo": 12,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/105 STS 304-W 156A",
+        "quantity": 3,
+        "unit": "EA",
+        "unitPrice": 10120,
+        "amount": 30360,
+        "poNo": "",
+        "remarks": "일신프랜지"
+      },
+      {
+        "itemNo": 13,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/105 STS 304-W 50A X 156",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 12580,
+        "amount": 25160,
+        "poNo": "",
+        "remarks": "일신프랜지"
+      }
+    ],
+    "itemCount": 3,
+    "poNumbers": [
+      "ES261012-2830"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 367250,
+      "freightPrice": 0,
+      "subtotal": 367250,
+      "vat": 36725,
+      "grandTotal": 403975,
+      "itemCount": 13,
+      "totalQuantity": 43
+    },
+    "rawText": "AH EAA\n2026 & 10 A 21 H                                                     No:0004- 1/ 2\n공 등록번호            606 - 81 - 75098              공 등록번호      838-05-01054\n상 호 (주)대경벤드    성명 김학      상 호 알트에프(/(ㅠ.6) 4% 조현진\n=\n주 4 경남 양산시 어실로 115           ㄴ 주 A 부산광역시 사상구 낙동대로 133082 67(삼리\n자 ®BH/FAX 055)364-1800 362-7074                       자 전화/54 051 )311-8605                  051-328-4012\nNo BB 명/재 질 / 규 격              수량 단위 단 가            금 ow            비 고\n1 TEE                            8/208                                                            일신프렌지 이종식님 91066020 ES261012-2830\nSTS 304-W                  ERW 350A * 150A                    758.240                758.240\n2 766                            5/205                                                            일신프렌지                                28261012-2839\nSTS 304-W               ERW         350A                         1                758.240             758.240\n3 CAP          5/205                       일신프렌지            28261012-2839\n515 304-5                  SML'S        350A                               1                    224.850                224.850\n4 45E(L)         5/108                       일신프렌지            =8261012-2839\nSTS 304-W             ERW          15A                      1                 2.190              2.190\n5 45E(L)                 5/105                                            일신프렌지                       -5261012-2839\nSTS 304-W               ERW           25A                        15                  2.950               44 250\n6 90E(L)         5/105                       일신 프렌지            =8261012-2839\nSTS 304-W                 ERW             156A                            16                      2.190                 35.040\n7 90E(L)                 S/10S                                            일신프렌지                       -5261012-2839\nSTS 304-W               ERW          100A                         1                  23.460               23.460\n8 906(5)         8/108                       일신 프렌지            =8261012-2839\nSTS 304-W                 ERW           200A                              8                   101.120                808.960\n9 90E(S)         5/105                       일신 프렌지            ES261012-2839\nSTS 304                  6                                                 2                    134.950                269.900\n10                                                                                                                                            일신프렌지                                          ES261012-2839\n                    222 470                222.470\n11                                                                                                        일신 프렌지                                68261012-2839\n1              413.700            413,700\n12                                                                                                        일신프렌지                                ES261012-2839\n                      10.730                  10.730\n13 TEE                            5/10                                                            일신 프렌지                                68261012-2839\nSTS 3047                  ERW             25A + 156                   4                       5.740                  22.960\n14 TEE                            5/105                                                            일신 프렌지                                68261012-2839\nSTS 304                  ERW             256                               2                       5,740                  11.480\n15 TEE                            5/105                                                            일신 프렌지                                £5261012-2839\nSTS 304                  ERW             40M + 156                    3                     10.120                  30.360\n6 TEE                            5/105                                                            일신 프렌지                                28261012-2839\nSTS 304           6        50A + 156            2             12.580           25.160\n공급가액\n부 가 세\n합 . 계\n다 음페이지 계 =        (주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:58.295Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:58.295Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 367250,
+      "vat": 36725,
+      "grandTotal": 403975,
+      "discrepancy": {
+        "type": "NONE",
+        "diff": 0,
+        "detail": "일신프랜지 [0004-1/] 전표가: 367,250원 vs 발주가: 367,250원 (정상 일치)"
+      }
+    },
+    "customer": {
+      "name": "일신프랜지",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": true,
+      "matchedOrdersCount": 1,
+      "matchedPoNumbers": [
+        "ES261012-2830"
+      ],
+      "customerName": "일신프랜지",
+      "invoiceSubtotal": 367250,
+      "expectedPurchaseSubtotal": 367250,
+      "diffAmount": 0,
+      "discrepancyType": "NONE",
+      "statusText": "정상 일치",
+      "discrepancy": {
+        "type": "NONE",
+        "diff": 0,
+        "detail": "일신프랜지 [0004-1/] 전표가: 367,250원 vs 발주가: 367,250원 (정상 일치)"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569648186-13-00042",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0004-2/",
+    "invoiceDate": "2026-01-00",
+    "pageIndex": 13,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "일신프랜지",
+    "customerNumber": "119-86-53843",
+    "matchedOrderId": "PO-20261012-JUSIK-001",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/10S STS 304-W 80A X 65A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 21680,
+        "amount": 21680,
+        "poNo": "ES261012-2839",
+        "remarks": "일신프랜지 ES261012-2839"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/10S STS 304-W 100A X 40A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 35040,
+        "amount": 70080,
+        "poNo": "ES261012-2839",
+        "remarks": "일신프랜지 ES261012-2839"
+      },
+      {
+        "itemNo": 3,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/10S STS 304-W 125A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 49350,
+        "amount": 98700,
+        "poNo": "ES261012-2839",
+        "remarks": "일신프랜지 ES261012-2839"
+      },
+      {
+        "itemNo": 4,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/10S STS 304-W 160A X 125A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 63070,
+        "amount": 63070,
+        "poNo": "ES261012-2839",
+        "remarks": "일신프랜지 ES261012-2839"
+      },
+      {
+        "itemNo": 5,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/108 STS 304-W 100A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 216500,
+        "amount": 216500,
+        "poNo": "ES261012-2839",
+        "remarks": "일신프랜지 ES261012-2839"
+      },
+      {
+        "itemNo": 6,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/10S STS 304-W 250A X 200A",
+        "quantity": 9,
+        "unit": "EA",
+        "unitPrice": 216500,
+        "amount": 1948500,
+        "poNo": "ES261012-2839",
+        "remarks": "일신프랜지 ES261012-2839"
+      },
+      {
+        "itemNo": 7,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/10S STS 304-W 250A",
+        "quantity": 7,
+        "unit": "EA",
+        "unitPrice": 216500,
+        "amount": 1515500,
+        "poNo": "ES261012-2839",
+        "remarks": "일신프랜지 ES261012-2839"
+      },
+      {
+        "itemNo": 8,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S/10S STS 304-S 25A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 3680,
+        "amount": 3680,
+        "poNo": "ES261012-2839",
+        "remarks": "일신프랜지 ES261012-2839"
+      },
+      {
+        "itemNo": 9,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S/10S STS 304-S 125A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 17650,
+        "amount": 35300,
+        "poNo": "ES261012-2839",
+        "remarks": "일신프랜지 ES261012-2839"
+      },
+      {
+        "itemNo": 10,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S/10S STS 304-S 150A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 26230,
+        "amount": 26230,
+        "poNo": "",
+        "remarks": "일신프랜지"
+      },
+      {
+        "itemNo": 11,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S/10S STS 304-S 250A",
+        "quantity": 8,
+        "unit": "EA",
+        "unitPrice": 91670,
+        "amount": 733360,
+        "poNo": "ES261012-2839",
+        "remarks": "일신프랜지 ES261012-2839"
+      },
+      {
+        "itemNo": 12,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S/10S STS 304-S 400A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 206640,
+        "amount": 206640,
+        "poNo": "ES261012-2839",
+        "remarks": "일신프랜지 ES261012-2839"
+      }
+    ],
+    "itemCount": 31,
+    "poNumbers": [
+      "ES261012-2839"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 8601230,
+      "freightPrice": 0,
+      "subtotal": 8601230,
+      "vat": 860,
+      "grandTotal": 0,
+      "itemCount": 12,
+      "totalQuantity": 36
+    },
+    "rawText": "거래명세서\n2026 주 10 B 21 BH                                                No:0004- 2/ 2\n공 등록번호                 606 - 81 - 75098                    공 등록번호 _ 838-05-01054\n상 _ 호 (주)대경벤드       성명 김학          상 = 알트에프(/시7.『) 42 조현진\n그\n주 A 경남 양산시 어실로 115           ㄴ 주 A 부산광역시 사상구 USHER 1330번길 67(심르\n자 전화/6&4% 055)364-1800          362-7074                       자 AsH/FAX 051 )311-8605                  051-328-4012\nNo          품       명 / 재       잘 / 7         격              수량 of       단       가            금         액            비 고\n17 TEE                  S/10S                                       일신프렌지                    ES261012-2839\nSTS 304-W                  ERW             80A * 65A                    1                     21.680                  21.680\n18 TEE                  S/10S                                       일신프렌지                    ES261012-2839\nSTS 304-W                  ERW            100A * 40A                   2                     35,040                  70,080\n19 TEE                  S/10S                                       일신프렌지                    ES261012-2839\nSTS 304-W                  ERW            125A                               2                     49.350                  98.700\n20 TEE                                    S/10S                                                                               일신프렌지                                          ES261012-2839\nSTS 304-W                  ERW            160A + 125A                    1                      63.070                  63,070\n21 TEE                                    5/108                                                                               일신프렌지                                          ES261012-2839\nSTS 304-W                  ERW           250A ~ 100A                    1                    216.500                216.500\n22 TEE                                   S/10S                                                                            일신프렌지                                        ES261012-2839\nSTS 304-W                  ERW           250A * 200A                   9                    216.500             1,948,500\n23 TEE                                   S/10S                                                                            일신프렌지                                        ES261012-2839\nSTS 304-W                  ERW           250A                               7                   216.500             1.515.500\n24 CAP                                   S/10S                                                                            일신프렌지                                        ES261012-2839\nSTS 304-S                  SML'S          25A                               1                       3.680                    3,680\n25 CAP                                   S/10S                                                                            일신프렌지                                        ES261012-2839\nSTS 304-S                  SML'S         125A                               2                     17.650                  35.300\n26 CAP                                   S/10S                                                                            일신프렌지                                        65261012-2839\nSTS 304-5                  SML'S         150A                               1                      26.230                  26,230\n27 CAP                                   S/10S                                                                            일신프렌지                                        ES261012-2839\nSTS 304-S                  SML'S        250A                               8                     91.670                733.360\n28 CAP                                  S/10S                                                                           일신프렌지                                       ES261012-2839\nSTS 304-S                  SML'S        400A                               1                    206.640                206.640\nxxx 0]             of             여             백 3g x\n96           공급가액                       8,601,230\n부 가 세                                       860, 123\n합 . 계                                   9,461,353\n(FF =\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:57.561Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:57.561Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 8601230,
+      "vat": 860,
+      "grandTotal": 0,
+      "discrepancy": {
+        "type": "UNDER_BILLED",
+        "diff": -8898770,
+        "detail": "일신프랜지 [0004-2/] 전표가: 8,601,230원 vs 발주가: 17,500,000원 (과소 청구 (-8,898,770원))"
+      }
+    },
+    "customer": {
+      "name": "일신프랜지",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": true,
+      "matchedOrdersCount": 1,
+      "matchedPoNumbers": [
+        "ES261012-2839"
+      ],
+      "customerName": "일신프랜지",
+      "invoiceSubtotal": 8601230,
+      "expectedPurchaseSubtotal": 17500000,
+      "diffAmount": -8898770,
+      "discrepancyType": "UNDER_BILLED",
+      "statusText": "과소 청구 (-8,898,770원)",
+      "discrepancy": {
+        "type": "UNDER_BILLED",
+        "diff": -8898770,
+        "detail": "일신프랜지 [0004-2/] 전표가: 8,601,230원 vs 발주가: 17,500,000원 (과소 청구 (-8,898,770원))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569644587-12-00071",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0007-1/",
+    "invoiceDate": "2026-10-21",
+    "pageIndex": 12,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "부산밸브",
+    "customerNumber": "",
+    "matchedOrderId": null,
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S/108 STS 304-W 1/2\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 57000,
+        "amount": 114000,
+        "poNo": "ES261020-2937",
+        "remarks": "부산밸브 ES261020-2937"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261020-2937"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 114000,
+      "freightPrice": 0,
+      "subtotal": 114000,
+      "vat": 11400,
+      "grandTotal": 125400,
+      "itemCount": 1,
+      "totalQuantity": 2
+    },
+    "rawText": "거래명세서\n2026 주 10 A 21 H                                No:0007- 1/ 1\n공 등록번호       606 - 81 - 75098        공 등록번호 _ 838-05-01054\n상 호 (주)대경벤드     성명 김학       상 5 알트에프(/[ㅠ.『) 성명 ZA\n그\n주 _소 경남 양산시 어실로 115            Cc 주 . 소 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『/4&※& 055)364-1800   362-/074       자 &3H/FAX 051 )311-8605     051-328-4012\n1 80)         S/108xS/40S                 부산밸브 910¢ 502018648    ES261020-2937\nWP 304/L-W       ERW     4\" x 1-1/2\"         2          57.000        114.000\nxxx (|    of    여    HH xy ke\n2      공급가액               114,000\n부가세                   11,400\n합   계               125,400\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:57.404Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:57.404Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 114000,
+      "vat": 11400,
+      "grandTotal": 125400,
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "부산밸브 [0007-1/] 전표가: 114,000원 vs 발주가: 0원 (발주서 미등록 (ES261020-2937))"
+      }
+    },
+    "customer": {
+      "name": "부산밸브",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": false,
+      "matchedOrdersCount": 0,
+      "matchedPoNumbers": [],
+      "customerName": "부산밸브",
+      "invoiceSubtotal": 114000,
+      "expectedPurchaseSubtotal": 0,
+      "diffAmount": 0,
+      "discrepancyType": "UNMATCHED_PO",
+      "statusText": "발주서 미등록 (ES261020-2937)",
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "부산밸브 [0007-1/] 전표가: 114,000원 vs 발주가: 0원 (발주서 미등록 (ES261020-2937))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569643209-11-00111",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0011-1/",
+    "invoiceDate": "1800-36-02",
+    "pageIndex": 11,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "일신프랜지",
+    "customerNumber": "",
+    "matchedOrderId": null,
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/10S STS 304-W 65A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 126870,
+        "amount": 126870,
+        "poNo": "ES260929-2713",
+        "remarks": "일신프랜지 ES260929-2713"
+      },
+      {
+        "itemNo": 2,
+        "type": "FREIGHT",
+        "name": "운임",
+        "spec": "화물 배송료",
+        "quantity": 1,
+        "unit": "건",
+        "unitPrice": 4000,
+        "amount": 4000,
+        "poNo": "",
+        "remarks": "일신프랜지 운임"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES260929-2713"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 0,
+      "freightPrice": 91066020,
+      "subtotal": 130870,
+      "vat": 13087,
+      "grandTotal": 143957,
+      "itemCount": 2,
+      "totalQuantity": 2
+    },
+    "rawText": "거래명세서\n2026 i 10 A 21 H                                No:0011- 1/ 1\n공 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 호 (주)대경벤드   성명 김학     상 호 알트에프(/[ㅠ.『) £2 조현진\n그\n주   소 경남 양산시 어실로 115            ㄴ 주   소 부산광역시 사상구 낙동대로 1330번길 67(삼\n자 전화/『&※ 055)364-1800   362-7074      자 &H3H/FAX 051 )311-8605     051-328-4012\nNo  =  명 / 재  질 / 7  격   수량 _ 단위  단  가   =)  액   비 고\n1 TEE       S/10S                일신프랜지         ES260929-2713\nSTS 304-W          ERW      200A *ㅎ 65A           1           126.870         126.870\n2 운임                                    일신프랜지 빅조단님 91066020\n1 건     4,000      4,000\n**& (|   of   여   백 ey x\n2     공급가액             130,870\n부 가 세                   13,087\n합   계            143,957\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:57.245Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:57.245Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 130870,
+      "vat": 13087,
+      "grandTotal": 143957,
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "일신프랜지 [0011-1/] 전표가: 130,870원 vs 발주가: 0원 (발주서 미등록 (ES260929-2713))"
+      }
+    },
+    "customer": {
+      "name": "일신프랜지",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": false,
+      "matchedOrdersCount": 0,
+      "matchedPoNumbers": [],
+      "customerName": "일신프랜지",
+      "invoiceSubtotal": 130870,
+      "expectedPurchaseSubtotal": 0,
+      "diffAmount": 0,
+      "discrepancyType": "UNMATCHED_PO",
+      "statusText": "발주서 미등록 (ES260929-2713)",
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "일신프랜지 [0011-1/] 전표가: 130,870원 vs 발주가: 0원 (발주서 미등록 (ES260929-2713))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569641583-10-00121",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0012-1/",
+    "invoiceDate": "2026-10-21",
+    "pageIndex": 10,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "에스와이금속",
+    "customerNumber": "",
+    "matchedOrderId": null,
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S/105 WP 304L-S 1/2\"",
+        "quantity": 30,
+        "unit": "EA",
+        "unitPrice": 4790,
+        "amount": 143700,
+        "poNo": "",
+        "remarks": "에스와이금속"
+      },
+      {
+        "itemNo": 2,
+        "type": "FREIGHT",
+        "name": "운임",
+        "spec": "화물 배송료",
+        "quantity": 1,
+        "unit": "건",
+        "unitPrice": 4000,
+        "amount": 4000,
+        "poNo": "",
+        "remarks": "에스와이금속 운임"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2940"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 0,
+      "freightPrice": 910660,
+      "subtotal": 147700,
+      "vat": 0,
+      "grandTotal": 162470,
+      "itemCount": 2,
+      "totalQuantity": 31
+    },
+    "rawText": "거래 명세서\n2026 주 10 A 21 H                                No:0012- 1/ 1\nEs 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 호 (주)대경벤드   성명 김학     상 호 알트에프(/1.『) 성명 조현진\n그\n주   소 경남 양산시 어실로 115            CL 주   A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『&※ 055)364-1800   362-7074       자 전화/6&※ 051 )311-8605     051-328-4012\nNo  품  명 / 재  a / 7  2   수량 _ 단위  단  가   금  액   비 고\n1 906(Ｌ)      5/105                에스와이금속        65261021-2940\nWP 304L-S          SML'S     1/2\"                30            4,790         143, 700\n2 운임                                        에스와이금속 AXEY 910660:\n1 건     4.000      4.000\nxxx (|   하   여   BH ay x\n31     공급가액            147,700\n£ 가 세                  14,770\n합   계            162,470\n(FYI =\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:57.082Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:57.082Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 147700,
+      "vat": 0,
+      "grandTotal": 162470,
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "에스와이금속 [0012-1/] 전표가: 147,700원 vs 발주가: 0원 (발주서 미등록 (ES261019-2940))"
+      }
+    },
+    "customer": {
+      "name": "에스와이금속",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": false,
+      "matchedOrdersCount": 0,
+      "matchedPoNumbers": [],
+      "customerName": "에스와이금속",
+      "invoiceSubtotal": 147700,
+      "expectedPurchaseSubtotal": 0,
+      "diffAmount": 0,
+      "discrepancyType": "UNMATCHED_PO",
+      "statusText": "발주서 미등록 (ES261019-2940)",
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "에스와이금속 [0012-1/] 전표가: 147,700원 vs 발주가: 0원 (발주서 미등록 (ES261019-2940))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569639993-9-00171",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0017-1/",
+    "invoiceDate": "2026-10-21",
+    "pageIndex": 9,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "케이에프트레이딩",
+    "customerNumber": "",
+    "matchedOrderId": null,
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S/105 WP 304-W 3\"",
+        "quantity": 190,
+        "unit": "EA",
+        "unitPrice": 13650,
+        "amount": 2593500,
+        "poNo": "",
+        "remarks": "케이에프트레이딩"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2945"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 2593500,
+      "freightPrice": 0,
+      "subtotal": 2593500,
+      "vat": 259350,
+      "grandTotal": 0,
+      "itemCount": 1,
+      "totalQuantity": 190
+    },
+    "rawText": "거래명세서\n2026 주 10 A 21 H                                No:0017- 1/ 1\n공 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 _ 호 (주)대경벤드   성명 김학     상 = ENZ(ALT.F) 성명 조현진\n들 주 _ 소 경남 양산시 어실로 115           ㄴ 주 A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『&※ 055)364-1800   362-7074       자 ®3t/FAX 051 )311-8605     051-328-4012\nNo  품 2 / 재 질 / 7  격   수량 단위 © . 가   =  액   비 고\n1 90E(L)         5/105                        케이에프트레「'|딩 신기세정 91(65261021-2945\nWP 304-W           ERW      3                   190            13.650       2.593.500\nxxx 0    하    여    백 xd\n190     공급가액           2,593,500\n부가세                  259,350\n합 . 계          2,852,850\n주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:56.923Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:56.923Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 2593500,
+      "vat": 259350,
+      "grandTotal": 0,
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "케이에프트레이딩 [0017-1/] 전표가: 2,593,500원 vs 발주가: 0원 (발주서 미등록 (ES261019-2945))"
+      }
+    },
+    "customer": {
+      "name": "케이에프트레이딩",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": false,
+      "matchedOrdersCount": 0,
+      "matchedPoNumbers": [],
+      "customerName": "케이에프트레이딩",
+      "invoiceSubtotal": 2593500,
+      "expectedPurchaseSubtotal": 0,
+      "diffAmount": 0,
+      "discrepancyType": "UNMATCHED_PO",
+      "statusText": "발주서 미등록 (ES261019-2945)",
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "케이에프트레이딩 [0017-1/] 전표가: 2,593,500원 vs 발주가: 0원 (발주서 미등록 (ES261019-2945))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569638575-8-00161",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0016-1/",
+    "invoiceDate": "2026-10-21",
+    "pageIndex": 8,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "나래스틸",
+    "customerNumber": "108-81-50652",
+    "matchedOrderId": "PO-20260915-NARAE-002",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "TEE(NECK)",
+        "spec": "S/105 STS 304-W 450A X 32A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 574000,
+        "amount": 1148000,
+        "poNo": "ES260915-2617",
+        "remarks": "나래스틸 ES260915-2617"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/105 STS 304-W 200A",
+        "quantity": 15,
+        "unit": "EA",
+        "unitPrice": 574000,
+        "amount": 8610000,
+        "poNo": "ES260915-2617",
+        "remarks": "나래스틸 ES260915-2617"
+      }
+    ],
+    "itemCount": 5,
+    "poNumbers": [
+      "ES260915-2617"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 9758000,
+      "freightPrice": 0,
+      "subtotal": 9758000,
+      "vat": 0,
+      "grandTotal": 0,
+      "itemCount": 2,
+      "totalQuantity": 17
+    },
+    "rawText": "거래명세서\n2026 주 10 A 21 H                                No:0016- 1/ 1\n공 등록번호        606 - 81 - 75098         = 등록번호    838-05-01054\n상 _ 호 (주)대경벤드     성명 김학       상 5 YZENI(ALT.F) 842 조현진\n-그\n주   소 경남 양산시 어실로 115            ㄴ 주   A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 HSH/FAX 055)364-1800   362-/074       자 전화/『&% 051 )311-8605     051-328-4012\nNo    품   명 / 재   질 / Rr   격     수량 _ 단위   단   가    금   액     비 고\n1 TEE(NECK)        5/105                         나래스틸 신자엽님 9106602018¢ ES260915-2617\nSTS 304-W          ERW      450A * 32A            2           574,000       1.148.000\n2 TEE        5/105                  나래스틸           ES260915-2617\nSTS 304-W          ERW      450A *= 200A          15          574.000       8.610.000\n*xx (|     of    여     백 *1*\n17      공급가액             9,758,000\n2 Jt 세                 975,800\n[그   계            10,733,800\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:56.577Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:56.577Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 9758000,
+      "vat": 0,
+      "grandTotal": 0,
+      "discrepancy": {
+        "type": "UNDER_BILLED",
+        "diff": -11542000,
+        "detail": "나래스틸 [0016-1/] 전표가: 9,758,000원 vs 발주가: 21,300,000원 (과소 청구 (-11,542,000원))"
+      }
+    },
+    "customer": {
+      "name": "나래스틸",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": true,
+      "matchedOrdersCount": 1,
+      "matchedPoNumbers": [
+        "ES260915-2617"
+      ],
+      "customerName": "나래스틸",
+      "invoiceSubtotal": 9758000,
+      "expectedPurchaseSubtotal": 21300000,
+      "diffAmount": -11542000,
+      "discrepancyType": "UNDER_BILLED",
+      "statusText": "과소 청구 (-11,542,000원)",
+      "discrepancy": {
+        "type": "UNDER_BILLED",
+        "diff": -11542000,
+        "detail": "나래스틸 [0016-1/] 전표가: 9,758,000원 vs 발주가: 21,300,000원 (과소 청구 (-11,542,000원))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569636698-7-00181",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0018-1/",
+    "invoiceDate": "2026-10-21",
+    "pageIndex": 7,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "월드윈플랜메탈",
+    "customerNumber": "123-38-41592",
+    "matchedOrderId": "PO-20261019-TAEIL-008",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "45E(L)",
+        "spec": "S/105 STS 304-W 40A",
+        "quantity": 100,
+        "unit": "EA",
+        "unitPrice": 4910,
+        "amount": 491000,
+        "poNo": "",
+        "remarks": "월드윈플랜메탈"
+      },
+      {
+        "itemNo": 2,
+        "type": "FREIGHT",
+        "name": "운임",
+        "spec": "화물 배송료",
+        "quantity": 1,
+        "unit": "건",
+        "unitPrice": 6000,
+        "amount": 6000,
+        "poNo": "",
+        "remarks": "월드윈플랜메탈 운임"
+      }
+    ],
+    "itemCount": 2,
+    "poNumbers": [
+      "ES261019-2917"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 493000,
+      "freightPrice": 4000,
+      "subtotal": 497000,
+      "vat": 49700,
+      "grandTotal": 546700,
+      "itemCount": 2,
+      "totalQuantity": 101
+    },
+    "rawText": "거래명세서\n2026 주 10 A 21 H                                No:0018- 1/ 1\n5 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 FF (주)대경벤드   성명 김      상 _호 알트에프(&1.『) €2 조현진\n고\n주   소 경남 양산시 어실로 115            ㄴㄴ 주   소 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『&※& 055)364-1800   362-/074       자 전화/『&※ 051 )311-8605     051-328-4012\n1 456(ㄴ)      65/105                 월드윈플랜메' +}       65261021-2942\nSTS 304-W          ERW        40A                100             4.910          491.000\n2 운임                                         월드윈플랜메날 대현기계설비 (\n1 건       6.000        6.000\nxxx (|   하   여   백 xd x\n101       공급가액               497,000\n부가세                  49,700\n합   계               546,700\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:56.215Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:56.215Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 497000,
+      "vat": 49700,
+      "grandTotal": 546700,
+      "discrepancy": {
+        "type": "UNDER_BILLED",
+        "diff": -2687480,
+        "detail": "월드윈플랜메탈 [0018-1/] 전표가: 497,000원 vs 발주가: 3,184,480원 (과소 청구 (-2,687,480원))"
+      }
+    },
+    "customer": {
+      "name": "월드윈플랜메탈",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": true,
+      "matchedOrdersCount": 1,
+      "matchedPoNumbers": [
+        "ES261019-2917"
+      ],
+      "customerName": "월드윈플랜메탈",
+      "invoiceSubtotal": 497000,
+      "expectedPurchaseSubtotal": 3184480,
+      "diffAmount": -2687480,
+      "discrepancyType": "UNDER_BILLED",
+      "statusText": "과소 청구 (-2,687,480원)",
+      "discrepancy": {
+        "type": "UNDER_BILLED",
+        "diff": -2687480,
+        "detail": "월드윈플랜메탈 [0018-1/] 전표가: 497,000원 vs 발주가: 3,184,480원 (과소 청구 (-2,687,480원))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569635256-6-00211",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0021-1/",
+    "invoiceDate": "2026-10-21",
+    "pageIndex": 6,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "한국종합배관",
+    "customerNumber": "",
+    "matchedOrderId": null,
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/208 STS 304-W 200A X 150A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 251800,
+        "amount": 251800,
+        "poNo": "ES261021-2949",
+        "remarks": "한국종합배관 ES261021-2949"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261021-2949"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 251800,
+      "freightPrice": 0,
+      "subtotal": 251800,
+      "vat": 25180,
+      "grandTotal": 276980,
+      "itemCount": 1,
+      "totalQuantity": 1
+    },
+    "rawText": "거래명세서\n2026 주 10 A 21 H                               No:0021- 1/ 1\n공 등록번호        606 - 81 - 75098         공 증록번호 838-05-01054\n상 호 (주)대경벤드     성명 김         상 호 YEOI(ALT.F) 성명 조현진\n그\n주 _ 소 경남 양산시 HAZ 115            느 주 _ 소 부산광역시 사상구 낙동대로 1330번길 67(심\n자 &M3H/FAX 055)364~-1800   362-7074       자 H3H/FAX 051 )311-8605     051-328-4012\n1 TEE        S/208                st Zatti & 3106602018671  ES261021-2949\nSTS 304-W          ERW      200A * 150A           1           251.800         251.800\nxxx (|    ot    여    백 gy x\n1      공급가액               251,800\n부가세                   25,180\n합   계              276,980\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:56.049Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:56.049Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 251800,
+      "vat": 25180,
+      "grandTotal": 276980,
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "한국종합배관 [0021-1/] 전표가: 251,800원 vs 발주가: 0원 (발주서 미등록 (ES261021-2949))"
+      }
+    },
+    "customer": {
+      "name": "한국종합배관",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": false,
+      "matchedOrdersCount": 0,
+      "matchedPoNumbers": [],
+      "customerName": "한국종합배관",
+      "invoiceSubtotal": 251800,
+      "expectedPurchaseSubtotal": 0,
+      "diffAmount": 0,
+      "discrepancyType": "UNMATCHED_PO",
+      "statusText": "발주서 미등록 (ES261021-2949)",
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "한국종합배관 [0021-1/] 전표가: 251,800원 vs 발주가: 0원 (발주서 미등록 (ES261021-2949))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569633897-5-00221",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0022-1/",
+    "invoiceDate": "2026-10-21",
+    "pageIndex": 5,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "아리스텐레스",
+    "customerNumber": "",
+    "matchedOrderId": null,
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S/405 STS 316L-W 100A X 804",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 39620,
+        "amount": 39620,
+        "poNo": "",
+        "remarks": "아리스텐레스"
+      },
+      {
+        "itemNo": 2,
+        "type": "FREIGHT",
+        "name": "운임",
+        "spec": "화물 배송료",
+        "quantity": 1,
+        "unit": "건",
+        "unitPrice": 4000,
+        "amount": 4000,
+        "poNo": "",
+        "remarks": "아리스텐레스 운임"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2946"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 34514,
+      "freightPrice": 9106,
+      "subtotal": 43620,
+      "vat": 4362,
+      "grandTotal": 47982,
+      "itemCount": 2,
+      "totalQuantity": 2
+    },
+    "rawText": "거래명세서\n2026 10 A 21 8                                No:0022- 1/ 1\n공 등록번호        606 - 81 - 75098          공 등록번호    838-05-01054\n상 호 (주)대경벤드     성명 김         상 호 YEWI(ALT.F) 82 조현진\n=\n주 _ 소 경남 양산시 HAZ 115            ㄴㄴ 주 4 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/6/&※% 055)364-1800   362-7074       자 전화/『&& 051 )311-8605     051-328-4012\n1 R(C)       5/405                아리스텐레스        65261021-2946\nSTS 316L-W         ERW      100A * 804          1           39.620         39.620\n2 운임                                        아리스텐레스 박조나단님 9106(\n1 건      4.000       4.000\n**&* (|    하    여    백 **＊\n2      공급가액                43,620\n부가세                    4,362\n합   계               47,982\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:55.890Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:55.890Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 43620,
+      "vat": 4362,
+      "grandTotal": 47982,
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "아리스텐레스 [0022-1/] 전표가: 43,620원 vs 발주가: 0원 (발주서 미등록 (ES261019-2946))"
+      }
+    },
+    "customer": {
+      "name": "아리스텐레스",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": false,
+      "matchedOrdersCount": 0,
+      "matchedPoNumbers": [],
+      "customerName": "아리스텐레스",
+      "invoiceSubtotal": 43620,
+      "expectedPurchaseSubtotal": 0,
+      "diffAmount": 0,
+      "discrepancyType": "UNMATCHED_PO",
+      "statusText": "발주서 미등록 (ES261019-2946)",
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "아리스텐레스 [0022-1/] 전표가: 43,620원 vs 발주가: 0원 (발주서 미등록 (ES261019-2946))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569632419-4-00231",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0023-1/",
+    "invoiceDate": "1800-36-02",
+    "pageIndex": 4,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "(주)에스제이앤브이",
+    "customerNumber": "410-81-78475",
+    "matchedOrderId": "PO-20261019-TAEIL-010",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S/105 STS 316L-W 254A",
+        "quantity": 20,
+        "unit": "EA",
+        "unitPrice": 5610,
+        "amount": 112200,
+        "poNo": "",
+        "remarks": "(주)에스제이앤브이"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S/105 STS 316L-W 32A",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 7500,
+        "amount": 75000,
+        "poNo": "ES261021-2950",
+        "remarks": "(주)에스제이앤브이 ES261021-2950"
+      },
+      {
+        "itemNo": 3,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S/105 STS 316L-W 65A",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 19650,
+        "amount": 196500,
+        "poNo": "",
+        "remarks": "(주)에스제이앤브이"
+      },
+      {
+        "itemNo": 4,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/10S STS 316L-W 50A",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 23910,
+        "amount": 239100,
+        "poNo": "",
+        "remarks": "(주)에스제이앤브이"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2919"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 622800,
+      "freightPrice": 0,
+      "subtotal": 622800,
+      "vat": 62280,
+      "grandTotal": 685080,
+      "itemCount": 4,
+      "totalQuantity": 50
+    },
+    "rawText": "거래명세서\n2026 = 10 B 21 H                                No:0023- 1/ 1\n공 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 = (주)대경벤드     성명 김학        상 = 알트에프(시ㅣ7.『) 싱명_ 조현진\n그\n주   소 경남 양산시 HAZ 115            ㄴㄴ 주   소 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『5&&% 055)364-~1800   362-7074       자 &3H/FAX 051 )311-8605     051-328-4012\nNo    품   명 / 재   a / 규   격     수량 _ 단위   단 가     금   액     비 고\n1 906(ㄴ)         5/105                       에스제이맨브(| 김대환님 9106(65261021-2950\nSTS 316L-W         ERW       254                20            5.610         112.200\n2 90E(L)       5/105                  에스제이앤브(|        ES261021-2950\nSTS 316L-W          ERW        32A                 10             7.500           75.000\n3 90E(L)       5/105                  에스제이앤브(|       65261021-2950\nSTS 316L-W         ERW       65A                 10            19.650         196.500\n4 TEE        S/10S                  에스제이앤브(|        65261021-2950\nSTS 316L-W         ERW       50A                 10            23.910         239.100\nxxx (|     ot     여     백 xy x\n50       공급가액                622,800\n부가세                  62,280\n합   계               685,080\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:55.564Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:55.564Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 622800,
+      "vat": 62280,
+      "grandTotal": 685080,
+      "discrepancy": {
+        "type": "OVER_BILLED",
+        "diff": 417300,
+        "detail": "(주)에스제이앤브이 [0023-1/] 전표가: 622,800원 vs 발주가: 205,500원 (초과 청구 (+417,300원))"
+      }
+    },
+    "customer": {
+      "name": "(주)에스제이앤브이",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": true,
+      "matchedOrdersCount": 1,
+      "matchedPoNumbers": [
+        "ES261019-2919"
+      ],
+      "customerName": "(주)에스제이앤브이",
+      "invoiceSubtotal": 622800,
+      "expectedPurchaseSubtotal": 205500,
+      "diffAmount": 417300,
+      "discrepancyType": "OVER_BILLED",
+      "statusText": "초과 청구 (+417,300원)",
+      "discrepancy": {
+        "type": "OVER_BILLED",
+        "diff": 417300,
+        "detail": "(주)에스제이앤브이 [0023-1/] 전표가: 622,800원 vs 발주가: 205,500원 (초과 청구 (+417,300원))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569630238-3-00241",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0024-1/",
+    "invoiceDate": "2026-11-21",
+    "pageIndex": 3,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "신조금속",
+    "customerNumber": "",
+    "matchedOrderId": null,
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S/405 STS 304-W 250A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 365200,
+        "amount": 730400,
+        "poNo": "",
+        "remarks": "신조금속"
+      },
+      {
+        "itemNo": 2,
+        "type": "FREIGHT",
+        "name": "운임",
+        "spec": "화물 배송료",
+        "quantity": 1,
+        "unit": "건",
+        "unitPrice": 15000,
+        "amount": 15000,
+        "poNo": "",
+        "remarks": "신조금속 운임"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2953"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 0,
+      "freightPrice": 9106602018,
+      "subtotal": 745400,
+      "vat": 0,
+      "grandTotal": 0,
+      "itemCount": 2,
+      "totalQuantity": 3
+    },
+    "rawText": "거래명세서\n2026 주 11 A 21 H                                No:0024- 1/ 1\n공 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 _ 호 (주)대경벤드   성명 김학     4 5 알트에프(/[ㅠ.『) 성명 조현진\n그\n주   A 경남 양산시 어실로 115            ㄴ 주   소 부산광역시 사상구 낙동대로 1330번길 67(삼르\n자 전화/『&% 055)364-1800   362-7074       자 전화/『&% 051 )311-8605     051-328-4012\nNo  2  명 / 재  질 / 7  격   수량 og  단  가   금  액   비 고\n1 906(5)      5/405                알트에프         -5261021-2953\nSTS 304-W          ERW      250A                 2           365,200         730,400\n2 운임                                           알트에프 신조금속 9106602018(\n1 건     15.000      15.000\nxxx (|   하   여   백 ***\n3     공급가액            745,400\n2 가 세                  74,540\ngt   Al            819,940\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:55.426Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:55.426Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 745400,
+      "vat": 0,
+      "grandTotal": 0,
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "신조금속 [0024-1/] 전표가: 745,400원 vs 발주가: 0원 (발주서 미등록 (ES261019-2953))"
+      }
+    },
+    "customer": {
+      "name": "신조금속",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": false,
+      "matchedOrdersCount": 0,
+      "matchedPoNumbers": [],
+      "customerName": "신조금속",
+      "invoiceSubtotal": 745400,
+      "expectedPurchaseSubtotal": 0,
+      "diffAmount": 0,
+      "discrepancyType": "UNMATCHED_PO",
+      "statusText": "발주서 미등록 (ES261019-2953)",
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "신조금속 [0024-1/] 전표가: 745,400원 vs 발주가: 0원 (발주서 미등록 (ES261019-2953))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569628379-2-00251",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0025-1/",
+    "invoiceDate": "2026-10-21",
+    "pageIndex": 2,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "나래스틸",
+    "customerNumber": "",
+    "matchedOrderId": null,
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S/108 STS 304-W 150A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 50310,
+        "amount": 50310,
+        "poNo": "",
+        "remarks": "나래스틸"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S/105 STS 304-W 250A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 168690,
+        "amount": 168690,
+        "poNo": "ES261021-2952",
+        "remarks": "나래스틸 ES261021-2952"
+      },
+      {
+        "itemNo": 3,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S/40S STS 304-W 250A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 456500,
+        "amount": 456500,
+        "poNo": "ES261021-2952",
+        "remarks": "나래스틸 ES261021-2952"
+      },
+      {
+        "itemNo": 4,
+        "type": "FREIGHT",
+        "name": "운임",
+        "spec": "화물 배송료",
+        "quantity": 1,
+        "unit": "건",
+        "unitPrice": 20000,
+        "amount": 20000,
+        "poNo": "",
+        "remarks": "나래스틸 운임"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261021-2952"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 694590,
+      "freightPrice": 910,
+      "subtotal": 695500,
+      "vat": 69550,
+      "grandTotal": 765050,
+      "itemCount": 4,
+      "totalQuantity": 4
+    },
+    "rawText": "거래명세서\n2026 주 10 A 21 H                                No:0025- 1/ 1\n공 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 호 (주)대경벤드     성명 김학       상 호 알트에프(/[7.6) 성명 EHX\n그\n수   소 경남 양산시 HAZ 115            ㄴㄴ 주 A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『&& 055)364-1800   362-7074       자 H3H/FAX 051 )311-8605      051-328-4012\nNo    품 명 / 재   질 / =   격     수량 단위   단 가     El   oH     H 고\n1 90E(L)      S/108                나래스틸         65261021-2952\nSTS 304-W          ERW       150A                  1            50.310          50.310\n2 90E(L)       5/105                  나래스틸           ES261021-2952\nSTS 304          ERW      250A                  1           168.690         168.690\n3 90E(L)       S/40S                  나래스틸          ES261021-2952\nSTS 304          ERW      250A                 1           456.500         456.500\n4 운임                                 나래스틸 910(502018675\n1 A      20.000       20.000\nxxx QO     ot     여     백 *ㅎ3\n4      공급가액               695,500\n부가세                  69,550\n합   계              765,050\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:55.286Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:55.286Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 695500,
+      "vat": 69550,
+      "grandTotal": 765050,
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "나래스틸 [0025-1/] 전표가: 695,500원 vs 발주가: 0원 (발주서 미등록 (ES261021-2952))"
+      }
+    },
+    "customer": {
+      "name": "나래스틸",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": false,
+      "matchedOrdersCount": 0,
+      "matchedPoNumbers": [],
+      "customerName": "나래스틸",
+      "invoiceSubtotal": 695500,
+      "expectedPurchaseSubtotal": 0,
+      "diffAmount": 0,
+      "discrepancyType": "UNMATCHED_PO",
+      "statusText": "발주서 미등록 (ES261021-2952)",
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "나래스틸 [0025-1/] 전표가: 695,500원 vs 발주가: 0원 (발주서 미등록 (ES261021-2952))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792569626510-1-00261",
+    "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
+    "invoiceNo": "0026-1/",
+    "invoiceDate": "2026-10-21",
+    "pageIndex": 1,
+    "totalPages": 16,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "대신배관",
+    "customerNumber": "",
+    "matchedOrderId": null,
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S/105 STS 316L-W 125A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 66450,
+        "amount": 66450,
+        "poNo": "",
+        "remarks": "대신배관"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/105 STS 316L-W 100A X 80A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 66580,
+        "amount": 66580,
+        "poNo": "ES261021-2948",
+        "remarks": "대신배관 ES261021-2948"
+      },
+      {
+        "itemNo": 3,
+        "type": "PRODUCT",
+        "name": "TEE",
+        "spec": "S/105 STS 316L-W 65A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 93770,
+        "amount": 187540,
+        "poNo": "ES261021-2948",
+        "remarks": "대신배관 ES261021-2948"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261021-2948"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 320570,
+      "freightPrice": 0,
+      "subtotal": 320570,
+      "vat": 32057,
+      "grandTotal": 352627,
+      "itemCount": 3,
+      "totalQuantity": 4
+    },
+    "rawText": "거래 명세서\n2026 주 10 A 21 H                                No:0026- 1/ 1\ns 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 _ 호 (주)대경벤드     성명 김학        상 _호 알트에프(시ㅣ1.『) €8 조현진\n”  주   소 경남 양산시 어실로 115            ㄴㄴ 수   소 부산광역시 사상구 낙동대로 1330번길 67(삼\n자 전화/『&※ 055)364-1800   362-/074       자 &&H/FAX 051 )311-8605      051-328-4012\nNo    품   명 / 재   a / 규   격     수량 _ 단위   단 가     금   액     비 고\n1 906(Ｌ)          5/105                          알트에프 대신배관 9106602018(65261021-2948\nSTS 316L-W         ERW       125A                  1            66,450          66.450\n2 TEE        5/105                  알트에프          ES261021-2948\nSTS 316L-W         ERW      100A = 80A           1            66.580          66.580\n3 TEE        5/105                  알트에프          ES261021-2948\nSTS 316L-W         ERW       125A *ㅎ 65A           2            93.770         187.540\nxxx (|     of     여     LITE\n4      공급가액                320,570\n부가세                  32,057\n합   계               352,627\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-21T08:00:55.125Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-21T08:00:55.125Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 320570,
+      "vat": 32057,
+      "grandTotal": 352627,
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "대신배관 [0026-1/] 전표가: 320,570원 vs 발주가: 0원 (발주서 미등록 (ES261021-2948))"
+      }
+    },
+    "customer": {
+      "name": "대신배관",
+      "code": "",
+      "contact": ""
+    },
+    "crossCheck": {
+      "hasOrderMatch": false,
+      "matchedOrdersCount": 0,
+      "matchedPoNumbers": [],
+      "customerName": "대신배관",
+      "invoiceSubtotal": 320570,
+      "expectedPurchaseSubtotal": 0,
+      "diffAmount": 0,
+      "discrepancyType": "UNMATCHED_PO",
+      "statusText": "발주서 미등록 (ES261021-2948)",
+      "discrepancy": {
+        "type": "UNMATCHED_PO",
+        "diff": 0,
+        "detail": "대신배관 [0026-1/] 전표가: 320,570원 vs 발주가: 0원 (발주서 미등록 (ES261021-2948))"
+      }
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539378205-2-00291",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_1서울재고_pdf.pdf",
+    "invoiceNo": "0029-1/",
+    "invoiceDate": "2026-10-20",
+    "pageIndex": 2,
+    "totalPages": 2,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "알트에프",
+    "customerNumber": "838-05-01054",
+    "matchedOrderId": "PO-20260903-TAEIL-003",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS304-W 10A",
+        "quantity": 200,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS304-W 20A",
+        "quantity": 1000,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 3,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS304-W 32A",
+        "quantity": 600,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 4,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS304-W 40A",
+        "quantity": 500,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 5,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS304-W 65A",
+        "quantity": 300,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 6,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS304-W 80A",
+        "quantity": 448,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 7,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS304-W 100A",
+        "quantity": 224,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 8,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS304-W 200A",
+        "quantity": 30,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 9,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS304-W 250A",
+        "quantity": 15,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 10,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS304-W 400A",
+        "quantity": 4,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 11,
+        "type": "PRODUCT",
+        "name": "90E(S)",
+        "spec": "S10S STS304-W 65A",
+        "quantity": 120,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 12,
+        "type": "PRODUCT",
+        "name": "90E(S)",
+        "spec": "S10S STS304-W 80A",
+        "quantity": 60,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 13,
+        "type": "PRODUCT",
+        "name": "90E(S)",
+        "spec": "S10S STS304-W 200A",
+        "quantity": 50,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 14,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S STS304-W 32A",
+        "quantity": 60,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 15,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S STS304-W 40A",
+        "quantity": 50,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 16,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 20A X 15A",
+        "quantity": 100,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 17,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 25A X 15A",
+        "quantity": 225,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 18,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 32A X 15A",
+        "quantity": 80,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 19,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 32A X 25A",
+        "quantity": 40,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 20,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 40A X 20A",
+        "quantity": 75,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 21,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 40A X 32A",
+        "quantity": 40,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 22,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 50A X 15A",
+        "quantity": 80,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 23,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 50A X 25A",
+        "quantity": 80,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 24,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 65A X 15A",
+        "quantity": 30,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 25,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 65A X 20A",
+        "quantity": 30,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 26,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 80A X 50A",
+        "quantity": 36,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 27,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 100A X 40A",
+        "quantity": 7,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 28,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 40A X 32A",
+        "quantity": 80,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 29,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 50A X 20A",
+        "quantity": 100,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 30,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 50A X 40A",
+        "quantity": 150,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 31,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 65A X 50A",
+        "quantity": 80,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 32,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 80A X 50A",
+        "quantity": 50,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 33,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 100A X 50A",
+        "quantity": 100,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 34,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 125A X 100A",
+        "quantity": 40,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 35,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 150A X 50A",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 36,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 150A X 65A",
+        "quantity": 20,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 37,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 150A X 80A",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 38,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 150A X 125A",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 39,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 250A X 100A",
+        "quantity": 4,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 40,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 250A X 200A",
+        "quantity": 15,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 41,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 350A X 200A",
+        "quantity": 4,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 42,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 400A X 300A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 43,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 400A X 250A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 44,
+        "type": "PRODUCT",
+        "name": "R(E)",
+        "spec": "S10S STS304-W 32A X 25A",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 45,
+        "type": "PRODUCT",
+        "name": "R(E)",
+        "spec": "S10S STS304-W 65A X 50A",
+        "quantity": 20,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 46,
+        "type": "PRODUCT",
+        "name": "R(E)",
+        "spec": "S10S STS304-W 80A X 65A",
+        "quantity": 30,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 47,
+        "type": "PRODUCT",
+        "name": "R(E)",
+        "spec": "S10S STS304-W 150A X 125A",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 48,
+        "type": "PRODUCT",
+        "name": "R(E)",
+        "spec": "S10S STS304-W 200A X 100A",
+        "quantity": 7,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 49,
+        "type": "PRODUCT",
+        "name": "R(E)",
+        "spec": "S10S STS304-W 250A X 200A",
+        "quantity": 5,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 50,
+        "type": "PRODUCT",
+        "name": "R(E)",
+        "spec": "S10S STS304-W 350A X 200A",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 51,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S STS304-S 20A",
+        "quantity": 100,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 52,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S STS304-S 50A",
+        "quantity": 150,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 53,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S STS304-S 65A",
+        "quantity": 50,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 54,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S STS304-S 125A",
+        "quantity": 75,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 55,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S STS304-S 150A",
+        "quantity": 40,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 56,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S STS304-S 300A",
+        "quantity": 7,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 57,
+        "type": "PRODUCT",
+        "name": "45E(L)",
+        "spec": "S10S STS304-W 40A",
+        "quantity": 50,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 58,
+        "type": "PRODUCT",
+        "name": "45E(L)",
+        "spec": "S10S STS304-W 100A",
+        "quantity": 30,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      },
+      {
+        "itemNo": 59,
+        "type": "PRODUCT",
+        "name": "45E(L)",
+        "spec": "S10S STS304-W 300A",
+        "quantity": 4,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES260903-2474",
+        "remarks": "알트에프 발주분"
+      }
+    ],
+    "itemCount": 59,
+    "poNumbers": [
+      "ES260903-2474"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 3075750,
+      "freightPrice": 0,
+      "subtotal": 3075750,
+      "vat": 307575,
+      "grandTotal": 0
+    },
+    "rawText": "거래 명세서\n2026 주 10 A 20 8                                                No:0029- 1/ 1\n공 등록번호              606 - 81 - /5098                공 등록번호       838-05-01054\n상 = (주)대경벤드       성명 김학          상 3 ZENIZ(ALT.F) 성명 조현진\n그\n주 _소 경남 양산시 어실로 115                   ㄴㄴ 주 A 부산광역시 사상구 낙동대로 1330번길 67(신\n자 전화/6&4※ 055)364-1800        362-7074                   자 HSH/FAX 051 )311-8605               051-328-4012\nNo        E 명 / 재 2 / 7       A           수량 e948 . 가         금       액          비 고\n1 906(ㄴ)             5/105                                  서울재고발주븐 박조나단님 91(65260903-2474\nSTS 304          ERW        10 A               200             2,300         460.000\n2 TEE                                 5/105                                                                         서울재고발주!\"                               ES260903-2474\nSTS 304-W          ERW       654 * 154          30            18.670         560.100\n3 TEE                               5/105                                                                    서울재고발주!                            ES260903-2474\nSTS 304-W          ERW        65A * 20A          30            18.670         560, 100\n4 R(E)                         5/105                                                          서울재고발주{!                        ES260903-2474\nSTS 304-W          ERW      200A * 100A           7           91.090         637.630\n5 CAP                             5/105                                                              서울재고발주!                          ES260903-2474\nSTS 304-S          SML'S     300A                 7           122,560         857.920\nxxx (|          of          여          백 *ㅠ;ㅎ\n274           공급가액                        3,075,750\n부 가 세                                307,575\ngt       계                            3,383,325\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:18.564Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:18.564Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 3075750,
+      "vat": 307575,
+      "grandTotal": 0
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539375720-1-00111",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_1서울재고_pdf.pdf",
+    "invoiceNo": "0011-1/",
+    "invoiceDate": "2026-10-20",
+    "pageIndex": 1,
+    "totalPages": 2,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "(주)알트에프",
+    "customerNumber": "838-06-71345",
+    "matchedOrderId": "PO-20261012-TAEIL-005",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "90E(S)",
+        "spec": "S10S STS304-W 65A",
+        "quantity": 120,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 50A X 20A",
+        "quantity": 20,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 3,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 50A X 32A",
+        "quantity": 28,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 4,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 65A X 25A",
+        "quantity": 30,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 5,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 200A X 100A",
+        "quantity": 4,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 6,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 300A X 100A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 7,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS304-W 300A X 200A",
+        "quantity": 3,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 8,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 40A X 25A",
+        "quantity": 50,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 9,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 50A X 25A",
+        "quantity": 50,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 10,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 80A X 50A",
+        "quantity": 50,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 11,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S STS304-S 65A",
+        "quantity": 50,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 12,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S STS304-S 100A",
+        "quantity": 136,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 13,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S20S STS304-W 15A",
+        "quantity": 20,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 14,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S20S STS304-W 100A",
+        "quantity": 16,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 15,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S20S STS304-W 15A",
+        "quantity": 20,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 16,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S20S STS304-W 65A",
+        "quantity": 20,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 17,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S20S STS304-W 100A",
+        "quantity": 8,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 18,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS316L-W 15A",
+        "quantity": 200,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 19,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS316L-W 20A",
+        "quantity": 270,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 20,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS316L-W 25A",
+        "quantity": 100,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 21,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS316L-W 32A",
+        "quantity": 60,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 22,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS316L-W 100A",
+        "quantity": 30,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 23,
+        "type": "PRODUCT",
+        "name": "45E(L)",
+        "spec": "S10S STS316L-W 20A",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 24,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S STS316L-S 32A",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 25,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S STS316L-S 65A",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 26,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S STS316L-S 250A",
+        "quantity": 4,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 27,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S STS316L-S 300A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 28,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS316L-W 32A X 25A",
+        "quantity": 15,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 29,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS316L-W 50A X 40A",
+        "quantity": 36,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 30,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS316L-W 65A X 50A",
+        "quantity": 20,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 31,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS316L-W 100A X 80A",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 32,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS316L-W 150A X 100A",
+        "quantity": 4,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 33,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S STS316L-W 80A",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 34,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 40A X 15A",
+        "quantity": 15,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 35,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 40A X 20A",
+        "quantity": 15,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 36,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 65A X 15A",
+        "quantity": 5,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 37,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 65A X 20A",
+        "quantity": 5,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 38,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 80A X 15A",
+        "quantity": 5,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 39,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 100A X 32A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 40,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 100A X 40A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 41,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 125A X 50A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 42,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 125A X 65A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 43,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 150A X 50A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 44,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 150A X 65A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 45,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 150A X 80A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 46,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 150A X 100A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 47,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 200A X 100A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 48,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 200A X 125A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      },
+      {
+        "itemNo": 49,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S STS316L-W 200A X 150A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261012-2824",
+        "remarks": "(주)알트에프 발주분"
+      }
+    ],
+    "itemCount": 49,
+    "poNumbers": [
+      "ES261012-2824"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 5086600,
+      "freightPrice": 0,
+      "subtotal": 5086600,
+      "vat": 508660,
+      "grandTotal": 5595260
+    },
+    "rawText": "거래명세서\n2026 주 10 A 20 H                                No:0011- 1/ 1\n= 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\nd= (주)대경벤드   성명 김학     상 호 알트에프(/|[1.5) 성명 ZEA\n그\n주 _소 경남 양산시 어실로 115            ㄴㄴ 주 A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『&※ 055)364-1800   362-7074       자 MBH/FAX 051 )311-8605     051-328-4012\nNo    품 명 / 재 2 / 7   격     수량 _ 단위   단 가    금   액     비 고\n1 906(ㄴ)          5/105                          서울재고 232 박조나단님 9 65261008-2817\nSTS 304-W          ERW       125A                140            34.970       4.895.800\n2 R(C)        S/10S                  서울재고          ES261012-2824\nSTS 316L-W         ERW       100A = 804          10            19.080         190.800\n*** (|     of    여     백 *?&\n150      공급가액             5,086,600\n부가세                  508,660\n합   계             5,595,260\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:18.205Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:18.205Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 5086600,
+      "vat": 508660,
+      "grandTotal": 5595260
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539363634-17-00013",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0001-3/",
+    "invoiceDate": "2026-11-20",
+    "pageIndex": 17,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "(주)건일 C-PET",
+    "customerNumber": "613-81-37831",
+    "matchedOrderId": "PO-20261019-TAEIL-011",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S WP316L-S 8\" X 6\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 154340,
+        "amount": 308680,
+        "poNo": "ES261019-2920",
+        "remarks": "(주)건일 C-PET 발주분"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2920"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 14206440,
+      "freightPrice": 0,
+      "subtotal": 14206440,
+      "vat": 1420644,
+      "grandTotal": 0
+    },
+    "rawText": "거래명세서\n2026 주 11 A 20 A                                                    No:0001- 3/ 3\nZ 등록번호                                       공 등록번호 _ 838-05-01054\nJ 상 호 (주)대경벤드      성명 김학        상 _ 호 알트에프(시ㅜ.『) 성명_ 조현진\n=  주   A 경남 양산시 어실로 115            ㄴㄴ 주   A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『6※ 055)364-1800      362-7074             자 전화/6&4※ 051 )311-8605          051-328-4012\nNo      = 명 /재 질 / 7     격        수량 단위 _단 가       금     액       비고\n33 R(E)               S/10S                                  건일씨펫                    -5260826-2378\nWP 304L-S          SML'S                          1            72.670          72.670\n34 R(E)               S/80S                                  건일씨펫                    -5260826-2378\nWP 3041 -5        SML'S    2\" x 1-1/2\"         3          13.420        40.260\n35 R(E)               S/80S                                  건일씨펫                    -5260826-2378\nWP 304L-S         SML'S    2\" x 3/4\"            2           20.510         41,020\n36 R(E)               S/80S                                  건일씨펫                    -5260826-2378\nWP 304L-S        SML'S    3\" = 1-1/2\"         3          33.810        101.430\n37 R(E)               S/80S                                  건일씨펫                    -5260826-2378\nWP 3041! -5           SML'S                           1             46,660           46,660\n38 TEE                S/10S                                  건일씨펫                    -5260826-2378\nWP 304L-S           SML'S     2                    56             23.960        1.341.760\n39 TEE                S/10S                                  건일씨펫                    ES260826—-2378\nWP 304L-S          SML'S     3                    3            36,970         110,910\n40 TEE                S/10S                                  건일씨펫                    ES260826—-2378\nWP 304L-S           SML'S     4                     pd            51.770          103.540\n41 TEE                S/80S                                  건일씨펫                    ES260826—-2378\nWP 304L-S           SML'S     2                    19            38.150          724,850\n42 TEE                S/80S                                  건일씨펫                    ES260826—2378\nWP 304L-S           SML'S     3                     4            56.470          225.880\n43 TEE                S/10S                                  건일씨펫                    ES260826—2378\nWP 316L-S           SML'S     3                     1             54.130           54.130\n44 TEE                S/80S                                  건일씨펫                    ES260826—-2378\nWP 304L-S        SML'S    2\" x 1-1/2\"         pd          38.150        76,300\n45 TEE                S/80S                                  건일씨펫                    ES260826—2378\nWP 304L-S           SML'S                           1             56.470           56.470\n46 TEE                S/80S                                  건일씨펫                    ES260826—2378\nWP 304L-S          SML'S     4 = 2                2            85.370         170.740\n47 TEE                S/10S                                  건일씨펫                    ES260826-2378\nWP 304L-S          SML'S     3\" x 2\"              8            36.970         295.760\n48 TEE                S/10S                                  건일씨펫                    ES260826-2378\nWP 304L-S          SML'S                          1            51.770          51.770\n823         공급가액                    14,206,440\n부가 세                1,420,644\n[그     계                   15,627,084\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:09.230Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:09.230Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 14206440,
+      "vat": 1420644,
+      "grandTotal": 0
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539352516-16-00012",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0001-2/",
+    "invoiceDate": "2026-01-00",
+    "pageIndex": 16,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "(주)건일 C-PET",
+    "customerNumber": "613-81-37831",
+    "matchedOrderId": "PO-20261019-TAEIL-011",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S WP316L-S 8\" X 6\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 154340,
+        "amount": 308680,
+        "poNo": "ES261019-2920",
+        "remarks": "(주)건일 C-PET 발주분"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2920"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 308680,
+      "freightPrice": 0,
+      "subtotal": 308680,
+      "vat": 30868,
+      "grandTotal": 339548
+    },
+    "rawText": "거래명세서\n2026 주 10 AR 20 H                                 No:0001- 2/ 3\n2 등록번호                                 공 등록번호    838-05-01054\n_ ¥ 호 (주)대경벤드      성명 김학         상 호 알트에프(시1.5) 성명 조현진\n。 주 A 경남 양산시 어실로 115           ㄴ 주 A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/68※ 055)364-1800     362-7074           자 전화/58※ 051 )311-8605         051-328-4012\nNo     E 명 /재 질 / 규 =       수량 단위 © 가      금 _ 액      비 고\n17 45E(L)           8/108                             건일씨펫                 68260826-2378\nWP 304L-S           SML'S     3                     1             25.210           25.210\n18 45E(L)           $/108                             건일씨펫                 68260826-2378\nWP 304L-S          M's 4                    2            43.160          86.320\n19 45E(L)           5/808                             건일씨펫                 65260826-2378\nWP 304L-S           8'5 2                     5             18.630           93, 150\n20 90E(L)           S/108                             건일씨펫                 =8260826-2378\nWP 304L-S          SML'S     2                  428            11.230       4.806.440\n21 90E(L)           S/10S                             건일씨펫                 65260826-2378\nWP 304L-S          M's 3                   30            25,210         756.300\n22 90E(L)           S/10S                             건일씨펫                 =8260826-2378\nWP 304L-S           SML'S     4                    32            43.160        1.381.120\n23 90E(L)           S/10S                             건일씨펫                 -5260826-2378\nWP 304L-S          SML'S 6                    1           124,220         124,220\n24 90E(L)           $/80S                             건일씨펫                 =8260826-2378\nWP 304L-S           SML'S     2                    40             18.630          745.200\n25 Q0E(L)           S/80S                             건일씨펫                 =8260826-2378\nWP 304L-S           SML'S     3                     8            44,100          352,800\n26 90E(L)           $/80S                             건일씨펫                 =8260826-2378\nWP 304L-S           SML'S     4                     3             79.720          239.160\n27 R(C)             S/108                             건일씨펫                 =8260826-2378\nWP 304L-S           SML'S                           7             17.840          124.880\n28 R(C)             S/80S                             건일씨펫                 =8260826-2378\nWP 304L-S          SML'S                         17            15,050         255,850\n29 R(C)             S/80S                             건일씨펫                 =8260826-2378\nWP 3041-5  SME'S 2\" x 3/4\"           2          18,060        36.120\n30 R(C)     CURT 87808. 0. 7                      건일씨펫                 =8260826-2378\nWP 304L-S 17 7888 39 1-1/2\"        3         29.940        89.820\n31 R(C)                                              건일씨펫                 =8260826-2378\nWP 304L-S                                          2             27.350           54.700\n32 (6)             8/108                             건일씨펫                 =8260826-2378\nWP 304L-S           SML'S                           2             36,480           72,960\n공급가액\n부가세\n합 . 계\n다음폐이지 계 속         (주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:08.855Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:08.855Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 308680,
+      "vat": 30868,
+      "grandTotal": 339548
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539348373-15-00011",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0001-1/",
+    "invoiceDate": "2026-10-20",
+    "pageIndex": 15,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "(주)건일 C-PET",
+    "customerNumber": "613-81-37831",
+    "matchedOrderId": "PO-20261019-TAEIL-011",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S WP316L-S 8\" X 6\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 154340,
+        "amount": 308680,
+        "poNo": "ES261019-2920",
+        "remarks": "(주)건일 C-PET 발주분"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2920"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 308680,
+      "freightPrice": 0,
+      "subtotal": 308680,
+      "vat": 30868,
+      "grandTotal": 339548
+    },
+    "rawText": "거래명세서\n2026 주 10 A 20 8                                                      No:0001- 1/ 3\n공 등록번호       606 - 81 - 75098         공 등록번호 _ 838-05-01054\n_ #2 (주)대경벤드     성명 김학       상 _ 호 YEWI(ALT.F) 성명 조현진\n、 주 A 경남 양산시 어실로 115            LF A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『&※ 055)364-1800      362-7074              자 전화/『& 051 )311-8605           051-328-4012\nNo      = 9/8 2 / 7 A        수량 단위 oo 가       금 oo       비 고\n1 906(ㄴ)          5/805                          건일씨펫               65260826-2378\nWP 304L-S          SML'S     1-1/2\"               18            12.560         226.080\n2 90E(L)           S/80S                            건일씨펫                ES260826-2378\nWP 304L-S          SML'S     1                   21             8.360         175.560\n3 90E(L)           S/80S                            건일씨펫                ES260826—-2378\nWP 304L-S           SML'S     1/2\"                  29             6.950          201.550\n4 90E(L)           S/80S                            건일씨펫                ES260826-2378\nWP 304L-S           SML'S     3/4\"                  2             7.900           15.800\n5 R(C)                S/80S                                    건일씨펫                     ES260826-2378\nWP 3041! -5        SML'S    1-1/2\" = 1\"         8          9,460        75.680\n6 800)                S/80S                                    건일씨펫                     ES260826—2378\nWP 304L-S         SML'S     1-1/2\" = 3/4\"         1            10.710          10.710\n7 R(C)                S/80S                                    건일씨펫                     ES260826-2378\nWP 304L-S        SML'S    1\" * 1/2\"           1           6.180         6.180\n8 R(C)            S/80S                            건일씨펫                ES260826—2378\nWP 304L-S         SML'S     1\" = 3/4\"            2            5.410          10.820\n9 R(C)                S/80S                                    건일씨펫                     ES260826-2378\nWP 304L-S        SML'S    3/4\" = 1/2\"         2          3,430         6.860\n10 R(E)                S/80S                                    건일씨펫                     ES260826—-2378\nWP 304L-S        SML'S    1-1/2\" = {\"         1          10.740        10.740\n11 R(E)           S/80S                          건일씨펫               ES260826-2378\nWP 304L-S        SML'S    1\" = 1/2\"           8          7.020        56.160\n12 106)                S/80S                                    건일씨펫                     ES260826-2378\nWP 3041-S        SML'S    3/4\" = 1/2\"         2          3.890         7.780\n13 TEE             S/80S                             건일씨펫                6260826-2378\nWP 304L-S           SML'S     1-1/2\"                 8             21.980          175.840\n14 TEE              S/80S                              건일씨펫                 =S5260826-2378\nWP 304! -5          SML'S     1                    19            16.540         314.260\n15 TEE                S/80S                                    건일씨펫                     -5260826-2378\nWP 304L-S        SML'S    1-1/2\" = 1\"         5          21.980        109.900\n16 45E(L)                      S/10S                                                          건일씨펫                                  -5260826-2378\nWP 304L-S           SML'S     2                     4             11.030           44.120\n공급가액\n부가세\n합 . 계\n다음페이지 게 속       (주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:08.486Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:08.486Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 308680,
+      "vat": 30868,
+      "grandTotal": 339548
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539343408-14-42012",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "4201-2/",
+    "invoiceDate": "2026-10-20",
+    "pageIndex": 14,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "진성종합배관(주)",
+    "customerNumber": "138-81-23383",
+    "matchedOrderId": "PO-20260930-TAEIL-007",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S WP304-S 2\"",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 5400,
+        "amount": 54000,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S WP304-S 3\"",
+        "quantity": 14,
+        "unit": "EA",
+        "unitPrice": 8170,
+        "amount": 114380,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 3,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S WP304-S 4\"",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 12530,
+        "amount": 12530,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 4,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S WP304-S 6\"",
+        "quantity": 7,
+        "unit": "EA",
+        "unitPrice": 29150,
+        "amount": 204050,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 5,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S WP304-S 8\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 53110,
+        "amount": 106220,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 6,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 2\"",
+        "quantity": 466,
+        "unit": "EA",
+        "unitPrice": 7760,
+        "amount": 3616160,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 7,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 2-1/2\"",
+        "quantity": 25,
+        "unit": "EA",
+        "unitPrice": 11490,
+        "amount": 287250,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 8,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 3\"",
+        "quantity": 32,
+        "unit": "EA",
+        "unitPrice": 15170,
+        "amount": 485440,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 9,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 4\"",
+        "quantity": 28,
+        "unit": "EA",
+        "unitPrice": 26070,
+        "amount": 729960,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 10,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 6\"",
+        "quantity": 34,
+        "unit": "EA",
+        "unitPrice": 62890,
+        "amount": 2138260,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 11,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 8\"",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 126400,
+        "amount": 126400,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 12,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 10\"",
+        "quantity": 56,
+        "unit": "EA",
+        "unitPrice": 210870,
+        "amount": 11808720,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 13,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 12\"",
+        "quantity": 6,
+        "unit": "EA",
+        "unitPrice": 347620,
+        "amount": 2085720,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 14,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S WP304-W 2\"",
+        "quantity": 35,
+        "unit": "EA",
+        "unitPrice": 13980,
+        "amount": 489300,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 15,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S WP304-W 3\"",
+        "quantity": 3,
+        "unit": "EA",
+        "unitPrice": 24090,
+        "amount": 72270,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 16,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S WP304-W 4\"",
+        "quantity": 4,
+        "unit": "EA",
+        "unitPrice": 38930,
+        "amount": 155720,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 17,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S WP304-W 6\"",
+        "quantity": 14,
+        "unit": "EA",
+        "unitPrice": 78840,
+        "amount": 1103760,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 18,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S WP304-W 10\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 270620,
+        "amount": 541240,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 19,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S WP304-W 4\" X 3\"",
+        "quantity": 11,
+        "unit": "EA",
+        "unitPrice": 38930,
+        "amount": 428230,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 20,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S WP304-W 6\" X 4\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 78840,
+        "amount": 157680,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 21,
+        "type": "PRODUCT",
+        "name": "R(E)",
+        "spec": "S10S WP304-W 10\" X 6\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 138860,
+        "amount": 277720,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 22,
+        "type": "PRODUCT",
+        "name": "R(E)",
+        "spec": "S10S WP304-W 10\" X 8\"",
+        "quantity": 9,
+        "unit": "EA",
+        "unitPrice": 76010,
+        "amount": 684090,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      }
+    ],
+    "itemCount": 22,
+    "poNumbers": [
+      "ES260930-2735"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 21114990,
+      "freightPrice": 0,
+      "subtotal": 21114990,
+      "vat": 2111499,
+      "grandTotal": 23226489
+    },
+    "rawText": "거래명세서\n2026 주 10 A 20 H                                                    No:4201- 2/ 2\n2 등록번호                                       공 등록번호 _ 838-05-01054\n상 호 (주)대경벤드    성명 김학      상 호 알트에프(/[ㅠ.『) 42 조현진\n그\n주 A 경남 양산시 어실로 115             CL FA 부산광역시 사상구 낙동대로 1330번길 67(심\n자 H3H/FAX 055)364-1800      362-7074             자 전화/6&※ 051 )311-8605          051-328-4012\nNo      품 @/ 8 # / 7     격        수량 단위 © J       =     액       비 고\n17 TEE                S/108                                  진성종합배관                ES260930-2735\nWP 304-W            ERW       6                    14            63.070          882.980\n18 TEE                5/105                                  진성종합배관                ES260930-2735\nWP 304-w           ERW       10\"                   2           216.500         433.000\n19 TEE                S/10S                                  진성종합배관                65260930-2735\nWP 304-W           ERW                           11            35.040         385,440\n20 TEE                5/105                                  진성종합배관                65260930-2735\nWP 304            ERW                             2            63.070          126.140\n21 R(E)               5/105                                  진성종합배관                65260930-2735\nWP 304-W          ERW      10\" * 6\"             2          111.080         222.160\n22 R(E)               5/105                                  진성종합배관                65260930-2735\nWP 304-w           ERW      10\" * 8\"              9            60.800         547.200\n*ㅎ** (|          하          여          HH gy x\n764         공급가액                    21,114,990\n부가 세                2,111,499\n합     계                   23,226,489\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:08.106Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:08.106Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 21114990,
+      "vat": 2111499,
+      "grandTotal": 23226489
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539340776-13-42011",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "4201-1/",
+    "invoiceDate": "2026-10-20",
+    "pageIndex": 13,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "진성종합배관(주)",
+    "customerNumber": "138-81-23383",
+    "matchedOrderId": "PO-20260930-TAEIL-007",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S WP304-S 2\"",
+        "quantity": 10,
+        "unit": "EA",
+        "unitPrice": 5400,
+        "amount": 54000,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S WP304-S 3\"",
+        "quantity": 14,
+        "unit": "EA",
+        "unitPrice": 8170,
+        "amount": 114380,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 3,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S WP304-S 4\"",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 12530,
+        "amount": 12530,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 4,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S WP304-S 6\"",
+        "quantity": 7,
+        "unit": "EA",
+        "unitPrice": 29150,
+        "amount": 204050,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 5,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S WP304-S 8\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 53110,
+        "amount": 106220,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 6,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 2\"",
+        "quantity": 466,
+        "unit": "EA",
+        "unitPrice": 7760,
+        "amount": 3616160,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 7,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 2-1/2\"",
+        "quantity": 25,
+        "unit": "EA",
+        "unitPrice": 11490,
+        "amount": 287250,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 8,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 3\"",
+        "quantity": 32,
+        "unit": "EA",
+        "unitPrice": 15170,
+        "amount": 485440,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 9,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 4\"",
+        "quantity": 28,
+        "unit": "EA",
+        "unitPrice": 26070,
+        "amount": 729960,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 10,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 6\"",
+        "quantity": 34,
+        "unit": "EA",
+        "unitPrice": 62890,
+        "amount": 2138260,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 11,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 8\"",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 126400,
+        "amount": 126400,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 12,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 10\"",
+        "quantity": 56,
+        "unit": "EA",
+        "unitPrice": 210870,
+        "amount": 11808720,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 13,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S WP304-W 12\"",
+        "quantity": 6,
+        "unit": "EA",
+        "unitPrice": 347620,
+        "amount": 2085720,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 14,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S WP304-W 2\"",
+        "quantity": 35,
+        "unit": "EA",
+        "unitPrice": 13980,
+        "amount": 489300,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 15,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S WP304-W 3\"",
+        "quantity": 3,
+        "unit": "EA",
+        "unitPrice": 24090,
+        "amount": 72270,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 16,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S WP304-W 4\"",
+        "quantity": 4,
+        "unit": "EA",
+        "unitPrice": 38930,
+        "amount": 155720,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 17,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S WP304-W 6\"",
+        "quantity": 14,
+        "unit": "EA",
+        "unitPrice": 78840,
+        "amount": 1103760,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 18,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S10S WP304-W 10\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 270620,
+        "amount": 541240,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 19,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S WP304-W 4\" X 3\"",
+        "quantity": 11,
+        "unit": "EA",
+        "unitPrice": 38930,
+        "amount": 428230,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 20,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S WP304-W 6\" X 4\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 78840,
+        "amount": 157680,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 21,
+        "type": "PRODUCT",
+        "name": "R(E)",
+        "spec": "S10S WP304-W 10\" X 6\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 138860,
+        "amount": 277720,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      },
+      {
+        "itemNo": 22,
+        "type": "PRODUCT",
+        "name": "R(E)",
+        "spec": "S10S WP304-W 10\" X 8\"",
+        "quantity": 9,
+        "unit": "EA",
+        "unitPrice": 76010,
+        "amount": 684090,
+        "poNo": "ES260930-2735",
+        "remarks": "진성종합배관(주) 발주분"
+      }
+    ],
+    "itemCount": 22,
+    "poNumbers": [
+      "ES260930-2735"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 25679100,
+      "freightPrice": 0,
+      "subtotal": 25679100,
+      "vat": 2567910,
+      "grandTotal": 28247010
+    },
+    "rawText": "거래명세서\n2026 주 10 A 20 H                                                     No:4201- 1/ 2\n공 등록번호                     606 - 81 - 75098                         공 등록번호          838-05-01054\n상 2 (주)대경벤드     성명 김학       상 = 알트에프(/[1.『) 성명 조현진\n그\n주 _ 소 경남 양산시 어실로 115           。 주 A 부산광역시 사상구 낙동대로 1330번길 67(삼=\n자 ABFA 055)364-1800 362-7074                       자 전화/66※ 051 )311-8605                  051-328-4012\nNo = 명/재 = / 규 A              수량 단위 단 가            = _ 액            비고\n1 CAP          8/108                       진성종합배관           =8260930-2735\nWP 304-5                    S'S 2                                  10                       4.860                  48.600\n2 CAP          8/108                       진성종합배관           =8260930-2735\nWP 304-S                 SML'S       3                              14                    7.350              102,900\n3 CAP          $/10S                       진성종합배관           £5260930-2735\nWP 304-5                   SI'S 4                                    1                      11.280                  11.280\n4 CAP          $/108                       진성종합배관           £5260930-2735\nWP 304-5            S'S 6                      7             26.230          183.610\n5 CAP          $/108                       진성종합배관           =8260930-2735\nWP 304-S                    SML'S        8                                    pd                     47.800                  95.600\n6 90E(L)                             S/10S                                                                            진성종합배관                                    -=5260930-2735\nWP 304-W                   EAN           2                                466                       6.980             3.252.680\n7 90E(L)                             S/10S                                                                          진성종합배관                                   -5260930-2735\nWP 304-W                   ERW           2-1/2\"                          25                      10.340                258.500\n8 90E(L)                               S/10S                                                                                진성종합배관                                     6ㄷ5260930-2735\nWP 304-W                    ERW           3                                  32                      13.650                436.800\n9 90E(L)         $/108                       진성종합배관          68260930-2735\nWP 304-W                   ERN           4                                  28                     23.460                656.880\n10 90E(L)         $/108                       진성종합배관          68260930-2735\nWP 304-\\       ERW    6             34        50.310     1.710.540\n11 906(ㄴ)         8/108                       진성종합배관          ES260930-2735\nWP 304-W                   ERW           8\n12 90E(L)         $/108                       진성종합배관          68260930-2735\nWP 304-W                   ERW            10\"                               56                    168.690             9.446.640\n13 90E(L)         $/108                       진성종합배관           ㄷ8260930-2735\nWP 304-W                    EAN            12\"                                 6                    278.090             1.668.540\n14 TEE          8/108                       진성종합배관           ㄷ8260930-2735\nWP 304-W                   ERW           2                                  35                      12.580                440.300\n15 TEE                                  S/10S                                                                          진성종합배관                                   ES260930-2735\nWP 304-W              ERW        3\"                         3               21.680             65.040\n16 TEE                                    S/108                                                                              진성종합배관                                     ES260930-2735\nWP 304-W                           ERW               4                                                 4                             35.040                       140.160\n공급가액\n= 가 세\n합 . 계\n다 음페이지 계 =        (주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:07.733Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:07.733Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 25679100,
+      "vat": 2567910,
+      "grandTotal": 28247010
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539336845-12-00031",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0003-1/",
+    "invoiceDate": "1800-36-02",
+    "pageIndex": 12,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "유한스테인레스(주)",
+    "customerNumber": "9106602018540",
+    "matchedOrderId": "PO-20261020-TAEIL-001",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S20S STS304-S 90A",
+        "quantity": 4,
+        "unit": "EA",
+        "unitPrice": 0,
+        "amount": 0,
+        "poNo": "ES261020-2928",
+        "remarks": "유한스테인레스(주) 발주분"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261020-2928"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 95680,
+      "freightPrice": 0,
+      "subtotal": 95680,
+      "vat": 0,
+      "grandTotal": 105248
+    },
+    "rawText": "거래명세서\n2026 % 10 A 20 8                                No:0003- 1/ 1\n공 등록번호        606 - 81 - 75098         곡 등록번호 _ 838-05-01054\n상 _ 호 (주)대경벤드   성명 김학     상 5 알트에프(/[7.『) #2 EA\n=  수   소 경남 양산시 Haz 115            . 수   A 부산광역시 사상구 낙동대로 1330번길 67(삼르\n자 &3H/FAX 055)364-1800   362-7074       자 전화/『&4※ 051 )311-8605     051-328-4012\nNo  품  명 / 재  a / 7  격   수량 단위  단  가   글  액   비 고\n1 CAP              5/205                             유한스테인레:~ 9106602018540 65261020-2928\n515 304-5          SML'S      90 A                 4            23.920          95.680\nxxx Of    하    여    By x\n4      공급가액              95,680\n2 Jt 세                   9,568\n합   계             105,248\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:07.365Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:07.365Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 95680,
+      "vat": 0,
+      "grandTotal": 105248
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539335259-11-00041",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0004-1/",
+    "invoiceDate": "2026-01-00",
+    "pageIndex": 11,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "국일배관",
+    "customerNumber": "610-01-24897",
+    "matchedOrderId": "PO-20261019-GUGIL-001",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S40S WP304L-W 1-1/2\"",
+        "quantity": 3,
+        "unit": "EA",
+        "unitPrice": 10250,
+        "amount": 30750,
+        "poNo": "ES261019-2925",
+        "remarks": "국일배관 발주분"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S40S WP316L-W 1-1/2\"",
+        "quantity": 3,
+        "unit": "EA",
+        "unitPrice": 16120,
+        "amount": 48360,
+        "poNo": "ES261019-2925",
+        "remarks": "국일배관 발주분"
+      }
+    ],
+    "itemCount": 2,
+    "poNumbers": [
+      "ES261019-2925"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 70560,
+      "freightPrice": 910,
+      "subtotal": 71470,
+      "vat": 7147,
+      "grandTotal": 78617
+    },
+    "rawText": "거래명세서\n2026 주 10 B 20 H                                No:0004- 1/ 1\n공 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 _ 호 (주)대경벤드   성명 김학     상 _ 호 알트에프(시1.) 성명_ 조현진\n”  주   소 경남 양산시 어실로 115           ㄴㄴ 수   A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/6&※% 055)364-1800   362-/074       자 H3H/FAX 051 )311-8605     051-328-4012\nNo  품  명 / 재  a / 7  격   수량 _ 단위  단  가   금  액   비 고\n1 906(Ｌ)      S/40S                국일배관         ES261019-2925\nWP 304L-W          ERW       1-1/2\"                3             8,700          26.100\n2 90e(L)       S/40S                  국일배관          65261019-2925\nWP 316L-W          ERW       1-1/2\"                3            13.790          41.370\n3 운임                                 국일배관 910(602018541\n1 건      4,000      4,000\nxxx (|    하    여    백 ges x\n7     공급가액              71,470\n부 가 세                   7,147\n합   계             78,617\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:07.022Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:07.022Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 71470,
+      "vat": 7147,
+      "grandTotal": 78617
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539333279-10-00071",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0007-1/",
+    "invoiceDate": "2026-10-20",
+    "pageIndex": 10,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "(주)에스에이치이엔지산업",
+    "customerNumber": "143-81-14964",
+    "matchedOrderId": "PO-20261020-TAEIL-003",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S STS304-W 50A X 25A",
+        "quantity": 30,
+        "unit": "EA",
+        "unitPrice": 7480,
+        "amount": 224400,
+        "poNo": "ES261020-2930",
+        "remarks": "(주)에스에이치이엔지산업 발주분"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261020-2930"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 168480,
+      "freightPrice": 0,
+      "subtotal": 168480,
+      "vat": 16848,
+      "grandTotal": 185328
+    },
+    "rawText": "거래명세서\n2026 주 10 A 20 8                                No:0007- 1/ 1\n2 등록번호       606 - 81 - 75098         z 등록번호 _ 838-05-01054\n& _ 호 (주)대경벤드   성명 김학     상 5 알트에프(/[ㅠ.『) 42 조현진\n=  =   A 경남 양산시 어실로 115            ㄴ 주   A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『&※% 055)364-1800   362-7074       자 전화/『&※ 051 )311-8605     051-328-4012\nNo BE 명/재 질 / 규 = 수량 단위 _단 가 금 _ 액 비 고\n1 800)         5/105                    Ofl 2 Gl Ol XI OI {XI AHS] 9106602(65261020-2930\nSTS 304-W          ERW       50A » 25A          26             6.480         168.480\nsex 0    하    of    백 체*\n26     공급가액           168,480\n부가 세                   16,848\n합  계           185,328\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:06.655Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:06.655Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 168480,
+      "vat": 16848,
+      "grandTotal": 185328
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539331611-9-00081",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0008-1/",
+    "invoiceDate": "2026-01-00",
+    "pageIndex": 9,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "(주)태형산업",
+    "customerNumber": "588-86-01051",
+    "matchedOrderId": "PO-20261020-TAEIL-004",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S WP304-S 5\" X 4\"",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 63930,
+        "amount": 63930,
+        "poNo": "ES261020-2931",
+        "remarks": "(주)태형산업 발주분"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261020-2931"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 65358,
+      "freightPrice": 2,
+      "subtotal": 65360,
+      "vat": 6536,
+      "grandTotal": 71896
+    },
+    "rawText": "거래명세서\n2026 주 10 B 20 H                                No:0008- 1/ 1\n2 등록번호       606 - 81 - 75098         공 등록번호 _ 838-05-01054\n상 _ 호 (주)대경벤드   성명 |김학    상 _ 호 알트에프(시1.『) 4% 조현진\n-그\n주 _ 소 경남 양산시 어실로 115           ㄴ 주 A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『&% 055)364-1800   362-/074       자 전화/『&※ 051 )311-8605     051-328-4012\nNo = 9/8 질 / 7 A 수량 단위 _단 . 가 금 _ 액 비 고\n1 800)       S/10S                태형산업         ES261020-2931\nWP 304-S      SML'S  5 = 4        1      59.360     59.360\n2 운임                                     태형산업 2 54 9106602018:\n1 건     6,000      6,000\nxxx (|   하   여   백 xq\n2     공급가액            65,360\n부가세                    6,536\n합  계           71,896\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:06.298Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:06.298Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 65360,
+      "vat": 6536,
+      "grandTotal": 71896
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539329705-8-00091",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0009-1/",
+    "invoiceDate": "1800-36-02",
+    "pageIndex": 8,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "주식회사 한일스틸",
+    "customerNumber": "645-88-00136",
+    "matchedOrderId": "PO-20261020-TAEIL-002",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "T(S)",
+        "spec": "S20S STS304-W 100A",
+        "quantity": 12,
+        "unit": "EA",
+        "unitPrice": 49320,
+        "amount": 591840,
+        "poNo": "ES261020-2929",
+        "remarks": "주식회사 한일스틸 발주분"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261020-2929"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 0,
+      "freightPrice": 910660,
+      "subtotal": 562880,
+      "vat": 56288,
+      "grandTotal": 619168
+    },
+    "rawText": "A HE Al A\n2026 £ 10 A 20 H                                No:0009- 1/ 1\n공 등록번호        606 - 81 - 75098         = 등록번호    838-05-01054\n상 _ 호 (주)대경벤드   성명 김학     상 5 알트에프(씨1.『) 성명_ 조현진\n”  주   소 경남 양산시 어실로 115            ㄴ 주   A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『&※ 055)364-1800   362-7074       자 &3H/FAX 051 )311-8605     051-328-4012\n\"10  품  명 / 재  질 / 7  격   수량 _ 단위  단  가   3  oH   H 고\n1 TEE       S/20S                StU AE          25261020-2929\nSTS 304-W          ERW       100A                 12            46.240         554.880\n2 운임                                       한일스틸 한일종합배관 910660:\n1 건     8,000      8,000\nxxx (|   하   여   백 xy x\n13     공급가액             562,880\n부가 세                  56,288\n합   계            619, 168\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:05.934Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:05.934Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 562880,
+      "vat": 56288,
+      "grandTotal": 619168
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539327864-7-00131",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0013-1/",
+    "invoiceDate": "2026-10-20",
+    "pageIndex": 7,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "상진밴드",
+    "customerNumber": "622-01-46083",
+    "matchedOrderId": "PO-20261019-TAEIL-016",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "45E(L)",
+        "spec": "S10S STS304-W 500A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 800000,
+        "amount": 1600000,
+        "poNo": "ES261019-2926",
+        "remarks": "상진밴드 발주분"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2926"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 1440000,
+      "freightPrice": 0,
+      "subtotal": 1440000,
+      "vat": 144000,
+      "grandTotal": 0
+    },
+    "rawText": "거래명세서\n2026 주 10 A 20 H                                No:0013- 1/ 1\n공 등록번호       606 - 81 - 75098         공 등록번호 _ 838-05-01054\n상 _ 호 (주)대경벤드   성명 김학     상 5 알트에프(시71.『) 42 조현진\n=  주   소 경남 양산시 어실로 115            는 주   A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『&※ 055)364-1800   362-7074       자 M3H/FAX 051 )311-8605     051-328-4012\nNo 품 명 /재 질 / 7 A 수량 단위 _단 J} 금 _액 비 고\n1 45E(L)          S/10S                          dE 22 0|AX 91066020 ES261019-2926\nSTS 304-W          ERW      500A                 2           720.000        1.440.000\nxxx Of    하    여    CTR\npa     공급가액          1,440,000\n부가 세                  144,000\ngt  계          1,584,000\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:05.568Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:05.568Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 1440000,
+      "vat": 144000,
+      "grandTotal": 0
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539326182-6-00171",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0017-1/",
+    "invoiceDate": "2026-10-20",
+    "pageIndex": 6,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "(주)건일 C-PET",
+    "customerNumber": "613-81-37831",
+    "matchedOrderId": "PO-20261019-TAEIL-011",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S WP316L-S 8\" X 6\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 154340,
+        "amount": 308680,
+        "poNo": "ES261019-2920",
+        "remarks": "(주)건일 C-PET 발주분"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2920"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 59420,
+      "freightPrice": 0,
+      "subtotal": 59420,
+      "vat": 5942,
+      "grandTotal": 65362
+    },
+    "rawText": "거래명세서\n2026 주 10 A 20 H                                No:0017- 1/ 1\n공 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 _ 호 (주)대경벤드     성명 김학       상 호 알트에프(/[7.『) #2 조현진\n그\n주   소 경남 양산시 HAZ 115            느 수   A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 &3H/FAX 055)364-1800   362-7074       자 &3H/FAX 051 )311-8605     051-328-4012\nNo    품 명 / 재 #2 / 고   격     수량 단위   단 가    3   액     비 고\n1 806)         5/405                     건일씨펫 910(502018557    ES261019-2909\nWP 316L-S          SML'S                          2            16.760          33.520\n2 R(E)        5/405                  건일씨펫          ES261019-2909\nWP 316L-S        SML'S    2\" * 1-1/2\"         2          12.950        25.900\nxxx Qf     ot    여     백 ㅠ1*\n4      공급가액               59,420\n부 가 세                   5,942\n합   계               65,362\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:05.224Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:05.224Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 59420,
+      "vat": 5942,
+      "grandTotal": 65362
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539324319-5-00181",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0018-1/",
+    "invoiceDate": "1800-36-02",
+    "pageIndex": 5,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "(주)대경이엠",
+    "customerNumber": "696-87-01359",
+    "matchedOrderId": "PO-20261019-TAEIL-017",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "T(R)",
+        "spec": "S10S WP304-S 3\" X 1\"",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 50420,
+        "amount": 50420,
+        "poNo": "ES261019-2927",
+        "remarks": "(주)대경이엠 발주분"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "R(C)",
+        "spec": "S10S WP304-S 1\" X 3/4\"",
+        "quantity": 1,
+        "unit": "EA",
+        "unitPrice": 5030,
+        "amount": 5030,
+        "poNo": "ES261019-2927",
+        "remarks": "(주)대경이엠 발주분"
+      }
+    ],
+    "itemCount": 2,
+    "poNumbers": [
+      "ES261019-2927"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 0,
+      "freightPrice": 91066020,
+      "subtotal": 52360,
+      "vat": 5236,
+      "grandTotal": 57596
+    },
+    "rawText": "거래명세서\n2026 = 10 A 20 H                                No:0018- 1/ 1\n공 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 = (주)대경벤드   성명 2      상 _호 AEYZ(ALT.F) 싱명_ 조현진\n”  주   소 경남 양산시 HAZ 115            ㄴㄴ 주   A 부산광역시 사상구 낙동대로 1330번길 67(\n자 전화/『5&&% 055)364-1800   362-7074      자 전화/『/&※ 051 )311-8605     051-328-4012\nNo  =  명 / HN  질 / 7  격   수량 HH  단  가   =  of   비 고\n1 TEE       S/10S                대경이엠         ES261019-2927\nWP 304-S           SML'S                          1            43.690          43,690\n2 R(C)        5/105                  대경이엠           65261019-2927\nWP 304-S          SML'S    1\" = 3/4\"            1            4.670          4.670\n3 운임                                       대경이엠 화성보일러 91066020\n1 A      4.000       4.000\n**& (|    하    여    백 *&\n3      공급가액              52,360\n부가 세                   5,236\n합   계              57,596\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:04.868Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:04.868Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 52360,
+      "vat": 5236,
+      "grandTotal": 57596
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539322417-4-00221",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0022-1/",
+    "invoiceDate": "2026-10-20",
+    "pageIndex": 4,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "(주)현대배관 ",
+    "customerNumber": "9106802018572",
+    "matchedOrderId": "PO-20261020-TAEIL-006",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S10S STS304-W 300A",
+        "quantity": 4,
+        "unit": "EA",
+        "unitPrice": 347620,
+        "amount": 1390480,
+        "poNo": "ES261020-2933",
+        "remarks": "(주)현대배관  발주분"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261020-2933"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 1112360,
+      "freightPrice": 0,
+      "subtotal": 1112360,
+      "vat": 111236,
+      "grandTotal": 1223596
+    },
+    "rawText": "AH EAA\n2026 주 10 A 20 H                                No:0022- 1/ 1\n공 등록번호       606 - 81 - 75098        공 등록번호 _ 838-05-01054\n상 _ 호 (주)대경벤드   성명 김학     상 = ZENIZ(ALT.F) 성명 조현진\n들 주 _ 소 경남 양산시 어실로 115           ㄴㄴ 주 A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 H3H/FAX 055)364-1800   362-7074      자 전화/『&※ 051 )311-8605     051-328-4012\nNo E 명 / NM 2 / 7 = 수량 단위 _단 가 금 _ 액 비 고\n1 90E(L)      5/105                현대배관 9106802018572   ES261020-2933\nSTS 304-W          ERW      300A                 4           278,090        1.112.360\n*** |    하    여    Bx x\n4    공급가액          1,112,360\n부가세                  111,236\n합  계         1,223,596\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:04.497Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:04.497Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 1112360,
+      "vat": 111236,
+      "grandTotal": 1223596
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539320785-3-00231",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0023-1/",
+    "invoiceDate": "2026-10-20",
+    "pageIndex": 3,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "대현ENG",
+    "customerNumber": "610-24-48087",
+    "matchedOrderId": "PO-20261019-DAEHY-001",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "CAP",
+        "spec": "S10S WP304-S 20\"",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 355000,
+        "amount": 710000,
+        "poNo": "ES261019-2911",
+        "remarks": "대현ENG 발주분"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2911"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 639000,
+      "freightPrice": 0,
+      "subtotal": 639000,
+      "vat": 63900,
+      "grandTotal": 0
+    },
+    "rawText": "거래명세서\n2026 주 10 A 20 H                                No:0023- 1/ 1\n공 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 호 (주)대경벤드     성명 김학       상 호 알트에프(/[ㅠ.『) 성명 ZZ\n그\n주   소 경남 양산시 HAZ 115            느 수 A 부산광역시 사상구 낙동대로 1330번길 67(심\n자 전화/『&※% 055)364-1800   362-7074       자 &3H/FAX 051 )311-8605     051-328-4012\n1 CAP          5/105                      대현테6 9106(22018563     ES261019-2911\nWP 304-S           SML'S     20\"                   2            319.500          639.000\nxxx (|    of    여    백 ey x\n2      공급가액               639,000\n부가세                   63,900\n[그   계              702,900\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:04.153Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:04.153Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 639000,
+      "vat": 63900,
+      "grandTotal": 0
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539319155-2-00261",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0026-1/",
+    "invoiceDate": "2026-10-20",
+    "pageIndex": 2,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "(주)현대배관 ",
+    "customerNumber": "416-81-79579",
+    "matchedOrderId": "PO-20261020-TAEIL-007",
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "45E(L)",
+        "spec": "S20S STS304-W 200A",
+        "quantity": 4,
+        "unit": "EA",
+        "unitPrice": 158520,
+        "amount": 634080,
+        "poNo": "ES261020-2934",
+        "remarks": "(주)현대배관  발주분"
+      },
+      {
+        "itemNo": 2,
+        "type": "PRODUCT",
+        "name": "90E(L)",
+        "spec": "S20S STS304-W 200A",
+        "quantity": 3,
+        "unit": "EA",
+        "unitPrice": 226460,
+        "amount": 679380,
+        "poNo": "ES261020-2934",
+        "remarks": "(주)현대배관  발주분"
+      }
+    ],
+    "itemCount": 2,
+    "poNumbers": [
+      "ES261020-2934"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 899148,
+      "freightPrice": 2,
+      "subtotal": 899150,
+      "vat": 89915,
+      "grandTotal": 989065
+    },
+    "rawText": "거래명세서\n2026 주 10 A 20 H                               No:0026- 1/ 1\ns 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 호 (주)대경벤드     성명 김학       상 5 알트에프(/[.『) 42 조현진\n그\n주   A 경남 양산시 HAZ 115            ㄴㄴ 주   A 부산광역시 사상구 낙동대로 1330번길 67(삼\n자 전화/『/&4※% 055)364-1800   362-7074       자 HSH/FAX 051 )311-8605     051-328-4012\nNo    =   명 / HN   질 / 7   격     수량 tH   단   가     금   액     비 고\n1 456(Ｌ)      S/20S                현대배관         -5261020-2934\nSTS 304-W          ERW      200A                 4           126.820         507.280\n2 90E(L)          S/20S                         5205 재고 LF&        ㄷ52603283-재 고\nSTS 304-W          ERW      200A                 3           122.290         366.870\n3 운임                                  SHH 2 910¢ 502018562\n1 건      25.000       25.000\nxxx (]     of     여     백 xa x\n8      공급가액               899,150\n부 가 세                  89,915\n합   계               989,065\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:03.806Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:03.806Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 899150,
+      "vat": 89915,
+      "grandTotal": 989065
+    }
+  },
+  {
+    "id": "DKB-INV-SCANNED-1792539317235-1-00271",
+    "fileName": "TalkFile_알트에프_거래명세표_1020_pdf.pdf",
+    "invoiceNo": "0027-1/",
+    "invoiceDate": "2026-10-20",
+    "pageIndex": 1,
+    "totalPages": 17,
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115",
+      "phone": "055-364-1800"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "customerName": "",
+    "customerNumber": "",
+    "matchedOrderId": null,
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "대경 배관 자재",
+        "spec": "대경 규격 출하품",
+        "quantity": 1,
+        "unit": "LOT",
+        "unitPrice": 1085380,
+        "amount": 1085380,
+        "poNo": "ES261020-2935",
+        "remarks": "대경 거래명세표"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261020-2935"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 1085380,
+      "freightPrice": 0,
+      "subtotal": 1085380,
+      "vat": 108538,
+      "grandTotal": 1193918
+    },
+    "rawText": "거래명세서\n2026 주 10 A 20 H                                No:0027- 1/ 1\n공 등록번호        606 - 81 - 75098         공 등록번호    838-05-01054\n상 호 (주)대경벤드     성명 김학       상 호 YEWIZ(ALT.F) 성명 조현진\n그\n주   소 경남 양산시 어실로 115            ㄴㄴ 주   A 부산광역시 사상구 낙동대로 1330번길 67(삼르\n자 전화/『5&※% 055)364-1800   362-/074       자 전화/『&※ 051 )311-8605      051-328-4012\nNo    품   명 / 재   질 / 7   격     수량 of   단   가     =   액     비 고\n1 906(Ｌ)          5/205                          포항산업배관 유영준님 910660: ES261020-2935\nSTS 304-W          ERW       100A                30            30.700         921.000\n2 45E(L)       S/20S                   포항산업배관         ES261020-2935\nSTS 304-W          ERW       65A                 3            12.900          38,700\n3 45E(L)       5/205                  포항산업배관         ES261020-2935\nSTS 304-W          ERW       100A                 4            31.420         125.680\nxxx (|     of     여     백 ㅠ**\n37      공급가액              1,085,380\n부가 세                  108,538\n합   계             1,193,918\n(주)대경벤드\n",
+    "source": "TELEGRAM_BOT",
+    "processedAt": "2026-10-20T23:36:03.634Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "accounting": {
+      "recordedAt": "2026-10-20T23:36:03.634Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 1085380,
+      "vat": 108538,
+      "grandTotal": 1193918
+    }
+  },
+  {
     "id": "DKB-INV-SCANNED-1792478393946-2-00311",
     "fileName": "TalkFile_알트에프_거래명세표_1019_1서울재고_pdf.pdf",
     "invoiceNo": "0031-1/",

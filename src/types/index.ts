@@ -91,6 +91,7 @@ export interface Quotation {
         companyName?: string;
         contactName?: string;
         phone?: string;
+        mobile?: string;
         email?: string;
         address?: string;
         bizNo?: string;
@@ -127,6 +128,8 @@ export interface Quotation {
         company?: string;
         email?: string;
     };
+    sourcePhone?: string;
+    mobile?: string;
     dispatchStatus?: 'NOT_SENT' | 'PENDING' | 'SENT' | 'FAILED';
     dispatchedAt?: string;
 }

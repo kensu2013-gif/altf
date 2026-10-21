@@ -1,5 +1,127 @@
 [
   {
+    "id": "mail_1792543123437",
+    "timestamp": "2026-10-21T00:38:43.437Z",
+    "type": "REAL_IMAP_COLLECTED",
+    "uid": 22671,
+    "subject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+    "extractedPdfCount": 14,
+    "files": [
+      {
+        "filename": "261020_알트에프.260826-2378 (08-26-29).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/261020_알트에프.260826-2378 (08-26-29).pdf",
+        "sizeBytes": 1092765,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+        "date": "Wed, 21 Oct 2026 08:32:16 +0900"
+      },
+      {
+        "filename": "261020_알트에프.260930-2735 (10-01-72).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/261020_알트에프.260930-2735 (10-01-72).pdf",
+        "sizeBytes": 3285599,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+        "date": "Wed, 21 Oct 2026 08:32:16 +0900"
+      },
+      {
+        "filename": "261020_알트에프.261019-2909 (10-19-38).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/261020_알트에프.261019-2909 (10-19-38).pdf",
+        "sizeBytes": 1346511,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+        "date": "Wed, 21 Oct 2026 08:32:16 +0900"
+      },
+      {
+        "filename": "261020_알트에프.261019-2911 (10-19-32).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/261020_알트에프.261019-2911 (10-19-32).pdf",
+        "sizeBytes": 1139618,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+        "date": "Wed, 21 Oct 2026 08:32:16 +0900"
+      },
+      {
+        "filename": "261020_알트에프.261019-2925 (10-20-06).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/261020_알트에프.261019-2925 (10-20-06).pdf",
+        "sizeBytes": 1333371,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+        "date": "Wed, 21 Oct 2026 08:32:16 +0900"
+      },
+      {
+        "filename": "261020_알트에프.261019-2926 (10-20-09).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/261020_알트에프.261019-2926 (10-20-09).pdf",
+        "sizeBytes": 1213213,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+        "date": "Wed, 21 Oct 2026 08:32:16 +0900"
+      },
+      {
+        "filename": "261020_알트에프.261019-2927 (10-20-11).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/261020_알트에프.261019-2927 (10-20-11).pdf",
+        "sizeBytes": 1353329,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+        "date": "Wed, 21 Oct 2026 08:32:16 +0900"
+      },
+      {
+        "filename": "261020_알트에프.261020-2928 (10-20-36).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/261020_알트에프.261020-2928 (10-20-36).pdf",
+        "sizeBytes": 1141792,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+        "date": "Wed, 21 Oct 2026 08:32:16 +0900"
+      },
+      {
+        "filename": "261020_알트에프.261020-2929 (10-20-35).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/261020_알트에프.261020-2929 (10-20-35).pdf",
+        "sizeBytes": 1154923,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+        "date": "Wed, 21 Oct 2026 08:32:16 +0900"
+      },
+      {
+        "filename": "261020_알트에프.261020-2930 (10-20-38).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/261020_알트에프.261020-2930 (10-20-38).pdf",
+        "sizeBytes": 1217853,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+        "date": "Wed, 21 Oct 2026 08:32:16 +0900"
+      },
+      {
+        "filename": "261020_알트에프.261020-2931 (10-20-37).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/261020_알트에프.261020-2931 (10-20-37).pdf",
+        "sizeBytes": 1226870,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+        "date": "Wed, 21 Oct 2026 08:32:16 +0900"
+      },
+      {
+        "filename": "261020_알트에프.261020-2933 (10-20-46).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/261020_알트에프.261020-2933 (10-20-46).pdf",
+        "sizeBytes": 1201408,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+        "date": "Wed, 21 Oct 2026 08:32:16 +0900"
+      },
+      {
+        "filename": "261020_알트에프.261020-2934 (10-20-48).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/261020_알트에프.261020-2934 (10-20-48).pdf",
+        "sizeBytes": 1228442,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+        "date": "Wed, 21 Oct 2026 08:32:16 +0900"
+      },
+      {
+        "filename": "261020_알트에프.261020-2935 (10-20-50).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/261020_알트에프.261020-2935 (10-20-50).pdf",
+        "sizeBytes": 1295413,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/20일 출고분 성적서 전달드 립니다",
+        "date": "Wed, 21 Oct 2026 08:32:16 +0900"
+      }
+    ]
+  },
+  {
     "id": "mail_1792479326069",
     "timestamp": "2026-10-20T06:55:26.069Z",
     "type": "REAL_IMAP_COLLECTED",

@@ -1,36 +1,36 @@
 [
   {
-    "id": "int-01-receiver",
+    "id": "int-01-mail-intake",
     "code": "INT-01",
-    "name": "접수 전담봇",
+    "name": "메일 견적접수봇",
     "deptId": "sle",
     "deptName": "영업부",
-    "teamName": "영업지원팀",
+    "teamName": "영업2팀",
     "tier": 1,
     "position": "사원",
-    "role": "카카오 채널 / 대표메일 / 로컬 수동 접수 인입 등록 및 1,265개 거래처 마스터 매칭",
+    "role": "altf@altf.kr 전체 메일함 실시간 감시, 견적의뢰/발주 인입 메일 및 첨부파일 자동 접수",
     "status": "ACTIVE",
     "isCreated": true,
     "approvalStatus": "AUTO_RUNNING",
-    "assignedHuman": "영업자 / 접수 담당자",
+    "assignedHuman": "영업 지원 / 메일 담당",
     "requiresApproval": false,
     "metrics": {
       "speed": 98,
       "accuracy": 99,
       "load": 20,
       "uptime": "99.9%",
-      "tasksToday": 12
+      "tasksToday": 18
     },
-    "currentTask": "인입 대기 및 신규 견적/발주 모니터링",
+    "currentTask": "altf@altf.kr 견적의뢰 메일 실시간 수신 대기 중",
     "lastActive": "방금 전",
     "triggerEvents": [
-      "EVENT_INTAKE_RECEIVED"
+      "EVENT_MAIL_RECEIVED"
     ],
     "emittedEvents": [
       "EVENT_INTAKE_CLASSIFIED"
     ],
     "logs": [
-      "[정상] 접수함 인입 대기 중"
+      "[정상] altf@altf.kr 메일플러그 IMAP 실시간 모니터링 가동 중"
     ],
     "connectedDeptIds": [
       "sle",
@@ -39,43 +39,200 @@
     "orderIndex": 0
   },
   {
-    "id": "int-02-normalizer",
+    "id": "int-02-messenger-intake",
     "code": "INT-02",
-    "name": "문서 판독·표준화봇",
+    "name": "카카오·솔라피 메신저 인입봇",
     "deptId": "sle",
     "deptName": "영업부",
-    "teamName": "영업지원팀",
-    "tier": 2,
-    "position": "대리",
-    "role": "엑셀/PDF/사진 발주서 판독 및 ALTF 표준 품목 키(45E-S10S-50A-STS304) 자동 변환",
+    "teamName": "영업2팀",
+    "tier": 1,
+    "position": "사원",
+    "role": "카카오톡 채널·오픈채팅 및 솔라피(문자/MMS) 인입 텍스트, 사진, 파일 실시간 수신 및 분류",
     "status": "ACTIVE",
     "isCreated": true,
     "approvalStatus": "AUTO_RUNNING",
-    "assignedHuman": "영업 지원 담당",
+    "assignedHuman": "영업자 / 카카오 채널 관리자",
     "requiresApproval": false,
     "metrics": {
-      "speed": 92,
-      "accuracy": 95,
-      "load": 15,
+      "speed": 99,
+      "accuracy": 98,
+      "load": 25,
       "uptime": "99.9%",
-      "tasksToday": 8
+      "tasksToday": 34
     },
-    "currentTask": "품목 유사도 매핑 대기 중",
+    "currentTask": "카카오톡 견적 접수 [KAKAO-1792595135537-F7VH] - https://talk.kakaocdn.net/dna/",
     "lastActive": "방금 전",
     "triggerEvents": [
+      "EVENT_MESSENGER_RECEIVED"
+    ],
+    "emittedEvents": [
+      "EVENT_INTAKE_CLASSIFIED"
+    ],
+    "logs": [
+      "[오전 12:06:23] 카톡 수신 완료: https://talk.kakaocdn.net/dna/wvx9z...",
+      "[오후 11:20:38] 카톡 수신 완료: https://talk.kakaocdn.net/dna/cZOfP...",
+      "[오후 10:56:29] 카톡 수신 완료: https://talk.kakaocdn.net/dna/rSd2o...",
+      "[오후 10:55:05] 카톡 수신 완료: 견적문의...",
+      "[오후 10:47:27] 카톡 수신 완료: https://talk.kakaocdn.net/dna/QxvfE...",
+      "[오후 10:39:10] 카톡 수신 완료: https://talk.kakaocdn.net/dna/QxvfE...",
+      "[오후 8:01:55] 카톡 수신 완료: [견적 요청 사진 첨부]...",
+      "[오후 7:40:34] 카톡 수신 완료: https://talk.kakaocdn.net/dna/t8tBT...",
+      "[오후 7:34:25] 카톡 수신 완료: https://talk.kakaocdn.net/dna/t8tBT...",
+      "[오후 4:59:48] 카톡 수신 완료: 304 S/20S \nT(R)\n40x25 - 10ea\nT(S)\n4..."
+    ],
+    "connectedDeptIds": [
+      "sle",
+      "purchase"
+    ],
+    "orderIndex": 1,
+    "processedCount": 10,
+    "supervisorId": "",
+    "connectedAgentIds": [],
+    "scheduleInterval": "REALTIME"
+  },
+  {
+    "id": "int-03-doc-ocr",
+    "code": "INT-03",
+    "name": "비정형 문서·OCR 판독봇",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "teamName": "영업2팀",
+    "tier": 2,
+    "position": "대리",
+    "role": "카카오톡/메일 첨부 사진, 팩스 스캔본, 손글씨, PDF 발주서 Vision OCR 텍스트 및 테이블 구조화",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "AUTO_RUNNING",
+    "assignedHuman": "문서 판독 담당자",
+    "requiresApproval": false,
+    "metrics": {
+      "speed": 93,
+      "accuracy": 96,
+      "load": 30,
+      "uptime": "99.8%",
+      "tasksToday": 23
+    },
+    "currentTask": "견적서 이미지 OCR 분석 중: KAKAO-1792595135537-F7VH",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_FILE_UPLOADED"
+    ],
+    "emittedEvents": [
+      "EVENT_DOC_PARSED"
+    ],
+    "logs": [
+      "[오전 12:06:23] 견적서 사진 수신 (KAKAO-1792595135537-F7VH) -> OCR 파싱 착수",
+      "[오후 11:20:38] 견적서 사진 수신 (KAKAO-1792592389123-5B6U) -> OCR 파싱 착수",
+      "[오후 10:56:29] 견적서 사진 수신 (KAKAO-1792590963017-6GQ7) -> OCR 파싱 착수",
+      "[오후 10:47:27] 견적서 사진 수신 (KAKAO-1792590424082-4YF9) -> OCR 파싱 착수",
+      "[오후 10:39:10] 견적서 사진 수신 (KAKAO-1792589950540-DPE1) -> OCR 파싱 착수",
+      "[오후 8:01:55] 견적서 사진 수신 (KAKAO-1792580515653-HF2B) -> OCR 파싱 착수",
+      "[오후 7:40:34] 견적서 사진 수신 (KAKAO-1792579234717-KRAE) -> OCR 파싱 착수",
+      "[오후 7:34:25] 견적서 사진 수신 (KAKAO-1792578865106-OLNC) -> OCR 파싱 착수",
+      "[정상] Vision OCR 엔진 및 표 추출 어댑터 가동 중"
+    ],
+    "connectedDeptIds": [
+      "sle"
+    ],
+    "orderIndex": 2,
+    "processedCount": 8,
+    "supervisorId": "",
+    "connectedAgentIds": [],
+    "scheduleInterval": "REALTIME"
+  },
+  {
+    "id": "int-04-excel-parser",
+    "code": "INT-04",
+    "name": "대량 엑셀·BOM 파서봇",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "teamName": "영업2팀",
+    "tier": 2,
+    "position": "대리",
+    "role": "고객사 대량 엑셀 견적의뢰서 및 구글 스프레드시트 연동, 복잡한 셀 서식에서 품목·수량·규격 자동 파싱",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "AUTO_RUNNING",
+    "assignedHuman": "데이터/엑셀 정제 담당",
+    "requiresApproval": false,
+    "metrics": {
+      "speed": 95,
+      "accuracy": 99,
+      "load": 15,
+      "uptime": "99.9%",
+      "tasksToday": 10
+    },
+    "currentTask": "대용량 엑셀 BOM 및 구글시트 파싱 대기",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_EXCEL_RECEIVED"
+    ],
+    "emittedEvents": [
+      "EVENT_BOM_EXTRACTED"
+    ],
+    "logs": [
+      "[정상] ExcelJS / 구글시트 파서 엔진 대기 중"
+    ],
+    "connectedDeptIds": [
+      "sle",
+      "dat"
+    ],
+    "orderIndex": 3
+  },
+  {
+    "id": "int-05-ai-normalizer",
+    "code": "INT-05",
+    "name": "배관·피팅 품목정규화 AI 봇",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "teamName": "영업2팀",
+    "tier": 3,
+    "position": "대리",
+    "role": "비표준 은어/약어(엘보, 뽕티, 편심, C타입 등)를 ALTF 표준 품목 키로 정규화 및 1,265개 거래처 CRM 마스터 매칭",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "AUTO_RUNNING",
+    "assignedHuman": "품목 마스터 / 기술영업 과장",
+    "requiresApproval": false,
+    "metrics": {
+      "speed": 96,
+      "accuracy": 98,
+      "load": 22,
+      "uptime": "99.9%",
+      "tasksToday": 42
+    },
+    "currentTask": "배관 피팅 규격 표준화 매칭 [KAKAO-1792595135537-F7VH]",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_DOC_PARSED",
+      "EVENT_BOM_EXTRACTED",
       "EVENT_INTAKE_CLASSIFIED"
     ],
     "emittedEvents": [
       "EVENT_ITEMS_NORMALIZED"
     ],
     "logs": [
-      "[정상] 문서 판독 어댑터 가동"
+      "[오전 12:06:23] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792595135537-F7VH]",
+      "[오후 11:20:38] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792592389123-5B6U]",
+      "[오후 10:56:29] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792590963017-6GQ7]",
+      "[오후 10:55:05] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792590905531-Z5HO]",
+      "[오후 10:47:27] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792590424082-4YF9]",
+      "[오후 10:39:10] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792589950540-DPE1]",
+      "[오후 8:01:55] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792580515653-HF2B]",
+      "[오후 7:40:34] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792579234717-KRAE]",
+      "[오후 7:34:25] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792578865106-OLNC]",
+      "[오후 4:59:48] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792569538918-EJF9]"
     ],
     "connectedDeptIds": [
       "sle",
-      "purchase"
+      "purchase",
+      "executive"
     ],
-    "orderIndex": 1
+    "orderIndex": 4,
+    "processedCount": 10,
+    "supervisorId": "",
+    "connectedAgentIds": [],
+    "scheduleInterval": "REALTIME"
   },
   {
     "id": "sle-01-quote-drafter",
@@ -83,10 +240,10 @@
     "name": "견적 초안 등록봇",
     "deptId": "sle",
     "deptName": "영업부",
-    "teamName": "영업지원팀",
+    "teamName": "영업1팀",
     "tier": 2,
     "position": "대리",
-    "role": "거래처 등급 및 최근 요율(SLE-07) 적용하여 db.quotations 초안(DRAFT_BY_BOT) 자동 등록",
+    "role": "정규화 품목에 거래처 최근 요율(SLE-07) 및 요청 요율 적용, 전사 재고·단가·납기 대조 견적서 초안 자동 작성",
     "status": "ACTIVE",
     "isCreated": true,
     "approvalStatus": "AUTO_RUNNING",
@@ -95,11 +252,11 @@
     "metrics": {
       "speed": 94,
       "accuracy": 97,
-      "load": 10,
+      "load": 18,
       "uptime": "99.9%",
-      "tasksToday": 5
+      "tasksToday": 22
     },
-    "currentTask": "견적 초안 생성 대기",
+    "currentTask": "견적서 초안 자동 생성 [Q-KAKAO-183822] - 주식회사 시흥에스티 (13개 품목, 3,049,080원)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_ITEMS_NORMALIZED"
@@ -108,13 +265,22 @@
       "EVENT_QUOTE_DRAFT_CREATED"
     ],
     "logs": [
-      "[정상] 견적 마스터 및 요율표 로드 완료"
+      "[오전 12:06:23] 주식회사 시흥에스티 견적 초안 발행 완료: 3,049,080원",
+      "[오후 11:20:38] ATLF 견적 초안 발행 완료: 90,717원",
+      "[오후 10:56:29] ATLF 견적 초안 발행 완료: 90,717원",
+      "[오후 10:47:27] 주식회사 시흥에스티 견적 초안 발행 완료: 3,049,080원",
+      "[오후 10:39:10] 주식회사 시흥에스티 견적 초안 발행 완료: 3,049,080원",
+      "[오후 8:01:55] (주)성우스틸 견적 초안 발행 완료: 234,450원",
+      "[오후 7:40:34] (주)성우스틸 견적 초안 발행 완료: 234,450원",
+      "[오후 4:59:48] 경기배관 견적 초안 발행 완료: 139,920원",
+      "[정상] 거래처별 요율표 및 3대 창고 재고 대조 완료"
     ],
     "connectedDeptIds": [
       "sle",
       "executive"
     ],
-    "orderIndex": 2
+    "orderIndex": 5,
+    "processedCount": 8
   },
   {
     "id": "sle-02-quote-dispatcher",
@@ -122,10 +288,10 @@
     "name": "견적 승인 회신봇",
     "deptId": "sle",
     "deptName": "영업부",
-    "teamName": "영업지원팀",
+    "teamName": "영업1팀",
     "tier": 3,
     "position": "과장",
-    "role": "영업자 승인 시 원메일 In-Reply-To PDF 회신 또는 카카오 1회용 토큰 견적 링크 발송",
+    "role": "영업자 승인 시 원메일 In-Reply-To PDF 회신 또는 카카오톡 알림톡/친구톡(솔라피 연동) 견적 링크 자동 발송",
     "status": "ACTIVE",
     "isCreated": true,
     "approvalStatus": "PENDING",
@@ -134,11 +300,11 @@
     "metrics": {
       "speed": 99,
       "accuracy": 100,
-      "load": 5,
+      "load": 10,
       "uptime": "100%",
-      "tasksToday": 3
+      "tasksToday": 17
     },
-    "currentTask": "영업자 견적 승인 대기열 감시",
+    "currentTask": "단가 요율(-50%) 및 시화/양산 실시간 재고 검증 완료",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_QUOTE_APPROVED_BY_SALES"
@@ -147,13 +313,25 @@
       "EVENT_QUOTE_DISPATCHED"
     ],
     "logs": [
-      "[정상] 승인 게이트 연동 대기"
+      "[오전 12:06:23] 주식회사 시흥에스티 단가 요율 및 재고 검증 통과",
+      "[오후 11:20:38] ATLF 단가 요율 및 재고 검증 통과",
+      "[오후 10:56:29] ATLF 단가 요율 및 재고 검증 통과",
+      "[오후 10:47:27] 주식회사 시흥에스티 단가 요율 및 재고 검증 통과",
+      "[오후 10:39:10] 주식회사 시흥에스티 단가 요율 및 재고 검증 통과",
+      "[오후 8:01:55] (주)성우스틸 단가 요율 및 재고 검증 통과",
+      "[오후 7:40:34] (주)성우스틸 단가 요율 및 재고 검증 통과",
+      "[오후 4:59:48] 경기배관 단가 요율 및 재고 검증 통과",
+      "[정상] 솔라피 알림톡 및 메일플러그 발송 게이트 대기 중"
     ],
     "connectedDeptIds": [
       "sle",
       "executive"
     ],
-    "orderIndex": 3
+    "orderIndex": 6,
+    "processedCount": 8,
+    "supervisorId": "",
+    "connectedAgentIds": [],
+    "scheduleInterval": "REALTIME"
   },
   {
     "id": "sle-08-followup",
@@ -161,23 +339,23 @@
     "name": "미주문 팔로업봇",
     "deptId": "sle",
     "deptName": "영업부",
-    "teamName": "영업지원팀",
+    "teamName": "영업1팀",
     "tier": 2,
     "position": "과장",
-    "role": "견적 발송 후 D+2, D+7 동안 미주문 상태인 건을 식별하여 담당 영업자에게 알림",
+    "role": "견적 발송 후 D+2, D+7 동안 미주문 상태인 건을 식별하여 담당 영업자에게 알림 및 카카오톡 리마인드",
     "status": "ACTIVE",
     "isCreated": true,
-    "approvalStatus": "AUTO_RUNNING",
+    "approvalStatus": "APPROVED",
     "assignedHuman": "담당 영업자",
     "requiresApproval": false,
     "metrics": {
       "speed": 95,
       "accuracy": 98,
-      "load": 10,
+      "load": 12,
       "uptime": "99.9%",
-      "tasksToday": 14
+      "tasksToday": 20
     },
-    "currentTask": "발송 견적 경과일 추적 대기",
+    "currentTask": "발송 견적 경과일 추적 및 수주 전환 모니터링",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_QUOTE_DISPATCHED"
@@ -191,7 +369,7 @@
     "connectedDeptIds": [
       "sle"
     ],
-    "orderIndex": 4
+    "orderIndex": 7
   },
   {
     "id": "pur-11-po-intake",
@@ -370,7 +548,7 @@
       "uptime": "99.9%",
       "tasksToday": 2440
     },
-    "currentTask": "[영업시간 1시간 주기] 발주 2440건 분류 관리 | 미결 462건 | 고객발송준비 420건 (다음: 오늘 14:00)",
+    "currentTask": "[영업시간 1시간 주기] 발주 2440건 분류 관리 | 미결 462건 | 고객발송준비 420건 (다음: 익일 영업시간 09:00)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_ORDER_CREATED",
@@ -380,10 +558,10 @@
       "EVENT_BACKLOG_SYNCED"
     ],
     "logs": [
-      "[14:00] [PUR-07] altf.kr 발주 2440건 업체/날짜별 분류 완료",
-      "[14:00] 미결(Pending) 462건 추적 중 (매입발주서 자동 매핑)",
-      "[14:00] QC-01 성적서 교차 대조: 432건 접수 확인",
-      "[14:00] 출고 완료 패키징: 거래명세표+성적서 번들 420건 발송 대기"
+      "[18:02] [PUR-07] altf.kr 발주 2440건 업체/날짜별 분류 완료",
+      "[18:02] 미결(Pending) 462건 추적 중 (매입발주서 자동 매핑)",
+      "[18:02] QC-01 성적서 교차 대조: 432건 접수 확인",
+      "[18:02] 출고 완료 패키징: 거래명세표+성적서 번들 420건 발송 대기"
     ],
     "connectedDeptIds": [
       "quality",
@@ -491,7 +669,7 @@
     "role": "시화 출고 품목 LOT 번호 1:1 엄격 매칭 기반 성적서 발행 (추정/기본값 대체 100% 금지)",
     "status": "ACTIVE",
     "isCreated": true,
-    "approvalStatus": "AUTO_RUNNING",
+    "approvalStatus": "APPROVED",
     "assignedHuman": "품질 총괄 책임자",
     "requiresApproval": true,
     "metrics": {
@@ -571,7 +749,7 @@
     "role": "성적서 미입고 건 누락 경보 기록(qc_missing_alerts.json) 및 24시간 초과 시 대경 독촉 메일 초안 작성",
     "status": "ACTIVE",
     "isCreated": true,
-    "approvalStatus": "AUTO_RUNNING",
+    "approvalStatus": "APPROVED",
     "assignedHuman": "품질 책임자 / 사무실",
     "requiresApproval": false,
     "metrics": {
@@ -686,7 +864,7 @@
     "role": "MES 출고 데이터(출고번호, LOT) 수집 및 원장 S 라인 매칭하여 MES_SHIPPED 확정",
     "status": "ACTIVE",
     "isCreated": true,
-    "approvalStatus": "AUTO_RUNNING",
+    "approvalStatus": "APPROVED",
     "assignedHuman": "물류 총괄 담당자",
     "requiresApproval": false,
     "metrics": {
@@ -735,7 +913,7 @@
       "uptime": "100%",
       "tasksToday": 4
     },
-    "currentTask": "대경벤드 거래명세표 No:0029-1/ 매입 확정 처리 (0원)",
+    "currentTask": "대경벤드 거래명세표 No:0002-1/ 매입 확정 처리 (0원)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_MES_SHIPPED",
@@ -745,11 +923,11 @@
       "EVENT_STATEMENT_READY"
     ],
     "logs": [
-      "[08:36] [대경벤드] 거래명세표 No:0029-1/ 수신 및 매입 확정",
-      "[08:36] 공급가액: 3,075,750원, 부가세: 307,575원 전표 등록",
-      "[08:36] [대경벤드] 거래명세표 No:0011-1/ 수신 및 매입 확정",
-      "[08:36] 공급가액: 5,086,600원, 부가세: 508,660원 전표 등록",
-      "[08:36] [대경벤드] 거래명세표 No:0001-3/ 수신 및 매입 확정"
+      "[17:00] [대경벤드] 거래명세표 No:0002-1/ 수신 및 매입 확정",
+      "[17:00] 공급가액: 100,890원, 부가세: 0원 전표 등록",
+      "[17:00] [대경벤드] 거래명세표 No:0003-1/ 수신 및 매입 확정",
+      "[17:00] 공급가액: 153,540원, 부가세: 15,354원 전표 등록",
+      "[17:00] [대경벤드] 거래명세표 No:0004-1/ 수신 및 매입 확정"
     ],
     "connectedDeptIds": [
       "general"
@@ -770,7 +948,7 @@
     "role": "거래명세표 + 품질부 성적서 PDF를 1:1 결합하여 고객 발송 대기 패키지(PACKAGED) 번들링",
     "status": "ACTIVE",
     "isCreated": true,
-    "approvalStatus": "AUTO_RUNNING",
+    "approvalStatus": "APPROVED",
     "assignedHuman": "사무실 총무 담당자",
     "requiresApproval": false,
     "metrics": {
@@ -888,7 +1066,7 @@
     "role": "매일 08:00, 14:00 지연 건(접수 2시간 미배정, 견적 4시간 미승인, 직송 24시간 성적서 미비) 감지 보고",
     "status": "ACTIVE",
     "isCreated": true,
-    "approvalStatus": "AUTO_RUNNING",
+    "approvalStatus": "APPROVED",
     "assignedHuman": "대표이사 / 총괄 관리자",
     "requiresApproval": false,
     "metrics": {
@@ -960,7 +1138,7 @@
     ],
     "assignedHuman": "조현진 대표",
     "requiresApproval": false,
-    "approvalStatus": "APPROVED",
+    "approvalStatus": "AUTO_RUNNING",
     "orderIndex": 0,
     "scheduleInterval": "24h"
   },
@@ -1006,7 +1184,7 @@
     ],
     "assignedHuman": "조현진 대표",
     "requiresApproval": false,
-    "approvalStatus": "APPROVED",
+    "approvalStatus": "AUTO_RUNNING",
     "orderIndex": 1,
     "scheduleInterval": "REALTIME"
   },
@@ -1018,7 +1196,7 @@
     "deptName": "데이터관리팀",
     "teamName": "재고동기화자동화팀",
     "tier": 3,
-    "role": "하루 3회(09:00, 13:00, 17:30) 정기 스케줄 가동 ➔ 태일/시화 구글시트 Apps Script 실행 ➔ DAT-05 대리 호출",
+    "role": "태일/시화재고 구글시트 Apps Script 실행 및 원격 재고 API 연동 전담",
     "status": "ACTIVE",
     "isCreated": true,
     "position": "사원",
@@ -1029,18 +1207,18 @@
       "uptime": "99.9%",
       "tasksToday": 5
     },
-    "currentTask": "[대기] 하루 3회 정기 스케줄 (09:00 / 13:00 / 17:30) 대기 중",
+    "currentTask": "[대기] 태일/시화재고 구글시트 동기화 대기 중",
     "lastActive": "방금 전",
     "triggerEvents": [
-      "SCHEDULED_3_TIMES_DAILY",
+      "SCHEDULED_10_00",
       "MANUAL_TAEIL_SYNC_REQUEST"
     ],
     "emittedEvents": [
       "TAEIL_SIHWA_SYNCED"
     ],
     "logs": [
-      "[정기] 하루 3회(09:00, 13:00, 17:30) 자동 스케줄러 상시 가동 중",
-      "[연계] 완료 시 DAT-05 대리에게 자동 연계 신호 전달"
+      "[대기] 태일/시화재고 Apps Script (importStockData) 연동 파이프라인 가동 완료",
+      "[정상] 8800포트 원격 API (stocklist_get.php) 상태 확인 대기"
     ],
     "connectedDeptIds": [
       "dat"
@@ -1050,20 +1228,20 @@
     ],
     "assignedHuman": "조현진 대표",
     "requiresApproval": false,
-    "approvalStatus": "APPROVED",
+    "approvalStatus": "AUTO_RUNNING",
     "orderIndex": 2,
     "supervisorId": "",
-    "scheduleInterval": "3_TIMES_A_DAY"
+    "scheduleInterval": "3h"
   },
   {
     "id": "dat-slot-4",
     "code": "DAT-04",
-    "name": "대경 재고 텔레그램 수신 & 변환 봇",
+    "name": "대경 재고 파일 수신 & 변환 봇",
     "deptId": "dat",
     "deptName": "데이터관리팀",
     "teamName": "재고동기화자동화팀",
     "tier": 3,
-    "role": "텔레그램 엑셀 수신 대기 ➔ 전달받은 엑셀 제목 제외 A4:M1168 정밀 추출 및 대경 시트 반영 ➔ DAT-05 대리 호출",
+    "role": "대경재고 엑셀 파일 수신, 대경재고변환 구글시트 전송 및 Apps Script 실행 전담",
     "status": "ACTIVE",
     "isCreated": true,
     "position": "사원",
@@ -1074,18 +1252,18 @@
       "uptime": "99.9%",
       "tasksToday": 4
     },
-    "currentTask": "[대기] 텔레그램(@Altf_office_auto_bot) 대경재고 엑셀 신호 대기 중",
+    "currentTask": "[대기] 대경재고 엑셀 파일 수신 대기 중",
     "lastActive": "방금 전",
     "triggerEvents": [
-      "TELEGRAM_DAEKYUNG_FILE_RECEIVED",
+      "DAEKYUNG_FILE_DROPPED",
       "MANUAL_DAEKYUNG_SYNC_REQUEST"
     ],
     "emittedEvents": [
       "DAEKYUNG_STOCK_SYNCED"
     ],
     "logs": [
-      "[대기] 텔레그램 봇 연동 대경 재고장 엑셀 파일 상시 수신 감시 중",
-      "[연계] A4:M1168 추출 후 구글시트 반영 즉시 DAT-05 대리 호출"
+      "[대기] 대경재고 파일 간편 업로드 및 대경재고변환 Apps Script 트리거 준비 완료",
+      "[정상] 대경재고 시트(구글 드라이브) 연동 대기"
     ],
     "connectedDeptIds": [
       "dat"
@@ -1095,7 +1273,7 @@
     ],
     "assignedHuman": "조현진 대표",
     "requiresApproval": false,
-    "approvalStatus": "APPROVED",
+    "approvalStatus": "AUTO_RUNNING",
     "orderIndex": 3,
     "supervisorId": "",
     "scheduleInterval": "REALTIME"
@@ -1108,7 +1286,7 @@
     "deptName": "데이터관리팀",
     "teamName": "재고동기화자동화팀",
     "tier": 2,
-    "role": "대경/태일 반응 시 3~5분 버퍼링 후 ALTF DB Apps Script 실행 ➔ 실패 시 완료될 때까지 3~5분 간격 자동 재시작 ➔ 구글드라이브 inventory.json 생성 시 완결 & 과장 호출",
+    "role": "태일/대경 완료 후 3~5분 구글시트 대용량 수식 연산 안정화 대기 및 ALTF 재고 DB Apps Script 실행, inventory.json 추출 총괄",
     "status": "ACTIVE",
     "isCreated": true,
     "position": "대리",
@@ -1119,7 +1297,7 @@
       "uptime": "99.9%",
       "tasksToday": 6
     },
-    "currentTask": "[대기] 상위 재고(대경/태일) 반응 시 3~5분 버퍼 및 성공할 때까지 자동 재시작 관제",
+    "currentTask": "[대기] 3~5분 안정화 버퍼링 및 ALTF 재고 DB 연산 관제 대기 중",
     "lastActive": "방금 전",
     "triggerEvents": [
       "TAEIL_SIHWA_SYNCED",
@@ -1129,9 +1307,8 @@
       "INVENTORY_JSON_GENERATED"
     ],
     "logs": [
-      "[대기] 대용량 수식 연산(IMPORTRANGE) 3~5분 안정화 버퍼링 타이머 준비 완료",
-      "[재시도] 실행 실패 시 완료될 때까지 3~5분 후 자동 재시작 루프 탑재",
-      "[완결] 구글 드라이브에 최신 inventory.json 생성 확인 시 역할 완결 ➔ DAT-06 과장 호출"
+      "[대기] 구글시트 연산 안정화 타이머 (기본 3분 30초 카운트다운) 준비 완료",
+      "[연계] ALTF 재고 DATA BASE 시트 Apps Script 연동 대기"
     ],
     "connectedDeptIds": [
       "dat"
@@ -1141,18 +1318,20 @@
     ],
     "assignedHuman": "조현진 대표",
     "requiresApproval": false,
-    "approvalStatus": "APPROVED",
-    "orderIndex": 4
+    "approvalStatus": "AUTO_RUNNING",
+    "orderIndex": 4,
+    "supervisorId": "",
+    "scheduleInterval": "REALTIME"
   },
   {
     "id": "dat-slot-6",
     "code": "DAT-06",
-    "name": "S3 배포 & 중복 정리/감시 총괄 과장 봇",
+    "name": "S3 배포 & 재고 갱신/변동량 감시 봇",
     "deptId": "dat",
     "deptName": "데이터관리팀",
     "teamName": "재고동기화자동화팀",
     "tier": 1,
-    "role": "구글 드라이브 최신 inventory.json 다운로드 ➔ S3(s3://altf-web-data-prod/public/inventory/inventory.json) 업로드 ➔ 다운받은 로컬 파일 중복 방지 즉시 삭제 ➔ 신호 대기 복귀 & 텔레그램 결재 보고",
+    "role": "구버전 inventory.json 중복 방지 파일 정리, 최신 inventory.json의 AWS S3 업로드, 웹 재고 갱신 및 시화재고 일일 변동량 분석 확정",
     "status": "ACTIVE",
     "isCreated": true,
     "position": "과장",
@@ -1163,7 +1342,7 @@
       "uptime": "99.9%",
       "tasksToday": 8
     },
-    "currentTask": "[대기] DAT-05 완료 신호 수신 대기 (신호 시 S3 업로드 ➔ 다운로드 삭제 ➔ 대기 복귀)",
+    "currentTask": "[대기] S3 클라우드 업로드 및 시화재고 변동량 분석 대기 중",
     "lastActive": "방금 전",
     "triggerEvents": [
       "INVENTORY_JSON_GENERATED"
@@ -1173,9 +1352,8 @@
       "SIHWA_DAILY_DIFF_CONFIRMED"
     ],
     "logs": [
-      "[대기] DAT-05 신호 대기 ➔ 새로 다운로드 받아 S3 public/inventory/ 업로드",
-      "[정리] 업로드 완료 즉시 다운받은 inventory.json 중복 방지 삭제",
-      "[보고] 작업 완결 후 조현진 대표님께 텔레그램 결재 보고서 즉시 발송"
+      "[대기] Downloads 폴더 구버전 파일 중복 방지 정리 및 S3 업로드 파이프라인 가동",
+      "[연동] altf.kr admin 재고 갱신 및 시화재고 변동량 실시간 분석 준비 완료"
     ],
     "connectedDeptIds": [
       "dat",
