@@ -754,10 +754,24 @@ const sendJsonResponse = (req, res, statusCode, data) => {
         const raw = JSON.stringify(data);
         const acceptEncoding = req.headers['accept-encoding'] || '';
         if (acceptEncoding.includes('gzip') && raw.length > 2048) {
-            zlib.gzip(raw, (err, result) => {
+            // Streaming gzip for large payloads to prevent memory exhaustion on memory-constrained servers (e.g. Render 512MB)
+            if (raw.length > 256 * 1024) {
+                res.writeHead(statusCode, {
+                    'Content-Type': 'application/json',
+                    'Content-Encoding': 'gzip'
+                });
+                const gzip = zlib.createGzip({ level: 4 });
+                gzip.pipe(res);
+                gzip.end(raw);
+                return;
+            }
+
+            zlib.gzip(raw, { level: 4 }, (err, result) => {
                 if (err) {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Compression error' }));
+                    if (!res.headersSent) {
+                        res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+                        res.end(raw);
+                    }
                 } else {
                     res.writeHead(statusCode, {
                         'Content-Type': 'application/json',
@@ -771,8 +785,10 @@ const sendJsonResponse = (req, res, statusCode, data) => {
             res.end(raw);
         }
     } catch(e) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'JSON parse error' }));
+        if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Server payload serialization error' }));
+        }
     }
 };
 
@@ -5244,7 +5260,16 @@ const server = http.createServer(async (req, res) => {
             res.end(JSON.stringify({ error: 'Forbidden' }));
             return;
         }
-        sendJsonResponse(req, res, 200, db.orders);
+
+        const limitStr = url.searchParams.get('limit');
+        let ordersToSend = db.orders;
+        if (limitStr) {
+            const limit = parseInt(limitStr, 10);
+            if (!isNaN(limit) && limit > 0) {
+                ordersToSend = ordersToSend.slice(0, limit);
+            }
+        }
+        sendJsonResponse(req, res, 200, ordersToSend);
         return;
     }
 
