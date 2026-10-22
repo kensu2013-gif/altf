@@ -9,15 +9,15 @@
   "targetUrl": "https://altf.kr/api/orders (재고 발주 API 감지)",
   "status": "STANDBY",
   "statusLabel": "대기 중 (STANDBY)",
-  "lastSyncTime": "2026-10-21T08:00:01.697Z",
-  "nextSyncTime": "2026-10-22T01:00:00.000Z",
-  "nextSyncLabel": "내일 오전 10:00",
+  "lastSyncTime": "2026-10-22T01:00:01.102Z",
+  "nextSyncTime": "2026-10-22T08:00:00.000Z",
+  "nextSyncLabel": "오늘 오후 17:00",
   "lastSyncType": "SCHEDULED_TRIGGER",
   "summary": {
-    "totalItems": 1364,
+    "totalItems": 1370,
     "fulfilledCount": 308,
     "partialCount": 42,
-    "pendingCount": 1014,
-    "fulfillmentRate": 23
+    "pendingCount": 1020,
+    "fulfillmentRate": 22
   }
 }

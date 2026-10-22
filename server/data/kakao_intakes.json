@@ -1,5 +1,129 @@
 [
   {
+    "id": "KAKAO-1792641582303-GJ4Q",
+    "type": "text",
+    "botUserKey": "ae13f2fcaf674c9ced76087384cca24ae64e590c9e8eb31a25ee2c80f84ff89884",
+    "isRegisteredUser": true,
+    "matchedUser": {
+      "botUserKey": "ae13f2fcaf674c9ced76087384cca24ae64e590c9e8eb31a25ee2c80f84ff89884",
+      "name": "조현진",
+      "phone": "01062223751",
+      "company": "ATLF",
+      "email": "",
+      "registeredAt": "2026-10-21T09:00:00Z",
+      "notes": "알트에프 대표"
+    },
+    "utterance": "90E(L)\n32 - 600 (긴급)\n40 - 600 (긴급)\n50 - 1400 \n100 - 224 (긴급)\n150 - 180/ 90개만 (긴급) \n200 - 32\n\n90E(S)\n100 - 20\n\n45E(L)\n100 - 90 (긴급)\n400 - 5 (긴급)\n\nT(S)\n32 - 60\n40 - 50\n80 - 48\n200 - 20 (긴급)\n\nT(R)\n25x15 - 150 (긴급)\n40x15 - 20\n40x32 - 20\n50x40 - 15\n100x50 - 18\n100x80 - 20 (긴급)\n150x100 - 4\n300x125 - 2\n\nR(C)\n50x32 - 50\n80x65 - 50\n350x250 - 3\n400x250 - 3\n\nR(E)\n350x300 - 2\n400x250 - 2\n400x300 - 2\n\nCAP\n25 - 150\n50 - 150 (긴급)\n------------------------------------\n304 S/20S\n\nT(S)\n40 - 20",
+    "imageUrl": null,
+    "status": "QUOTE_DRAFTED",
+    "receivedAt": "2026-10-22T03:59:42.299Z",
+    "channel": "카카오톡 채널 (@altf)",
+    "assignedTeam": "영업2팀 (인입/표준화)",
+    "assignedAgents": [
+      "INT-02",
+      "INT-05",
+      "SLE-01",
+      "SLE-02"
+    ],
+    "customer": {
+      "name": "ATLF",
+      "ceo": "조현진",
+      "phone": "01062223751",
+      "email": "",
+      "address": ""
+    },
+    "discountRate": 50,
+    "remarks": "",
+    "parsedItems": [
+      {
+        "originalText": "T(S) 32 - 60",
+        "itemId": "T(S)-S10S-32A-STS304-W",
+        "type": "T(S)",
+        "schedule": "S10S",
+        "size": "32A",
+        "material": "STS304-W",
+        "qty": 60,
+        "basePrice": 17700,
+        "currentStock": 937,
+        "stockStatus": "AVAILABLE",
+        "location": "양산",
+        "matchedInDb": true
+      },
+      {
+        "originalText": "T(R) 25x15 - 150 (긴급)",
+        "itemId": "T(R)-S10S-25A X 15A-STS304-W",
+        "type": "T(R)",
+        "schedule": "S10S",
+        "size": "25A X 15A",
+        "material": "STS304-W",
+        "qty": 1,
+        "basePrice": 12750,
+        "currentStock": 1331,
+        "stockStatus": "AVAILABLE",
+        "location": "양산",
+        "matchedInDb": true
+      },
+      {
+        "originalText": "R(C) 50x32 - 50",
+        "itemId": "R(C)-S10S-50A X 32A-STS304-W",
+        "type": "R(C)",
+        "schedule": "S10S",
+        "size": "50A X 32A",
+        "material": "STS304-W",
+        "qty": 50,
+        "basePrice": 11200,
+        "currentStock": 57,
+        "stockStatus": "AVAILABLE",
+        "location": "양산",
+        "matchedInDb": true
+      },
+      {
+        "originalText": "R(E) 350x300 - 2",
+        "itemId": "R(E)-S10S-350A X 300A-STS304-W",
+        "type": "R(E)",
+        "schedule": "S10S",
+        "size": "350A X 300A",
+        "material": "STS304-W",
+        "qty": 2,
+        "basePrice": 515870,
+        "currentStock": 0,
+        "stockStatus": "OUT_OF_STOCK",
+        "location": "양산/시화",
+        "matchedInDb": true
+      },
+      {
+        "originalText": "T(S) 40 - 20",
+        "itemId": "T(S)-S20S-40A-STS304-W",
+        "type": "T(S)",
+        "schedule": "S20S",
+        "size": "40A",
+        "material": "STS304-W",
+        "qty": 20,
+        "basePrice": 25440,
+        "currentStock": 26,
+        "stockStatus": "AVAILABLE",
+        "location": "양산",
+        "matchedInDb": true
+      }
+    ],
+    "quotationId": "Q261022-001",
+    "sleReview": {
+      "status": "AUTO_APPROVABLE",
+      "decision": "APPROVE",
+      "reviewer": "영업1팀 SLE-02 (박조나단 과장)",
+      "reviewedAt": "2026-10-22T03:59:42.303Z",
+      "escalationReasons": [],
+      "warnings": [
+        "재고 부족 품목 1건 (대경벤드 출고 납기 조율 필요)"
+      ],
+      "actionNeeded": "✅ 박조나단 과장 검토 완료 (즉시 정식 견적서 카카오톡 0원 회신 가능)",
+      "isLargeAmount": false,
+      "hasZeroPriceItem": false,
+      "hasPriceAnomaly": false,
+      "hasStockShortage": true
+    }
+  },
+  {
     "id": "KAKAO-1792595135537-F7VH",
     "type": "image",
     "botUserKey": "ae13f2fcaf674c9ced76087384cca24ae64e590c9e8eb31a25ee2c80f84ff89884",

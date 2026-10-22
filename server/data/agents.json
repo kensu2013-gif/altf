@@ -616,8 +616,7 @@
     "connectedDeptIds": [
       "quality"
     ],
-    "orderIndex": 0,
-    "scheduleInterval": "30m"
+    "orderIndex": 0
   },
   {
     "id": "qc-vision-parser",
