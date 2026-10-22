@@ -3189,213 +3189,32 @@ const server = http.createServer(async (req, res) => {
     // GET /api/inventory/inventory.json
     if (req.method === 'GET' && url.pathname === '/api/inventory/inventory.json') {
         try {
-            const now = Date.now();
-            const forceRefresh = url.searchParams.get('refresh') === 'true' || url.searchParams.get('bypass') === 'true';
-            if (forceRefresh) {
-                console.log('[API] Forced refresh requested. Running update-inventory.js script...');
-                
-                // Trigger update-inventory.js with FORCE_S3 env variable to fetch latest raw data and overwrite local JSON file
-                await new Promise((resolve, reject) => {
-                    exec('node scripts/update-inventory.js', { env: { ...process.env, FORCE_S3: 'true' } }, (error, stdout, stderr) => {
-                        if (error) {
-                            console.error(`[API Refresh] Failed to execute update-inventory.js:`, error);
-                            reject(error);
-                        } else {
-                            console.log(`[API Refresh] update-inventory.js executed successfully:`, stdout);
-                            if (stderr) console.warn(`[API Refresh] update-inventory.js stderr:`, stderr);
-                            resolve(stdout);
-                        }
-                    });
+            const localPath = './public/api/inventory/inventory.json';
+
+            // 1. Direct high-speed file streaming if local file exists (Zero-RAM footprint)
+            if (fs.existsSync(localPath)) {
+                res.writeHead(200, {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'public, max-age=300'
                 });
-
-                console.log('[API] Invalidating memory cache...');
-                inventoryCache.gzippedData = null;
-                inventoryCache.rawData = null;
-                inventoryCache.parsedData = null;
-                inventoryCache.timestamp = 0;
-            }
-
-            // Check memory cache first
-            // Check memory cache first
-            const hasCache = !!inventoryCache.gzippedData;
-            const isExpired = (now - inventoryCache.timestamp) > CACHE_TTL;
-
-            const performInventoryUpdate = async (inventoryData, timestamp) => {
-                try {
-                    const itemsArr = Array.isArray(inventoryData) ? inventoryData : (inventoryData.items || []);
-                    const sihwaStockMap = {};
-                    const ysStockMap = {};
-                    
-                    itemsArr.forEach(item => {
-                        let shStock = 0;
-                        let ysStock = 0;
-
-                        // Track maker '대경' and '태일' for local inventory snapshot
-                        const maker = item.maker || item.maker1 || '';
-                        if (maker !== '대경' && maker !== '태일') {
-                            return;
-                        }
-
-                        const locationStock = {};
-                        if (item.locationStock && Object.keys(item.locationStock).length > 0) {
-                            for (const [key, qty] of Object.entries(item.locationStock)) {
-                                const newKey = (key === '서울' || key === '서울재고') ? '시화' : key;
-                                locationStock[newKey] = (locationStock[newKey] || 0) + Number(qty);
-                            }
-                        } else {
-                            const shQtyVal = item.sh_qty !== undefined ? item.sh_qty : item.shQty;
-                            const ysQtyVal = item.ready_qty !== undefined ? item.ready_qty : item.ysQty;
-                            if (item.location1 && shQtyVal !== undefined) {
-                                const loc1 = (item.location1 === '서울' || item.location1 === '서울재고') ? '시화' : item.location1;
-                                locationStock[loc1] = (locationStock[loc1] || 0) + Number(shQtyVal);
-                            }
-                            if (item.location && ysQtyVal !== undefined) {
-                                const primaryLoc = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
-                                locationStock[primaryLoc] = (locationStock[primaryLoc] || 0) + Number(ysQtyVal);
-                            }
-                        }
-
-                        if (locationStock['시화'] !== undefined || locationStock['부산'] !== undefined) {
-                            shStock = (locationStock['시화'] || 0) + (locationStock['부산'] || 0);
-                        }
-                        if (locationStock['양산'] !== undefined) {
-                            ysStock = locationStock['양산'];
-                        }
-
-                        const id = item.sku_key || item.id;
-                        if (id) {
-                            sihwaStockMap[id] = { name: item.item || item.name, stock: shStock, sh_qty: shStock };
-                            ysStockMap[id] = { name: item.item || item.name, stock: ysStock, ys_qty: ysStock };
-                        }
-                    });
-
-                    // In-memory snapshot update (no S3 overwrite overhead on read)
-                    db.currentSnapshot = sihwaStockMap;
-                    db.currentDaekyungSnapshot = ysStockMap;
-                    db.inventorySnapshot = sihwaStockMap;
-                    db.daekyungSnapshot = ysStockMap;
-
-                    if (!db.lastSnapshot || Object.keys(db.lastSnapshot).length === 0) {
-                        db.lastSnapshot = sihwaStockMap;
-                        db.lastSnapshotDate = new Date(timestamp + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
-                    }
-                    if (!db.lastDaekyungSnapshot || Object.keys(db.lastDaekyungSnapshot).length === 0) {
-                        db.lastDaekyungSnapshot = ysStockMap;
-                    }
-                } catch (snapErr) {
-                    console.error('[API] Error updating live inventory snapshots:', snapErr);
-                }
-
-                inventoryCache.parsedData = inventoryData;
-                const rawJson = JSON.stringify(inventoryData);
-                inventoryCache.rawData = Buffer.from(rawJson, 'utf-8');
-                inventoryCache.gzippedData = await new Promise((resolve, reject) =>
-                    zlib.gzip(inventoryCache.rawData, { level: 4 }, (err, buf) => err ? reject(err) : resolve(buf))
-                );
-                inventoryCache.timestamp = timestamp;
-            };
-
-            if (hasCache && isExpired && !forceRefresh) {
-                console.log('[API] Stale-while-revalidate hit. Serving expired cache instantly, updating in background...');
-                
-                const acceptEncoding = req.headers['accept-encoding'] || '';
-                const cacheControl = 'no-store, no-cache, must-revalidate';
-                
-                if (acceptEncoding.includes('gzip')) {
-                    res.writeHead(200, {
-                        'Content-Type': 'application/json',
-                        'Content-Encoding': 'gzip',
-                        'Cache-Control': cacheControl
-                    });
-                    res.end(inventoryCache.gzippedData);
-                } else {
-                    res.writeHead(200, {
-                        'Content-Type': 'application/json',
-                        'Cache-Control': cacheControl
-                    });
-                    res.end(inventoryCache.rawData);
-                }
-
-                // Asynchronous background update
-                (async () => {
-                    if (global.isUpdatingInventoryCache) {
-                        return;
-                    }
-                    global.isUpdatingInventoryCache = true;
-                    try {
-                        let inventoryData = null;
-                        const localPath = './public/api/inventory/inventory.json';
-                        try {
-                            const fs = await import('fs');
-                            if (fs.existsSync(localPath)) {
-                                const fileRaw = fs.readFileSync(localPath, 'utf8');
-                                inventoryData = JSON.parse(fileRaw);
-                            }
-                        } catch (e) {}
-                        if (!inventoryData) {
-                            inventoryData = await getInventoryFromS3();
-                        }
-                        await performInventoryUpdate(inventoryData, Date.now());
-                    } catch (bgErr) {
-                        console.error('[API Background] Failed to update inventory cache:', bgErr);
-                    } finally {
-                        global.isUpdatingInventoryCache = false;
-                    }
-                })();
+                fs.createReadStream(localPath).pipe(res);
                 return;
             }
 
-            if (!hasCache || forceRefresh) {
-                if (forceRefresh || !inventoryLoadPromise) {
-                    inventoryLoadPromise = (async () => {
-                        let inventoryData = null;
-                        const localPath = './public/api/inventory/inventory.json';
-                        if (!forceRefresh) {
-                            try {
-                                const fs = await import('fs');
-                                if (fs.existsSync(localPath)) {
-                                    const fileRaw = fs.readFileSync(localPath, 'utf8');
-                                    inventoryData = JSON.parse(fileRaw);
-                                }
-                            } catch (e) {}
-                        }
-                        if (!inventoryData) {
-                            inventoryData = await getInventoryFromS3();
-                        }
-                        await performInventoryUpdate(inventoryData, now);
-                    })().finally(() => { inventoryLoadPromise = null; });
-                }
-                await inventoryLoadPromise;
-            } else {
-                console.log('[API] Cache hit. Serving inventory from memory.');
-            }
-
-            const acceptEncoding = req.headers['accept-encoding'] || '';
-            const cacheControl = process.env.NODE_ENV === 'production'
-                ? 'public, max-age=300'
-                : 'no-store, no-cache, must-revalidate';
-
-            // Serve Gzip if supported by browser
-            if (acceptEncoding.includes('gzip')) {
-                res.writeHead(200, {
-                    'Content-Type': 'application/json',
-                    'Content-Encoding': 'gzip',
-                    'Cache-Control': cacheControl
-                });
-                res.end(inventoryCache.gzippedData);
-            } else {
-                res.writeHead(200, {
-                    'Content-Type': 'application/json',
-                    'Cache-Control': cacheControl
-                });
-                res.end(inventoryCache.rawData);
-            }
+            // 2. High-speed 302 redirect to fast public S3 CDN URL if local file is missing
+            res.writeHead(302, {
+                'Location': 'https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/public/inventory/inventory.json'
+            });
+            res.end();
+            return;
         } catch (error) {
             console.error('[API] Failed to serve inventory.json:', error);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Failed to fetch inventory data' }));
+            res.writeHead(302, {
+                'Location': 'https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/public/inventory/inventory.json'
+            });
+            res.end();
+            return;
         }
-        return;
     }
 
     // Helper: Generate Custom ID
@@ -5110,8 +4929,15 @@ const server = http.createServer(async (req, res) => {
             try { saveData(); } catch (e) {}
         }
 
-        const combinedQuotes = [...db.quotations];
-        sendJsonResponse(req, res, 200, combinedQuotes);
+        const limitStr = url.searchParams.get('limit');
+        let quotesToSend = [...db.quotations];
+        if (limitStr) {
+            const limit = parseInt(limitStr, 10);
+            if (!isNaN(limit) && limit > 0) {
+                quotesToSend = quotesToSend.slice(0, limit);
+            }
+        }
+        sendJsonResponse(req, res, 200, quotesToSend);
         return;
     }
 
