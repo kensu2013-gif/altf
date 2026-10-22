@@ -359,8 +359,8 @@ export class InventorySyncService {
   }
 
   async runStep2Daekyung(fileData = null, options = {}) {
-    // 🛡️ [직전 봇 감시/확인]: 반드시 직전 봇 DAT-03(사원)의 SUCCESS 신호가 감지되어야 작동
-    if (!options.bypassPrerequisite && this.state.chain.dat03.status !== 'SUCCESS') {
+    // 🛡️ [직전 봇 감시/확인]: 만약 options.isParallel(동시 실행 모드) 또는 bypassPrerequisite가 아니면 직전 봇 DAT-03 SUCCESS 신호 감시
+    if (!options.bypassPrerequisite && !options.isParallel && this.state.chain.dat03.status !== 'SUCCESS') {
       const errMsg = `[DAT-04 사원 거부] 직전 봇 DAT-03(태일/시화 동기화)의 SUCCESS 신호가 확인되지 않았습니다. (현재 상태: ${this.state.chain.dat03.status})`;
       console.warn(errMsg);
       this.state.chain.dat04.status = 'WAITING_PREVIOUS';
@@ -370,11 +370,17 @@ export class InventorySyncService {
     }
 
     this.state.step2.status = 'RUNNING';
-    this.state.step2.message = '대경재고 원장 파일 수신 및 구글시트 변환 트리거 중...';
+    this.state.step2.message = options.isParallel 
+      ? '태일·시화와 동시 가동 중: 대경재고 원장 파일 수신 및 구글시트 변환 트리거 중...'
+      : '대경재고 원장 파일 수신 및 구글시트 변환 트리거 중...';
     this.state.chain.dat04.status = 'RUNNING';
-    this.state.chain.dat04.message = '대경재고 원장 파일 수신 및 구글시트 변환 트리거 중...';
+    this.state.chain.dat04.message = this.state.step2.message;
     this.state.error = null;
-    this._updateAgentStatus('DAT-04', '[가동] 직전 DAT-03 SUCCESS 확인됨 ➔ 대경재고 원장 접수 및 변환 중...', '대경재고 원장 처리 시작', 'ACTIVE');
+
+    const startMsg = options.isParallel 
+      ? '[동시 가동] 태일·시화(DAT-03)와 함께 대경재고 원장 접수 및 변환 중...'
+      : '[가동] 직전 DAT-03 SUCCESS 확인됨 ➔ 대경재고 원장 접수 및 변환 중...';
+    this._updateAgentStatus('DAT-04', startMsg, '대경재고 원장 처리 시작', 'ACTIVE');
 
     try {
       let savedPath = null;
@@ -452,10 +458,16 @@ export class InventorySyncService {
       this.state.chain.dat04.status = 'SUCCESS';
       this.state.chain.dat04.lastSuccessAt = new Date().toISOString();
       this.state.chain.dat04.message = `대경재고 원장 접수 및 변환 완료 (SUCCESS 신호 방출)`;
-      this.state.chain.dat05.message = '[신호 감지] DAT-03, DAT-04 사원 완료 감지 ➔ 3~5분 버퍼링 및 ALTF DB 연산 착수 대기';
+      
+      const isDat03Done = this.state.chain.dat03.status === 'SUCCESS';
+      this.state.chain.dat05.message = isDat03Done 
+        ? '[신호 감지] DAT-03, DAT-04 사원 완료 감지 ➔ 3~5분 버퍼링 및 ALTF DB 연산 착수 대기'
+        : '[신호 대기] DAT-04 완료, DAT-03 태일·시화 동시 작업 완료 대기 중';
 
       this._updateAgentStatus('DAT-04', `[완료] 대경재고 변환 완료 (${itemCount}건, SUCCESS 신호 방출)`, `대경재고 ${itemCount}건 구글시트 변환 완료 (SUCCESS)`);
-      this._updateAgentStatus('DAT-05', '[신호 감지] DAT-03, DAT-04 사원 완료 감지 ➔ 3~5분 버퍼링 및 ALTF DB 대기', '직전 사원 봇들(DAT-03, DAT-04)의 SUCCESS 신호 모두 감지됨');
+      if (isDat03Done) {
+        this._updateAgentStatus('DAT-05', '[신호 감지] DAT-03, DAT-04 사원 완료 감지 ➔ 3~5분 버퍼링 및 ALTF DB 대기', '직전 사원 봇들(DAT-03, DAT-04)의 SUCCESS 신호 모두 감지됨');
+      }
 
       console.log(`[DAT-04 사원] ✅ 대경재고 변환 완료 (SUCCESS). 다음 봇 DAT-05 대리에게 바통 터치!`);
       return { success: true, step2: this.state.step2 };
@@ -468,6 +480,38 @@ export class InventorySyncService {
       this._updateAgentStatus('DAT-04', `[실패] 대경재고 변환 오류: ${err.message}`, `대경재고 변환 오류: ${err.message}`);
       throw err;
     }
+  }
+
+  // ==========================================
+  // [사원 동시 병렬 가동] 텔레그램 수신 또는 원클릭 시 DAT-03 & DAT-04 거의 동시 실행
+  // ==========================================
+  async runSimultaneousDualSync(daekyungFileData = null) {
+    console.log(`\n⚡ [사원 동시 병렬 가동] 대경재고장 수신 즉시 태일·시화재고 Apps Script 동시 실행`);
+    console.log(`[순서 규칙] DAT-03(사원) & DAT-04(사원) 거의 동시 가동 ➔ 둘 다 SUCCESS 완료 후 DAT-05(대리)`);
+
+    this._updateAgentStatus('DAT-03', '[동시 가동] 대경재고장 수신에 맞춰 태일·시화재고 Apps Script 즉시 실행 중...', '태일·시화 동시 실행', 'ACTIVE');
+    this._updateAgentStatus('DAT-04', '[동시 가동] 대경재고 원장 접수 및 구글시트 변환 중...', '대경재고 동시 실행', 'ACTIVE');
+
+    // 두 사원의 작업을 거의 동시에 병렬 트리거
+    const [step1Result, step2Result] = await Promise.all([
+      this.runStep1TaeilSihwa(),
+      this.runStep2Daekyung(daekyungFileData, { isParallel: true, bypassPrerequisite: true })
+    ]);
+
+    if (this.state.chain.dat03.status !== 'SUCCESS' || this.state.chain.dat04.status !== 'SUCCESS') {
+      throw new Error(`[사원 동시 가동 오류] DAT-03(${this.state.chain.dat03.status}) 또는 DAT-04(${this.state.chain.dat04.status}) 실패`);
+    }
+
+    console.log(`[사원 동시 가동 완결] ✅ DAT-03 & DAT-04 모두 SUCCESS 완료! 대리 DAT-05에게 바통 터치.\n`);
+    this.state.chain.dat05.message = '[신호 감지] 직전 사원들(DAT-03, DAT-04) 동시 완료 확인됨 ➔ 3~5분 버퍼링 대기';
+    this._updateAgentStatus('DAT-05', '[신호 감지] 사원들(DAT-03, DAT-04) 동시 완료 확인됨 ➔ 3~5분 버퍼링 및 ALTF DB 대기', 'DAT-03 & DAT-04 동시 완료 확인');
+
+    return {
+      success: true,
+      step1: step1Result.step1,
+      step2: step2Result.step2,
+      chain: this.state.chain
+    };
   }
 
   // ==========================================

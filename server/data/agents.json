@@ -548,7 +548,7 @@
       "uptime": "99.9%",
       "tasksToday": 2464
     },
-    "currentTask": "[영업시간 1시간 주기] 발주 2464건 분류 관리 | 미결 467건 | 고객발송준비 424건 (다음: 오늘 10:00)",
+    "currentTask": "[영업시간 1시간 주기] 발주 2464건 분류 관리 | 미결 467건 | 고객발송준비 424건 (다음: 오늘 11:00)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_ORDER_CREATED",
@@ -558,10 +558,10 @@
       "EVENT_BACKLOG_SYNCED"
     ],
     "logs": [
-      "[09:01] [PUR-07] altf.kr 발주 2464건 업체/날짜별 분류 완료",
-      "[09:01] 미결(Pending) 467건 추적 중 (매입발주서 자동 매핑)",
-      "[09:01] QC-01 성적서 교차 대조: 436건 접수 확인",
-      "[09:01] 출고 완료 패키징: 거래명세표+성적서 번들 424건 발송 대기"
+      "[10:01] [PUR-07] altf.kr 발주 2464건 업체/날짜별 분류 완료",
+      "[10:01] 미결(Pending) 467건 추적 중 (매입발주서 자동 매핑)",
+      "[10:01] QC-01 성적서 교차 대조: 436건 접수 확인",
+      "[10:01] 출고 완료 패키징: 거래명세표+성적서 번들 424건 발송 대기"
     ],
     "connectedDeptIds": [
       "quality",
@@ -1207,7 +1207,7 @@
       "uptime": "99.9%",
       "tasksToday": 5
     },
-    "currentTask": "[대기] 정기 3회(09:00/13:00/17:30) 또는 수동 동기화 대기 중",
+    "currentTask": "[완료] 태일/시화 동기화 완료 (SUCCESS 신호 방출)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "SCHEDULED_TAEIL_TIME",
@@ -1217,6 +1217,9 @@
       "SIGNAL_DAT03_SUCCESS"
     ],
     "logs": [
+      "[AM 10:01:50] 태일/시화재고 구글시트 동기화 완료 (SUCCESS)",
+      "[AM 10:01:41] 태일/시화재고 Apps Script 및 원격 API 호출 시작",
+      "[AM 10:01:41] 태일·시화 동시 실행",
       "[대기] 태일/시화재고 Apps Script (importStockData) 연동 파이프라인 가동 완료",
       "[정상] 8800포트 원격 API (stocklist_get.php) 상태 확인 대기"
     ],
@@ -1252,7 +1255,7 @@
       "uptime": "99.9%",
       "tasksToday": 4
     },
-    "currentTask": "[거부] 직전 봇 DAT-03 SUCCESS 신호 미확인 ➔ 실행 대기",
+    "currentTask": "[신호 감지] DAT-03 사원 완료 감지 ➔ 대경재고 변환 착수 대기",
     "lastActive": "방금 전",
     "triggerEvents": [
       "SIGNAL_DAT03_SUCCESS",
@@ -1262,6 +1265,10 @@
       "SIGNAL_DAT04_SUCCESS"
     ],
     "logs": [
+      "[AM 10:01:50] 직전 봇 DAT-03의 SUCCESS 신호 감지됨",
+      "[AM 10:01:43] 대경재고 1164건 구글시트 변환 완료 (SUCCESS)",
+      "[AM 10:01:41] 대경재고 원장 처리 시작",
+      "[AM 10:01:41] 대경재고 동시 실행",
       "[AM 9:49:21] [DAT-04 사원 거부] 직전 봇 DAT-03(태일/시화 동기화)의 SUCCESS 신호가 확인되지 않았습니다. (현재 상태: IDLE)",
       "[감시] 직전 봇 DAT-03(태일/시화) SUCCESS 신호 수신 대기",
       "[대기] 대경재고 파일 간편 업로드 및 대경재고변환 Apps Script 트리거 준비 완료"
@@ -1290,7 +1297,7 @@
     "role": "사원(DAT-03, DAT-04) SUCCESS 완료 신호 확인 후 3~5분 구글시트 수식 안정화 버퍼링 관제 및 ALTF 재고 DB Apps Script 실행, inventory.json 생성 신호(SIGNAL_DAT05_SUCCESS) 방출",
     "status": "ACTIVE",
     "isCreated": true,
-    "position": "대리",
+    "position": "과장",
     "metrics": {
       "speed": 95,
       "accuracy": 100,
@@ -1298,7 +1305,7 @@
       "uptime": "99.9%",
       "tasksToday": 6
     },
-    "currentTask": "[거부] 직전 사원(DAT-03, DAT-04) SUCCESS 미확인 ➔ 대기 중",
+    "currentTask": "[신호 감지] 사원들(DAT-03, DAT-04) 동시 완료 확인됨 ➔ 3~5분 버퍼링 및 ALTF DB 대기",
     "lastActive": "방금 전",
     "triggerEvents": [
       "SIGNAL_DAT03_SUCCESS",
@@ -1308,6 +1315,7 @@
       "SIGNAL_DAT05_SUCCESS"
     ],
     "logs": [
+      "[AM 10:01:50] DAT-03 & DAT-04 동시 완료 확인",
       "[AM 9:49:21] [DAT-05 대리 거부] 직전 사원 봇들의 SUCCESS 신호가 모두 확인되지 않았습니다. (DAT-03: IDLE, DAT-04: WAITING_PREVIOUS) 사원 작업이 100% 완료된 후에만 버퍼링을 시작할 수 있습니다.",
       "[감시] 사원(DAT-03, DAT-04) 완료 신호 전수 확인 대기",
       "[대기] 구글시트 연산 안정화 타이머 (기본 3분 30초 카운트다운) 준비 완료"
@@ -1336,7 +1344,7 @@
     "role": "DAT-05 대리의 SUCCESS 신호 감지 후 최신 inventory.json 결과물 실물 엄격 검수(구버전 차단), S3 클라우드 업로드 및 시화재고 변동량 분석 확정",
     "status": "ACTIVE",
     "isCreated": true,
-    "position": "과장",
+    "position": "팀장",
     "metrics": {
       "speed": 99,
       "accuracy": 100,

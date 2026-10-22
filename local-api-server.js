@@ -2239,6 +2239,18 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // 4-1. POST /api/dat/inventory-sync/dual-step1-2 : 사원(DAT-03 태일/시화, DAT-04 대경) 동시 병렬 실행
+        if (req.method === 'POST' && url.pathname === '/api/dat/inventory-sync/dual-step1-2') {
+            try {
+                const body = await parseBody(req);
+                const result = await inventorySyncService.runSimultaneousDualSync(body);
+                sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
         // 5. POST /api/dat/inventory-sync/step3 : 대리 3~5분 버퍼링 & ALTF DB 실행
         if (req.method === 'POST' && url.pathname === '/api/dat/inventory-sync/step3') {
             try {

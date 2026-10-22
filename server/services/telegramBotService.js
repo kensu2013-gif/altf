@@ -443,35 +443,31 @@ ${matchedOrdersList}
         const { inventorySyncService } = await import('./inventorySyncService.js');
 
         try {
-            // 1단계: 접수 안내
+            // 1단계: 접수 및 동시 실행 안내
             await this.sendMessage(chatId, `
-<b>📊 [대경벤드 재고장 접수 & 전사 재고 동기화 가동]</b>
+<b>📊 [대경벤드 재고장 접수 & 태일·시화 동시 가동]</b>
 📄 <b>파일명</b>: <code>${fileName}</code>
 
-조현진 대표님, 데이터관리팀 자율 에이전트 연쇄 공정을 즉시 가동합니다:
-1️⃣ <b>[DAT-04 사원]</b> 대경재고 원장 파싱 (A4:M1168) & 구글시트 반영
-2️⃣ <b>[DAT-03 사원]</b> 태일·시화재고 구글시트 Apps Script 실행
-3️⃣ <b>[DAT-05 대리]</b> ALTF 재고 DB 시트 연산 관제 (3분 30초 대기)
-4️⃣ <b>[DAT-06 과장]</b> S3 배포 & 웹 갱신 ➔ <b>완료 시 과장 최종 결재 보고</b>
+조현진 대표님, 지시사항에 따라 대경재고 수신 즉시 <b>태일·시화 Apps Script를 동시 실행</b>합니다:
+1️⃣ ⚡ <b>[DAT-04 사원 & DAT-03 사원 동시 가동]</b> 대경재고 원장 파싱 & 태일·시화 Apps Script 동시 실행
+2️⃣ ⏳ <b>[DAT-05 대리]</b> 두 사원 SUCCESS 완료 확인 후 ALTF 재고 DB 버퍼링 관제 (3분 30초 대기)
+3️⃣ 🚀 <b>[DAT-06 과장]</b> 신규 inventory.json 실물 검수 & S3 배포 ➔ <b>과장 최종 결재 보고</b>
             `.trim());
 
-            // Step 2: 대경재고 파싱 및 시트 전송
-            const step2Res = await inventorySyncService.runStep2Daekyung({
+            // ⚡ [사원 동시 병렬 실행]: 대경재고 파싱과 태일/시화 Apps Script를 그 순간 동시에 실행!
+            const dualRes = await inventorySyncService.runSimultaneousDualSync({
                 filename: fileName,
                 buffer: buffer
             });
-            const daekyungCount = step2Res.step2?.itemCount || 1164;
-
-            // Step 1: 태일/시화 재고 구글시트 Apps Script 실행
-            const step1Res = await inventorySyncService.runStep1TaeilSihwa();
+            const daekyungCount = dualRes.step2?.itemCount || 1164;
 
             // 중간 버퍼링 진입 안내
             const waitMin = inventorySyncService.config.bufferWaitMinutes || 3.5;
             await this.sendMessage(chatId, `
-⏳ <b>[DAT-05 대리 관제]</b> 대경(<b>${daekyungCount.toLocaleString()}개 규격</b>) 및 태일·시화 시트 반영을 마쳤습니다.
+⏳ <b>[DAT-05 대리 관제]</b> 대경(<b>${daekyungCount.toLocaleString()}개 규격</b>) 및 태일·시화 시트 동시 반영이 모두 SUCCESS 완료되었습니다!
 'ALTF 재고 DATA BASE' 구글시트 대용량 수식 연산(IMPORTRANGE) 안정화를 위해 <b>${waitMin}분 버퍼링 카운트다운</b>에 진입합니다.
 
-(카운트다운 종료 즉시 <b>DAT-06 과장</b>이 S3 배포를 완결하고 최종 결재 보고를 올리겠습니다.)
+(카운트다운 종료 즉시 <b>DAT-06 과장</b>이 신규 결과물을 엄격 검수한 뒤 S3 배포를 완결하고 최종 결재 보고를 올리겠습니다.)
             `.trim());
 
             // Step 3: 버퍼링 타이머 가동 & 실패 시 성공할 때까지 3~5분 간격 자동 재시작
