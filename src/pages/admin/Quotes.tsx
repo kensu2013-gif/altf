@@ -1,6 +1,6 @@
 import { useState, useEffect, useDeferredValue, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FileText, Calendar, Download, Trash2, ArchiveRestore, Search, Image } from 'lucide-react';
+import { FileText, Calendar, Download, Trash2, ArchiveRestore, Search, Image, MessageSquare } from 'lucide-react';
 import { AdminQuoteDetail } from './components/AdminQuoteDetail';
 import { QuoteSimilarityDrawer } from './components/QuoteSimilarityDrawer';
 import { QuoteComparisonModal } from './components/QuoteComparisonModal';
@@ -739,35 +739,104 @@ export default function AdminQuotes() {
                                     <div className="flex items-center justify-end gap-3 lg:gap-5 shrink-0 w-full xl:w-auto pt-3 xl:pt-0 border-t border-slate-100 xl:border-t-0 flex-nowrap ml-auto">
                                         {/* 사진 보기 및 접수(StatusSelect) 영역 */}
                                         <div className="flex items-center gap-2 shrink-0">
-                                            {(quote.attachments && quote.attachments.length > 0) && (
-                                                <div className="flex gap-1.5 shrink-0">
-                                                    {quote.attachments.map((file, i) => {
-                                                        const fileObj = file as unknown as (string | { name?: string; url?: string | { url?: string } });
-                                                        const fileUrl = typeof fileObj === 'string'
-                                                            ? fileObj
-                                                            : typeof fileObj?.url === 'string'
-                                                                ? fileObj.url
-                                                                : (typeof fileObj?.url === 'object' && fileObj?.url?.url) || '';
-                                                        const fileName = (typeof fileObj === 'object' && fileObj && 'name' in fileObj && typeof fileObj.name === 'string')
-                                                            ? fileObj.name
-                                                            : '첨부 사진';
+                                            {(() => {
+                                                const isKakaoQuote = quote.source === 'KAKAO' || 
+                                                                     quote.id.startsWith('Q-KAKAO') || 
+                                                                     !!quote.kakaoUser || 
+                                                                     !!quote.botUserKey || 
+                                                                     (quote.memo && quote.memo.includes('카카오'));
+                                                const hasAttachments = quote.attachments && quote.attachments.length > 0;
+
+                                                if (isKakaoQuote) {
+                                                    // 🟡 카카오톡 접수건: 노란색 테마
+                                                    if (hasAttachments) {
+                                                        // 1) 카카오 사진이 있는 경우: 노란색 "카카오 사진" 버튼
                                                         return (
-                                                            <a 
-                                                                key={i} 
-                                                                href={`${import.meta.env.VITE_API_URL || ''}/api/download?url=${encodeURIComponent(fileUrl)}`}
-                                                                target="_blank" 
-                                                                rel="noopener noreferrer" 
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 rounded-full text-xs font-bold transition-colors shadow-sm shrink-0 whitespace-nowrap"
-                                                                title={fileName}
-                                                            >
-                                                                <Image className="w-3.5 h-3.5" />
-                                                                사진 보기 {quote.attachments!.length > 1 ? `(${i+1})` : ''}
-                                                            </a>
+                                                            <div className="flex gap-1.5 shrink-0">
+                                                                {quote.attachments!.map((file, i) => {
+                                                                    const fileObj = file as unknown as (string | { name?: string; url?: string | { url?: string } });
+                                                                    const fileUrl = typeof fileObj === 'string'
+                                                                        ? fileObj
+                                                                        : typeof fileObj?.url === 'string'
+                                                                            ? fileObj.url
+                                                                            : (typeof fileObj?.url === 'object' && fileObj?.url?.url) || '';
+                                                                    const fileName = (typeof fileObj === 'object' && fileObj && 'name' in fileObj && typeof fileObj.name === 'string')
+                                                                        ? fileObj.name
+                                                                        : '카카오 사진';
+                                                                    const isDirect = fileUrl.includes('drive.google.com') || fileUrl.includes('docs.google.com');
+                                                                    const finalHref = isDirect ? fileUrl : `${import.meta.env.VITE_API_URL || ''}/api/download?url=${encodeURIComponent(fileUrl)}`;
+                                                                    return (
+                                                                        <a 
+                                                                            key={i} 
+                                                                            href={finalHref}
+                                                                            target="_blank" 
+                                                                            rel="noopener noreferrer" 
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-100/90 border border-yellow-300 text-yellow-900 hover:bg-yellow-200 rounded-full text-xs font-bold transition-all shadow-sm shrink-0 whitespace-nowrap ring-1 ring-yellow-200"
+                                                                            title={`[카카오톡 첨부사진] ${fileName}`}
+                                                                        >
+                                                                            <Image className="w-3.5 h-3.5 text-yellow-800" />
+                                                                            카카오 사진 {quote.attachments!.length > 1 ? `(${i+1})` : ''}
+                                                                        </a>
+                                                                    );
+                                                                })}
+                                                            </div>
                                                         );
-                                                    })}
-                                                </div>
-                                            )}
+                                                    } else {
+                                                        // 2) 카카오 텍스트 문의인 경우: 노란색 "카카오 텍스트" 버튼 (클릭 시 상세 모달 오픈)
+                                                        return (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedQuote(quote);
+                                                                }}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-100/90 border border-yellow-300 text-yellow-900 hover:bg-yellow-200 rounded-full text-xs font-bold transition-all shadow-sm shrink-0 whitespace-nowrap ring-1 ring-yellow-200"
+                                                                title={`[카카오톡 텍스트 견적문의] ${quote.memo || '텍스트 견적 내용 보기'}`}
+                                                            >
+                                                                <MessageSquare className="w-3.5 h-3.5 text-yellow-800" />
+                                                                카카오 텍스트
+                                                            </button>
+                                                        );
+                                                    }
+                                                } else {
+                                                    // 🔵 웹 앞단(Make.com/도면 업로드) 접수건: 오리지널 파란색 테두리 "사진 보기" 버튼
+                                                    if (hasAttachments) {
+                                                        return (
+                                                            <div className="flex gap-1.5 shrink-0">
+                                                                {quote.attachments!.map((file, i) => {
+                                                                    const fileObj = file as unknown as (string | { name?: string; url?: string | { url?: string } });
+                                                                    const fileUrl = typeof fileObj === 'string'
+                                                                        ? fileObj
+                                                                        : typeof fileObj?.url === 'string'
+                                                                            ? fileObj.url
+                                                                            : (typeof fileObj?.url === 'object' && fileObj?.url?.url) || '';
+                                                                    const fileName = (typeof fileObj === 'object' && fileObj && 'name' in fileObj && typeof fileObj.name === 'string')
+                                                                        ? fileObj.name
+                                                                        : '견적 첨부사진';
+                                                                    const isDirect = fileUrl.includes('drive.google.com') || fileUrl.includes('docs.google.com');
+                                                                    const finalHref = isDirect ? fileUrl : `${import.meta.env.VITE_API_URL || ''}/api/download?url=${encodeURIComponent(fileUrl)}`;
+                                                                    return (
+                                                                        <a 
+                                                                            key={i} 
+                                                                            href={finalHref}
+                                                                            target="_blank" 
+                                                                            rel="noopener noreferrer" 
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50 rounded-full text-xs font-bold transition-all shadow-sm shrink-0 whitespace-nowrap"
+                                                                            title={`[견적 첨부사진] ${fileName}`}
+                                                                        >
+                                                                            <Image className="w-3.5 h-3.5 text-blue-600" />
+                                                                            사진 보기 {quote.attachments!.length > 1 ? `(${i+1})` : ''}
+                                                                        </a>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                }
+                                            })()}
                                             <div className="shrink-0">
                                                 <StatusSelect
                                                     status={quote.status}

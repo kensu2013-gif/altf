@@ -1843,29 +1843,41 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                             </div>
                             
                             {/* NEW: Attached Photos */}
-                            {quote.attachments && quote.attachments.length > 0 && (
-                                <div className="mt-4 pt-4 border-t border-yellow-200/50">
-                                    <h4 className="text-xs font-bold text-yellow-800 mb-2">첨부된 사진/파일</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {quote.attachments.map((file, i) => {
-                                            const fileItem = file as { name?: string; url?: string | { url?: string } } | string;
-                                            const fileUrl = typeof fileItem === 'string' ? fileItem : (typeof fileItem?.url === 'string' ? fileItem.url : (typeof fileItem?.url === 'object' && fileItem.url ? fileItem.url.url || '' : ''));
-                                            return (
-                                                <a 
-                                                    key={i} 
-                                                    href={`${import.meta.env.VITE_API_URL || ''}/api/download?url=${encodeURIComponent(fileUrl)}`}
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer" 
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-yellow-300 text-yellow-700 hover:bg-yellow-100 rounded-md text-sm font-bold transition-colors shadow-sm"
-                                                >
-                                                    <Image className="w-4 h-4" />
-                                                    첨부사진 보기 {quote.attachments!.length > 1 ? `(${i+1})` : ''}
-                                                </a>
-                                            );
-                                        })}
+                            {quote.attachments && quote.attachments.length > 0 && (() => {
+                                const isKakao = quote.source === 'KAKAO' || quote.id.startsWith('Q-KAKAO') || !!(quote as any).kakaoUser || !!(quote as any).botUserKey || (quote.memo && quote.memo.includes('카카오'));
+                                return (
+                                    <div className="mt-4 pt-4 border-t border-yellow-200/50">
+                                        <h4 className="text-xs font-bold text-yellow-800 mb-2">
+                                            {isKakao ? '카카오톡 첨부 사진/파일' : '견적문의 첨부 사진/파일'}
+                                        </h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {quote.attachments.map((file, i) => {
+                                                const fileItem = file as { name?: string; url?: string | { url?: string } } | string;
+                                                const fileUrl = typeof fileItem === 'string' ? fileItem : (typeof fileItem?.url === 'string' ? fileItem.url : (typeof fileItem?.url === 'object' && fileItem.url ? fileItem.url.url || '' : ''));
+                                                const isDirect = fileUrl.includes('drive.google.com') || fileUrl.includes('googleusercontent.com') || fileUrl.includes('docs.google.com');
+                                                const downloadUrl = isDirect ? fileUrl : `${import.meta.env.VITE_API_URL || ''}/api/download?url=${encodeURIComponent(fileUrl)}`;
+                                                
+                                                return (
+                                                    <a 
+                                                        key={i} 
+                                                        href={downloadUrl}
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer" 
+                                                        className={
+                                                            isKakao 
+                                                                ? "inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 border border-amber-300 text-amber-900 hover:bg-amber-200 rounded-md text-sm font-bold transition-colors shadow-sm"
+                                                                : "inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border-2 border-blue-600 text-blue-700 hover:bg-blue-50 rounded-md text-sm font-bold transition-colors shadow-sm"
+                                                        }
+                                                    >
+                                                        <Image className="w-4 h-4" />
+                                                        {isKakao ? '카카오 사진' : '사진 보기'} {quote.attachments!.length > 1 ? `(${i+1})` : ''}
+                                                    </a>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
                         </div>
 
                         {/* NEW: 카카오톡 접수건 고객 매칭 & Make/Solapi 웹훅 자동 회신 패널 */}

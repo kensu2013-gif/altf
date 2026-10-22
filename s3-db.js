@@ -376,10 +376,24 @@ export async function getPresignedUrlToS3(key, options = {}) {
         const downloadName = options.downloadName || path.basename(key);
         const encodedFilename = encodeURIComponent(downloadName);
 
+        // Determine correct MIME type from file extension
+        let contentType = options.contentType;
+        if (!contentType) {
+            const ext = path.extname(key).toLowerCase();
+            if (ext === '.png') contentType = 'image/png';
+            else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+            else if (ext === '.webp') contentType = 'image/webp';
+            else if (ext === '.gif') contentType = 'image/gif';
+            else if (ext === '.svg') contentType = 'image/svg+xml';
+            else if (ext === '.pdf') contentType = 'application/pdf';
+            else if (ext === '.xlsx' || ext === '.xls') contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            else contentType = 'application/octet-stream';
+        }
+
         const command = new GetObjectCommand({
             Bucket: BUCKET_NAME,
             Key: key,
-            ResponseContentType: options.contentType || 'application/pdf',
+            ResponseContentType: contentType,
             ResponseContentDisposition: `inline; filename*=UTF-8''${encodedFilename}`
         });
         const url = await getSignedUrl(s3Client, command, { expiresIn });

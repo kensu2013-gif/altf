@@ -2788,13 +2788,25 @@ const server = http.createServer(async (req, res) => {
     // GET /api/download
     if (req.method === 'GET' && url.pathname === '/api/download') {
         try {
-            const S3Url = url.searchParams.get('url');
-            if (!S3Url) {
+            const rawUrl = url.searchParams.get('url');
+            if (!rawUrl) {
                 res.writeHead(400, { 'Content-Type': 'application/json' });
                 return res.end(JSON.stringify({ error: 'Missing url parameter' }));
             }
-            // Parse Key from URL (e.g. https://bucket.s3.region.amazonaws.com/documents/quotes/...)
-            const parsed = new URL(S3Url);
+
+            // 1. Google Drive, Docs 또는 외부 CDN 링크는 S3 파싱 없이 원본 주소로 즉시 안전 리다이렉트
+            if (
+                rawUrl.includes('drive.google.com') ||
+                rawUrl.includes('docs.google.com') ||
+                rawUrl.includes('googleusercontent.com') ||
+                (!rawUrl.includes('amazonaws.com') && !rawUrl.startsWith('/'))
+            ) {
+                res.writeHead(302, { Location: rawUrl });
+                return res.end();
+            }
+
+            // 2. S3 Object Key 파싱 (e.g. https://bucket.s3.region.amazonaws.com/documents/quotes/...)
+            const parsed = new URL(rawUrl, 'https://altf.kr');
             const key = decodeURIComponent(parsed.pathname.slice(1)); // remove leading slash & decode Unicode
 
             // Security check: Block dangerous path traversal and direct database / backup access
@@ -2811,7 +2823,7 @@ const server = http.createServer(async (req, res) => {
                 return res.end(JSON.stringify({ error: '접근이 제한된 파일입니다.' }));
             }
 
-            // Generate temporary exact presigned URL
+            // Generate temporary exact presigned URL with correct MIME content-type (png, jpg, pdf, etc.)
             const presignedUrl = await getPresignedUrlToS3(key);
 
             // Redirect the user to the presigned URL
