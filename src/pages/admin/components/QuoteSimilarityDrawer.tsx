@@ -82,11 +82,13 @@ export const QuoteSimilarityDrawer: React.FC<QuoteSimilarityDrawerProps> = ({
                         return (
                             <div
                                 key={c.targetId}
-                                className={`border rounded-xl p-4 transition-all shadow-xs ${
+                                onClick={() => onOpenComparisonModal(c)}
+                                className={`border rounded-xl p-4 transition-all shadow-xs cursor-pointer ${
                                     isSelected 
-                                        ? 'border-teal-500 ring-2 ring-teal-500/20 bg-teal-50/20' 
-                                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                                        ? 'border-teal-500 ring-2 ring-teal-500/20 bg-teal-50/20 shadow-md' 
+                                        : 'border-slate-200 hover:border-teal-400 hover:shadow-md bg-white'
                                 }`}
+                                title="카드를 클릭하여 상세 정밀 비교 창을 엽니다."
                             >
                                 {/* Card Header */}
                                 <div className="flex items-start justify-between gap-2 mb-2">
@@ -159,10 +161,13 @@ export const QuoteSimilarityDrawer: React.FC<QuoteSimilarityDrawerProps> = ({
                                 </div>
 
                                 {/* Actions */}
-                                <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100">
+                                <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
                                     <button
                                         type="button"
-                                        onClick={() => onSelectCandidate(isSelected ? null : c)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onSelectCandidate(isSelected ? null : c);
+                                        }}
                                         className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
                                             isSelected 
                                                 ? 'bg-teal-600 text-white' 
@@ -175,7 +180,10 @@ export const QuoteSimilarityDrawer: React.FC<QuoteSimilarityDrawerProps> = ({
 
                                     <button
                                         type="button"
-                                        onClick={() => onOpenComparisonModal(c)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onOpenComparisonModal(c);
+                                        }}
                                         className="py-1.5 px-2.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
                                         title="양쪽 품목을 나란히 놓고 비교합니다."
                                     >
@@ -185,7 +193,10 @@ export const QuoteSimilarityDrawer: React.FC<QuoteSimilarityDrawerProps> = ({
 
                                     <button
                                         type="button"
-                                        onClick={() => handleOpenInNewWindow(c)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenInNewWindow(c);
+                                        }}
                                         className="py-1.5 px-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
                                         title="현재 창을 유지한 채 새 탭에서 과거 문서를 확인합니다."
                                     >
@@ -195,7 +206,10 @@ export const QuoteSimilarityDrawer: React.FC<QuoteSimilarityDrawerProps> = ({
 
                                     <button
                                         type="button"
-                                        onClick={() => onDismissMatch(c.targetId)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onDismissMatch(c.targetId);
+                                        }}
                                         className="py-1.5 px-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg text-xs font-bold transition-all"
                                         title="이 문서는 관련이 없습니다 (학습 피드백)"
                                     >

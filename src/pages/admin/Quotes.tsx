@@ -224,7 +224,22 @@ export default function AdminQuotes() {
         return map;
     }, [quotes]);
 
-    const activeDrawerData = drawerQuoteId ? similarityMap.get(drawerQuoteId) : null;
+    const activeDrawerQuote = quotes.find(q => q.id === drawerQuoteId);
+    const activeDrawerData = useMemo(() => {
+        if (!drawerQuoteId) return null;
+        const fromMap = similarityMap.get(drawerQuoteId);
+        if (fromMap) return fromMap;
+        if (activeDrawerQuote?.similarity && (activeDrawerQuote.similarity.topScore ?? 0) >= 50) {
+            const top = activeDrawerQuote.similarity as unknown as SimilarityMatchCandidate;
+            return {
+                topType: activeDrawerQuote.similarity.topType,
+                topScore: activeDrawerQuote.similarity.topScore,
+                topMatch: top,
+                candidates: [top]
+            };
+        }
+        return null;
+    }, [drawerQuoteId, similarityMap, activeDrawerQuote]);
 
     const quoteCounts = quotes.reduce((acc, q) => {
         if (q.isDeleted) {
@@ -552,7 +567,11 @@ export default function AdminQuotes() {
                             })();
 
                             return (
-                                <div key={quote.id} className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col xl:flex-row xl:items-center justify-between gap-4 group hover:shadow-md transition-all">
+                                <div 
+                                    key={quote.id} 
+                                    onClick={() => setSelectedQuote(quote)}
+                                    className="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col xl:flex-row xl:items-center justify-between gap-4 group hover:shadow-md hover:border-teal-300 transition-all cursor-pointer"
+                                >
                                     {/* 좌측: 기본 정보 및 상태 태그 그룹 (수정됨, 재고부족, 유사도) */}
                                     <div className="flex items-start gap-4 min-w-0 flex-1">
                                         <div className="p-3 bg-teal-50 text-teal-600 rounded-lg group-hover:bg-teal-100 transition-colors shrink-0">
@@ -590,6 +609,10 @@ export default function AdminQuotes() {
                                                                 e.stopPropagation();
                                                                 setDrawerQuoteId(quote.id);
                                                                 setActiveDrawerCandidate(simInfo.topMatch);
+                                                                // 🔥 유의 뱃지 클릭 시 즉시 정밀 비교 모달이 열려 상세 내역을 바로 확인!
+                                                                if (simInfo.topMatch) {
+                                                                    setComparisonCandidate(simInfo.topMatch);
+                                                                }
                                                             }}
                                                             className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-2xs inline-flex items-center gap-1 cursor-pointer transition-all hover:scale-105 active:scale-95 shrink-0 whitespace-nowrap ${
                                                                 simInfo.topType === 'SAME_PROJECT' ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100' :
@@ -641,8 +664,15 @@ export default function AdminQuotes() {
                                             {(quote.attachments && quote.attachments.length > 0) && (
                                                 <div className="flex gap-1.5 shrink-0">
                                                     {quote.attachments.map((file, i) => {
-                                                        const anyFile = file as any;
-                                                        const fileUrl = typeof anyFile === 'string' ? anyFile : (typeof anyFile?.url === 'string' ? anyFile.url : (anyFile?.url?.url || ''));
+                                                        const fileObj = file as unknown as (string | { name?: string; url?: string | { url?: string } });
+                                                        const fileUrl = typeof fileObj === 'string'
+                                                            ? fileObj
+                                                            : typeof fileObj?.url === 'string'
+                                                                ? fileObj.url
+                                                                : (typeof fileObj?.url === 'object' && fileObj?.url?.url) || '';
+                                                        const fileName = (typeof fileObj === 'object' && fileObj && 'name' in fileObj && typeof fileObj.name === 'string')
+                                                            ? fileObj.name
+                                                            : '첨부 사진';
                                                         return (
                                                             <a 
                                                                 key={i} 
@@ -651,7 +681,7 @@ export default function AdminQuotes() {
                                                                 rel="noopener noreferrer" 
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 rounded-full text-xs font-bold transition-colors shadow-sm shrink-0 whitespace-nowrap"
-                                                                title={file.name || '첨부 사진'}
+                                                                title={fileName}
                                                             >
                                                                 <Image className="w-3.5 h-3.5" />
                                                                 사진 보기 {quote.attachments!.length > 1 ? `(${i+1})` : ''}

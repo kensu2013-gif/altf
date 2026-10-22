@@ -2073,7 +2073,10 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                     {topSimilarityCandidate && topSimilarityCandidate.similarityType !== 'NONE' && (
                                         <button
                                             type="button"
-                                            onClick={() => setIsSimilarityDrawerOpen(true)}
+                                            onClick={() => {
+                                                setIsSimilarityDrawerOpen(true);
+                                                setComparisonCandidate(topSimilarityCandidate);
+                                            }}
                                             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black border shadow-2xs transition-all cursor-pointer ${
                                                 topSimilarityCandidate.similarityType === 'SAME_PROJECT' ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100' :
                                                 topSimilarityCandidate.similarityType === 'SHORTAGE' ? 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100' :
