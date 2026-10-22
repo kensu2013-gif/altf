@@ -97,6 +97,50 @@ export class KakaoBotService {
                 this.users = [];
                 fs.writeFileSync(USERS_FILE, JSON.stringify([], null, 2), 'utf8');
             }
+
+            // 🔥 [고도화] 기존 텍스트 인입 건 최신 피팅 정규화 엔진(다중 카테고리/수량)으로 자동 재스캔
+            for (const intake of this.intakes) {
+                if (intake.type === 'text' && intake.utterance && (!intake.parsedItems || intake.parsedItems.length < 10)) {
+                    const normalized = fittingNormalizerService.normalize(intake.utterance);
+                    if (normalized.items && normalized.items.length > (intake.parsedItems?.length || 0)) {
+                        intake.parsedItems = normalized.items;
+                        // 연결된 draftQuotation도 모든 품목 및 금액으로 동기화
+                        const quoteIdx = this.draftQuotations.findIndex(q => q.id === intake.quotationId);
+                        if (quoteIdx >= 0) {
+                            const rate = intake.discountRate || 50;
+                            let totalAmount = 0;
+                            const items = normalized.items.map((it, idx) => {
+                                const discountedUnitPrice = Math.round(it.basePrice * (1 - rate / 100));
+                                const amount = discountedUnitPrice * it.qty;
+                                totalAmount += amount;
+                                return {
+                                    id: `item-${intake.id}-${idx}`,
+                                    productId: it.itemId,
+                                    itemId: it.itemId,
+                                    name: it.type,
+                                    thickness: it.schedule,
+                                    size: it.size,
+                                    material: it.material,
+                                    quantity: it.qty,
+                                    unitPrice: discountedUnitPrice,
+                                    userUnitPrice: discountedUnitPrice,
+                                    amount,
+                                    base_price: it.basePrice,
+                                    discountRate: rate,
+                                    currentStock: it.currentStock,
+                                    location: it.location,
+                                    maker: '대경',
+                                    stockStatus: it.stockStatus,
+                                    isVerified: true,
+                                    isSelected: true
+                                };
+                            });
+                            this.draftQuotations[quoteIdx].items = items;
+                            this.draftQuotations[quoteIdx].totalAmount = totalAmount;
+                        }
+                    }
+                }
+            }
         } catch (e) {
             console.error('[KakaoBotService] 데이터 로드 실패:', e.message);
             this.intakes = [];
@@ -1406,20 +1450,9 @@ export class KakaoBotService {
             memo: memo || intake?.remarks
         }, true);
 
-        // Solapi 또는 Webhook으로 고객 휴대폰에 완결형 텍스트 견적서 발송
-        let dispatchResult = null;
-        try {
-            const phone = targetPhone || quote?.customerInfo?.phone || intake?.customer?.phone || intake?.matchedUser?.phone;
-            dispatchResult = await this.dispatchQuotation({
-                quotationId: quote?.id || quotationId,
-                botUserKey: intake?.botUserKey,
-                customMessage: finalMessage,
-                targetPhone: phone
-            });
-        } catch (dispatchErr) {
-            console.error('[KakaoBot] 승인 후 발송 오류:', dispatchErr.message);
-            dispatchResult = { success: false, error: dispatchErr.message };
-        }
+        // 🛑 [사용자 지침 반영] 고객에게 문자로 회신하는 것은 전면 중단하고, 내부 견적서 작성 및 대장 등록에 집중
+        console.log(`[KakaoBot] 💾 [견적서 내부 확정] 견적번호 ${quotationId || intakeId} 대장 등록 완료 (검토자: ${reviewerName}) - 문자 외부 발송은 중단됨`);
+        const dispatchResult = { success: true, mode: 'INTERNAL_CONFIRMED', message: '문자 발송 없이 내부 대장에 정상 등록 및 확정되었습니다.' };
 
         console.log(`[KakaoBot] 🎯 [담당자 최종 승인 완료] 견적번호 ${quotationId || intakeId} 발송 완료 (검토자: ${reviewerName})`);
 

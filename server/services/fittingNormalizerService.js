@@ -159,12 +159,17 @@ export class FittingNormalizerService {
         }
 
         // 라인별 피팅 품목 파싱
+        let currentType = null;
+
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
 
+            // 0. 구분선(-----------------) 무시
+            if (/^[-=_\*~]{3,}$/.test(line)) continue;
+
             // 1. 공통 재질/두께 헤더 라인 감지 (예: "304 S/20S", "316L SCH10S")
             const matThickMatch = line.match(/(304|316L?|WP304L?|WP316L?|SUS304|SUS316L?|STS304L?|STS316L?)\s*(?:S\/|SCH|S)?([0-9]{1,3}S?)/i);
-            if (matThickMatch) {
+            if (matThickMatch && !line.match(/\d+\s*[-~:]\s*\d+/)) {
                 const rawMat = matThickMatch[1].toUpperCase();
                 const rawSch = matThickMatch[2].toUpperCase();
 
@@ -184,18 +189,20 @@ export class FittingNormalizerService {
                 continue;
             }
 
-            // 2. 품명 단독 라인인 경우 다음 라인과 병합 처리
-            // 예: 라인 i: "T(R)", 라인 i+1: "40x25 - 10ea"
-            let checkLine = line;
-            let detectedType = this.detectItemType(checkLine);
+            // 2. 단독 품명 카테고리 헤더 라인 감지 (예: "90E(L)", "90E(S)", "T(S)", "T(R)", "CAP")
+            const detectedType = this.detectItemType(line);
+            const hasSizeOrQty = /\d+x\d+|\d+\s*[-~:]\s*\d+|\d+A|\d+"/i.test(line);
 
-            if (detectedType && !checkLine.match(/\d+x\d+|\d+A|\d+"/i) && i + 1 < lines.length) {
-                // 다음 라인에 규격/수량이 있으면 병합
-                checkLine = `${line} ${lines[i + 1]}`;
-                i++; // 다음 라인 소비
+            if (detectedType && !hasSizeOrQty) {
+                currentType = detectedType;
+                continue;
             }
 
-            const item = this.parseItemLine(checkLine, currentMaterial, currentSchedule);
+            // 3. 활성 품명 결정 (현재 라인에 명시된 품명 우선, 없으면 직전 카테고리 품명 상속)
+            const activeType = detectedType || currentType;
+            if (!activeType) continue;
+
+            const item = this.parseItemLine(line, currentMaterial, currentSchedule, activeType);
             if (item) {
                 items.push(item);
             }
@@ -237,28 +244,40 @@ export class FittingNormalizerService {
     /**
      * 단일 라인에서 품목 정보 추출 및 인벤토리 매칭
      */
-    parseItemLine(line, defaultMat, defaultSch) {
+    parseItemLine(line, defaultMat, defaultSch, fallbackType = null) {
         const u = line.toUpperCase();
 
         // 1. 품명 결정
-        let type = this.detectItemType(u);
+        let type = this.detectItemType(u) || fallbackType;
         if (!type) return null;
 
-        // 2. 수량 추출 (- 10ea, 10개, 10, 1ea 등)
-        let qty = 1;
-        const qtyMatch = line.match(/(?:-|\/|\s)\s*(\d+)\s*(?:EA|PCS|개)?\s*$/i) || line.match(/(\d+)\s*(?:EA|PCS|개)/i);
-        if (qtyMatch) {
-            qty = parseInt(qtyMatch[1], 10);
+        // 2. 라인을 규격부와 수량부로 분리 (예: "32 - 600 (긴급)", "25x15 - 150 (긴급)")
+        let sizeTarget = line;
+        let qtyTarget = line;
+        if (line.includes('-') || line.includes(':') || line.includes('~')) {
+            const parts = line.split(/[-~:]/);
+            sizeTarget = parts[0].trim();
+            qtyTarget = parts.slice(1).join('-').trim();
         }
 
-        // 3. 재질 및 두께 라인 내 인라인 추출 (규칙 1, 3 반영)
+        // 3. 수량 추출 (- 10ea, 10개, 180/ 90개만 등)
+        let qty = 1;
+        const explicitOnlyMatch = qtyTarget.match(/\/\s*(\d+)\s*개만/);
+        if (explicitOnlyMatch) {
+            qty = parseInt(explicitOnlyMatch[1], 10);
+        } else {
+            const qtyMatch = qtyTarget.match(/(\d+)/);
+            if (qtyMatch) {
+                qty = parseInt(qtyMatch[1], 10);
+            }
+        }
+
+        // 4. 재질 및 두께 라인 내 인라인 추출 (규칙 1, 3 반영)
         let material = defaultMat;
         let schedule = defaultSch;
 
-        if (/WP316L?/i.test(u)) material = 'STS316L-W';
-        else if (/STS316L?/i.test(u)) material = 'STS316L-W';
-        else if (/WP304L?/i.test(u)) material = 'STS304-W';
-        else if (/STS304L?/i.test(u)) material = 'STS304-W';
+        if (/WP316L?/i.test(u) || /STS316L?/i.test(u)) material = 'STS316L-W';
+        else if (/WP304L?/i.test(u) || /STS304L?/i.test(u)) material = 'STS304-W';
 
         if (/S\/?40S?|SCH\s*40/i.test(u)) schedule = 'S40S';
         else if (/S\/?80S?|SCH\s*80/i.test(u)) {
@@ -271,11 +290,11 @@ export class FittingNormalizerService {
             material = material.replace('-W', '-S'); // CAP은 항상 -S (규칙 1)
         }
 
-        // 4. 규격 추출 (규칙 2 반영: ANSI 분수/인치 및 JIS DN mm 상호 완벽 변환)
+        // 5. 규격 추출 (규칙 2 반영: ANSI 분수/인치 및 JIS DN mm 상호 완벽 변환)
         let size = '';
 
         // (1) ANSI 분수 복수 규격: 1 1/2*1, 1-1/2X1, 1*3/4, 2*1-1/2 등
-        const fracPairMatch = line.match(/(\d+(?:\s+|-)?\d*\/\d+|\d+)\s*(?:\*|X|×)\s*(\d+(?:\s+|-)?\d*\/\d+|\d+)/i);
+        const fracPairMatch = sizeTarget.match(/(\d+(?:\s+|-)?\d*\/\d+|\d+)\s*(?:\*|X|×)\s*(\d+(?:\s+|-)?\d*\/\d+|\d+)/i);
         if (fracPairMatch) {
             let rawS1 = fracPairMatch[1].trim().replace(/-/g, ' ');
             let rawS2 = fracPairMatch[2].trim().replace(/-/g, ' ');
@@ -308,8 +327,8 @@ export class FittingNormalizerService {
                 if (type === 'T(S)') type = 'T(R)';
             }
         } else {
-            // (2) 일반 정수 페어: 40x25, 40*25
-            const sizePairMatch = line.match(/(\d+)(?:A|")?\s*(?:X|\*|×)\s*(\d+)(?:A|")?/i);
+            // (2) 일반 정수 페어: 25x15, 40x15, 350x250, 400x300 등
+            const sizePairMatch = sizeTarget.match(/(\d+)(?:A|")?\s*(?:X|x|\*|×)\s*(\d+)(?:A|")?/i);
             if (sizePairMatch) {
                 let s1 = parseInt(sizePairMatch[1], 10);
                 let s2 = parseInt(sizePairMatch[2], 10);
@@ -323,7 +342,7 @@ export class FittingNormalizerService {
                 }
             } else {
                 // (3) 단일 분수 인치: 3/4", 1/2", 1-1/2", 1", 2" 등
-                const singleFracMatch = line.match(/(?:^|\s)(?:3\/4|1\/2|1\s+1\/2|1-1\/2|1\s+1\/4|1-1\/4|2\s+1\/2|2-1\/2)(?:\"|\b)/i);
+                const singleFracMatch = sizeTarget.match(/(?:^|\s)(?:3\/4|1\/2|1\s+1\/2|1-1\/2|1\s+1\/4|1-1\/4|2\s+1\/2|2-1\/2)(?:\"|\b)/i);
                 if (singleFracMatch) {
                     const sf = singleFracMatch[0].trim().replace(/\"/g, '');
                     if (sf === '1/2') size = '15A';
@@ -332,8 +351,8 @@ export class FittingNormalizerService {
                     else if (sf === '1 1/4' || sf === '1-1/4') size = '32A';
                     else if (sf === '2 1/2' || sf === '2-1/2') size = '65A';
                 } else {
-                    // (4) 단일 정수: 40A, 25A, 50 등
-                    const singleSizeMatch = line.match(/(\d+)\s*A/i) || line.match(/(?:T\(S\)|T|40|50|25|20|15|65|80|100)\s*(\d{1,3})(?!\d)/i);
+                    // (4) 단일 정수: 32, 40, 50, 100, 150, 200, 400 등
+                    const singleSizeMatch = sizeTarget.match(/(\d+)\s*A/i) || sizeTarget.match(/(\d+)/);
                     if (singleSizeMatch) {
                         const s = parseInt(singleSizeMatch[1], 10);
                         if (s > 0) size = `${s}A`;
@@ -344,10 +363,10 @@ export class FittingNormalizerService {
 
         if (!size) return null;
 
-        // 5. 알트에프 표준 품목 ID 조립
+        // 6. 알트에프 표준 품목 ID 조립
         const itemId = `${type}-${schedule}-${size}-${material}`;
 
-        // 6. 실제 인벤토리 검색 및 단가/재고 매칭
+        // 7. 실제 인벤토리 검색 및 단가/재고 매칭
         let matched = this.inventoryMap.get(itemId);
 
         // Fallback: 대소문자나 공백 차이 fuzzy 매칭

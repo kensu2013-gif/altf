@@ -293,10 +293,10 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
         }
     };
 
-    // Approve & Dispatch final quote
+    // Approve & Finalize internal quotation (SMS/message dispatch paused per user policy)
     const handleApproveAndDispatch = async () => {
         if (!activeItem) return;
-        if (!confirm(`[견적 승인 및 카톡 회신 발송]\n\n총 금액: ${currentGrandTotal.toLocaleString()}원\n수신 고객: ${editCustomerName || activeItem.customer?.name}\n\n사무실 담당자 최종 검토 승인으로 확정하고 고객 카카오톡(또는 문자)으로 정식 회신을 발송하시겠습니까?`)) {
+        if (!confirm(`[견적서 대장 내부 확정]\n\n• 총 금액: ${currentGrandTotal.toLocaleString()}원 (총 ${editItems.length}품목)\n• 거래처명: ${editCustomerName || activeItem.customer?.name}\n\n* 고객 문자/카톡 직접 발송은 중단된 상태입니다.\n작성된 견적 품목과 단가를 시스템 정식 견적서 대장에 최종 확정 등록하시겠습니까?`)) {
             return;
         }
 
@@ -317,7 +317,7 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                 })
             });
 
-            // Then approve and dispatch
+            // Then approve internally without external SMS dispatch
             const res = await fetch('/api/kakao/approve-quote', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -331,14 +331,14 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
             });
 
             if (res.ok) {
-                alert('✅ [승인 및 발송 완료] 완결형 텍스트 견적서가 고객에게 성공적으로 회신되었습니다!');
+                alert('✅ [내부 대장 확정 완료] 31개 품목 견적서가 시스템 대장에 성공적으로 등록 및 확정되었습니다.\n(고객 문자 회신은 발송되지 않았습니다.)');
                 await fetchQueue();
             } else {
                 const errData = await res.json();
-                alert('발송 실패: ' + (errData.error || '알 수 없는 오류'));
+                alert('대장 저장 실패: ' + (errData.error || '알 수 없는 오류'));
             }
         } catch (e: any) {
-            alert('승인 발송 중 오류: ' + e.message);
+            alert('견적 대장 확정 중 오류: ' + e.message);
         } finally {
             setSaving(false);
         }
@@ -401,7 +401,7 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                                 </span>
                             </div>
                             <p className="text-xs text-gray-400 mt-0.5">
-                                메신저로 들어온 비정형 txt 원문을 확인하고, AI 파싱 단가 대장을 직접 검토·수정하여 URL 링크 없는 완결형 카톡 견적서를 즉시 회신합니다.
+                                메신저로 들어온 비정형 txt 원문을 확인하고, 규격·단가표 매칭 데이터를 검토·수정하여 정식 견적서 대장으로 확정 적재합니다. (고객 문자발송은 일시중단)
                             </p>
                         </div>
                     </div>
@@ -446,7 +446,7 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                                     onClick={() => setFilterStatus('APPROVED')}
                                     className={`flex-1 py-1 rounded-md font-medium transition-colors ${filterStatus === 'APPROVED' ? 'bg-emerald-600 text-white font-bold shadow' : 'text-gray-400 hover:text-white'}`}
                                 >
-                                    승인 완료
+                                    대장 확정
                                 </button>
                             </div>
                             <div className="relative">
@@ -490,7 +490,7 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                                                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
                                                         : 'bg-amber-500/20 text-amber-400 border border-amber-500/40 animate-pulse'
                                                 }`}>
-                                                    {isApproved ? '🟢 승인/발송 완료' : '🟡 검토 대기 (Pending)'}
+                                                    {isApproved ? '🟢 대장 확정 완료' : '🟡 검토 대기 (Pending)'}
                                                 </span>
                                                 <span className="text-[11px] text-gray-500">
                                                     {formattedDate} {formattedTime}
@@ -785,7 +785,7 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                                 </div>
                             </div>
 
-                            {/* Section 3: Live Preview of KakaoTalk Message (URL-free Native Format) */}
+                            {/* Section 3: Quotation Summary (Internal Ledger Creation / External SMS Paused) */}
                             <div className="bg-[#161922] border border-emerald-500/40 rounded-xl p-5 shadow-lg space-y-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
@@ -793,10 +793,10 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                                             3
                                         </div>
                                         <h3 className="text-sm font-bold text-emerald-400">
-                                            3. 카카오톡 메신저 최종 회신 메시지 라이브 프리뷰 (URL 링크 없음)
+                                            3. 카카오톡 인입 기반 견적서 품목 및 금액 요약 (내부 대장 작성용)
                                         </h3>
-                                        <span className="text-[11px] text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">
-                                            모바일 카톡 채팅창 완결형
+                                        <span className="text-[11px] text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/60">
+                                            고객 문자발송 일시중단 (내부 작성 모드)
                                         </span>
                                     </div>
                                     <button
@@ -804,7 +804,7 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
                                     >
                                         {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                                        {copied ? '복사 완료!' : '메시지 전문 복사'}
+                                        {copied ? '복사 완료!' : '견적 요약문 복사'}
                                     </button>
                                 </div>
 
@@ -815,7 +815,7 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                                 <div className="text-[11px] text-gray-400 flex items-center gap-2">
                                     <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                                     <span>
-                                        외부 브라우저나 로그인 페이지(URL)로 빠지지 않고, 고객이 카카오톡 채팅창 안에서 모든 품목과 금액을 바로 확인하여 10초 만에 발주할 수 있습니다.
+                                        현재 고객 대상 문자(SMS) 회신은 중단된 상태입니다. 비정형 카톡 요청 품목을 정식 견적서 데이터로 작성하여 시스템 대장에 안전하게 적재 및 보관합니다.
                                     </span>
                                 </div>
                             </div>
@@ -857,10 +857,10 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                             <button
                                 onClick={handleApproveAndDispatch}
                                 disabled={saving}
-                                className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black shadow-lg shadow-amber-500/20 transition-all transform active:scale-95 disabled:opacity-50"
+                                className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-black shadow-lg shadow-emerald-500/20 transition-all transform active:scale-95 disabled:opacity-50"
                             >
-                                <Send className="w-4 h-4" />
-                                {saving ? '처리 중...' : '🚀 담당자 최종 승인 및 카톡 회신 발송 (Review Gate)'}
+                                <Save className="w-4 h-4" />
+                                {saving ? '처리 중...' : '💾 [내부 확정] 카톡 견적서 대장 작성 및 저장'}
                             </button>
                         </div>
                     </div>
