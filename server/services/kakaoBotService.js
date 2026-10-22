@@ -46,7 +46,10 @@ export class KakaoBotService {
         };
         // 🔥 중복 수신 및 무한 루프 격발 차단용 캐시 (60초 TTL)
         this.recentRequests = new Map();
+        this.standbyResetTimer = null;
         this.loadData();
+        // 기동 시 영업팀 에이전트 실시간 대기 상태로 정돈
+        this.resetAgentsToStandby();
     }
 
     /**
@@ -1047,9 +1050,84 @@ export class KakaoBotService {
 
             if (changed) {
                 fs.writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2), 'utf8');
+
+                // 🔥 [실시간 대기 자동 환원] 처리 완료 후 10초 동안 완료 메시지를 노출한 뒤,
+                // 에이전트들을 정상적인 "실시간 수신 대기(STANDBY)" 상태로 자동 복구합니다.
+                // 이를 통해 과거 처리 건이 영구 박제되어 남아있는 문제를 원천 해결합니다.
+                if (this.standbyResetTimer) {
+                    clearTimeout(this.standbyResetTimer);
+                }
+                this.standbyResetTimer = setTimeout(() => {
+                    this.resetAgentsToStandby(['INT-02', 'INT-03', 'INT-05', 'SLE-01', 'SLE-02']);
+                }, 10000);
             }
         } catch (e) {
             console.error('[KakaoBotService] 에이전트 디스패치 오류:', e.message);
+        }
+    }
+
+    /**
+     * 영업2팀 / 영업1팀 에이전트들을 실시간 수신 대기(STANDBY / IDLE) 상태로 환원
+     * 과거 완료 건이 currentTask에 계속 남아있는 현상 방지
+     */
+    resetAgentsToStandby(agentCodes = ['INT-02', 'INT-03', 'INT-05', 'SLE-01', 'SLE-02']) {
+        try {
+            if (!fs.existsSync(AGENTS_FILE)) return;
+            const agents = JSON.parse(fs.readFileSync(AGENTS_FILE, 'utf8'));
+            let changed = false;
+
+            const defaultTasks = {
+                'INT-02': '카카오톡 채널(@altf) 및 솔라피 인입 실시간 수신 대기 중',
+                'INT-03': '비정형 문서·사진 Vision OCR 판독 엔진 대기 중',
+                'INT-05': '14,136건 ALTF 표준 마스터 품목 규격 정규화 대기 중',
+                'SLE-01': '견적의뢰 인입 시 견적서 초안 자동 작성 대기',
+                'SLE-02': '단가 요율 및 시화/양산 실시간 재고 검증 대기'
+            };
+
+            for (const code of agentCodes) {
+                const prefix = code.toLowerCase() + '-';
+                const ag = agents.find(a => a.code === code || a.id === code.toLowerCase() || (typeof a.id === 'string' && a.id.toLowerCase().startsWith(prefix)));
+                if (ag) {
+                    const targetTask = defaultTasks[code];
+                    if (targetTask && ag.currentTask !== targetTask) {
+                        ag.currentTask = targetTask;
+                        ag.status = 'ACTIVE';
+                        ag.lastActive = '방금 전';
+                        changed = true;
+                    }
+                }
+            }
+
+            if (changed) {
+                fs.writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2), 'utf8');
+                console.log(`[KakaoBot] 🔄 영업 에이전트(${agentCodes.join(', ')}) 실시간 대기(STANDBY) 상태 복귀 완료`);
+            }
+        } catch (e) {
+            console.error('[KakaoBotService] 에이전트 대기 복귀 오류:', e.message);
+        }
+    }
+
+    /**
+     * 카카오 테스트 데이터 초기화 및 에이전트 대기 복귀
+     */
+    clearTestData() {
+        try {
+            this.intakes = [];
+            this.draftQuotations = [];
+            this.stats = {
+                totalReceived: 0,
+                textQuotes: 0,
+                imageQuotes: 0,
+                lastReceivedAt: null
+            };
+            this.recentRequests.clear();
+            this.saveData();
+            this.resetAgentsToStandby();
+            console.log('[KakaoBot] 🧹 카카오 인입 및 견적 테스트 데이터 전체 초기화 완료');
+            return { success: true, message: '카카오 테스트 데이터 초기화 완료' };
+        } catch (e) {
+            console.error('[KakaoBot] 테스트 데이터 초기화 오류:', e.message);
+            throw e;
         }
     }
 
