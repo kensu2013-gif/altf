@@ -170,7 +170,6 @@ export default function AdminQuotes() {
     const [kakaoRawTextQuote, setKakaoRawTextQuote] = useState<Quotation | null>(null);
     const [copiedRawText, setCopiedRawText] = useState(false);
     const [intakesCache, setIntakesCache] = useState<Array<{ id?: string; quotationId?: string; botUserKey?: string; utterance?: string }>>([]);
-    const [rawTextModalContent, setRawTextModalContent] = useState<string>('');
     const [rawTextModalLoading, setRawTextModalLoading] = useState<boolean>(false);
 
     useEffect(() => {
@@ -185,86 +184,61 @@ export default function AdminQuotes() {
             .catch(() => {});
     }, []);
 
-    // 💬 카카오 원문 모달 오픈 시 실시간 최신 원문(utterance) 매칭 및 지연 로딩
-    useEffect(() => {
-        if (!kakaoRawTextQuote) {
-            setRawTextModalContent('');
-            setRawTextModalLoading(false);
-            return;
-        }
+    const isValidCustomerText = (txt?: string) => {
+        if (!txt) return false;
+        const t = txt.trim();
+        if (t.startsWith('http://') || t.startsWith('https://')) return false;
+        if (t.startsWith('카카오톡 채널 인입')) return false;
+        return t.length > 0;
+    };
 
-        const isValidCustomerText = (txt?: string) => {
-            if (!txt) return false;
-            const t = txt.trim();
-            if (t.startsWith('http://') || t.startsWith('https://')) return false;
-            if (t.startsWith('카카오톡 채널 인입')) return false;
-            return t.length > 0;
-        };
-
-        // 1. 견적 객체 자체에 고객 원문이 있는 경우
-        if (isValidCustomerText(kakaoRawTextQuote.rawText)) {
-            setRawTextModalContent(kakaoRawTextQuote.rawText!);
-            setRawTextModalLoading(false);
-            return;
-        }
-        if (isValidCustomerText(kakaoRawTextQuote.utterance)) {
-            setRawTextModalContent(kakaoRawTextQuote.utterance!);
-            setRawTextModalLoading(false);
-            return;
-        }
-
-        // 2. 이미 캐시된 intakes 리스트에서 해당 견적서 고유 매칭 (타 견적 유입 방지)
-        const matched = intakesCache.find(it => 
-            it.quotationId === kakaoRawTextQuote.id || 
-            (kakaoRawTextQuote.intakeId && it.id === kakaoRawTextQuote.intakeId)
-        );
+    const getQuoteRawText = (q: Quotation): string => {
+        if (isValidCustomerText(q.rawText)) return q.rawText!;
+        if (isValidCustomerText(q.utterance)) return q.utterance!;
+        const matched = intakesCache.find(it => it.quotationId === q.id || (q.intakeId && it.id === q.intakeId));
         if (matched && isValidCustomerText(matched.utterance)) {
-            setRawTextModalContent(matched.utterance!);
-            setRawTextModalLoading(false);
-            return;
+            return matched.utterance!;
         }
+        if (isValidCustomerText(q.memo)) return q.memo!;
+        return '카카오톡 원문 텍스트가 없습니다.';
+    };
 
-        // 3. 서버에서 실시간 intake 다시 가져오기
-        setRawTextModalLoading(true);
-        fetch('/api/kakao/intakes')
-            .then(res => res.json())
-            .then(data => {
-                const list = data.items || data.intakes || [];
-                if (Array.isArray(list)) {
-                    setIntakesCache(list);
-                    const found = list.find((it: { id?: string; quotationId?: string; botUserKey?: string; utterance?: string }) => 
-                        it.quotationId === kakaoRawTextQuote.id || 
-                        (kakaoRawTextQuote.intakeId && it.id === kakaoRawTextQuote.intakeId)
-                    );
-                    if (found && isValidCustomerText(found.utterance)) {
-                        setRawTextModalContent(found.utterance!);
-                        return;
+    const handleOpenRawTextModal = (quote: Quotation) => {
+        setKakaoRawTextQuote(quote);
+        const hasLocal = isValidCustomerText(quote.rawText) ||
+            isValidCustomerText(quote.utterance) ||
+            intakesCache.some(it => 
+                (it.quotationId === quote.id || (quote.intakeId && it.id === quote.intakeId)) &&
+                isValidCustomerText(it.utterance)
+            );
+        if (!hasLocal) {
+            setRawTextModalLoading(true);
+            fetch('/api/kakao/intakes')
+                .then(res => res.json())
+                .then(data => {
+                    const list = data.items || data.intakes || [];
+                    if (Array.isArray(list)) {
+                        setIntakesCache(list);
                     }
-                }
-                if (isValidCustomerText(kakaoRawTextQuote.memo)) {
-                    setRawTextModalContent(kakaoRawTextQuote.memo!);
-                } else {
-                    setRawTextModalContent('고객이 카카오톡 채팅창에 직접 입력한 텍스트 원문이 없습니다.');
-                }
-            })
-            .catch(() => {
-                if (isValidCustomerText(kakaoRawTextQuote.memo)) {
-                    setRawTextModalContent(kakaoRawTextQuote.memo!);
-                } else {
-                    setRawTextModalContent('카카오톡 원문 텍스트를 불러오지 못했습니다.');
-                }
-            })
-            .finally(() => {
-                setRawTextModalLoading(false);
-            });
-    }, [kakaoRawTextQuote, intakesCache]);
+                })
+                .catch(() => {})
+                .finally(() => {
+                    setRawTextModalLoading(false);
+                });
+        }
+    };
+
+    const handleCloseRawTextModal = () => {
+        setKakaoRawTextQuote(null);
+        setRawTextModalLoading(false);
+    };
 
     // 🔒 Esc 키로 모달 닫기 및 스크롤 락 (모달 안정화)
     useEffect(() => {
         if (!kakaoRawTextQuote) return;
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
-                setKakaoRawTextQuote(null);
+                handleCloseRawTextModal();
             }
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -276,16 +250,7 @@ export default function AdminQuotes() {
         };
     }, [kakaoRawTextQuote]);
 
-    const getQuoteRawText = (q: Quotation): string => {
-        if (q.rawText && !q.rawText.startsWith('카카오톡 채널 인입')) return q.rawText;
-        if (q.utterance && !q.utterance.startsWith('http') && !q.utterance.startsWith('카카오톡 채널 인입')) return q.utterance;
-        const matched = intakesCache.find(it => it.quotationId === q.id || (q.intakeId && it.id === q.intakeId));
-        if (matched && matched.utterance && !matched.utterance.startsWith('http')) {
-            return matched.utterance;
-        }
-        if (q.memo && !q.memo.startsWith('카카오톡 채널 인입')) return q.memo;
-        return '카카오톡 원문 텍스트가 없습니다.';
-    };
+    const currentRawText = kakaoRawTextQuote ? getQuoteRawText(kakaoRawTextQuote) : '';
 
     // Handle incoming URL query parameter (?quoteId=...) for direct search & open
     const urlQuoteId = searchParams.get('quoteId');
@@ -910,7 +875,7 @@ export default function AdminQuotes() {
                                                                 type="button"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    setKakaoRawTextQuote(quote);
+                                                                    handleOpenRawTextModal(quote);
                                                                 }}
                                                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-100/90 border border-yellow-300 text-yellow-900 hover:bg-yellow-200 rounded-full text-xs font-bold transition-all shadow-sm shrink-0 whitespace-nowrap ring-1 ring-yellow-200 cursor-pointer"
                                                                 title="카카오톡 고객 입력 원문 텍스트 바로보기"
@@ -1099,7 +1064,7 @@ export default function AdminQuotes() {
             {kakaoRawTextQuote && (
                 <div 
                     className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
-                    onClick={() => setKakaoRawTextQuote(null)}
+                    onClick={handleCloseRawTextModal}
                 >
                     <div 
                         className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-yellow-300 animate-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]"
@@ -1122,7 +1087,7 @@ export default function AdminQuotes() {
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setKakaoRawTextQuote(null)}
+                                onClick={handleCloseRawTextModal}
                                 className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-yellow-200/50 transition-colors cursor-pointer"
                             >
                                 <X className="w-5 h-5" />
@@ -1136,7 +1101,7 @@ export default function AdminQuotes() {
                                     <span>💬 고객이 카카오톡 채팅창에 입력한 원본 내용:</span>
                                 </span>
                                 <span className="text-[11px] text-slate-500 font-semibold">
-                                    {rawTextModalLoading ? '조회 중...' : `${(rawTextModalContent || getQuoteRawText(kakaoRawTextQuote)).length}자`}
+                                    {rawTextModalLoading ? '조회 중...' : `${currentRawText.length}자`}
                                 </span>
                             </div>
                             {rawTextModalLoading ? (
@@ -1146,7 +1111,7 @@ export default function AdminQuotes() {
                                 </div>
                             ) : (
                                 <pre className="bg-white rounded-xl p-4 border border-yellow-200 shadow-inner font-mono text-xs text-slate-800 whitespace-pre-wrap leading-relaxed select-text min-h-[160px] max-h-[380px] overflow-y-auto">
-                                    {rawTextModalContent || getQuoteRawText(kakaoRawTextQuote)}
+                                    {currentRawText}
                                 </pre>
                             )}
                         </div>
@@ -1155,9 +1120,9 @@ export default function AdminQuotes() {
                         <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
                             <button
                                 type="button"
-                                disabled={rawTextModalLoading || !(rawTextModalContent || getQuoteRawText(kakaoRawTextQuote))}
+                                disabled={rawTextModalLoading || !currentRawText}
                                 onClick={() => {
-                                    const textToCopy = rawTextModalContent || getQuoteRawText(kakaoRawTextQuote);
+                                    const textToCopy = currentRawText;
                                     navigator.clipboard.writeText(textToCopy);
                                     setCopiedRawText(true);
                                     setTimeout(() => setCopiedRawText(false), 2000);
@@ -1172,7 +1137,7 @@ export default function AdminQuotes() {
                                     type="button"
                                     onClick={() => {
                                         const q = kakaoRawTextQuote;
-                                        setKakaoRawTextQuote(null);
+                                        handleCloseRawTextModal();
                                         setSelectedQuote(q);
                                     }}
                                     className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer"
@@ -1182,7 +1147,7 @@ export default function AdminQuotes() {
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setKakaoRawTextQuote(null)}
+                                    onClick={handleCloseRawTextModal}
                                     className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-lg border border-slate-300 transition-all cursor-pointer"
                                 >
                                     닫기
