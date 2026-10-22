@@ -391,7 +391,11 @@ async function updateInventory() {
 
     } catch (error) {
         console.error('❌ Failed to update inventory:', error);
-        process.exit(1);
+        if (fs.existsSync(OUTPUT_PATH)) {
+            console.log('⚠️ Using existing local inventory.json file. Build will continue.');
+        }
+        // Render 빌드가 일시적 S3 에러로 중단되지 않도록 정상 종료
+        process.exit(0);
     }
 }
 

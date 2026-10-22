@@ -681,5 +681,11 @@ export class MailplugCollectorService {
 }
 
 export const mailplugService = new MailplugCollectorService();
-// 서버 시작과 동시에 1시간 주기 자동 스케줄러 가동
-mailplugService.startHourlyScheduler();
+// [Isolation Guard] 프로덕션 Render 환경에서는 무거운 메일플러그 자동 스케줄러를 차단하고 로컬에서만 가동
+const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+if (!isProd) {
+    mailplugService.startHourlyScheduler();
+} else {
+    console.log('[QC-01 Mailplug] Production environment detected. Automatic background scheduler is disabled.');
+}
+

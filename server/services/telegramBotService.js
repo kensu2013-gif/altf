@@ -34,10 +34,12 @@ export class TelegramBotService {
             lastUpdateId: 0
         };
         this.isPollingActive = false;
-        this.pollingTimer = null;
         this.loadConfig();
-        if (this.config.botToken && this.config.polling !== false) {
+        const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+        if (!isProd && this.config.botToken && this.config.polling !== false) {
             this.startPolling();
+        } else if (isProd) {
+            console.log('[TelegramBot] Production environment detected. Automatic background polling is disabled.');
         }
     }
 

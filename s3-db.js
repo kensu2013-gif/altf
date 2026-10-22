@@ -234,8 +234,28 @@ export async function getInventoryFromS3() {
 }
 
 export async function saveDbToS3(dbObject) {
+    const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+    const allowLocalS3Write = process.env.ALLOW_LOCAL_S3_WRITE === 'true';
+
+    // [Local Isolation Guard]
+    // 로컬 환경에서의 에이전트 수정/테스트가 실제 운영 altf.kr S3 DB(db.json)를 덮어쓰지 않도록 원천 격리
+    if (!isProd && !allowLocalS3Write) {
+        try {
+            const dir = './data';
+            const LOCAL_DB = path.join(dir, 'db_local.json');
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            fs.writeFileSync(LOCAL_DB, JSON.stringify(dbObject, null, 2), 'utf8');
+            console.log(`[Local Isolation] Saved to local database file (${LOCAL_DB}). Production S3 DB is safely untouched.`);
+            return;
+        } catch (localError) {
+            console.error('[Local Isolation] Failed to save to local DB file:', localError);
+            return;
+        }
+    }
+
     if (!hasAwsCredentials()) {
-        // console.log('[S3] No AWS credentials detected. Saving locally...');
         try {
             const dir = './data';
             const LOCAL_DB = path.join(dir, 'db.json');
@@ -243,7 +263,6 @@ export async function saveDbToS3(dbObject) {
                 fs.mkdirSync(dir, { recursive: true });
             }
             fs.writeFileSync(LOCAL_DB, JSON.stringify(dbObject), 'utf8');
-            // console.log(`[Local DB] Successfully saved database to local fallback: ${LOCAL_DB}`);
             return;
         } catch (localError) {
             console.error('[Local DB] Critical: Failed to save to local fallback DB:', localError);

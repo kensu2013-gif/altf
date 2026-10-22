@@ -715,9 +715,13 @@ async function checkAndGenerateAiReports() {
     }
 }
 
-// 부팅 30초 후 1회(재시작 중 놓친 기간을 즉시 캐치업) + 이후 매시간 체크
-setTimeout(() => { checkAndGenerateAiReports().catch(e => console.error('[AI Report] Catch-up run failed:', e)); }, 30 * 1000);
-setInterval(() => { checkAndGenerateAiReports().catch(e => console.error('[AI Report] Scheduled run failed:', e)); }, AI_REPORT_CHECK_INTERVAL_MS);
+// [Isolation Guard] 로컬 개발 환경에서만 자동 AI 리포트 생성 스케줄러 가동 (프로덕션 리소스 절약)
+if (!isProd) {
+    setTimeout(() => { checkAndGenerateAiReports().catch(e => console.error('[AI Report] Catch-up run failed:', e)); }, 30 * 1000);
+    setInterval(() => { checkAndGenerateAiReports().catch(e => console.error('[AI Report] Scheduled run failed:', e)); }, AI_REPORT_CHECK_INTERVAL_MS);
+} else {
+    console.log('[AI Report] Production environment detected. Automatic background scheduler is disabled.');
+}
 
 // --- Global Memory Cache ---
 let inventoryCache = {
@@ -882,6 +886,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     const url = new URL(req.url, `http://${req.headers.host}`);
+
+    // Fast Healthcheck Endpoints for Render, Cloudflare, and uptime monitors
+    if (url.pathname === '/health' || url.pathname === '/ping' || (url.pathname === '/' && req.method === 'GET')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'healthy', service: 'altf-api', timestamp: new Date().toISOString() }));
+        return;
+    }
 
     // Read-only user (test1234@test.com) restriction middleware
     const session = getAuthenticatedSession(req);
@@ -5466,8 +5477,8 @@ server.on('error', (e) => {
     }
 });
 
-server.listen(PORT, () => {
-    console.log(`Local API Server running at http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Local API Server running at http://0.0.0.0:${PORT}`);
 });
 
 // --- Global Exception & Rejection Handlers to prevent server crash ---

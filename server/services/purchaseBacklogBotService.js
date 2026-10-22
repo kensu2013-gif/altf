@@ -639,4 +639,11 @@ export class PurchaseBacklogBotService {
 }
 
 export const purchaseBacklogBotService = new PurchaseBacklogBotService();
-purchaseBacklogBotService.startBusinessHoursHourlyScheduler();
+// [Isolation Guard] 프로덕션 Render 환경에서는 무거운 발주 백로그 봇 스케줄러를 차단하고 로컬에서만 가동
+const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+if (!isProd) {
+    purchaseBacklogBotService.startBusinessHoursHourlyScheduler();
+} else {
+    console.log('[PUR-07 Agent] Production environment detected. Automatic background scheduler is disabled.');
+}
+
