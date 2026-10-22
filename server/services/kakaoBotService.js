@@ -235,8 +235,8 @@ export class KakaoBotService {
                                     }
                                 ],
                                 quickReplies: [
-                                    { messageText: '견적서 보기', action: 'webLink', label: '📄 정식 견적서 보기', webLinkUrl: `https://altf.kr/admin/quotes?id=${finishedQuote.id}` },
-                                    { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                                    { messageText: '발주 진행', action: 'message', label: '🚀 발주 진행 요청' },
+                                    { label: '📞 영업팀 직통전화', action: 'phone', phoneNumber: '0513033751' }
                                 ]
                             }
                         };
@@ -306,8 +306,8 @@ export class KakaoBotService {
                         ],
                         // 🚫 무한루프의 주범이었던 '접수 현황 확인' 버튼 영구 제거! 정식 견적서 확인 및 웹 바로가기만 노출
                         quickReplies: [
-                            { messageText: '견적서 보기', action: 'webLink', label: '📄 정식 견적서 보기', webLinkUrl: `https://altf.kr/admin/quotes?id=${recentQuote.id}` },
-                            { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                            { messageText: '발주 진행', action: 'message', label: '🚀 발주 진행 요청' },
+                            { label: '📞 영업팀 직통전화', action: 'phone', phoneNumber: '0513033751' }
                         ]
                     }
                 };
@@ -450,8 +450,8 @@ export class KakaoBotService {
                             }
                         ],
                         quickReplies: [
-                            { messageText: '견적서 보기', action: 'webLink', label: '📄 정식 견적서 보기', webLinkUrl: `https://altf.kr/admin/quotes?id=${existingQuote.id}` },
-                            { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                            { messageText: '발주 진행', action: 'message', label: '🚀 발주 진행 요청' },
+                            { label: '📞 영업팀 직통전화', action: 'phone', phoneNumber: '0513033751' }
                         ]
                     }
                 };
@@ -476,8 +476,8 @@ export class KakaoBotService {
                             }
                         ],
                         quickReplies: [
-                            { messageText: '견적서 보기', action: 'webLink', label: '📄 정식 견적서 보기', webLinkUrl: `https://altf.kr/admin/quotes?id=${existingQuote.id}` },
-                            { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                            { messageText: '발주 진행', action: 'message', label: '🚀 발주 진행 요청' },
+                            { label: '📞 영업팀 직통전화', action: 'phone', phoneNumber: '0513033751' }
                         ]
                     }
                 };
@@ -531,7 +531,7 @@ export class KakaoBotService {
             matchedUser: matchedUser || null,
             utterance: utterance || '[내용 없음]',
             imageUrl: null,
-            status: 'QUOTE_DRAFTED',
+            status: 'PENDING_REVIEW', // 담당자 검토 대기
             receivedAt,
             channel: '카카오톡 채널 (@altf)',
             assignedTeam: '영업2팀 (인입/표준화)',
@@ -550,16 +550,16 @@ export class KakaoBotService {
         const draftQuote = this.createDraftQuotation(intakeRecord, normalized);
         draftQuote.botUserKey = botUserKey;
         draftQuote.kakaoBotUserKey = botUserKey;
-        draftQuote.status = 'PROCESSED'; // 답변완료 상태 설정
+        draftQuote.status = 'PENDING_REVIEW'; // 담당자 검토 전 상태 유지
         
         const reviewResult = sleQuoteReviewService.reviewQuotation(draftQuote, this.draftQuotations);
         draftQuote.sleReview = reviewResult;
-        draftQuote.reviewStatus = reviewResult.status;
+        draftQuote.reviewStatus = 'PENDING_REVIEW';
         intakeRecord.quotationId = draftQuote.id;
         intakeRecord.sleReview = reviewResult;
 
         this.draftQuotations.unshift(draftQuote);
-        console.log(`[KakaoBot] ✅ 견적서 생성 완료 [${draftQuote.id}] 고객사: ${draftQuote.customerName} (${draftQuote.items.length}개 품목, ${draftQuote.totalAmount.toLocaleString()}원)`);
+        console.log(`[KakaoBot] 📥 [검토대기 인입] 견적서 초안 생성 [${draftQuote.id}] 고객사: ${draftQuote.customerName} (${draftQuote.items.length}개 품목, ${draftQuote.totalAmount.toLocaleString()}원) -> 담당자 검토 관제 대기`);
 
         if (this.onQuotationCreated) {
             this.onQuotationCreated(draftQuote);
@@ -571,21 +571,8 @@ export class KakaoBotService {
             this.dispatchToAgents(intakeRecord, draftQuote);
         }, 50);
 
-        // 🔥 [솔라피 자동 견적 발송] 수동 버튼 클릭 없이도 즉시 솔라피로 견적서 발송!
-        setTimeout(async () => {
-            try {
-                console.log(`[KakaoBot] ⚡ [자동 발송] 솔라피를 통한 견적서 ${draftQuote.id} 자동 발송 시도...`);
-                await this.dispatchQuotation({
-                    quotationId: draftQuote.id,
-                    botUserKey,
-                    targetPhone: normalized.customer?.phone || draftQuote.customerInfo?.phone
-                });
-            } catch (autoDispatchErr) {
-                console.error('[KakaoBot] 솔라피 자동 견적 발송 오류:', autoDispatchErr.message);
-            }
-        }, 100);
-
-        const responseText = this.formatKakaoQuoteMessage(draftQuote);
+        // 1차 산출 가견적 메시지 (완결형 텍스트, URL 없음)
+        const responseText = this.formatKakaoQuoteMessage(draftQuote, false);
 
         return {
             version: '2.0',
@@ -597,19 +584,22 @@ export class KakaoBotService {
                         }
                     }
                 ],
-                // 🚫 '접수 현황 확인' 제거: 이미 결과가 나왔으므로 정식 견적서 보기 및 홈페이지 링크만 제공
+                // 외부 웹 링크(URL) 완전 제거 -> 카카오톡 네이티브 전화/메시지 액션 제공
                 quickReplies: [
                     {
-                        messageText: '견적서 보기',
-                        action: 'webLink',
-                        label: '📄 정식 견적서 보기',
-                        webLinkUrl: `https://altf.kr/admin/quotes?id=${draftQuote.id}`
+                        messageText: '발주 진행',
+                        action: 'message',
+                        label: '🚀 발주 진행 요청'
                     },
                     {
-                        messageText: '홈페이지 방문',
-                        action: 'webLink',
-                        label: '🌐 알트에프 웹 바로가기',
-                        webLinkUrl: 'https://altf.kr'
+                        label: '📞 담당자 직통 전화',
+                        action: 'phone',
+                        phoneNumber: '0513033751'
+                    },
+                    {
+                        messageText: '재고 및 납기 문의',
+                        action: 'message',
+                        label: '📦 재고/납기 추가 문의'
                     }
                 ]
             }
@@ -759,8 +749,8 @@ export class KakaoBotService {
                                     ],
                                     // 🚫 콜백 시에도 무한루프를 유발하는 '접수 현황 확인' 버튼 삭제!
                                     quickReplies: [
-                                        { messageText: '견적서 보기', action: 'webLink', label: '📄 정식 견적서 보기', webLinkUrl: `https://altf.kr/admin/quotes?id=${draftQuote.id}` },
-                                        { messageText: '홈페이지 방문', action: 'webLink', label: '🌐 알트에프 웹 바로가기', webLinkUrl: 'https://altf.kr' }
+                                        { messageText: '발주 진행', action: 'message', label: '🚀 발주 진행 요청' },
+                                        { label: '📞 영업팀 직통전화', action: 'phone', phoneNumber: '0513033751' }
                                     ]
                                 }
                             };
@@ -841,29 +831,75 @@ export class KakaoBotService {
     }
 
     /**
-     * 카카오톡 규격(최대 1,000자 제한)에 완벽 부합하는 정밀 견적서 카드 포맷터 (최대 650자 이내 보장)
+     * 카카오톡 메신저 규격에 최적화된 완결형 B2B 견적서 텍스트 생성기
+     * - 외부 웹 URL 링크 클릭을 강제하지 않고, 카카오톡 채팅창 내에서 모든 품목, 규격, 수량, 단가, 합계, 납기, 담당자 연락처를 완결 노출
      */
-    formatKakaoQuoteMessage(quote) {
-        const custName = quote.customerName || '고객사';
-        const totalWon = (quote.totalAmount || 0).toLocaleString();
-        const itemCount = quote.items?.length || 0;
-        const rate = quote.items?.[0]?.discountRate || 50;
+    formatKakaoQuoteMessage(quote, isApproved = false) {
+        if (!quote) return '견적 정보를 불러올 수 없습니다.';
 
-        // 주요 품목 최대 4개 요약 노출 (1000자 초과 절대 방지)
-        const displayItems = (quote.items || []).slice(0, 4);
-        const itemLines = displayItems.map((it, idx) => {
-            const uPrice = (it.unitPrice || 0).toLocaleString();
-            return `• ${it.name} ${it.thickness || ''} ${it.size} (${it.material || ''}) : ${it.quantity}EA | 단가: ${uPrice}원`;
-        }).join('\n');
+        const custName = quote.customerName || quote.customerInfo?.companyName || quote.customerInfo?.contactName || '고객사';
+        const totalAmount = quote.totalAmount || 0;
+        const vatAmount = Math.round(totalAmount * 0.1);
+        const grandTotal = totalAmount + vatAmount;
+        const items = quote.items || [];
+        const itemCount = items.length;
+        const rate = items[0]?.discountRate !== undefined ? items[0].discountRate : (quote.discountRate || 50);
 
-        const remainingCount = itemCount - displayItems.length;
-        const remainingText = remainingCount > 0 ? `\n... 외 ${remainingCount}개 품목 추가 포함` : '';
+        const isReviewed = isApproved || quote.reviewStatus === 'APPROVED' || quote.status === 'APPROVED';
+        const statusBadge = isReviewed 
+            ? '✅ [영업부 담당자 검토 및 단가 승인 완료]' 
+            : '⏳ [영업2팀 1차 자동 산출안 - 담당자 확인 중]';
 
-        const reviewBadge = quote.reviewStatus === 'ESCALATION_REQUIRED'
-            ? '⚠️ 영업부장 결재 진행 중'
-            : '✅ [박조나단 과장 검토 완료 - 출고 준비]';
+        const today = new Date();
+        const dateStr = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
 
-        return `📋 [알트에프 견적 회신]\n${custName} 귀하, 요청하신 피팅 견적이 산출되었습니다.\n\n[견적 요약 (요율 -${rate}% 적용)]\n${itemLines}${remainingText}\n\n💰 견적합계: ${totalWon}원 (VAT 별도)\n📦 검토상태: ${reviewBadge}\n🚚 납기/배송: ${quote.memo?.replace('카카오톡 채널 인입 (@altf) - ', '') || '시화/양산 당일 출고 준비'}\n\n👇 아래 [정식 견적서 보기] 버튼을 누르시면 직인 날인된 PDF를 즉시 확인하실 수 있습니다.`;
+        // 품목 리스트를 직관적이고 정돈된 텍스트 표/블록으로 포맷팅
+        let itemsText = '';
+        if (items.length === 0) {
+            itemsText = '• 등록된 견적 품목이 없습니다.';
+        } else if (items.length <= 10) {
+            itemsText = items.map((it, idx) => {
+                const spec = `${it.name || it.type || '피팅'} ${it.thickness || it.schedule || ''} ${it.size || ''} (${it.material || 'STS304'})`.trim();
+                const qty = it.quantity !== undefined ? it.quantity : (it.qty || 1);
+                const uPrice = (it.unitPrice || 0).toLocaleString();
+                const amt = (it.amount || (qty * (it.unitPrice || 0))).toLocaleString();
+                const stockNote = it.stockStatus === 'OUT_OF_STOCK' ? '주문제작 3~5일' : '즉시출고 가능';
+                return `${idx + 1}. ${spec}\n   수량: ${qty}EA | 단가: ${uPrice}원 | 금액: ${amt}원 [${stockNote}]`;
+            }).join('\n');
+        } else {
+            // 품목이 10개 초과인 경우 (1,000자 초과 방지 컴팩트 블록)
+            const topItems = items.slice(0, 10).map((it, idx) => {
+                const spec = `${it.name || it.type} ${it.thickness || it.schedule || ''} ${it.size}`;
+                const qty = it.quantity !== undefined ? it.quantity : (it.qty || 1);
+                const amt = (it.amount || (qty * (it.unitPrice || 0))).toLocaleString();
+                return `${idx + 1}. ${spec} : ${qty}EA (${amt}원)`;
+            }).join('\n');
+            itemsText = `${topItems}\n... 외 ${itemCount - 10}개 품목 추가 포함 (총 ${itemCount}품목)`;
+        }
+
+        const memoClean = quote.memo 
+            ? quote.memo.replace('카카오톡 채널 인입 (@altf) - ', '').trim() 
+            : '시화/양산 물류센터 당일 직출고 준비';
+
+        return `📋 [알트에프(AltF) 정식 견적서 회신]\n` +
+               `━━━━━━━━━━━━━━━━━━━━\n` +
+               `• 견적번호: ${quote.id || 'DRAFT'}\n` +
+               `• 수신고객: ${custName} 귀하\n` +
+               `• 견적일자: ${dateStr} (유효기간: 7일)\n` +
+               `• 적용요율: 단가표 기준 -${rate}% 적용\n` +
+               `━━━━━━━━━━━━━━━━━━━━\n` +
+               `[견적 품목 내역] (총 ${itemCount}개 품목)\n\n` +
+               `${itemsText}\n` +
+               `━━━━━━━━━━━━━━━━━━━━\n` +
+               `• 공급가액: ${totalAmount.toLocaleString()}원\n` +
+               `• 부가세(10%): ${vatAmount.toLocaleString()}원\n` +
+               `💰 최종 합계: ${grandTotal.toLocaleString()}원 (VAT 포함)\n` +
+               `━━━━━━━━━━━━━━━━━━━━\n` +
+               `📦 검토상태: ${statusBadge}\n` +
+               `🚚 배송/납기: ${memoClean}\n` +
+               `📞 직통문의: 051-303-3751 (영업2팀 직통)\n` +
+               `━━━━━━━━━━━━━━━━━━━━\n` +
+               `💬 본 견적으로 발주를 원하시면 "발주" 또는 "진행"이라고 회신해주세요.`;
     }
 
     /**
@@ -1172,6 +1208,255 @@ export class KakaoBotService {
     }
 
     /**
+     * 카카오톡 견적 인입건에 대한 사무실 담당자 검토 큐(Review Queue) 조회
+     * - 고객이 전송한 날것의 원문 텍스트(utterance)
+     * - AI 봇이 추출한 품목/단가/수량/할인율 대장
+     * - 실시간 카카오톡 완결형 텍스트 프리뷰
+     * - 담당자 검토 및 승인 상태
+     */
+    getReviewQueue() {
+        return this.intakes.map(intake => {
+            const quote = this.draftQuotations.find(q => q.id === intake.quotationId) || null;
+            const items = quote?.items && quote.items.length > 0 ? quote.items : (intake.parsedItems || []);
+            const totalAmount = quote?.totalAmount !== undefined 
+                ? quote.totalAmount 
+                : items.reduce((sum, it) => sum + (it.amount || ((it.quantity !== undefined ? it.quantity : (it.qty || 1)) * (it.unitPrice || it.basePrice || 0))), 0);
+            const vatAmount = Math.round(totalAmount * 0.1);
+            const grandTotal = totalAmount + vatAmount;
+
+            const normalizedItems = items.map((it, idx) => ({
+                id: it.id || `item-${intake.id}-${idx}`,
+                name: it.name || it.type || '피팅',
+                thickness: it.thickness || it.schedule || 'S10S',
+                size: it.size || '',
+                material: it.material || 'STS304-W',
+                quantity: it.quantity !== undefined ? it.quantity : (it.qty || 1),
+                basePrice: it.base_price !== undefined ? it.base_price : (it.basePrice || 0),
+                discountRate: it.discountRate !== undefined ? it.discountRate : (intake.discountRate || quote?.discountRate || 50),
+                unitPrice: it.unitPrice !== undefined ? it.unitPrice : (it.userUnitPrice || Math.round((it.base_price || it.basePrice || 0) * (1 - (it.discountRate || 50) / 100))),
+                amount: it.amount !== undefined ? it.amount : ((it.quantity !== undefined ? it.quantity : (it.qty || 1)) * (it.unitPrice || 0)),
+                currentStock: it.currentStock !== undefined ? it.currentStock : 999,
+                location: it.location || '양산',
+                stockStatus: it.stockStatus || 'AVAILABLE'
+            }));
+
+            const formattedText = quote 
+                ? this.formatKakaoQuoteMessage(quote, quote.reviewStatus === 'APPROVED') 
+                : this.formatKakaoQuoteMessage({
+                    id: intake.quotationId || 'DRAFT',
+                    customerName: intake.customer?.name || intake.matchedUser?.name || '카카오톡 고객',
+                    totalAmount,
+                    items: normalizedItems,
+                    memo: intake.remarks || '시화/양산 당일 즉시 출고 준비'
+                }, false);
+
+            return {
+                intakeId: intake.id,
+                quotationId: intake.quotationId || quote?.id || null,
+                receivedAt: intake.receivedAt,
+                type: intake.type,
+                botUserKey: intake.botUserKey,
+                matchedUser: intake.matchedUser,
+                customer: {
+                    name: intake.customer?.name || quote?.customerName || intake.matchedUser?.name || '카카오톡 고객',
+                    phone: intake.customer?.phone || quote?.customerInfo?.phone || intake.matchedUser?.phone || '',
+                    company: intake.customer?.name || quote?.customerInfo?.companyName || intake.matchedUser?.company || ''
+                },
+                rawUtterance: intake.utterance || '',
+                imageUrl: intake.imageUrl || null,
+                status: quote?.status || intake.status || 'PENDING_REVIEW',
+                reviewStatus: quote?.reviewStatus || (quote?.status === 'APPROVED' ? 'APPROVED' : 'PENDING_REVIEW'),
+                reviewedBy: quote?.reviewedBy || intake.reviewedBy || null,
+                reviewedAt: quote?.reviewedAt || intake.reviewedAt || null,
+                discountRate: quote?.items?.[0]?.discountRate || intake.discountRate || 50,
+                memo: quote?.memo || intake.remarks || '',
+                items: normalizedItems,
+                totalAmount,
+                vatAmount,
+                grandTotal,
+                formattedKakaoText: formattedText,
+                dispatchStatus: quote?.dispatchStatus || 'PENDING'
+            };
+        });
+    }
+
+    /**
+     * 사무실 담당자의 카카오톡 견적 수정 (품목, 단가, 수량, 할인율, 메모 재계산)
+     */
+    updateDraftQuote({ quotationId, intakeId, items, discountRate, memo, customerName, customerPhone }) {
+        const quoteIdx = this.draftQuotations.findIndex(q => q.id === quotationId);
+        const intakeIdx = this.intakes.findIndex(i => i.id === intakeId || i.quotationId === quotationId);
+
+        let quote = quoteIdx >= 0 ? this.draftQuotations[quoteIdx] : null;
+        let intake = intakeIdx >= 0 ? this.intakes[intakeIdx] : null;
+
+        const defaultRate = discountRate !== undefined ? Number(discountRate) : (quote?.items?.[0]?.discountRate || 50);
+
+        // 항목 재계산
+        let totalAmount = 0;
+        const updatedItems = (items || []).map((it, idx) => {
+            const qty = Number(it.quantity !== undefined ? it.quantity : (it.qty || 1));
+            const basePrice = Number(it.basePrice !== undefined ? it.basePrice : (it.base_price || 0));
+            const itRate = it.discountRate !== undefined ? Number(it.discountRate) : defaultRate;
+            const unitPrice = it.unitPrice !== undefined ? Number(it.unitPrice) : Math.round(basePrice * (1 - itRate / 100));
+            const amount = unitPrice * qty;
+            totalAmount += amount;
+
+            return {
+                id: it.id || `item-${Date.now()}-${idx}`,
+                productId: it.productId || it.itemId || `${it.name}-${it.thickness}-${it.size}`,
+                itemId: it.itemId || it.productId || `${it.name}-${it.thickness}-${it.size}`,
+                name: it.name,
+                thickness: it.thickness || 'S10S',
+                size: it.size,
+                material: it.material || 'STS304-W',
+                quantity: qty,
+                unitPrice,
+                userUnitPrice: unitPrice,
+                amount,
+                base_price: basePrice,
+                discountRate: itRate,
+                currentStock: it.currentStock !== undefined ? it.currentStock : 999,
+                location: it.location || '양산',
+                maker: it.maker || '대경',
+                stockStatus: it.stockStatus || 'AVAILABLE',
+                isVerified: true,
+                isSelected: true
+            };
+        });
+
+        if (quote) {
+            quote.items = updatedItems;
+            quote.totalAmount = totalAmount;
+            if (memo !== undefined) quote.memo = memo;
+            if (customerName) quote.customerName = customerName;
+            if (customerPhone && quote.customerInfo) quote.customerInfo.phone = customerPhone;
+            this.draftQuotations[quoteIdx] = quote;
+        }
+
+        if (intake) {
+            intake.parsedItems = updatedItems;
+            if (memo !== undefined) intake.remarks = memo;
+            if (customerName && intake.customer) intake.customer.name = customerName;
+            if (customerPhone && intake.customer) intake.customer.phone = customerPhone;
+            this.intakes[intakeIdx] = intake;
+        }
+
+        this.saveData();
+
+        if (quote && this.onQuotationUpdated) {
+            this.onQuotationUpdated(quote);
+        }
+
+        console.log(`[KakaoBot] ✏️ 담당자 검토 수정 저장 완료 (${quotationId || intakeId}): ${updatedItems.length}개 품목, 총액: ${totalAmount.toLocaleString()}원`);
+        return {
+            success: true,
+            quotationId,
+            intakeId,
+            totalAmount,
+            vatAmount: Math.round(totalAmount * 0.1),
+            grandTotal: Math.round(totalAmount * 1.1),
+            items: updatedItems,
+            formattedKakaoText: quote ? this.formatKakaoQuoteMessage(quote) : ''
+        };
+    }
+
+    /**
+     * 사무실 담당자의 최종 승인 및 카카오톡 완결형 텍스트 회신 발송 (Human-in-the-Loop)
+     */
+    async approveAndDispatchQuote({ quotationId, intakeId, reviewerName = '영업담당자', memo, targetPhone }) {
+        const quoteIdx = this.draftQuotations.findIndex(q => q.id === quotationId);
+        const intakeIdx = this.intakes.findIndex(i => i.id === intakeId || i.quotationId === quotationId);
+
+        let quote = quoteIdx >= 0 ? this.draftQuotations[quoteIdx] : null;
+        let intake = intakeIdx >= 0 ? this.intakes[intakeIdx] : null;
+
+        if (!quote && !intake) {
+            throw new Error(`견적 정보(ID: ${quotationId || intakeId})를 찾을 수 없습니다.`);
+        }
+
+        const now = new Date().toISOString();
+        if (quote) {
+            quote.status = 'APPROVED';
+            quote.reviewStatus = 'APPROVED';
+            quote.reviewedBy = reviewerName;
+            quote.reviewedAt = now;
+            quote.dispatchStatus = 'SENT';
+            quote.dispatchedAt = now;
+            if (memo) quote.memo = memo;
+            this.draftQuotations[quoteIdx] = quote;
+        }
+
+        if (intake) {
+            intake.status = 'APPROVED';
+            intake.reviewedBy = reviewerName;
+            intake.reviewedAt = now;
+            intake.dispatchedAt = now;
+            this.intakes[intakeIdx] = intake;
+        }
+
+        this.saveData();
+
+        // 확정된 완결형 텍스트 메시지 생성
+        const finalMessage = this.formatKakaoQuoteMessage(quote || {
+            id: quotationId,
+            customerName: intake?.customer?.name || '고객사',
+            totalAmount: intake?.parsedItems?.reduce((sum, it) => sum + (it.amount || 0), 0) || 0,
+            items: intake?.parsedItems || [],
+            memo: memo || intake?.remarks
+        }, true);
+
+        // Solapi 또는 Webhook으로 고객 휴대폰에 완결형 텍스트 견적서 발송
+        let dispatchResult = null;
+        try {
+            const phone = targetPhone || quote?.customerInfo?.phone || intake?.customer?.phone || intake?.matchedUser?.phone;
+            dispatchResult = await this.dispatchQuotation({
+                quotationId: quote?.id || quotationId,
+                botUserKey: intake?.botUserKey,
+                customMessage: finalMessage,
+                targetPhone: phone
+            });
+        } catch (dispatchErr) {
+            console.error('[KakaoBot] 승인 후 발송 오류:', dispatchErr.message);
+            dispatchResult = { success: false, error: dispatchErr.message };
+        }
+
+        console.log(`[KakaoBot] 🎯 [담당자 최종 승인 완료] 견적번호 ${quotationId || intakeId} 발송 완료 (검토자: ${reviewerName})`);
+
+        return {
+            success: true,
+            status: 'APPROVED',
+            reviewedBy: reviewerName,
+            reviewedAt: now,
+            dispatchedAt: now,
+            finalMessage,
+            dispatchResult
+        };
+    }
+
+    /**
+     * 카카오톡 견적 의뢰 반려 / 취소
+     */
+    rejectQuote({ quotationId, intakeId, reason = '고객 요청 취소 또는 규격 불일치' }) {
+        const quoteIdx = this.draftQuotations.findIndex(q => q.id === quotationId);
+        const intakeIdx = this.intakes.findIndex(i => i.id === intakeId || i.quotationId === quotationId);
+
+        if (quoteIdx >= 0) {
+            this.draftQuotations[quoteIdx].status = 'REJECTED';
+            this.draftQuotations[quoteIdx].reviewStatus = 'REJECTED';
+            this.draftQuotations[quoteIdx].rejectReason = reason;
+        }
+
+        if (intakeIdx >= 0) {
+            this.intakes[intakeIdx].status = 'REJECTED';
+            this.intakes[intakeIdx].rejectReason = reason;
+        }
+
+        this.saveData();
+        return { success: true, status: 'REJECTED', reason };
+    }
+
+    /**
      * 답변 완료된 견적서를 Solapi(문자/MMS) 또는 Make.com 웹훅으로 발송
      */
     async dispatchQuotation({ quotationId, botUserKey, customMessage, webhookUrl, targetPhone: explicitPhone }) {
@@ -1262,23 +1547,17 @@ export class KakaoBotService {
         }
 
         const formattedTotal = quote?.totalAmount ? `₩${quote.totalAmount.toLocaleString()}원 (VAT별도)` : '별도협의';
-
-        // 사용자 요청 100% 반영: 
-        // 1) 지저분하고 긴 S3 주소 대신 공식 초단축 URL(https://altf.kr/q/...) 제공
-        // 2) 불필요한 '공유/저장' 안내 문구 완전 삭제
-        // 3) 누르면 138KB 정식 PDF가 스마트폰에 즉시 다운로드
-        const messageText = customMessage || (
-            `[알트에프(AltF) 견적 회신]\n` +
+        // 카카오톡 및 LMS 완결형 견적서 텍스트 생성 (외부 URL 링크 의존 완전 탈피)
+        const messageText = customMessage || (quote ? this.formatKakaoQuoteMessage(quote, true) : (
+            `[알트에프(AltF) 정식 견적 회신]\n` +
             `${targetName} 담당자님, 요청하신 견적이 완료되었습니다.\n` +
             `━━━━━━━━━━━━━━━━━━━━\n` +
             `• 견적번호: ${quotationId}\n` +
             `• 공급가액: ${formattedTotal}\n` +
             stockSummaryText +
             `━━━━━━━━━━━━━━━━━━━━\n` +
-            `📄 공식 견적서(PDF) 다운로드:\n` +
-            `${shortPdfUrl}\n\n` +
-            `문의: 051-303-3751 / 알트에프(주)`
-        );
+            `문의: 051-303-3751 / 알트에프(주) 영업2팀`
+        ));
 
         const payload = {
             event: 'QUOTE_DISPATCHED',

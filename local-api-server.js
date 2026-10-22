@@ -2444,6 +2444,66 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // 7-1. GET /api/kakao/review-queue : 사무실 담당자 검토 관제 큐 조회 (원문 텍스트, AI 추출 품목, 완결형 텍스트 프리뷰)
+        if (req.method === 'GET' && url.pathname === '/api/kakao/review-queue') {
+            try {
+                const queue = kakaoBotService.getReviewQueue();
+                sendJsonResponse(req, res, 200, { success: true, count: queue.length, queue });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 7-2. POST /api/kakao/update-draft : 담당자가 초안 품목/단가/수량/할인율/메모 수정한 내용 저장
+        if (req.method === 'POST' && url.pathname === '/api/kakao/update-draft') {
+            try {
+                const body = await parseBody(req);
+                const result = kakaoBotService.updateDraftQuote(body);
+                sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 7-3. POST /api/kakao/approve-quote : 담당자 최종 승인 및 카카오톡 완결형 텍스트 회신 발송 (Human-in-the-Loop)
+        if (req.method === 'POST' && url.pathname === '/api/kakao/approve-quote') {
+            try {
+                const body = await parseBody(req);
+                const result = await kakaoBotService.approveAndDispatchQuote(body);
+
+                // db.quotations 상태도 'PROCESSED' / 'APPROVED'로 동기화
+                if (result.success && body.quotationId) {
+                    const qIdx = (db.quotations || []).findIndex(q => q.id === body.quotationId);
+                    if (qIdx >= 0) {
+                        db.quotations[qIdx].status = 'PROCESSED';
+                        db.quotations[qIdx].reviewStatus = 'APPROVED';
+                        db.quotations[qIdx].dispatchStatus = 'SENT';
+                        db.quotations[qIdx].dispatchedAt = new Date().toISOString();
+                        queueSave();
+                    }
+                }
+
+                sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 7-4. POST /api/kakao/reject-quote : 담당자 견적 반려 처리
+        if (req.method === 'POST' && url.pathname === '/api/kakao/reject-quote') {
+            try {
+                const body = await parseBody(req);
+                const result = kakaoBotService.rejectQuote(body);
+                sendJsonResponse(req, res, 200, result);
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
         // 8. GET /api/kakao/sla-benchmark : 과거 견적서 기반 회신 소요 시간(SLA) 벤치마크 및 이상치 분석
         if (req.method === 'GET' && url.pathname === '/api/kakao/sla-benchmark') {
             try {

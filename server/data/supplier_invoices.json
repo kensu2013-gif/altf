@@ -1,5 +1,141 @@
 [
   {
+    "id": "DKB-INV-SAMPLE-0015",
+    "fileName": "20261019_대경벤드_거래명세서_0015.pdf",
+    "invoiceNo": "No:0015",
+    "invoiceDate": "2026-10-19",
+    "supplier": {
+      "name": "(주)대경벤드",
+      "bizNo": "606-81-75098",
+      "ceo": "김학철",
+      "address": "경남 양산시 어실로 115"
+    },
+    "buyer": {
+      "name": "알트에프(ALT.F)",
+      "bizNo": "838-05-01054",
+      "ceo": "조현진",
+      "address": "부산광역시 사상구 낙동대로 1330번길 67"
+    },
+    "items": [
+      {
+        "itemNo": 1,
+        "type": "PRODUCT",
+        "name": "45E(S)",
+        "rawLine": "45E(S) STS 304-W S/20S ERW 300A",
+        "quantity": 2,
+        "unit": "EA",
+        "unitPrice": 237830,
+        "amount": 475660,
+        "poNo": "ES261019-2915",
+        "remarks": "국제밸브앤드피팅 910660201847ES261019-2915"
+      }
+    ],
+    "itemCount": 1,
+    "poNumbers": [
+      "ES261019-2915"
+    ],
+    "pricing": {
+      "totalSupplyPrice": 475660,
+      "freightPrice": 0,
+      "subtotal": 475660,
+      "vat": 47566,
+      "grandTotal": 523226
+    },
+    "source": "SIMULATION",
+    "processedAt": "2026-10-22T15:10:59.832Z",
+    "status": "RECEIVED_AND_DISPATCHED",
+    "crossCheck": {
+      "hasOrderMatch": true,
+      "matchedOrdersCount": 1,
+      "matchedPoNumbers": [
+        "ES261019-2915"
+      ],
+      "invoiceSubtotal": 475660,
+      "expectedPurchaseSubtotal": 594580,
+      "diffAmount": -118920,
+      "discrepancyType": "UNDER_BILLED",
+      "statusText": "과소 청구 (-118,920원)",
+      "discrepancy": {
+        "type": "UNDER_BILLED",
+        "diff": -118920,
+        "detail": "undefined [0015- 1/ 1] 전표가: 475,660원 vs 발주가: 594,580원 (과소 청구 (-118,920원))"
+      }
+    },
+    "accounting": {
+      "recordedAt": "2026-10-22T15:10:59.832Z",
+      "status": "PURCHASE_CONFIRMED",
+      "taxInvoiceMatched": false,
+      "subtotal": 475660,
+      "vat": 47566,
+      "grandTotal": 523226,
+      "discrepancy": {
+        "type": "UNDER_BILLED",
+        "diff": -118920,
+        "detail": "undefined [0015- 1/ 1] 전표가: 475,660원 vs 발주가: 594,580원 (과소 청구 (-118,920원))"
+      }
+    },
+    "archive": {
+      "id": "ARC-2026-10-19-No_0015",
+      "date": "2026-10-19",
+      "invoiceNo": "No:0015",
+      "poNumbers": [
+        "ES261019-2915"
+      ],
+      "customerName": "알트에프",
+      "pricing": {
+        "totalSupplyPrice": 475660,
+        "freightPrice": 0,
+        "subtotal": 475660,
+        "vat": 47566,
+        "grandTotal": 523226
+      },
+      "invoiceFile": {
+        "fileName": "No_0015_20261019_대경벤드_거래명세서_0015.pdf",
+        "path": "storage/archive/2026-10-19/invoices/No_0015_20261019_대경벤드_거래명세서_0015.pdf",
+        "sizeBytes": 0
+      },
+      "certificates": [
+        {
+          "certNo": "YR-26-10024",
+          "heatNo": "SE53453",
+          "lotNo": "KJA1209",
+          "fileName": "261019_알트에프.261019-2915 (10-19-34).pdf",
+          "localPath": "storage/archive/2026-10-19/certificates/261019_알트에프.261019-2915 (10-19-34).pdf"
+        }
+      ],
+      "itemsCount": 1,
+      "matchResult": {
+        "matchStatus": "ALL_MATCHED",
+        "totalItems": 1,
+        "matchedCount": 1,
+        "matchedCerts": [
+          {
+            "itemNo": 1,
+            "itemName": "45E(S)",
+            "qty": 2,
+            "certNo": "YR-26-10024",
+            "heatNo": "SE53453",
+            "lotNo": "KJA1209",
+            "pdfUrl": "261019_알트에프.261019-2915 (10-19-34).pdf"
+          }
+        ],
+        "itemVerification": [
+          {
+            "itemNo": 1,
+            "name": "45E(S)",
+            "status": "MATCHED",
+            "certNo": "YR-26-10024",
+            "heatNo": "SE53453",
+            "lotNo": "KJA1209"
+          }
+        ],
+        "isConfirmed": true,
+        "summaryMessage": "✅ [3각 대조 완결] 발주 품목 1개 중 1개 성적서 1:1 완벽 일치 확정"
+      },
+      "archivedAt": "2026-10-22T15:11:00.462Z"
+    }
+  },
+  {
     "id": "DKB-INV-2026-10-22-4205",
     "fileName": "알트에프_거래명세표_1022.pdf",
     "invoiceNo": "No:4205",

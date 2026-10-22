@@ -1,5 +1,65 @@
 [
   {
+    "id": "ARC-2026-10-19-No_0015",
+    "date": "2026-10-19",
+    "invoiceNo": "No:0015",
+    "poNumbers": [
+      "ES261019-2915"
+    ],
+    "customerName": "알트에프",
+    "pricing": {
+      "totalSupplyPrice": 475660,
+      "freightPrice": 0,
+      "subtotal": 475660,
+      "vat": 47566,
+      "grandTotal": 523226
+    },
+    "invoiceFile": {
+      "fileName": "No_0015_20261019_대경벤드_거래명세서_0015.pdf",
+      "path": "storage/archive/2026-10-19/invoices/No_0015_20261019_대경벤드_거래명세서_0015.pdf",
+      "sizeBytes": 0
+    },
+    "certificates": [
+      {
+        "certNo": "YR-26-10024",
+        "heatNo": "SE53453",
+        "lotNo": "KJA1209",
+        "fileName": "261019_알트에프.261019-2915 (10-19-34).pdf",
+        "localPath": "storage/archive/2026-10-19/certificates/261019_알트에프.261019-2915 (10-19-34).pdf"
+      }
+    ],
+    "itemsCount": 1,
+    "matchResult": {
+      "matchStatus": "ALL_MATCHED",
+      "totalItems": 1,
+      "matchedCount": 1,
+      "matchedCerts": [
+        {
+          "itemNo": 1,
+          "itemName": "45E(S)",
+          "qty": 2,
+          "certNo": "YR-26-10024",
+          "heatNo": "SE53453",
+          "lotNo": "KJA1209",
+          "pdfUrl": "261019_알트에프.261019-2915 (10-19-34).pdf"
+        }
+      ],
+      "itemVerification": [
+        {
+          "itemNo": 1,
+          "name": "45E(S)",
+          "status": "MATCHED",
+          "certNo": "YR-26-10024",
+          "heatNo": "SE53453",
+          "lotNo": "KJA1209"
+        }
+      ],
+      "isConfirmed": true,
+      "summaryMessage": "✅ [3각 대조 완결] 발주 품목 1개 중 1개 성적서 1:1 완벽 일치 확정"
+    },
+    "archivedAt": "2026-10-22T15:11:00.462Z"
+  },
+  {
     "id": "ARC-2026-10-22-4205",
     "date": "2026-10-22",
     "invoiceNo": "No:4205",

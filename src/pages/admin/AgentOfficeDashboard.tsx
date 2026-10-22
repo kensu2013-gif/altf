@@ -49,12 +49,14 @@ import {
     Clock,
     UploadCloud,
     Timer,
-    Settings
+    Settings,
+    MessageSquare
 } from 'lucide-react';
 import { CertificateLedgerModal } from '../../components/admin/CertificateLedgerModal';
 import { PurchaseLedgerModal } from '../../components/admin/PurchaseLedgerModal';
 import { CertificateIssuerModal } from '../../components/admin/CertificateIssuerModal';
 import { DaekyungInvoiceModal } from '../../components/admin/DaekyungInvoiceModal';
+import { KakaoMessengerQuoteModal } from '../../components/admin/KakaoMessengerQuoteModal';
 
 const STORAGE_KEY = 'altf_agent_swarm_core18_v1';
 const STORAGE_DEPT_KEY = 'altf_departments_core6_v1';
@@ -707,6 +709,7 @@ export default function AgentOfficeDashboard() {
     const [showPurchaseLedgerModal, setShowPurchaseLedgerModal] = useState<boolean>(false);
     const [showCertIssuerModal, setShowCertIssuerModal] = useState<boolean>(false);
     const [showDaekyungInvoiceModal, setShowDaekyungInvoiceModal] = useState<boolean>(false);
+    const [showKakaoQuoteModal, setShowKakaoQuoteModal] = useState<boolean>(false);
     const [showToolsDropdown, setShowToolsDropdown] = useState<boolean>(false);
     const toolsDropdownRef = React.useRef<HTMLDivElement>(null);
     const [latestSignal, setLatestSignal] = useState<{
@@ -2920,6 +2923,16 @@ export default function AgentOfficeDashboard() {
                         )}
                     </div>
 
+                    {/* 💬 카카오톡 메신저 견적 검토 관제 퀵 버튼 */}
+                    <button
+                        onClick={() => setShowKakaoQuoteModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-950/30 hover:bg-amber-950/60 hover:border-amber-400 text-amber-300 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                        title="카카오톡 메신저로 인입된 원본 텍스트(txt)를 확인하고 담당자가 견적을 확정·회신합니다."
+                    >
+                        <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+                        <span>카톡 견적 검토</span>
+                    </button>
+
                     {/* 📁 업무 대장 & 관제 도구 통합 드롭다운 (거대 배너 4개를 컴팩트 툴바로 일원화) */}
                     <div className="relative" ref={toolsDropdownRef}>
                         <button
@@ -3001,6 +3014,21 @@ export default function AgentOfficeDashboard() {
                                         </div>
                                     </div>
                                     <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1 py-0.5 rounded font-mono">신호</span>
+                                </button>
+
+                                {/* 5. 카카오톡 견적 검토 관제 (Human-in-the-Loop) */}
+                                <button
+                                    onClick={() => { setShowKakaoQuoteModal(true); setShowToolsDropdown(false); }}
+                                    className="w-full text-left p-2 rounded-lg hover:bg-amber-950/40 border border-transparent hover:border-amber-500/30 flex items-center justify-between transition-colors group cursor-pointer"
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <MessageSquare className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                                        <div>
+                                            <div className="text-xs font-bold text-slate-200 group-hover:text-amber-300">💬 [영업2팀] 카톡 견적 검토 관제</div>
+                                            <div className="text-[10px] text-slate-400">원문 txt 확인 및 단가 검토/카톡 회신</div>
+                                        </div>
+                                    </div>
+                                    <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded font-mono">신규</span>
                                 </button>
                             </div>
                         )}
@@ -4949,6 +4977,37 @@ export default function AgentOfficeDashboard() {
                                 </div>
                             </div>
 
+                            {/* 💬 [영업팀 INT/SLE 전용] 카카오톡 메신저 견적 인입 & 검토 관제 */}
+                            {(selectedAgent.code?.startsWith('INT-') || selectedAgent.code?.startsWith('SLE-') || selectedAgent.departmentId === 'sales-1' || selectedAgent.departmentId === 'sales-2') && (
+                                <div className="border border-amber-500/40 bg-amber-950/20 rounded-xl p-3.5 space-y-3.5 shadow-[0_0_20px_rgba(245,158,11,0.2)] my-3">
+                                    <div className="flex items-center justify-between border-b border-amber-900/40 pb-2">
+                                        <div className="flex items-center gap-1.5 text-amber-300 font-bold text-xs">
+                                            <MessageSquare className="w-4 h-4 text-amber-400" />
+                                            <span>카카오톡 직통 견적 인입 & 담당자 검토 관제 (Review Gate)</span>
+                                        </div>
+                                        <span className="text-[9px] px-2 py-0.5 rounded font-black bg-amber-500/20 text-amber-300 font-mono border border-amber-500/40">
+                                            {selectedAgent.code} 실시간 연계
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-gray-300 leading-relaxed">
+                                        고객이 카카오톡으로 보낸 비정형 텍스트(txt) 원문을 검토하고, AI 파싱 단가 대장을 직접 확인·조정한 후 외부 웹링크 없이 카카오톡 채팅창으로 완결형 견적서를 회신합니다.
+                                    </p>
+                                    <div className="flex items-center justify-between pt-1">
+                                        <div className="text-[11px] text-amber-400/80">
+                                            💡 Human-in-the-Loop 2차 판단 데스크
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowKakaoQuoteModal(true)}
+                                            className="py-1.5 px-3 rounded-lg bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-extrabold text-xs shadow-md shadow-amber-500/20 cursor-pointer transition-all flex items-center gap-1.5"
+                                        >
+                                            <MessageSquare className="w-3.5 h-3.5" />
+                                            <span>카톡 견적 검토 관제 열기</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* 🛒 [구매부 PUR-01 전용] 알트에프 재고 발주 List Up & 미결 관리 제어반 */}
                             {selectedAgent.code === 'PUR-01' && (
                                 <div className="border border-emerald-500/40 bg-emerald-950/20 rounded-xl p-3.5 space-y-3.5 shadow-[0_0_20px_rgba(16,185,129,0.2)] my-3">
@@ -6586,6 +6645,12 @@ export default function AgentOfficeDashboard() {
                         console.warn('Failed to refresh agents:', e);
                     }
                 }}
+            />
+
+            {/* 💬 7. 카카오톡 메신저 견적 인입 & 담당자 2차 검토 관제 (Human-in-the-Loop) */}
+            <KakaoMessengerQuoteModal
+                isOpen={showKakaoQuoteModal}
+                onClose={() => setShowKakaoQuoteModal(false)}
             />
 
             {/* ⚡ 구글시트 연동 및 버퍼링 설정 모달 */}
