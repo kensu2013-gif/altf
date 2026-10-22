@@ -1681,18 +1681,30 @@ export default function AgentOfficeDashboard() {
         return list.sort(sortAgents);
     }, [agents, selectedDeptId, statusFilter, searchQuery]);
 
-    // 상태 강제 변경 핸들러
-    const handleStatusChange = (agentId: string, newStatus: AgentStatus, e?: React.MouseEvent) => {
+    // 상태 강제 변경 핸들러 (대시보드 통제 절대 우선권)
+    const handleStatusChange = async (agentId: string, newStatus: AgentStatus, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
         setAgents(prev => prev.map(a => a.id === agentId ? { ...a, status: newStatus, lastActive: '방금 전' } : a));
         if (selectedAgent && selectedAgent.id === agentId) {
             setSelectedAgent(prev => prev ? { ...prev, status: newStatus } : null);
             setEditForm(prev => ({ ...prev, status: newStatus }));
         }
+
+        // 🎛️ 백엔드 즉각 통제 엔진으로 직통 전송 (스케줄러/프로세스 즉시 반응)
+        try {
+            await fetch('/api/agents/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: agentId, status: newStatus })
+            });
+            console.log(`[AgentOffice] 에이전트 ${agentId} 상태 -> ${newStatus} 즉시 적용 완료`);
+        } catch (err: any) {
+            console.warn('[AgentOffice] 상태 제어 API 전송 오류:', err?.message);
+        }
     };
 
     // 상세 패널 수정 내용 저장
-    const handleSaveEdit = () => {
+    const handleSaveEdit = async () => {
         if (!selectedAgent) return;
         setAgents(prev => prev.map(a => {
             if (a.id === selectedAgent.id) {
@@ -1730,11 +1742,27 @@ export default function AgentOfficeDashboard() {
             requiresApproval: editForm.requiresApproval,
             scheduleInterval: editForm.scheduleInterval
         } : null);
+
+        // 🎛️ 백엔드 제어 엔진 즉시 동기화
+        try {
+            await fetch('/api/agents/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: selectedAgent.id,
+                    status: editForm.status,
+                    scheduleInterval: editForm.scheduleInterval
+                })
+            });
+        } catch (err: any) {
+            console.warn('[AgentOffice] 상세 수정 제어 API 전송 오류:', err?.message);
+        }
+
         alert('에이전트 식별 코드, 이름, 직위(서열), 반복 주기(스케줄) 및 연계 정보가 성공적으로 저장되었습니다.');
     };
 
     // ⏱️ 카드 외부 주기 설정 원클릭 변경 핸들러
-    const handleSetScheduleInterval = (agentId: string, intervalId: string, e?: React.MouseEvent) => {
+    const handleSetScheduleInterval = async (agentId: string, intervalId: string, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
         setAgents(prev => prev.map(a => a.id === agentId ? { ...a, scheduleInterval: intervalId } : a));
         if (selectedAgent && selectedAgent.id === agentId) {
@@ -1742,6 +1770,18 @@ export default function AgentOfficeDashboard() {
             setEditForm(prev => ({ ...prev, scheduleInterval: intervalId }));
         }
         setActiveScheduleDropdownAgentId(null);
+
+        // 🎛️ 백엔드 스케줄러 즉각 리로딩 전송
+        try {
+            await fetch('/api/agents/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: agentId, scheduleInterval: intervalId })
+            });
+            console.log(`[AgentOffice] 에이전트 ${agentId} 실행주기 -> ${intervalId} 즉시 적용 완료`);
+        } catch (err: any) {
+            console.warn('[AgentOffice] 주기 제어 API 전송 오류:', err?.message);
+        }
     };
 
     // 직위 승진 (사원 ➔ 대리 ➔ 과장 ➔ 팀장)

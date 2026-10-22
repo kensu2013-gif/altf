@@ -148,8 +148,10 @@ export class MakeScenarioService {
         const dat02 = agents.find(a => a.id === 'dat-slot-2' || a.code === 'DAT-02');
         if (dat02) {
           dat02.isCreated = true;
-          dat02.status = 'ACTIVE';
-          dat02.currentTask = `[완결] #${recoveredScenario.id} (${recoveredScenario.name}) Old Data ${clearedCount}건 삭제 및 Active 재활성화 성공`;
+          if (dat02.status !== 'OFFLINE' && dat02.status !== 'OFF') {
+            dat02.status = 'ACTIVE';
+            dat02.currentTask = `[완결] #${recoveredScenario.id} (${recoveredScenario.name}) Old Data ${clearedCount}건 삭제 및 Active 재활성화 성공`;
+          }
           dat02.lastActive = '방금 전';
           dat02.metrics = dat02.metrics || {};
           dat02.metrics.tasksToday = (dat02.metrics.tasksToday || 0) + 1;

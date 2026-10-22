@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import xlsx from 'xlsx';
+import { agentControlManager } from './agentControlManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -451,13 +452,16 @@ export class PurchaseStockOrderService {
                 const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
                 const { label } = this.getNextScheduledTime(now);
 
-                purAgent.status = isRunning ? 'ACTIVE' : 'STANDBY';
+                // 사용자가 대시보드에서 명시적으로 OFFLINE(OFF) 또는 IDLE로 설정한 경우 덮어쓰지 않고 절대 우선 유지
+                if (purAgent.status !== 'OFFLINE' && purAgent.status !== 'OFF' && purAgent.status !== 'IDLE') {
+                    purAgent.status = isRunning ? 'ACTIVE' : 'STANDBY';
+                }
                 purAgent.currentTask = isRunning 
                     ? `altf.kr API 재고 발주 동기화 실행 중...` 
-                    : `업무시간 1일 2회 정기 감시 대기 중 (다음: ${label}, 미결 ${summary.pendingCount}건 관리)`;
+                    : (purAgent.status === 'OFFLINE' ? '대시보드에서 가동 중지됨 (OFF)' : `업무시간 1일 2회 정기 감시 대기 중 (다음: ${label}, 미결 ${summary.pendingCount}건 관리)`);
                 purAgent.lastActive = '방금 전';
 
-                const newLog = `[${timeStr}] [PUR-01] altf.kr API 재고 발주 동기화 완료: 총 ${summary.totalItems}건 (입고: ${summary.fulfilledCount}건, 미결: ${summary.pendingCount}건) ➔ ${label}까지 대기 상태 전환`;
+                const newLog = `[${timeStr}] [PUR-01] altf.kr API 재고 발주 동기화 완료: 총 ${summary.totalItems}건 (입고: ${summary.fulfilledCount}건, 미결: ${summary.pendingCount}건)`;
                 purAgent.logs = [newLog, ...(purAgent.logs || []).slice(0, 15)];
                 fs.writeFileSync(AGENTS_PATH, JSON.stringify(agents, null, 2), 'utf8');
             }
@@ -540,6 +544,11 @@ export class PurchaseStockOrderService {
      * 🛒 altf.kr API 호출 감지 & 재고 발주 List Up 및 미결 동기화
      */
     async syncFromAltfApi(isManual = false) {
+        if (!isManual && !agentControlManager.isAgentActive('PUR-01')) {
+            console.log(`[PUR-01] 🛑 대시보드 통제: PUR-01이 OFF 또는 비활성화 상태이므로 자동 동기화를 즉시 스킵합니다.`);
+            return { success: false, skipped: true, reason: 'PUR-01 agent is OFFLINE in dashboard' };
+        }
+
         console.log(`[PUR-01] altf.kr API 호출 감지 실행 (수동여부: ${isManual})...`);
         let remoteOrders = null;
 
@@ -575,11 +584,26 @@ export class PurchaseStockOrderService {
     }
 
     /**
-     * 하루 2번 (오전 10:00, 오후 17:00) 정기 감시 스케줄러 가동 (그 외 시간 대기 상태 유지)
+     * 하루 2번 (오전 10:00, 오후 17:00) 정기 감시 스케줄러 가동 (대시보드 통제 준수)
      */
     startTwiceDailyWatcher() {
         if (this.watcherTimer) clearTimeout(this.watcherTimer);
-        console.log('[PUR-01 Agent] 알트에프 재고 발주 1일 2회(오전 10:00, 오후 17:00) 정기 감시 스케줄러 가동 (그 외 대기 상태)');
+        
+        // 대시보드 변경 리스너 초기 1회 바인딩
+        if (!this._listenerBound) {
+            this._listenerBound = true;
+            agentControlManager.on('change', () => this.startTwiceDailyWatcher());
+        }
+
+        const isActive = agentControlManager.isAgentActive('PUR-01');
+        const sched = agentControlManager.getAgentSchedule('PUR-01', '12h');
+
+        if (!isActive || sched.isManual) {
+            console.log('[PUR-01 Agent] 🛑 대시보드 통제: PUR-01이 OFF 또는 수동 모드로 설정되어 자동 스케줄러가 중단되었습니다.');
+            return;
+        }
+
+        console.log('[PUR-01 Agent] 알트에프 재고 발주 정기 감시 스케줄러 가동 (대시보드 활성)');
 
         // 최초 기동 시 데이터가 없으면 대장 1회 초기화
         if (!this.cache.stockOrders) {
@@ -587,20 +611,38 @@ export class PurchaseStockOrderService {
         }
 
         const planNextRun = () => {
-            const now = new Date();
-            const { nextTime, label } = this.getNextScheduledTime(now);
-            const waitMs = Math.max(1000, nextTime.getTime() - now.getTime());
+            if (!agentControlManager.isAgentActive('PUR-01')) {
+                console.log('[PUR-01 Agent] 🛑 실행 시점 대시보드 OFF 감지 ➔ 스케줄 예약 해제');
+                return;
+            }
 
-            console.log(`[PUR-01 Agent] 현재 대기 상태 (STANDBY). 다음 정기 감지: ${label} (${Math.round(waitMs / 60000)}분 후)`);
+            const now = new Date();
+            let waitMs = 0;
+            let label = '';
+
+            // 사용자 지정 간격이 있는 경우 (예: 10m, 30m, 1h)
+            if (sched.intervalMs > 0 && sched.intervalId !== '12h' && sched.intervalId !== '24h') {
+                waitMs = sched.intervalMs;
+                label = `${Math.round(sched.intervalMs / 60000)}분 후`;
+            } else {
+                const nextInfo = this.getNextScheduledTime(now);
+                waitMs = Math.max(1000, nextInfo.nextTime.getTime() - now.getTime());
+                label = nextInfo.label;
+            }
+
+            console.log(`[PUR-01 Agent] 대기 상태. 다음 정기 감지: ${label} (${Math.round(waitMs / 60000)}분 후)`);
 
             this.watcherTimer = setTimeout(async () => {
+                if (!agentControlManager.isAgentActive('PUR-01')) {
+                    console.log(`[PUR-01 Agent] 🛑 대시보드에서 OFF/IDLE 설정되어 실행 스킵`);
+                    return;
+                }
                 console.log(`[PUR-01 Agent] ⏰ 정기 감지 시각 도래 (${label}) ➔ altf.kr API 감지 실행 시작!`);
                 try {
                     await this.syncFromAltfApi(false);
                 } catch (e) {
                     console.error('[PUR-01] 정기 동기화 에러:', e.message);
                 }
-                // 다음 시각 예약 (10시 -> 17시, 또는 17시 -> 익일 10시)
                 planNextRun();
             }, waitMs);
         };

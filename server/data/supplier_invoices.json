@@ -1441,7 +1441,7 @@
     "id": "DKB-INV-SCANNED-1792569632419-4-00231",
     "fileName": "TalkFile_알트에프_거래명세표_1021_pdf.pdf",
     "invoiceNo": "0023-1/",
-    "invoiceDate": "1800-36-02",
+    "invoiceDate": "2026-10-21",
     "pageIndex": 4,
     "totalPages": 16,
     "supplier": {
@@ -1459,7 +1459,7 @@
     },
     "customerName": "(주)에스제이앤브이",
     "customerNumber": "410-81-78475",
-    "matchedOrderId": "PO-20261019-TAEIL-010",
+    "matchedOrderId": "PO-20261021-TAEIL-009",
     "items": [
       {
         "itemNo": 1,
@@ -1470,8 +1470,8 @@
         "unit": "EA",
         "unitPrice": 5610,
         "amount": 112200,
-        "poNo": "",
-        "remarks": "(주)에스제이앤브이"
+        "poNo": "ES261021-2950",
+        "remarks": "(주)에스제이앤브이 ES261021-2950"
       },
       {
         "itemNo": 2,
@@ -1494,8 +1494,8 @@
         "unit": "EA",
         "unitPrice": 19650,
         "amount": 196500,
-        "poNo": "",
-        "remarks": "(주)에스제이앤브이"
+        "poNo": "ES261021-2950",
+        "remarks": "(주)에스제이앤브이 ES261021-2950"
       },
       {
         "itemNo": 4,
@@ -1506,13 +1506,13 @@
         "unit": "EA",
         "unitPrice": 23910,
         "amount": 239100,
-        "poNo": "",
-        "remarks": "(주)에스제이앤브이"
+        "poNo": "ES261021-2950",
+        "remarks": "(주)에스제이앤브이 ES261021-2950"
       }
     ],
     "itemCount": 1,
     "poNumbers": [
-      "ES261019-2919"
+      "ES261021-2950"
     ],
     "pricing": {
       "totalSupplyPrice": 622800,
@@ -1535,9 +1535,9 @@
       "vat": 62280,
       "grandTotal": 685080,
       "discrepancy": {
-        "type": "OVER_BILLED",
-        "diff": 417300,
-        "detail": "(주)에스제이앤브이 [0023-1/] 전표가: 622,800원 vs 발주가: 205,500원 (초과 청구 (+417,300원))"
+        "type": "UNDER_BILLED",
+        "diff": -105500,
+        "detail": "(주)에스제이앤브이 [0023-1/] 발주 ES261021-2950 매칭 완료 (수량 100% 일치, 전표가: 622,800원)"
       }
     },
     "customer": {
@@ -1549,18 +1549,18 @@
       "hasOrderMatch": true,
       "matchedOrdersCount": 1,
       "matchedPoNumbers": [
-        "ES261019-2919"
+        "ES261021-2950"
       ],
       "customerName": "(주)에스제이앤브이",
       "invoiceSubtotal": 622800,
-      "expectedPurchaseSubtotal": 205500,
-      "diffAmount": 417300,
-      "discrepancyType": "OVER_BILLED",
-      "statusText": "초과 청구 (+417,300원)",
+      "expectedPurchaseSubtotal": 728300,
+      "diffAmount": -105500,
+      "discrepancyType": "UNDER_BILLED",
+      "statusText": "정상 매입 할인 (전표 622,800원 vs 주문기준 728,300원)",
       "discrepancy": {
-        "type": "OVER_BILLED",
-        "diff": 417300,
-        "detail": "(주)에스제이앤브이 [0023-1/] 전표가: 622,800원 vs 발주가: 205,500원 (초과 청구 (+417,300원))"
+        "type": "UNDER_BILLED",
+        "diff": -105500,
+        "detail": "(주)에스제이앤브이 [0023-1/] 발주 ES261021-2950 매칭 완료 (수량 100% 일치, 전표가: 622,800원)"
       }
     }
   },
@@ -5212,15 +5212,37 @@
       "grandTotal": 523226
     },
     "source": "SIMULATION",
-    "processedAt": "2026-10-20T05:21:08.341Z",
+    "processedAt": "2026-10-22T04:10:05.482Z",
     "status": "RECEIVED_AND_DISPATCHED",
+    "crossCheck": {
+      "hasOrderMatch": true,
+      "matchedOrdersCount": 1,
+      "matchedPoNumbers": [
+        "ES261019-2915"
+      ],
+      "invoiceSubtotal": 475660,
+      "expectedPurchaseSubtotal": 594580,
+      "diffAmount": -118920,
+      "discrepancyType": "UNDER_BILLED",
+      "statusText": "과소 청구 (-118,920원)",
+      "discrepancy": {
+        "type": "UNDER_BILLED",
+        "diff": -118920,
+        "detail": "undefined [0015- 1/ 1] 전표가: 475,660원 vs 발주가: 594,580원 (과소 청구 (-118,920원))"
+      }
+    },
     "accounting": {
-      "recordedAt": "2026-10-20T05:21:08.341Z",
+      "recordedAt": "2026-10-22T04:10:05.482Z",
       "status": "PURCHASE_CONFIRMED",
       "taxInvoiceMatched": false,
       "subtotal": 475660,
       "vat": 47566,
-      "grandTotal": 523226
+      "grandTotal": 523226,
+      "discrepancy": {
+        "type": "UNDER_BILLED",
+        "diff": -118920,
+        "detail": "undefined [0015- 1/ 1] 전표가: 475,660원 vs 발주가: 594,580원 (과소 청구 (-118,920원))"
+      }
     }
   },
   {

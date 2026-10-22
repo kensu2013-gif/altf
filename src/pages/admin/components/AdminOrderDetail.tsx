@@ -3507,6 +3507,43 @@ if (deliveryNoteFiles.length > 0) {
                                                                      {sentSupplierName ? `${sentSupplierName.replace('(주)', '').trim()} 발송완료` : '발송완료'}
                                                                  </span>
                                                              )}
+                                                             {/* 0-C Route Badge (Read-Only) */}
+                                                             {item.route && (
+                                                                 <span
+                                                                     className={`text-[9px] font-black border rounded px-1.5 py-0.5 whitespace-nowrap shadow-xs shrink-0 ${
+                                                                         item.route === 'S'
+                                                                             ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                                                             : item.route === 'D'
+                                                                             ? 'bg-blue-50 text-blue-700 border-blue-300'
+                                                                             : 'bg-amber-50 text-amber-700 border-amber-300'
+                                                                     }`}
+                                                                     title={`경로: ${item.route === 'S' ? '시화재고' : item.route === 'D' ? '대경직송' : '주문제작'}${item.routeConfirmedBy?.name ? ` (확정자: ${item.routeConfirmedBy.name})` : ''}`}
+                                                                 >
+                                                                     {item.route === 'S' ? '시화(S)' : item.route === 'D' ? '직송(D)' : '제작(M)'}
+                                                                 </span>
+                                                             )}
+                                                             {/* 0-C Line Status Badge (Read-Only) */}
+                                                             {item.lineStatus && item.lineStatus !== 'RECEIVED' && (
+                                                                 <span
+                                                                     className="text-[9px] font-semibold bg-slate-100 text-slate-700 border border-slate-300 rounded px-1.5 py-0.5 whitespace-nowrap shadow-xs shrink-0"
+                                                                     title={`라인 상태: ${item.lineStatus}`}
+                                                                 >
+                                                                     {item.lineStatus === 'CONFIRMED' ? '확인' :
+                                                                      item.lineStatus === 'ROUTED' ? '경로확정' :
+                                                                      item.lineStatus === 'PICK_REQUESTED' ? '출고요청' :
+                                                                      item.lineStatus === 'PACKED' ? '포장완료' :
+                                                                      item.lineStatus === 'MES_SHIPPED' ? 'MES출고' :
+                                                                      item.lineStatus === 'SUPPLIER_PO_SENT' ? '매입발주' :
+                                                                      item.lineStatus === 'SUPPLIER_CONFIRMED' ? '매입확인' :
+                                                                      item.lineStatus === 'IN_PRODUCTION' ? '제작중' :
+                                                                      item.lineStatus === 'DIRECT_SHIPPED' ? '직송출고' :
+                                                                      item.lineStatus === 'STATEMENT_READY' ? '명세표' :
+                                                                      item.lineStatus === 'CERT_READY' ? '성적서' :
+                                                                      item.lineStatus === 'PACKAGED' ? '패키징' :
+                                                                      item.lineStatus === 'SENT' ? '발송완료' :
+                                                                      item.lineStatus === 'SETTLED' ? '정산' : item.lineStatus}
+                                                                 </span>
+                                                             )}
                                                             <input
                                                                 type="text"
                                                                 value={item.name}

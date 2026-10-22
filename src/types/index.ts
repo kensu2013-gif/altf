@@ -80,6 +80,61 @@ export interface LineItem {
     stockTargetLocation?: 'SIHWA' | 'BUSAN' | 'NONE'; // [NEW] Stock target destination
     isStockItem?: boolean; // [NEW] True if explicitly marked as stock replenishment
     allocatedCustomerName?: string; // [NEW] Customer name if allocated from stock to customer
+    // 0-C Schema Extensions (Route, Line Status, Keys, Events, Shipments)
+    lineId?: string;
+    route?: OrderRoute;
+    routeConfirmedBy?: { name: string; at: string };
+    lineStatus?: OrderLineStatus;
+    keys?: OrderLineKeys;
+    certRequired?: boolean;
+}
+
+export type OrderRoute = 'S' | 'D' | 'M' | null;
+
+export type OrderLineStatus =
+    | 'RECEIVED'
+    | 'CONFIRMED'
+    | 'ROUTED'
+    | 'PICK_REQUESTED'
+    | 'PACKED'
+    | 'MES_SHIPPED'
+    | 'SUPPLIER_PO_SENT'
+    | 'SUPPLIER_CONFIRMED'
+    | 'IN_PRODUCTION'
+    | 'DIRECT_SHIPPED'
+    | 'STATEMENT_READY'
+    | 'CERT_READY'
+    | 'PACKAGED'
+    | 'SENT'
+    | 'SETTLED';
+
+export interface OrderLineKeys {
+    customerPoNo?: string;
+    supplierPoNo?: string;
+    supplierStatementNo?: string;
+    mesOutboundNo?: string;
+    lotNo?: string;
+    heatNo?: string;
+    certId?: string;
+    shipmentId?: string;
+}
+
+export interface OrderEvent {
+    id?: string;
+    at: string;
+    actor: string;
+    type: string;
+    lineIds?: string[];
+    detail?: unknown;
+}
+
+export interface OrderShipment {
+    shipmentId: string;
+    lineIds: string[];
+    route: 'S' | 'D' | 'M';
+    shippedAt: string;
+    statementId?: string;
+    packageStatus?: 'DRAFT' | 'PACKAGED' | 'SENT';
 }
 
 export interface Quotation {
@@ -245,6 +300,9 @@ export interface Order {
     deliveryNote?: { name: string; url: string; }; // ALTF delivery note to customer
     supplierPO?: { name: string; url: string; }; // ALTF purchase order to supplier (internal)
     attachments?: { name: string; url: string; }[]; // General attachments added by customer
+    // 0-C Order Extensions
+    events?: OrderEvent[];
+    shipments?: OrderShipment[];
     // Generic Payload for flexible data (e.g. from Order Form)
     payload?: {
         customer?: {

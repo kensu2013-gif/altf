@@ -121,8 +121,8 @@ export class InventorySyncService {
 
       for (const ag of agents) {
         if (ag.code === code) {
-          if (taskMessage) ag.currentTask = taskMessage;
-          if (newStatus) ag.status = newStatus;
+          if (taskMessage && ag.status !== 'OFFLINE' && ag.status !== 'OFF') ag.currentTask = taskMessage;
+          if (newStatus && ag.status !== 'OFFLINE' && ag.status !== 'OFF') ag.status = newStatus;
           ag.lastActive = '방금 전';
           if (logMessage) {
             const timeStr = new Date().toLocaleTimeString('ko-KR');

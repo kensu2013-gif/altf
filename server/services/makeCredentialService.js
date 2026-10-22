@@ -154,8 +154,10 @@ export class MakeCredentialService {
                 const dat01 = agents.find(a => a.code === 'DAT-01' || a.id === 'dat-slot-1');
                 if (dat01) {
                     dat01.isCreated = true;
-                    dat01.status = 'ACTIVE';
-                    dat01.currentTask = `[완료] ${conn.name} Reauthorize 및 Verify 자동화 완결`;
+                    if (dat01.status !== 'OFFLINE' && dat01.status !== 'OFF') {
+                        dat01.status = 'ACTIVE';
+                        dat01.currentTask = `[완료] ${conn.name} Reauthorize 및 Verify 자동화 완결`;
+                    }
                     dat01.lastActive = '방금 전';
                     dat01.metrics = dat01.metrics || { speed: 95, accuracy: 100, load: 15, uptime: '99.9%', tasksToday: 0 };
                     dat01.metrics.tasksToday = (dat01.metrics.tasksToday || 0) + 1;

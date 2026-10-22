@@ -27,6 +27,7 @@ import { inventorySyncService } from './server/services/inventorySyncService.js'
 import { kakaoBotService } from './server/services/kakaoBotService.js';
 import { sleQuoteReviewService } from './server/services/sleQuoteReviewService.js';
 import { ledgerClient } from './server/services/ledgerClient.js';
+import { agentControlManager } from './server/services/agentControlManager.js';
 
 import multer from 'multer';
 
@@ -872,6 +873,13 @@ const server = http.createServer(async (req, res) => {
                     // 2. S3 DB 비동기 큐 동기화
                     queueSave();
 
+                    // 3. 🎛️ 에이전트 제어 관리자(대시보드 통제 우선권) 실시간 리로드 & 브로드캐스트
+                    try {
+                        agentControlManager.reloadAgents(agentList);
+                    } catch (ctrlErr) {
+                        console.warn('[API] AgentControlManager reload warning:', ctrlErr.message);
+                    }
+
                     console.log(`[API] Successfully saved ${agentList.length} agents to DB & local backup.`);
                     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                     res.end(JSON.stringify({ success: true, count: agentList.length }));
@@ -884,6 +892,41 @@ const server = http.createServer(async (req, res) => {
             });
             return;
         }
+    }
+
+    // 🎛️ 단일 에이전트 상태/주기 직접 제어 API (대시보드 즉시 반영)
+    if (url.pathname === '/api/agents/control' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { code, id, status, scheduleInterval } = JSON.parse(body || '{}');
+                const targetKey = code || id;
+                if (!targetKey) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'agent code or id is required' }));
+                    return;
+                }
+
+                const result = agentControlManager.updateAgentConfig(targetKey, {
+                    ...(status !== undefined ? { status } : {}),
+                    ...(scheduleInterval !== undefined ? { scheduleInterval } : {})
+                });
+
+                // db.agents 및 S3 큐 동기화
+                db.agents = agentControlManager.agentsCache;
+                queueSave();
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, agent: result.agent }));
+                return;
+            } catch (e) {
+                console.error('[API] Agent control failed:', e);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: e.message }));
+            }
+        });
+        return;
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

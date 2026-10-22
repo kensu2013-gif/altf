@@ -22,6 +22,7 @@ import { fileURLToPath } from 'url';
 import { fittingNormalizerService } from './fittingNormalizerService.js';
 import { fittingVisionOcrService } from './fittingVisionOcrService.js';
 import { sleQuoteReviewService } from './sleQuoteReviewService.js';
+import { agentControlManager } from './agentControlManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -974,10 +975,18 @@ export class KakaoBotService {
             const nowStr = new Date().toISOString();
             let changed = false;
 
+            // 보조 함수: 대시보드에서 OFFLINE/OFF로 설정된 에이전트의 status는 절대 덮어쓰지 않음
+            const safeSetAgentStatus = (ag, targetStatus = 'ACTIVE') => {
+                if (!ag) return;
+                if (ag.status !== 'OFFLINE' && ag.status !== 'OFF') {
+                    ag.status = targetStatus;
+                }
+            };
+
             // INT-02 (메신저/카톡 견적 인입 봇)
             const int02 = agents.find(a => a.code === 'INT-02' || a.id === 'int-02-messenger-intake' || a.id === 'INT-02');
             if (int02) {
-                int02.status = 'ACTIVE';
+                safeSetAgentStatus(int02, 'ACTIVE');
                 int02.lastActive = '방금 전';
                 int02.currentTask = `카카오톡 견적 접수 [${intake.id}] - ${intake.utterance.slice(0, 30)}`;
                 int02.processedCount = (int02.processedCount || 0) + 1;
@@ -992,7 +1001,7 @@ export class KakaoBotService {
             if (intake.type === 'image') {
                 const int03 = agents.find(a => a.code === 'INT-03' || a.id === 'int-03-vision-ocr' || a.id === 'INT-03');
                 if (int03) {
-                    int03.status = 'ACTIVE';
+                    safeSetAgentStatus(int03, 'ACTIVE');
                     int03.lastActive = '방금 전';
                     int03.currentTask = `견적서 이미지 OCR 분석 중: ${intake.id}`;
                     int03.processedCount = (int03.processedCount || 0) + 1;
@@ -1007,7 +1016,7 @@ export class KakaoBotService {
             // INT-05 (피팅 은어/약어 표준화 봇)
             const int05 = agents.find(a => a.code === 'INT-05' || a.id === 'int-05-ai-normalizer' || a.id === 'INT-05');
             if (int05) {
-                int05.status = 'ACTIVE';
+                safeSetAgentStatus(int05, 'ACTIVE');
                 int05.lastActive = '방금 전';
                 int05.currentTask = `배관 피팅 규격 표준화 매칭 [${intake.id}]`;
                 int05.processedCount = (int05.processedCount || 0) + 1;
@@ -1022,7 +1031,7 @@ export class KakaoBotService {
             if (draftQuote) {
                 const sle01 = agents.find(a => a.code === 'SLE-01' || a.id === 'sle-01-quote-drafter' || a.id === 'SLE-01');
                 if (sle01) {
-                    sle01.status = 'ACTIVE';
+                    safeSetAgentStatus(sle01, 'ACTIVE');
                     sle01.lastActive = '방금 전';
                     sle01.currentTask = `견적서 초안 자동 생성 [${draftQuote.id}] - ${draftQuote.customerName} (${draftQuote.items.length}개 품목, ${draftQuote.totalAmount.toLocaleString()}원)`;
                     sle01.processedCount = (sle01.processedCount || 0) + 1;
@@ -1036,7 +1045,7 @@ export class KakaoBotService {
                 // SLE-02 (견적 승인 회신봇)
                 const sle02 = agents.find(a => a.code === 'SLE-02' || a.id === 'sle-02-quote-dispatcher' || a.id === 'SLE-02');
                 if (sle02) {
-                    sle02.status = 'ACTIVE';
+                    safeSetAgentStatus(sle02, 'ACTIVE');
                     sle02.lastActive = '방금 전';
                     sle02.currentTask = `단가 요율(-${draftQuote.items[0]?.discountRate || 50}%) 및 시화/양산 실시간 재고 검증 완료`;
                     sle02.processedCount = (sle02.processedCount || 0) + 1;
@@ -1088,6 +1097,11 @@ export class KakaoBotService {
                 const prefix = code.toLowerCase() + '-';
                 const ag = agents.find(a => a.code === code || a.id === code.toLowerCase() || (typeof a.id === 'string' && a.id.toLowerCase().startsWith(prefix)));
                 if (ag) {
+                    // 사용자가 대시보드에서 명시적으로 OFFLINE/OFF로 끈 경우 절대 깨우지 않음!
+                    if (ag.status === 'OFFLINE' || ag.status === 'OFF') {
+                        continue;
+                    }
+
                     const targetTask = defaultTasks[code];
                     if (targetTask && ag.currentTask !== targetTask) {
                         ag.currentTask = targetTask;

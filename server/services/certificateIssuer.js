@@ -1410,9 +1410,11 @@ try {
             // QC-06 (성적서 발행봇)
             const qc06 = agents.find(a => a.code === 'QC-06' || a.id === 'qc-spec-verif');
             if (qc06) {
-                qc06.currentTask = `재고출고 [${outboundNo}] (${location}) 성적서 ${records.length}건 발행 완료 (PDF/엑셀 보관)`;
+                if (qc06.status !== 'OFFLINE' && qc06.status !== 'OFF') {
+                    qc06.currentTask = `재고출고 [${outboundNo}] (${location}) 성적서 ${records.length}건 발행 완료 (PDF/엑셀 보관)`;
+                    qc06.status = 'ACTIVE';
+                }
                 qc06.lastActive = '방금 전';
-                qc06.status = 'ACTIVE';
                 const lotSummary = records[0]?.items?.map(it => `${it.lotNo}➔${it.heatNo}`).join(', ') || '';
                 const log = `[${timeStr}] [QC-06] 출고지시서 ${outboundNo} (${customer}) 재고출고분 성적서 발행 성공: ${records.map(r => r.certNo).join(', ')} (양식: ${records[0]?.sheetName}, 매칭: ${lotSummary})`;
                 qc06.logs = [log, ...(qc06.logs || []).slice(0, 15)];
@@ -1464,9 +1466,11 @@ try {
             // QC-06 (성적서 발행봇)
             const qc06 = agents.find(a => a.code === 'QC-06' || a.id === 'qc-spec-verif');
             if (qc06) {
-                qc06.currentTask = `발주서 ${poNo} 성적서 ${records.length}건 발행 완료 (PDF/엑셀 보관)`;
+                if (qc06.status !== 'OFFLINE' && qc06.status !== 'OFF') {
+                    qc06.currentTask = `발주서 ${poNo} 성적서 ${records.length}건 발행 완료 (PDF/엑셀 보관)`;
+                    qc06.status = 'ACTIVE';
+                }
                 qc06.lastActive = '방금 전';
-                qc06.status = 'ACTIVE';
                 const log = `[${timeStr}] [QC-06] 발주번호 ${poNo} 성적서 발행 성공: ${records.map(r => r.certNo).join(', ')} (양식: ${records[0]?.sheetName})`;
                 qc06.logs = [log, ...(qc06.logs || []).slice(0, 15)];
             }

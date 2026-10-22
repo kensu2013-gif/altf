@@ -14,6 +14,7 @@ import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
 import iconv from 'iconv-lite';
 import { certificateParserService } from './certificateParser.js';
+import { agentControlManager } from './agentControlManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -594,32 +595,65 @@ export class MailplugCollectorService {
         };
     }
 
-    // 6. 1시간 주기 자동 메일 확인 스케줄러 (매시간 자동 감시)
-    startHourlyScheduler() {
+    // 6. 대시보드 연동 동적 스케줄러 (주기/상태 실시간 반영)
+    applyDashboardSchedule() {
+        const sched = agentControlManager.getAgentSchedule('QC-01', '1h');
+        const isAct = agentControlManager.isAgentActive('QC-01');
+
+        if (!isAct || sched.isManual) {
+            if (this.schedulerTimer) {
+                console.log(`🛑 [QC-01 Mailplug] 대시보드 통제: OFF 또는 수동 모드 감지 ➔ 자동 감시 스케줄러 즉시 중단`);
+                this.stopHourlyScheduler();
+            }
+            return;
+        }
+
+        const intervalMs = sched.intervalMs > 0 ? sched.intervalMs : (60 * 60 * 1000);
+        if (this.schedulerTimer && this.currentIntervalMs === intervalMs) {
+            return; // 동일 주기 유지
+        }
+
+        this.stopHourlyScheduler();
+        this.startDynamicScheduler(intervalMs, sched.intervalId);
+    }
+
+    startDynamicScheduler(intervalMs = 60 * 60 * 1000, intervalLabel = '1h') {
         if (this.schedulerTimer) return;
-        const ONE_HOUR_MS = 60 * 60 * 1000;
-        this.nextScheduledTime = new Date(Date.now() + ONE_HOUR_MS).toISOString();
-        console.log(`[QC-01 Mailplug] 1시간 주기 자동 메일 감시 스케줄러 시작! (다음 점검: ${this.nextScheduledTime})`);
+        this.currentIntervalMs = intervalMs;
+        this.currentIntervalLabel = intervalLabel;
+        this.nextScheduledTime = new Date(Date.now() + intervalMs).toISOString();
+        console.log(`[QC-01 Mailplug] ⏱️ 대시보드 주기 적용 (${intervalLabel}, ${Math.round(intervalMs / 60000)}분) 스케줄러 가동 (다음 점검: ${this.nextScheduledTime})`);
 
         this.schedulerTimer = setInterval(async () => {
+            if (!agentControlManager.isAgentActive('QC-01')) {
+                console.log(`[QC-01 Auto-Scheduler] 🛑 대시보드에서 OFF/IDLE 설정되어 실행 스킵`);
+                return;
+            }
             try {
                 const config = this.getConfig();
                 if (config.password) {
-                    console.log(`[QC-01 Auto-Scheduler] [${new Date().toLocaleTimeString('ko-KR')}] 1시간 주기 자동 메일 감시 실행...`);
+                    console.log(`[QC-01 Auto-Scheduler] [${new Date().toLocaleTimeString('ko-KR')}] 정기 메일 감시 실행...`);
                     const result = await this.syncNow();
                     console.log(`[QC-01 Auto-Scheduler] 수집 결과:`, result.message);
                 }
-                this.nextScheduledTime = new Date(Date.now() + ONE_HOUR_MS).toISOString();
+                this.nextScheduledTime = new Date(Date.now() + this.currentIntervalMs).toISOString();
             } catch (err) {
                 console.error('[QC-01 Auto-Scheduler] 에러:', err.message);
             }
-        }, ONE_HOUR_MS);
+        }, intervalMs);
+    }
+
+    startHourlyScheduler() {
+        this.applyDashboardSchedule();
+        // 대시보드 설정 변경 리스너 등록
+        agentControlManager.on('change', () => this.applyDashboardSchedule());
     }
 
     getSchedulerStatus() {
+        const isAct = agentControlManager.isAgentActive('QC-01');
         return {
-            isActive: !!this.schedulerTimer,
-            interval: '1시간 (60분)',
+            isActive: !!this.schedulerTimer && isAct,
+            interval: this.currentIntervalLabel || '1시간 (60분)',
             nextRunTime: this.nextScheduledTime,
             lastSyncTime: this.getConfig().lastSyncTime || null
         };
@@ -629,6 +663,7 @@ export class MailplugCollectorService {
         if (this.schedulerTimer) {
             clearInterval(this.schedulerTimer);
             this.schedulerTimer = null;
+            this.currentIntervalMs = null;
             this.nextScheduledTime = null;
         }
     }

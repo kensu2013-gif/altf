@@ -17,6 +17,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import xlsx from 'xlsx';
+import { agentControlManager } from './agentControlManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -133,7 +134,12 @@ export class PurchaseBacklogBotService {
     /**
      * 핵심 로직: 모든 발주서 분류, 매입발주서 연계, 미결/출고 관리, 성적서/명세표 매칭
      */
-    classifyAndSyncBacklog(ordersInput = null) {
+    classifyAndSyncBacklog(ordersInput = null, isManual = false) {
+        if (!isManual && !agentControlManager.isAgentActive('PUR-07')) {
+            console.log('🛑 [PUR-07 Agent] 대시보드 설정에 의해 에이전트가 비활성화(OFF/OFFLINE) 상태이므로 자동 분류를 건너뜁니다.');
+            return this.cache || {};
+        }
+
         const orders = this.loadOrders(ordersInput);
         const certList = this.loadCertificates();
 
@@ -417,8 +423,10 @@ export class PurchaseBacklogBotService {
 
             agents[pur07Idx].name = '발주 분류 및 미결 통합 관제봇';
             agents[pur07Idx].position = '대리';
-            agents[pur07Idx].role = 'altf.kr 웹 주문 전체 분류 저장, 매입발주서 연동, 미결 리스트 실시간 추적 및 출고 시 거래명세표·성적서 고객 패키징 총괄';
-            agents[pur07Idx].status = 'ACTIVE';
+            // 사용자가 대시보드에서 명시적으로 OFFLINE(OFF) 또는 IDLE로 설정한 경우 덮어쓰지 않고 절대 우선 유지!
+            if (agents[pur07Idx].status !== 'OFFLINE' && agents[pur07Idx].status !== 'OFF' && agents[pur07Idx].status !== 'IDLE') {
+                agents[pur07Idx].status = 'ACTIVE';
+            }
             agents[pur07Idx].approvalStatus = 'AUTO_RUNNING';
             agents[pur07Idx].connectedDeptIds = ['quality', 'general', 'shipping', 'sle'];
             agents[pur07Idx].connectedAgentIds = [
@@ -434,7 +442,9 @@ export class PurchaseBacklogBotService {
                 uptime: '99.9%',
                 tasksToday: (summary.totalOrders || 0)
             };
-            agents[pur07Idx].currentTask = `[영업시간 1시간 주기] 발주 ${summary.totalOrders || 0}건 분류 관리 | 미결 ${summary.pendingCount || 0}건 | 고객발송준비 ${summary.readyPackageCount || 0}건 (다음: ${label})`;
+            agents[pur07Idx].currentTask = agents[pur07Idx].status === 'OFFLINE'
+                ? '대시보드에서 가동 중지됨 (OFF)'
+                : `[영업시간 1시간 주기] 발주 ${summary.totalOrders || 0}건 분류 관리 | 미결 ${summary.pendingCount || 0}건 | 고객발송준비 ${summary.readyPackageCount || 0}건 (다음: ${label})`;
             agents[pur07Idx].lastActive = '방금 전';
 
             const newLogs = [
@@ -527,37 +537,73 @@ export class PurchaseBacklogBotService {
     }
 
     /**
-     * 영업시간 (09:00 ~ 18:00) 매 1시간 간격 자동 스케줄러 가동
+     * 대시보드 설정에 맞춘 동적 스케줄러 적용
+     */
+    applyDashboardSchedule() {
+        const schedule = agentControlManager.getAgentSchedule('PUR-07', '1h');
+        const isActive = agentControlManager.isAgentActive('PUR-07');
+
+        if (this.schedulerTimer) {
+            clearTimeout(this.schedulerTimer);
+            this.schedulerTimer = null;
+        }
+
+        if (!isActive) {
+            console.log('🛑 [PUR-07 Agent] 대시보드 상태: OFFLINE/OFF ➔ 정기 발주 분류 스케줄러를 정지(Pause)합니다.');
+            return;
+        }
+
+        if (schedule.isManual) {
+            console.log('✋ [PUR-07 Agent] 대시보드 설정: 수동 실행(MANUAL) ➔ 자동 타이머 비활성화, 수동 트리거 대기.');
+            return;
+        }
+
+        // 특정 인터벌(예: 5m, 10m, 30m, 8h, 24h 등)이 지정되었고 기본 1h(영업시간 모드)가 아닌 경우 해당 밀리초 주기로 정밀 가동
+        const customMs = schedule.intervalMs;
+        if (customMs > 0 && schedule.intervalId !== '1h') {
+            console.log(`⏱️ [PUR-07 Agent] 대시보드 커스텀 주기 [${schedule.intervalId}] (${Math.round(customMs / 60000)}분) 간격 타이머 가동`);
+            this.schedulerTimer = setTimeout(() => {
+                this.classifyAndSyncBacklog();
+                this.applyDashboardSchedule();
+            }, customMs);
+            return;
+        }
+
+        // 기본 1h 설정: 영업시간(09:00 ~ 18:00) 정시 동기화 로직 적용
+        const now = new Date();
+        const { nextTime, label } = this.getNextBusinessHour(now);
+        const waitMs = Math.max(1000, nextTime.getTime() - now.getTime());
+
+        console.log(`[PUR-07 Agent] 대시보드 정기 주기(1h): 다음 호출 ${label} (${Math.round(waitMs / 60000)}분 후)`);
+        this.schedulerTimer = setTimeout(() => {
+            console.log(`[PUR-07 Agent] ⏰ 정기 스케줄러 실행 시각 (${label}) ➔ altf.kr 발주 분류 & 미결 대장 동기화 실행!`);
+            try {
+                this.classifyAndSyncBacklog();
+            } catch (e) {
+                console.error('[PUR-07] 스케줄러 동기화 에러:', e.message);
+            }
+            this.applyDashboardSchedule();
+        }, waitMs);
+    }
+
+    /**
+     * 영업시간 및 대시보드 연동 자동 스케줄러 가동
      */
     startBusinessHoursHourlyScheduler() {
-        if (this.schedulerTimer) clearTimeout(this.schedulerTimer);
-        console.log('[PUR-07 Agent] ⏰ 영업시간(09:00 ~ 18:00) 매 1시간 간격 자동 감지 스케줄러 가동');
+        console.log('[PUR-07 Agent] ⏰ 대시보드 통제 연동 발주 감지 스케줄러 가동');
 
         // 최초 기동 시 데이터가 없으면 즉시 1회 분류 수행
-        if (!this.cache.summary) {
+        if (!this.cache.summary && agentControlManager.isAgentActive('PUR-07')) {
             this.classifyAndSyncBacklog();
         }
 
-        const planNextRun = () => {
-            const now = new Date();
-            const { nextTime, label } = this.getNextBusinessHour(now);
-            const waitMs = Math.max(1000, nextTime.getTime() - now.getTime());
+        this.applyDashboardSchedule();
 
-            console.log(`[PUR-07 Agent] 현재 대기(STANDBY). 다음 정기 호출: ${label} (${Math.round(waitMs / 60000)}분 후)`);
-
-            this.schedulerTimer = setTimeout(() => {
-                console.log(`[PUR-07 Agent] ⏰ 정기 스케줄러 실행 시각 (${label}) ➔ altf.kr 발주 분류 & 미결 대장 동기화 실행!`);
-                try {
-                    this.classifyAndSyncBacklog();
-                } catch (e) {
-                    console.error('[PUR-07] 스케줄러 동기화 에러:', e.message);
-                }
-                // 다음 1시간 후 예약
-                planNextRun();
-            }, waitMs);
-        };
-
-        planNextRun();
+        // 대시보드에서 에이전트 설정(ON/OFF, 주기 등) 변경 시 실시간 감지하여 즉시 타이머 재설정
+        agentControlManager.on('change', () => {
+            console.log('[PUR-07 Agent] 🔄 대시보드 설정 변경 이벤트 감지 ➔ 스케줄러 재적용');
+            this.applyDashboardSchedule();
+        });
     }
 
     /**
@@ -570,14 +616,16 @@ export class PurchaseBacklogBotService {
         const { nextTime, label } = this.getNextBusinessHour(now);
         const remainingMs = Math.max(0, nextTime.getTime() - now.getTime());
         const remainingMinutes = Math.floor(remainingMs / (1000 * 60));
+        const schedule = agentControlManager.getAgentSchedule('PUR-07', '1h');
+        const isActive = agentControlManager.isAgentActive('PUR-07');
 
         return {
             agentCode: 'PUR-07',
             agentName: '주문관리 발주서 분류 및 미결 통합 관제봇',
-            cycle: '평일 영업시간(09:00 ~ 18:00) 매 1시간 간격 (1일 10회)',
+            cycle: schedule.intervalId ? `대시보드 설정 주기: ${schedule.intervalId}` : '평일 영업시간(09:00 ~ 18:00) 매 1시간 간격',
             isBusinessHour,
-            status: 'STANDBY',
-            statusLabel: isBusinessHour ? '영업시간 정기 감시 중 (STANDBY)' : '영업시간 외 대기 (STANDBY)',
+            status: isActive ? 'ACTIVE' : 'OFFLINE',
+            statusLabel: !isActive ? '대시보드에서 가동 중지됨 (OFF)' : (isBusinessHour ? '영업시간 정기 감시 중 (ACTIVE)' : '영업시간 외 대기 (STANDBY)'),
             nextSyncTime: nextTime.toISOString(),
             nextSyncLabel: label,
             remainingMinutes,

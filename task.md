@@ -13,7 +13,7 @@
 
 | 단계 | 목표 | 상태 | 주요 작업 |
 |---|---|---|---|
-| **0단계** | **기반 정비 (Single Source of Truth & 안전 게이트)** | 🚀 **진행 중 (0-A, 0-B 완료, 0-C 착수)** | 성적서 기본값 제거(완료), 팀/팀원(+팀원 추가 버튼/모달/배정) 완성, 단일 원장(ledgerClient 완료), 라인 스키마(S/D/M), 발송 게이트 |
+| **0단계** | **기반 정비 (Single Source of Truth & 안전 게이트)** | 🚀 **진행 중 (0-A, 0-B, 0-C 완료, 0-D 착수)** | 성적서 기본값 제거(완료), 팀/팀원(+팀원 추가 버튼/모달/배정) 완성, 단일 원장(ledgerClient 완료), 라인 스키마(S/D/M 완료), 발송 게이트 |
 | **1단계** | **접수 창구 하나로 모으기 (카카오 + 대표메일)** | ⏳ 대기 | 접수함(intake), 문서 분류·판독·표준화(itemNormalizer), 견적 초안 자동화 |
 | **2단계** | **견적 회신 자동화** | ⏳ 대기 | 승인 1회 회신, 1회용 토큰 링크, SLE-08 팔로업 |
 | **3단계** | **발주서 접수, 경로 분할, 매입발주** | ⏳ 대기 | PUR-11 등록, PUR-12 견적 대조, PUR-13 S/D/M 제안, PUR-14 회신 |
@@ -83,12 +83,13 @@
   - `[x]` `server/services/ledgerClient.js` 원장 클라이언트 모듈 신설 (로컬 내 메모리/DB 주입 vs HTTP 원격 모드 분기)
   - `[x]` `daekyungInvoiceService.js`, `purchaseBacklogBotService.js`, `purchaseService.js` 내 파일 직접 쓰기 차단 및 `ledgerClient` 단일 원장 참조
   - `[x]` 엑셀 대장 파일은 원장의 변경을 가하는 원천이 아닌 원장에서 생성하는 '출력물'로만 제한
-- `[ ]` **0-C. 주문 라인 경로(S/D/M)·상태·연결키 스키마**
-  - `[ ]` 주문 품목 `items[]` 스키마 확장 (`lineId`, `route`: S/D/M, `lineStatus`, `keys`: `customerPoNo`, `supplierPoNo`, `supplierStatementNo`, `mesOutboundNo`, `lotNo`, `heatNo`, `certId`, `shipmentId`, `certRequired`)
-  - `[ ]` 주문 레벨 `events[]` 및 `shipments[]` (출고 묶음) 컬렉션 구조 탑재
-  - `[ ]` `server/services/lineStateMachine.js` 상태 전이 검증 엔진 구현 (비정상 전이 차단 및 단위 테스트 10종)
-  - `[ ]` 운임/DC/비품목 라인 식별 함수 (`isNonProductLine`, `certRequired: false`)
-  - `[ ]` 관리자 주문 상세 (`AdminOrderDetail.tsx`)에 라인별 경로/상태 뱃지 읽기 전용 렌더링
+- `[x]` **0-C. 주문 라인 경로(S/D/M)·상태·연결키 스키마 [완료: 2026-10-22]**
+  - `[x]` 주문 품목 `items[]` 스키마 확장 (`lineId`, `route`: S/D/M, `lineStatus`, `keys`: `customerPoNo`, `supplierPoNo`, `supplierStatementNo`, `mesOutboundNo`, `lotNo`, `heatNo`, `certId`, `shipmentId`, `certRequired`)
+  - `[x]` 주문 레벨 `events[]` 및 `shipments[]` (출고 묶음) 컬렉션 구조 탑재
+  - `[x]` `server/services/lineStateMachine.js` 상태 전이 검증 엔진 구현 (비정상 전이 차단 및 단위 테스트 37종 100% 통과)
+  - `[x]` 운임/DC/비품목 라인 식별 함수 (`isNonProductLine`, `certRequired: false`)
+  - `[x]` 관리자 주문 상세 (`AdminOrderDetail.tsx`)에 라인별 경로/상태 뱃지 읽기 전용 렌더링
+  - `[x]` `ledgerClient.js` 원장 수정 시 상태 전이 유효성 검사 및 키 병합 연동 완료
 - `[ ]` **0-D. 발송 게이트와 승인 대기열 (Dispatch Gate)**
   - `[ ]` `server/services/dispatchGate.js` 구현 (`enqueue`, `approve`, `reject`, 중복 발송 방지)
   - `[ ]` 메일플러그 SMTP 어댑터 (Reply-To 영업자 지정, 로컬 테스트 시 TEST_RECIPIENT 가드)

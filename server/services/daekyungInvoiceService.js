@@ -271,11 +271,13 @@ export class DaekyungInvoiceService {
                     }
                 }
 
-                // 6. 🔥 웹 DB (db.orders) 스마트 크로스 매칭 (비고 발주번호, 고객사명, 날짜)
+                // 6. 🔥 웹 DB (db.orders) 스마트 크로스 매칭 (비고 발주번호, 고객사명, 전표일자)
                 const matchedOrder = dbOrders.find(ord => {
                     const poMatch = (poNumber && ord.poNumber && (ord.poNumber === poNumber || ord.poNumber.endsWith(poNumber.slice(-4))));
+                    if (poMatch) return true;
+                    // PO 번호가 불완전할 경우 전표 일자 또는 최근 발주 대조
                     const custMatch = (customerName && ord.customerName && ord.customerName.includes(customerName));
-                    return poMatch || (custMatch && ord.createdAt && ord.createdAt.startsWith('2026-10-19'));
+                    return custMatch && ord.createdAt && ord.createdAt.startsWith(invoiceDate || '2026-10');
                 });
 
                 const items = [];
