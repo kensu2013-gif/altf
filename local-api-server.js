@@ -1,4 +1,6 @@
 import './server/polyfills.js';
+import fs from 'fs';
+import path from 'path';
 import http from 'http';
 import aromanize from 'aromanize';
 import crypto from 'crypto';
@@ -4573,40 +4575,11 @@ const server = http.createServer(async (req, res) => {
         }
 
         try {
-            const enriched = await updateDb(() => {
-                const enrichedList = enrichCustomersWithGrade(db.customers || [], db.orders || []);
-                
-                // Compare to see if there are actual changes in grades, order counts, or sales
-                let hasChanges = false;
-                if ((db.customers || []).length !== enrichedList.length) {
-                    hasChanges = true;
-                } else {
-                    for (let i = 0; i < enrichedList.length; i++) {
-                        const current = db.customers[i];
-                        const enrichedItem = enrichedList[i];
-                        if (
-                            current.grade !== enrichedItem.grade ||
-                            current.orderCount60Days !== enrichedItem.orderCount60Days ||
-                            current.totalSales60Days !== enrichedItem.totalSales60Days
-                        ) {
-                            hasChanges = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (hasChanges) {
-                    db.customers = enrichedList;
-                    console.log('[API] CRM customer grades or order counts changed. Saving to S3 database...');
-                    return enrichedList; // updateDb will run saveData()
-                } else {
-                    return { _bypassSave: true, data: enrichedList }; // skip S3 write
-                }
-            });
-
-            sendJsonResponse(req, res, 200, enriched);
+            // Serve customers fast without hammering S3 DB saves on simple GET queries
+            const customerList = db.customers || [];
+            sendJsonResponse(req, res, 200, customerList);
         } catch (e) {
-            console.error('[API] Error loading/enriching customers:', e);
+            console.error('[API] Error loading customers:', e);
             res.writeHead(500);
             res.end(JSON.stringify({ error: 'Server Error' }));
         }
