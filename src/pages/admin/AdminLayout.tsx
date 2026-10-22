@@ -114,6 +114,19 @@ export default function AdminLayout() {
         return count;
     }, 0);
 
+    // 🚪 0-D. 발송 대기열 결재 대기 건수
+    const [pendingDispatchCount, setPendingDispatchCount] = useState(0);
+    useEffect(() => {
+        fetch('/api/dispatch/queue?status=PENDING_APPROVAL')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && typeof data.count === 'number') {
+                    setPendingDispatchCount(data.count);
+                }
+            })
+            .catch(() => {});
+    }, [location.pathname]);
+
     const handleLogout = () => {
         logout();
         navigate('/login');
@@ -126,6 +139,7 @@ export default function AdminLayout() {
         { label: '주문 관리', path: '/admin/orders', emoji: '🛒', badge: orders.filter(o => o.status === 'SUBMITTED' && !o.isDeleted).length },
         { label: '미결 관리', path: '/admin/pending', emoji: '⏳', badge: delayedPendingCount },
         { label: '견적 관리', path: '/admin/quotes', emoji: '📝', badge: quotes.filter(q => q.status === 'SUBMITTED' && !q.isDeleted).length },
+        { label: '승인 대기함', path: '/admin/dispatch-queue', emoji: '👑', badge: pendingDispatchCount },
         { label: '시화재고 관리', path: '/admin/sihwainventory', emoji: '🏭' },
         { label: '부산재고 관리', path: '/admin/busaninventory', emoji: '⚓' },
         { label: '재고 관리', path: '/admin/inventory', emoji: '📦' },
@@ -171,7 +185,7 @@ export default function AdminLayout() {
                     {NAV_ITEMS.filter(item => {
                         if ('masterOnly' in item && item.masterOnly && user?.role !== 'MASTER') return false;
                         if (user?.role === 'MANAGER') {
-                            const baseAllowed = ['/admin/orders', '/admin/pending', '/admin/quotes', '/admin/pilot-split-po'];
+                            const baseAllowed = ['/admin/orders', '/admin/pending', '/admin/quotes', '/admin/dispatch-queue', '/admin/pilot-split-po'];
                             if (user.permissions?.viewCrm && item.path === '/admin/customers') return true;
                             if (user.permissions?.viewSihwa && (item.path === '/admin/sihwainventory' || item.path === '/admin/busaninventory')) return true;
                             return baseAllowed.includes(item.path);

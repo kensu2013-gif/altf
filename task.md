@@ -13,7 +13,7 @@
 
 | 단계 | 목표 | 상태 | 주요 작업 |
 |---|---|---|---|
-| **0단계** | **기반 정비 (Single Source of Truth & 안전 게이트)** | 🚀 **진행 중 (0-A, 0-B, 0-C 완료, 0-D 착수)** | 성적서 기본값 제거(완료), 팀/팀원(+팀원 추가 버튼/모달/배정) 완성, 단일 원장(ledgerClient 완료), 라인 스키마(S/D/M 완료), 발송 게이트 |
+| **0단계** | **기반 정비 (Single Source of Truth & 안전 게이트)** | ✅ **완료 (0-A, 0-B, 0-C, 0-D 완벽 구축)** | 성적서 기본값 제거(완료), 팀/팀원(+팀원 추가/배정) 완성, 단일 원장(ledgerClient), 라인 스키마(S/D/M), 발송 게이트(dispatchGate & 승인 대기함) |
 | **1단계** | **접수 창구 하나로 모으기 (카카오 + 대표메일)** | ⏳ 대기 | 접수함(intake), 문서 분류·판독·표준화(itemNormalizer), 견적 초안 자동화 |
 | **2단계** | **견적 회신 자동화** | ⏳ 대기 | 승인 1회 회신, 1회용 토큰 링크, SLE-08 팔로업 |
 | **3단계** | **발주서 접수, 경로 분할, 매입발주** | ⏳ 대기 | PUR-11 등록, PUR-12 견적 대조, PUR-13 S/D/M 제안, PUR-14 회신 |
@@ -90,12 +90,15 @@
   - `[x]` 운임/DC/비품목 라인 식별 함수 (`isNonProductLine`, `certRequired: false`)
   - `[x]` 관리자 주문 상세 (`AdminOrderDetail.tsx`)에 라인별 경로/상태 뱃지 읽기 전용 렌더링
   - `[x]` `ledgerClient.js` 원장 수정 시 상태 전이 유효성 검사 및 키 병합 연동 완료
-- `[ ]` **0-D. 발송 게이트와 승인 대기열 (Dispatch Gate)**
-  - `[ ]` `server/services/dispatchGate.js` 구현 (`enqueue`, `approve`, `reject`, 중복 발송 방지)
-  - `[ ]` 메일플러그 SMTP 어댑터 (Reply-To 영업자 지정, 로컬 테스트 시 TEST_RECIPIENT 가드)
-  - `[ ]` 팩스/카카오 어댑터 인터페이스 정의
-  - `[ ]` 텔레그램 사내 알림 연동 (`telegramBotService.js`)
-  - `[ ]` 관리자 화면 내 '승인 대기함 (Approval Queue)' UI 신설 및 역할별 승인/반려 모달 제공
+- `[x]` **0-D. 발송 게이트와 승인 대기열 (Dispatch Gate) [완료: 2026-10-22]**
+  - `[x]` `server/services/dispatchGate.js` 구현 (`enqueue`, `approve`, `reject`, 중복 발송 방지, 사내 텔레그램 알림)
+  - `[x]` 메일플러그 SMTP 어댑터 (Reply-To 영업자 지정, 로컬 테스트 시 TEST_RECIPIENT 및 sent_mock_emails 격리 가드)
+  - `[x]` 팩스/카카오 어댑터 인터페이스 정의 (`NOT_CONFIGURED`)
+  - `[x]` 텔레그램 사내 알림 연동 (`telegramBotService.js`)
+  - `[x]` `local-api-server.js`에 발송 대기열 REST API 연동 (`/api/dispatch/queue/*`)
+  - `[x]` 관리자 화면 내 '승인 대기함 (Approval Queue)' UI 신설 및 역할별 승인/반려 모달 제공 (`src/pages/admin/DispatchApprovalQueue.tsx`)
+  - `[x]` 관리자 레이아웃(`AdminLayout.tsx`)에 승인 대기함 메뉴(👑) 및 실시간 결재 대기 건수 뱃지 장착
+  - `[x]` 단위 테스트 6종 100% 통과 (`test_0d_dispatch_gate.mjs`)
 
 ---
 

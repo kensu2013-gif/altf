@@ -30,6 +30,7 @@ import { kakaoBotService } from './server/services/kakaoBotService.js';
 import { sleQuoteReviewService } from './server/services/sleQuoteReviewService.js';
 import { ledgerClient } from './server/services/ledgerClient.js';
 import { agentControlManager } from './server/services/agentControlManager.js';
+import { dispatchGate } from './server/services/dispatchGate.js';
 
 import multer from 'multer';
 
@@ -1121,6 +1122,110 @@ const server = http.createServer(async (req, res) => {
                     res.end(JSON.stringify(result));
                 } catch (err) {
                     res.writeHead(err.message.includes('not found') ? 404 : 500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: err.message }));
+                }
+            });
+            return;
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🚪 0-D. DISPATCH GATE & APPROVAL QUEUE ENDPOINTS
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (url.pathname.startsWith('/api/dispatch/queue')) {
+        // 1. GET /api/dispatch/queue : 발송 대기열 목록 조회
+        if (req.method === 'GET' && url.pathname === '/api/dispatch/queue') {
+            try {
+                const filter = {
+                    status: url.searchParams.get('status') || undefined,
+                    approverRole: url.searchParams.get('approverRole') || undefined,
+                    kind: url.searchParams.get('kind') || undefined,
+                    orderId: url.searchParams.get('orderId') || undefined,
+                    shipmentId: url.searchParams.get('shipmentId') || undefined,
+                    limit: url.searchParams.get('limit') || undefined
+                };
+                const items = dispatchGate.getQueue(filter);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, count: items.length, items }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+            return;
+        }
+
+        // 2. POST /api/dispatch/queue/enqueue : 신규 발송 요청 등록
+        if (req.method === 'POST' && url.pathname === '/api/dispatch/queue/enqueue') {
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    const data = JSON.parse(body || '{}');
+                    const item = await dispatchGate.enqueue(data);
+                    res.writeHead(201, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: true, item }));
+                } catch (err) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: err.message }));
+                }
+            });
+            return;
+        }
+
+        // 3. POST /api/dispatch/queue/:id/approve : 승인 및 실제 발송 실행
+        const approveMatch = url.pathname.match(/^\/api\/dispatch\/queue\/([^\/]+)\/approve$/);
+        if (req.method === 'POST' && approveMatch) {
+            const id = decodeURIComponent(approveMatch[1]);
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    const { user } = JSON.parse(body || '{}');
+                    const item = await dispatchGate.approve(id, user || { name: '관리자' });
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: true, item }));
+                } catch (err) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: err.message }));
+                }
+            });
+            return;
+        }
+
+        // 4. POST /api/dispatch/queue/:id/reject : 반려 처리
+        const rejectMatch = url.pathname.match(/^\/api\/dispatch\/queue\/([^\/]+)\/reject$/);
+        if (req.method === 'POST' && rejectMatch) {
+            const id = decodeURIComponent(rejectMatch[1]);
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    const { user, reason } = JSON.parse(body || '{}');
+                    const item = await dispatchGate.reject(id, user || { name: '관리자' }, reason);
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: true, item }));
+                } catch (err) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: err.message }));
+                }
+            });
+            return;
+        }
+
+        // 5. POST /api/dispatch/queue/:id/retry : 실패 건 재시도
+        const retryMatch = url.pathname.match(/^\/api\/dispatch\/queue\/([^\/]+)\/retry$/);
+        if (req.method === 'POST' && retryMatch) {
+            const id = decodeURIComponent(retryMatch[1]);
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    const { user } = JSON.parse(body || '{}');
+                    const item = await dispatchGate.retry(id, user || { name: '관리자' });
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: true, item }));
+                } catch (err) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: err.message }));
                 }
             });

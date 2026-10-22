@@ -1,0 +1,152 @@
+[
+  {
+    "id": "DSP-MVJMY5PO-7LJK",
+    "channel": "TELEGRAM_INTERNAL",
+    "to": "INTERNAL",
+    "replyTo": "sales@altf.kr",
+    "subject": "사내 공지",
+    "body": "일일 마감 보고",
+    "attachments": [],
+    "orderId": null,
+    "shipmentId": null,
+    "kind": "NOTICE",
+    "approverRole": null,
+    "requiresApproval": false,
+    "status": "SENT",
+    "enqueuedAt": "2026-10-22T14:27:45.132Z",
+    "enqueuedBy": "bot:EXE-11",
+    "retryCount": 0,
+    "meta": {},
+    "sentAt": "2026-10-22T14:27:46.091Z",
+    "dispatchResult": {
+      "delivered": true,
+      "telegramResponse": {
+        "ok": true,
+        "result": {
+          "message_id": 59,
+          "from": {
+            "id": 8246481952,
+            "is_bot": true,
+            "first_name": "Altf assist",
+            "username": "Altf_office_auto_bot"
+          },
+          "chat": {
+            "id": 5659564720,
+            "first_name": "Ken Cho",
+            "type": "private"
+          },
+          "date": 1792679265,
+          "text": "📢 [ALTF 사내 발송 통지]\n• 유형: NOTICE\n• 제목: 사내 공지\n\n일일 마감 보고",
+          "entities": [
+            {
+              "offset": 3,
+              "length": 15,
+              "type": "bold"
+            },
+            {
+              "offset": 25,
+              "length": 6,
+              "type": "bold"
+            }
+          ]
+        }
+      }
+    },
+    "lastError": null
+  },
+  {
+    "id": "DSP-MVJMY5PM-HLZM",
+    "channel": "EMAIL",
+    "to": "wrong-recipient@example.com",
+    "replyTo": "sales@altf.kr",
+    "subject": "[ALTF 잘못된 요청]",
+    "body": "오류 테스트",
+    "attachments": [],
+    "orderId": "ORD-TEST-001",
+    "shipmentId": null,
+    "kind": "NOTICE",
+    "approverRole": "SALES",
+    "requiresApproval": true,
+    "status": "REJECTED",
+    "enqueuedAt": "2026-10-22T14:27:45.130Z",
+    "enqueuedBy": "bot:SLE-08",
+    "retryCount": 0,
+    "meta": {},
+    "rejectedBy": {
+      "name": "최팀장",
+      "at": "2026-10-22T14:27:45.131Z",
+      "reason": "수신처 이메일 주소 오류"
+    }
+  },
+  {
+    "id": "DSP-MVJMY5PH-F8CS",
+    "channel": "EMAIL",
+    "to": "customer@example.com",
+    "replyTo": "sales@altf.kr",
+    "subject": "[ALTF 출고서류] 거래명세표 및 성적서",
+    "body": "출고 서류 일체 송부",
+    "attachments": [],
+    "orderId": "ORD-TEST-001",
+    "shipmentId": "SHIP-20261022-001",
+    "kind": "DOC_PACKAGE",
+    "approverRole": "OFFICE",
+    "requiresApproval": true,
+    "status": "SENT",
+    "enqueuedAt": "2026-10-22T14:27:45.125Z",
+    "enqueuedBy": "bot:GEN-03",
+    "retryCount": 0,
+    "meta": {},
+    "approvedBy": {
+      "name": "박총무",
+      "role": "OFFICE",
+      "at": "2026-10-22T14:27:45.126Z"
+    },
+    "sentAt": "2026-10-22T14:27:45.130Z",
+    "dispatchResult": {
+      "delivered": true,
+      "mode": "LOCAL_SAFE_TEST",
+      "mockPath": "/Volumes/Extreme SSD/altf-kr-web-skeleton/server/data/sent_mock_emails/DSP-MVJMY5PH-F8CS.json",
+      "targetTo": "customer@example.com",
+      "attachmentsCount": 0
+    },
+    "lastError": null
+  },
+  {
+    "id": "DSP-MVJMY5OY-6VX6",
+    "channel": "EMAIL",
+    "to": "customer@example.com",
+    "replyTo": "sales-rep@altf.kr",
+    "subject": "[ALTF 견적서] 태형산업 견적 회신",
+    "body": "첨부 견적서를 확인해 주십시오.",
+    "attachments": [
+      {
+        "fileName": "quote_태형산업.pdf",
+        "path": "/dummy/quote.pdf"
+      }
+    ],
+    "orderId": "ORD-TEST-001",
+    "shipmentId": null,
+    "kind": "QUOTE",
+    "approverRole": "SALES",
+    "requiresApproval": true,
+    "status": "SENT",
+    "enqueuedAt": "2026-10-22T14:27:45.106Z",
+    "enqueuedBy": "bot:SLE-01",
+    "retryCount": 0,
+    "meta": {},
+    "approvedBy": {
+      "name": "김영업",
+      "role": "SALES",
+      "at": "2026-10-22T14:27:45.107Z"
+    },
+    "sentAt": "2026-10-22T14:27:45.124Z",
+    "dispatchResult": {
+      "delivered": true,
+      "mode": "LOCAL_SAFE_TEST",
+      "mockPath": "/Volumes/Extreme SSD/altf-kr-web-skeleton/server/data/sent_mock_emails/DSP-MVJMY5OY-6VX6.json",
+      "targetTo": "customer@example.com",
+      "attachmentsCount": 1
+    },
+    "lastError": null
+  }
+]

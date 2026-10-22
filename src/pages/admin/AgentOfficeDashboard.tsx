@@ -1698,8 +1698,8 @@ export default function AgentOfficeDashboard() {
                 body: JSON.stringify({ id: agentId, status: newStatus })
             });
             console.log(`[AgentOffice] 에이전트 ${agentId} 상태 -> ${newStatus} 즉시 적용 완료`);
-        } catch (err: any) {
-            console.warn('[AgentOffice] 상태 제어 API 전송 오류:', err?.message);
+        } catch (err: unknown) {
+            console.warn('[AgentOffice] 상태 제어 API 전송 오류:', err instanceof Error ? err.message : String(err));
         }
     };
 
@@ -1754,8 +1754,8 @@ export default function AgentOfficeDashboard() {
                     scheduleInterval: editForm.scheduleInterval
                 })
             });
-        } catch (err: any) {
-            console.warn('[AgentOffice] 상세 수정 제어 API 전송 오류:', err?.message);
+        } catch (err: unknown) {
+            console.warn('[AgentOffice] 상세 수정 제어 API 전송 오류:', err instanceof Error ? err.message : String(err));
         }
 
         alert('에이전트 식별 코드, 이름, 직위(서열), 반복 주기(스케줄) 및 연계 정보가 성공적으로 저장되었습니다.');
@@ -1779,8 +1779,8 @@ export default function AgentOfficeDashboard() {
                 body: JSON.stringify({ id: agentId, scheduleInterval: intervalId })
             });
             console.log(`[AgentOffice] 에이전트 ${agentId} 실행주기 -> ${intervalId} 즉시 적용 완료`);
-        } catch (err: any) {
-            console.warn('[AgentOffice] 주기 제어 API 전송 오류:', err?.message);
+        } catch (err: unknown) {
+            console.warn('[AgentOffice] 주기 제어 API 전송 오류:', err instanceof Error ? err.message : String(err));
         }
     };
 
