@@ -27,36 +27,36 @@ interface SupplierInvoiceItem {
 
 interface SupplierInvoice {
     id: string;
-    fileName: string;
+    fileName?: string;
     invoiceNo: string;
     invoiceDate: string;
-    supplier: {
+    supplier?: {
         name: string;
-        bizNo: string;
-        ceo: string;
+        bizNo?: string;
+        ceo?: string;
     };
-    buyer: {
+    buyer?: {
         name: string;
-        bizNo: string;
-        ceo: string;
+        bizNo?: string;
+        ceo?: string;
     };
-    items: SupplierInvoiceItem[];
-    itemCount: number;
-    poNumbers: string[];
-    pricing: {
-        totalSupplyPrice: number;
-        freightPrice: number;
-        subtotal: number;
-        vat: number;
-        grandTotal: number;
+    items?: SupplierInvoiceItem[];
+    itemCount?: number;
+    poNumbers?: string[];
+    pricing?: {
+        totalSupplyPrice?: number;
+        freightPrice?: number;
+        subtotal?: number;
+        vat?: number;
+        grandTotal?: number;
     };
-    source: string;
-    processedAt: string;
-    accounting: {
-        status: string;
-        subtotal: number;
-        vat: number;
-        grandTotal: number;
+    source?: string;
+    processedAt?: string;
+    accounting?: {
+        status?: string;
+        subtotal?: number;
+        vat?: number;
+        grandTotal?: number;
     };
 }
 
@@ -584,22 +584,22 @@ export const DaekyungInvoiceModal: React.FC<DaekyungInvoiceModalProps> = ({
                                                     {inv.invoiceDate}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-slate-200 font-bold whitespace-nowrap">
-                                                    {inv.supplier.name}
+                                                    {inv.supplier?.name || '(주)대경벤드'}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-teal-300 font-bold whitespace-nowrap">
-                                                    {inv.poNumbers.join(', ') || '-'}
+                                                    {(inv.poNumbers || []).join(', ') || '-'}
                                                 </td>
-                                                <td className="py-2.5 px-3 text-slate-300 max-w-[200px] truncate" title={inv.items.map(it => it.name).join(', ')}>
-                                                    {inv.items.map(it => `${it.name} (${it.quantity})`).join(', ')}
+                                                <td className="py-2.5 px-3 text-slate-300 max-w-[200px] truncate" title={(inv.items || []).map(it => it.name).join(', ')}>
+                                                    {(inv.items || []).map(it => `${it.name} (${it.quantity})`).join(', ') || '-'}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-right text-slate-300 whitespace-nowrap">
-                                                    {inv.pricing.subtotal.toLocaleString()}원
+                                                    {(inv.pricing?.subtotal || inv.accounting?.subtotal || 0).toLocaleString()}원
                                                 </td>
                                                 <td className="py-2.5 px-3 text-right text-slate-400 whitespace-nowrap">
-                                                    {inv.pricing.vat.toLocaleString()}원
+                                                    {(inv.pricing?.vat || inv.accounting?.vat || 0).toLocaleString()}원
                                                 </td>
                                                 <td className="py-2.5 px-3 text-right font-black text-amber-300 whitespace-nowrap">
-                                                    {inv.pricing.grandTotal.toLocaleString()}원
+                                                    {(inv.pricing?.grandTotal || inv.accounting?.grandTotal || 0).toLocaleString()}원
                                                 </td>
                                                 <td className="py-2.5 px-3 text-center whitespace-nowrap">
                                                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
