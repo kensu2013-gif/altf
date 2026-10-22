@@ -24,6 +24,12 @@ export default function AdminInventory() {
     const handleRefresh = async () => {
         setIsRefreshing(true);
         try {
+            // Trigger backend S3 download sync first
+            try {
+                await fetch((import.meta.env.VITE_API_URL || '') + '/api/inventory/sync-s3', { method: 'POST' });
+            } catch (syncErr) {
+                console.warn('[AdminInventory] S3 sync endpoint warning:', syncErr);
+            }
             if (refreshInventory) {
                 await refreshInventory();
             }
@@ -37,27 +43,25 @@ export default function AdminInventory() {
     // Flatten inventory to separate Yangsan and Sihwa stocks
     const flatInventory: Product[] = [];
     inventory.forEach((item) => {
-        // 1. Yangsan Stock Row (or default location) - Only push if primary location is defined
-        const primaryLoc = item.location || '';
-        const primaryMaker = item.maker || '';
+        // 1. Yangsan Stock Row (or default location)
+        const primaryLoc = item.location || (item.locationStock && item.locationStock['양산'] !== undefined ? '양산' : (item.locationStock && item.locationStock['시화'] !== undefined ? '시화' : '양산'));
+        const primaryMaker = item.maker || item.maker1 || '';
         
-        if (primaryLoc) {
-            let primaryStock = 0;
-            if (item.locationStock && item.locationStock[primaryLoc] !== undefined) {
-                primaryStock = Number(item.locationStock[primaryLoc]);
-            } else {
-                primaryStock = item.ready_qty !== undefined ? Number(item.ready_qty) : (Number(item.currentStock) || 0);
-            }
-
-            flatInventory.push({
-                ...item,
-                uniqueKey: `${item.id}-primary`,
-                location: primaryLoc,
-                maker: primaryMaker,
-                currentStock: primaryStock,
-                stockStatus: primaryStock > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK',
-            });
+        let primaryStock = 0;
+        if (item.locationStock && primaryLoc && item.locationStock[primaryLoc] !== undefined) {
+            primaryStock = Number(item.locationStock[primaryLoc]);
+        } else {
+            primaryStock = item.ready_qty !== undefined ? Number(item.ready_qty) : (Number(item.currentStock) || 0);
         }
+
+        flatInventory.push({
+            ...item,
+            uniqueKey: `${item.id}-primary`,
+            location: primaryLoc,
+            maker: primaryMaker,
+            currentStock: primaryStock,
+            stockStatus: primaryStock > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK',
+        });
 
         // 2. Sihwa Stock Row (secondary location)
         const hasSecondary = (item.location1 && item.location1.trim() !== '') || 

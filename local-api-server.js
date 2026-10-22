@@ -3201,31 +3201,110 @@ const server = http.createServer(async (req, res) => {
 
     // GET /api/inventory/inventory.json
     if (req.method === 'GET' && url.pathname === '/api/inventory/inventory.json') {
-        try {
-            const localPath = './public/api/inventory/inventory.json';
+        const forceRefresh = url.searchParams.get('refresh') === 'true' || url.searchParams.get('sync') === 'true';
+        const localPath = './public/api/inventory/inventory.json';
 
-            // 1. Direct high-speed file streaming if local file exists (Zero-RAM footprint)
-            if (fs.existsSync(localPath)) {
+        // Helper: Fetch latest from S3 and save to disk
+        const fetchAndServeFromS3 = async () => {
+            const s3Url = 'https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/public/inventory/inventory.json';
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15000);
+            try {
+                console.log(`[API] Fetching latest inventory.json from S3 (${s3Url})...`);
+                const s3Res = await fetch(s3Url, { signal: controller.signal });
+                clearTimeout(timeout);
+                if (!s3Res.ok) throw new Error(`S3 HTTP ${s3Res.status}`);
+
+                const buffer = Buffer.from(await s3Res.arrayBuffer());
+                const parentDir = path.dirname(localPath);
+                if (!fs.existsSync(parentDir)) {
+                    fs.mkdirSync(parentDir, { recursive: true });
+                }
+                fs.writeFileSync(localPath, buffer);
+                console.log(`[API] Successfully synced latest inventory.json from S3 (${buffer.length} bytes)`);
+
+                // Invalidate memory cache
+                inventoryCache.gzippedData = null;
+                inventoryCache.rawData = null;
+                inventoryCache.parsedData = null;
+                inventoryCache.timestamp = 0;
+
                 res.writeHead(200, {
                     'Content-Type': 'application/json',
-                    'Cache-Control': 'public, max-age=300'
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Access-Control-Allow-Origin': '*'
                 });
-                fs.createReadStream(localPath).pipe(res);
-                return;
+                res.end(buffer);
+                return true;
+            } catch (s3Err) {
+                clearTimeout(timeout);
+                console.error('[API] Failed to fetch inventory from S3:', s3Err.message);
+                return false;
             }
+        };
 
-            // 2. High-speed 302 redirect to fast public S3 CDN URL if local file is missing
-            res.writeHead(302, {
-                'Location': 'https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/public/inventory/inventory.json'
+        if (forceRefresh || !fs.existsSync(localPath)) {
+            const success = await fetchAndServeFromS3();
+            if (success) return;
+        }
+
+        // 1. Direct high-speed file streaming if local file exists (Zero-RAM footprint)
+        if (fs.existsSync(localPath)) {
+            res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Cache-Control': forceRefresh ? 'no-cache' : 'public, max-age=120',
+                'Access-Control-Allow-Origin': '*'
             });
-            res.end();
+            fs.createReadStream(localPath).pipe(res);
             return;
-        } catch (error) {
-            console.error('[API] Failed to serve inventory.json:', error);
-            res.writeHead(302, {
-                'Location': 'https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/public/inventory/inventory.json'
+        }
+
+        // 2. Fallback: redirect with CORS headers
+        res.writeHead(302, {
+            'Location': 'https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/public/inventory/inventory.json',
+            'Access-Control-Allow-Origin': '*'
+        });
+        res.end();
+        return;
+    }
+
+    // POST or GET /api/inventory/sync-s3 (Manual trigger to download and sync inventory.json from S3)
+    if ((req.method === 'POST' || req.method === 'GET') && url.pathname === '/api/inventory/sync-s3') {
+        const localPath = './public/api/inventory/inventory.json';
+        const s3Url = 'https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/public/inventory/inventory.json';
+        try {
+            console.log(`[API] Explicit sync-s3 triggered. Downloading from S3...`);
+            const s3Res = await fetch(s3Url);
+            if (!s3Res.ok) throw new Error(`S3 HTTP ${s3Res.status}`);
+            const buffer = Buffer.from(await s3Res.arrayBuffer());
+            const parsed = JSON.parse(buffer.toString('utf8'));
+            const items = Array.isArray(parsed) ? parsed : (parsed.items || []);
+
+            const parentDir = path.dirname(localPath);
+            if (!fs.existsSync(parentDir)) {
+                fs.mkdirSync(parentDir, { recursive: true });
+            }
+            fs.writeFileSync(localPath, buffer);
+
+            // Invalidate memory cache
+            inventoryCache.gzippedData = null;
+            inventoryCache.rawData = null;
+            inventoryCache.parsedData = null;
+            inventoryCache.timestamp = 0;
+
+            console.log(`[API] sync-s3 complete. Total items: ${items.length}, Size: ${buffer.length}`);
+            sendJsonResponse(req, res, 200, {
+                success: true,
+                message: 'Successfully synced latest inventory.json from S3',
+                itemCount: items.length,
+                sizeBytes: buffer.length,
+                syncedAt: new Date().toISOString()
             });
-            res.end();
+            return;
+        } catch (syncErr) {
+            console.error('[API] sync-s3 failed:', syncErr.message);
+            res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify({ success: false, error: syncErr.message }));
             return;
         }
     }

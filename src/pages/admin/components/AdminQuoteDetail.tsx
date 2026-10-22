@@ -1844,7 +1844,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                             
                             {/* NEW: Attached Photos */}
                             {quote.attachments && quote.attachments.length > 0 && (() => {
-                                const isKakao = quote.source === 'KAKAO' || quote.id.startsWith('Q-KAKAO') || !!(quote as any).kakaoUser || !!(quote as any).botUserKey || (quote.memo && quote.memo.includes('카카오'));
+                                const isKakao = quote.source === 'KAKAO' || quote.id.startsWith('Q-KAKAO') || !!quote.kakaoUser || !!quote.botUserKey || (quote.memo && quote.memo.includes('카카오'));
                                 return (
                                     <div className="mt-4 pt-4 border-t border-yellow-200/50">
                                         <h4 className="text-xs font-bold text-yellow-800 mb-2">
