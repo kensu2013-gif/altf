@@ -1,6 +1,6 @@
 import { useState, useEffect, useDeferredValue, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FileText, Calendar, Download, Trash2, ArchiveRestore, Search, Image, MessageSquare } from 'lucide-react';
+import { FileText, Calendar, Download, Trash2, ArchiveRestore, Search, Image, MessageSquare, Copy, Check, X } from 'lucide-react';
 import { AdminQuoteDetail } from './components/AdminQuoteDetail';
 import { QuoteSimilarityDrawer } from './components/QuoteSimilarityDrawer';
 import { QuoteComparisonModal } from './components/QuoteComparisonModal';
@@ -165,6 +165,33 @@ export default function AdminQuotes() {
     }, [setQuotes, user, fetchUsers]);
 
     const [lastOpenedQuoteId, setLastOpenedQuoteId] = useState<string | null>(null);
+
+    // 💬 카카오톡 원문 텍스트 퀵 뷰어 모달 상태
+    const [kakaoRawTextQuote, setKakaoRawTextQuote] = useState<Quotation | null>(null);
+    const [copiedRawText, setCopiedRawText] = useState(false);
+    const [intakesCache, setIntakesCache] = useState<Array<{ quotationId?: string; botUserKey?: string; utterance?: string }>>([]);
+
+    useEffect(() => {
+        fetch('/api/kakao/intakes')
+            .then(res => res.json())
+            .then(data => {
+                const list = data.items || data.intakes || [];
+                if (Array.isArray(list)) {
+                    setIntakesCache(list);
+                }
+            })
+            .catch(() => {});
+    }, []);
+
+    const getQuoteRawText = (q: Quotation): string => {
+        if (q.rawText) return q.rawText;
+        if (q.utterance && !q.utterance.startsWith('http')) return q.utterance;
+        const matched = intakesCache.find(it => it.quotationId === q.id || (q.botUserKey && it.botUserKey === q.botUserKey));
+        if (matched && matched.utterance && !matched.utterance.startsWith('http')) {
+            return matched.utterance;
+        }
+        return q.memo || '카카오톡 원문 텍스트가 없습니다.';
+    };
 
     // Handle incoming URL query parameter (?quoteId=...) for direct search & open
     const urlQuoteId = searchParams.get('quoteId');
@@ -783,16 +810,16 @@ export default function AdminQuotes() {
                                                             </div>
                                                         );
                                                     } else {
-                                                        // 2) 카카오 텍스트 문의인 경우: 노란색 "카카오 텍스트" 버튼 (클릭 시 상세 모달 오픈)
+                                                        // 2) 카카오 텍스트 문의인 경우: 노란색 "카카오 텍스트" 버튼 (클릭 시 원문 팝업 모달 즉시 오픈)
                                                         return (
                                                             <button
                                                                 type="button"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    setSelectedQuote(quote);
+                                                                    setKakaoRawTextQuote(quote);
                                                                 }}
-                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-100/90 border border-yellow-300 text-yellow-900 hover:bg-yellow-200 rounded-full text-xs font-bold transition-all shadow-sm shrink-0 whitespace-nowrap ring-1 ring-yellow-200"
-                                                                title={`[카카오톡 텍스트 견적문의] ${quote.memo || '텍스트 견적 내용 보기'}`}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-100/90 border border-yellow-300 text-yellow-900 hover:bg-yellow-200 rounded-full text-xs font-bold transition-all shadow-sm shrink-0 whitespace-nowrap ring-1 ring-yellow-200 cursor-pointer"
+                                                                title="카카오톡 고객 입력 원문 텍스트 바로보기"
                                                             >
                                                                 <MessageSquare className="w-3.5 h-3.5 text-yellow-800" />
                                                                 카카오 텍스트
@@ -972,6 +999,95 @@ export default function AdminQuotes() {
                     onClose={() => setPreviewHtml(null)}
                     docType="QUOTATION"
                 />
+            )}
+
+            {/* 💬 카카오톡 고객 접수 원문 전용 팝업 모달 */}
+            {kakaoRawTextQuote && (
+                <div 
+                    className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+                    onClick={() => setKakaoRawTextQuote(null)}
+                >
+                    <div 
+                        className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-yellow-300 animate-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100 px-5 py-3.5 border-b border-yellow-200 flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-yellow-400 flex items-center justify-center text-slate-900 font-black text-[11px] shadow-xs ring-1 ring-yellow-300">
+                                    TALK
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                                        카카오톡 고객 접수 원문
+                                    </h3>
+                                    <p className="text-[11px] text-slate-600">
+                                        {kakaoRawTextQuote.customerName || kakaoRawTextQuote.customerInfo?.companyName || '고객사'} ({kakaoRawTextQuote.id})
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setKakaoRawTextQuote(null)}
+                                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-yellow-200/50 transition-colors cursor-pointer"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Content: Kakao Chat Bubble Style */}
+                        <div className="p-5 overflow-y-auto flex-1 bg-amber-50/30">
+                            <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+                                <span className="font-semibold text-amber-950 flex items-center gap-1">
+                                    <span>💬 고객이 카카오톡 채팅창에 입력한 원본 내용:</span>
+                                </span>
+                                <span className="text-[11px] text-slate-400">
+                                    {getQuoteRawText(kakaoRawTextQuote).length}자
+                                </span>
+                            </div>
+                            <pre className="bg-white rounded-xl p-4 border border-yellow-200 shadow-inner font-mono text-xs text-slate-800 whitespace-pre-wrap leading-relaxed select-text min-h-[160px] max-h-[380px] overflow-y-auto">
+                                {getQuoteRawText(kakaoRawTextQuote)}
+                            </pre>
+                        </div>
+
+                        {/* Footer Actions */}
+                        <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(getQuoteRawText(kakaoRawTextQuote));
+                                    setCopiedRawText(true);
+                                    setTimeout(() => setCopiedRawText(false), 2000);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer"
+                            >
+                                {copiedRawText ? <Check className="w-4 h-4 text-emerald-800" /> : <Copy className="w-4 h-4" />}
+                                <span>{copiedRawText ? '복사 완료!' : '원문 복사'}</span>
+                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const q = kakaoRawTextQuote;
+                                        setKakaoRawTextQuote(null);
+                                        setSelectedQuote(q);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer"
+                                >
+                                    <FileText className="w-4 h-4" />
+                                    <span>상세 견적서 열기</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setKakaoRawTextQuote(null)}
+                                    className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-lg border border-slate-300 transition-all cursor-pointer"
+                                >
+                                    닫기
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

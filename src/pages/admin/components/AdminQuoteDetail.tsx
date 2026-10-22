@@ -298,6 +298,39 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         email: quote.kakaoUser?.email || quote.customerInfo?.email || ''
     });
 
+    // 💬 카카오톡 고객 접수 원문 텍스트 연동
+    const [rawKakaoText, setRawKakaoText] = useState<string>(quote.rawText || quote.utterance || '');
+    const [isRawKakaoCopied, setIsRawKakaoCopied] = useState<boolean>(false);
+    const [showRawTextPanel, setShowRawTextPanel] = useState<boolean>(false);
+
+    useEffect(() => {
+        if (!rawKakaoText) {
+            fetch('/api/kakao/intakes')
+                .then(res => res.json())
+                .then(data => {
+                    const list = data.items || data.intakes || [];
+                    if (Array.isArray(list)) {
+                        const matched = list.find((it: { quotationId?: string; botUserKey?: string; utterance?: string }) => 
+                            it.quotationId === quote.id || (quote.botUserKey && it.botUserKey === quote.botUserKey)
+                        );
+                        if (matched && matched.utterance && !matched.utterance.startsWith('http')) {
+                            setRawKakaoText(matched.utterance);
+                        }
+                    }
+                })
+                .catch(() => {});
+        }
+    }, [quote.id, quote.botUserKey, rawKakaoText]);
+
+    const handleCopyRawKakao = () => {
+        const text = rawKakaoText || quote.rawText || quote.utterance || quote.memo || '';
+        if (text) {
+            navigator.clipboard.writeText(text);
+            setIsRawKakaoCopied(true);
+            setTimeout(() => setIsRawKakaoCopied(false), 2000);
+        }
+    };
+
     const handleCopyKakaoReply = () => {
         const custName = customerInfo.companyName || quote.customerName || '고객사';
         const delivery = response.deliveryDate || '당일/익일 출고';
@@ -368,42 +401,6 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
             setIsDispatching(false);
         }
     };
-
-    // 카카오 i 오픈빌더 0원 이벤트 푸시 직통 발송 (솔라피 비용 0원)
-    const handleDispatchKakaoEventPush = async () => {
-        setIsDispatching(true);
-        setDispatchStatusMsg(null);
-        try {
-            const res = await fetch('/api/kakao/event-push', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    botUserKey: quote.botUserKey,
-                    quotationId: quote.id,
-                    totalAmount: totalWithCharges || quote.totalAmount
-                })
-            });
-            const data = await res.json();
-            if (data.success) {
-                setDispatchStatusMsg(`✅ 0원 카카오 이벤트 푸시 전송 완료: ${data.message || '카카오톡 채팅방에 견적 카드가 바로 전송되었습니다.'}`);
-                updateQuotation(quote.id, { status: 'PROCESSED' });
-                if (onSuccess) onSuccess();
-            } else {
-                setDispatchStatusMsg(`⚠️ 카카오 푸시 오류: ${data.error || '발송 실패'}`);
-            }
-        } catch (e: unknown) {
-            setDispatchStatusMsg(`⚠️ 네트워크 오류: ${e instanceof Error ? e.message : String(e)}`);
-        } finally {
-            setIsDispatching(false);
-        }
-    };
-
-    // 경과 시간(SLA) 및 부장 결재 판정
-    const elapsedMinutes = useMemo(() => {
-        if (!quote.createdAt) return 0;
-        const diffMs = Date.now() - new Date(quote.createdAt).getTime();
-        return Math.max(0, Math.floor(diffMs / (1000 * 60)));
-    }, [quote.createdAt]);
 
 
 
@@ -1361,11 +1358,6 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     const calculatedTotal = selectedItems.reduce((sum, item) => sum + item.amount, 0);
     const totalWithCharges = calculatedTotal + charges.reduce((sum, c) => sum + c.amount, 0);
 
-    // SLE-02 견적 심사 & 부장 결재 판정 지능
-    const isLargeAmount = (totalWithCharges || quote.totalAmount || 0) >= 20000000;
-    const missingPriceCount = items.filter(it => !it.unitPrice || it.unitPrice <= 0 || !it.base_price).length;
-    const isManagerEscalationNeeded = isLargeAmount || missingPriceCount > 0;
-
     const persistCustomPrices = () => {
         const records = items
             .filter(item => !item.productId && item.name)
@@ -1834,12 +1826,24 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
 
                         {/* Customer Memo Section */}
                         <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4 shadow-sm">
-                            <h3 className="text-sm font-bold text-yellow-800 mb-2 flex items-center gap-2">
-                                <FileText className="w-4 h-4" />
-                                고객 요청 메모 (Customer Memo)
-                            </h3>
-                            <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
-                                {quote.memo || <span className="text-slate-400 italic">고객이 작성한 메모가 없습니다. (No customer memo)</span>}
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-sm font-bold text-yellow-800 flex items-center gap-2">
+                                    <FileText className="w-4 h-4" />
+                                    {(quote.source === 'KAKAO' || quote.id.startsWith('Q-KAKAO') || rawKakaoText) ? '카카오톡 고객 접수 원문 (Customer Memo)' : '고객 요청 메모 (Customer Memo)'}
+                                </h3>
+                                {(rawKakaoText || quote.rawText || quote.utterance) && (
+                                    <button
+                                        type="button"
+                                        onClick={handleCopyRawKakao}
+                                        className="text-[11px] font-bold text-amber-900 bg-yellow-200/80 hover:bg-yellow-300 border border-yellow-400 px-2 py-0.5 rounded flex items-center gap-1 transition-all cursor-pointer"
+                                    >
+                                        {isRawKakaoCopied ? <Check className="w-3 h-3 text-emerald-700" /> : <Copy className="w-3 h-3" />}
+                                        <span>{isRawKakaoCopied ? '복사 완료' : '원문 복사'}</span>
+                                    </button>
+                                )}
+                            </div>
+                            <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-mono bg-white/70 p-3 rounded-lg border border-yellow-200 shadow-inner max-h-80 overflow-y-auto select-text">
+                                {rawKakaoText || quote.rawText || quote.utterance || quote.memo || <span className="text-slate-400 italic">고객이 작성한 메모가 없습니다. (No customer memo)</span>}
                             </div>
                             
                             {/* NEW: Attached Photos */}
@@ -1880,7 +1884,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                             })()}
                         </div>
 
-                        {/* NEW: 카카오톡 접수건 고객 매칭 & Make/Solapi 웹훅 자동 회신 패널 */}
+                        {/* NEW: 카카오톡 접수건 고객 매칭 & Solapi/채팅 회신 패널 */}
                         {(quote.source === 'KAKAO' || quote.id.startsWith('Q-KAKAO')) && (
                             <div className="bg-gradient-to-r from-amber-50/90 via-yellow-50/90 to-amber-50/90 border border-yellow-300 rounded-xl p-4 shadow-sm flex flex-col gap-3">
                                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1890,12 +1894,12 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="text-sm font-bold text-slate-900">카카오톡 채널 연동 & SLE-02 심사</span>
+                                                <span className="text-sm font-bold text-slate-900">카카오톡 채널 연동</span>
                                                 <span className="text-[10px] bg-yellow-200 text-yellow-900 font-bold px-2 py-0.5 rounded-full">@altf 채널</span>
                                                 
-                                                {/* 카카오 사용자 식별 매칭 배지 */}
+                                                {/* 단일 카카오 고객 매칭 정보 */}
                                                 {(kakaoUserData.name || quote.kakaoUser?.name) ? (
-                                                    <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full border border-emerald-300">
+                                                    <span className="inline-flex items-center gap-1.5 text-[11px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full border border-emerald-300">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                                         고객 매칭: {kakaoUserData.company || quote.kakaoUser?.company || quote.customerName} {kakaoUserData.name || quote.kakaoUser?.name} ({kakaoUserData.phone || quote.kakaoUser?.phone || '연락처'})
                                                     </span>
@@ -1910,60 +1914,36 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                                     </button>
                                                 )}
 
-                                                {/* SLE-02 견적 심사 & 결재 판정 배지 */}
-                                                {isManagerEscalationNeeded ? (
-                                                    <span className="inline-flex items-center gap-1 text-[11px] bg-rose-100 text-rose-800 font-extrabold px-2.5 py-0.5 rounded-full border border-rose-300">
-                                                        <span>⚠️ [부장 결재 대기]</span>
-                                                        <span>{isLargeAmount ? '2천만원 이상 대형 견적' : '단가표 미등록 품목 포함 (대경벤드 문의)'}</span>
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1 text-[11px] bg-blue-100 text-blue-800 font-bold px-2.5 py-0.5 rounded-full border border-blue-300">
-                                                        <span>✅ [SLE-02 박과장 검토완료] 0원 즉시 회신 승인</span>
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-2.5 text-xs text-slate-600 mt-1 flex-wrap">
-                                                {quote.kakaoUser ? (
-                                                    <span className="inline-flex items-center gap-1.5 bg-yellow-100 text-yellow-950 border border-yellow-300 px-2.5 py-0.5 rounded-md text-[11px] font-bold shadow-xs">
-                                                        <span>💬 카톡 문의자:</span>
-                                                        <span className="font-black text-amber-900">{quote.kakaoUser.name}</span>
-                                                        <span className="text-slate-600 font-mono text-[10px]">({quote.kakaoUser.phone})</span>
-                                                    </span>
-                                                ) : quote.botUserKey ? (
-                                                    <span>카카오 ID: <code className="font-mono text-[11px] bg-white px-1.5 py-0.5 rounded border border-yellow-200 text-slate-700">{`${quote.botUserKey.slice(0, 10)}...${quote.botUserKey.slice(-6)}`}</code></span>
-                                                ) : null}
                                                 <button 
                                                     type="button" 
                                                     onClick={() => setIsRegisterOpen(!isRegisterOpen)} 
-                                                    className="text-[11px] text-blue-600 hover:underline font-bold"
+                                                    className="text-[11px] text-blue-600 hover:underline font-bold ml-1"
                                                 >
-                                                    [정보 {isRegisterOpen ? '닫기' : '수정/등록'}]
+                                                    [정보 {isRegisterOpen ? '닫기' : ((kakaoUserData.name || quote.kakaoUser?.name) ? '수정' : '등록')}]
                                                 </button>
-                                                <span className="text-slate-300">|</span>
-                                                {/* SLA 회신 소요 시간 벤치마크 */}
-                                                <span className={`inline-flex items-center gap-1 font-bold ${elapsedMinutes > 25 ? 'text-rose-600' : 'text-slate-600'}`}>
-                                                    <span>⏱️ 접수 후 {elapsedMinutes}분 경과</span>
-                                                    <span className="text-[10px] text-slate-400 font-normal">(권장 골든타임: 25분 이내)</span>
-                                                </span>
+
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setShowRawTextPanel(!showRawTextPanel)} 
+                                                    className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition-colors ml-1 cursor-pointer ${
+                                                        showRawTextPanel ? 'bg-amber-200 text-amber-900 border-amber-400' : 'bg-white hover:bg-yellow-100 text-amber-800 border-yellow-300'
+                                                    }`}
+                                                >
+                                                    <MessageSquare className="w-3 h-3 text-yellow-700" />
+                                                    <span>카톡 원문 {showRawTextPanel ? '닫기' : '보기'}</span>
+                                                </button>
                                             </div>
+                                            {quote.botUserKey && !(kakaoUserData.name || quote.kakaoUser?.name) && (
+                                                <div className="text-xs text-slate-600 mt-1">
+                                                    <span>카카오 ID: <code className="font-mono text-[11px] bg-white px-1.5 py-0.5 rounded border border-yellow-200 text-slate-700">{`${quote.botUserKey.slice(0, 10)}...${quote.botUserKey.slice(-6)}`}</code></span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
                                     {/* Action Buttons */}
                                     <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto flex-wrap">
-                                        {/* 1. 최신 0원 카카오 이벤트 푸시 직통 발송 버튼 */}
-                                        <button
-                                            type="button"
-                                            disabled={isDispatching}
-                                            onClick={handleDispatchKakaoEventPush}
-                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer disabled:opacity-50"
-                                            title="솔라피 비용 없이 카카오 공식 챗봇 이벤트 푸시를 통해 고객 카톡창으로 0원에 견적 카드를 꽂아넣습니다."
-                                        >
-                                            <MessageSquare className="w-3.5 h-3.5" />
-                                            <span>{isDispatching ? '발송 중...' : '💬 0원 카톡 직통 푸시'}</span>
-                                        </button>
-
-                                        {/* 2. Solapi LMS 문자 공식 견적서 발송 버튼 */}
+                                        {/* 1. Solapi LMS 문자 공식 견적서 발송 버튼 */}
                                         <button
                                             type="button"
                                             disabled={isDispatching}
@@ -1975,7 +1955,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             <span>{isDispatching ? '발송 중...' : '📱 솔라피 공식 견적서 발송'}</span>
                                         </button>
 
-                                        {/* 3. 클립보드 복사 */}
+                                        {/* 2. 클립보드 복사 */}
                                         <button
                                             type="button"
                                             onClick={handleCopyKakaoReply}
@@ -1986,7 +1966,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                             <span>{isKakaoCopied ? '복사 완료!' : '답변 복사'}</span>
                                         </button>
 
-                                        {/* 4. 1:1 채팅창 링크 */}
+                                        {/* 3. 1:1 채팅창 링크 */}
                                         <a
                                             href="https://pf.kakao.com/_jxcxaBn/chat"
                                             target="_blank"
@@ -1999,6 +1979,29 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                                         </a>
                                     </div>
                                 </div>
+
+                                {/* 💬 카카오톡 고객 접수 원문 전용 패널 */}
+                                {showRawTextPanel && (
+                                    <div className="bg-amber-100/70 rounded-xl border border-yellow-300 p-3 shadow-inner">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                                                <MessageSquare className="w-3.5 h-3.5 text-yellow-700" />
+                                                카카오톡 고객 입력 원문 (Customer Raw Text)
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={handleCopyRawKakao}
+                                                className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-yellow-200 hover:bg-yellow-300 border border-yellow-400 px-2 py-0.5 rounded transition-all cursor-pointer"
+                                            >
+                                                {isRawKakaoCopied ? <Check className="w-3 h-3 text-emerald-700" /> : <Copy className="w-3 h-3" />}
+                                                <span>{isRawKakaoCopied ? '복사 완료' : '원문 복사'}</span>
+                                            </button>
+                                        </div>
+                                        <pre className="bg-white rounded-lg p-3 border border-yellow-200 text-xs font-mono text-slate-800 whitespace-pre-wrap max-h-56 overflow-y-auto leading-relaxed select-text shadow-inner">
+                                            {rawKakaoText || quote.rawText || quote.utterance || '원문 텍스트를 불러올 수 없습니다.'}
+                                        </pre>
+                                    </div>
+                                )}
 
                                 {/* 발송 결과 피드백 바 */}
                                 {dispatchStatusMsg && (

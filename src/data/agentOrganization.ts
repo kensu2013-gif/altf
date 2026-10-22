@@ -73,6 +73,7 @@ export interface AgentUnit {
     code: string;
     name: string;
     deptId: string;
+    departmentId?: string; // alias for deptId
     deptName: string;
     tier: number;          // 1, 2, 3 스타
     role: string;

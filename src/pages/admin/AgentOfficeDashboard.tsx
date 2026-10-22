@@ -4978,7 +4978,7 @@ export default function AgentOfficeDashboard() {
                             </div>
 
                             {/* 💬 [영업팀 INT/SLE 전용] 카카오톡 메신저 견적 인입 & 검토 관제 */}
-                            {(selectedAgent.code?.startsWith('INT-') || selectedAgent.code?.startsWith('SLE-') || selectedAgent.departmentId === 'sales-1' || selectedAgent.departmentId === 'sales-2') && (
+                            {(selectedAgent.code?.startsWith('INT-') || selectedAgent.code?.startsWith('SLE-') || selectedAgent.deptId === 'sle' || selectedAgent.deptId === 'sales-1' || selectedAgent.deptId === 'sales-2') && (
                                 <div className="border border-amber-500/40 bg-amber-950/20 rounded-xl p-3.5 space-y-3.5 shadow-[0_0_20px_rgba(245,158,11,0.2)] my-3">
                                     <div className="flex items-center justify-between border-b border-amber-900/40 pb-2">
                                         <div className="flex items-center gap-1.5 text-amber-300 font-bold text-xs">

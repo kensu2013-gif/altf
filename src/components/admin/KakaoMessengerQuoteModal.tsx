@@ -3,23 +3,14 @@ import {
     X,
     MessageSquare,
     Check,
-    Edit2,
     Trash2,
     Plus,
     RefreshCw,
-    Send,
     AlertCircle,
-    CheckCircle2,
-    Phone,
-    Building,
-    Calendar,
-    Clock,
-    DollarSign,
     Copy,
     Search,
     ShieldCheck,
-    FileText,
-    ArrowRight
+    Save
 } from 'lucide-react';
 
 interface QuoteItem {
@@ -40,13 +31,23 @@ interface QuoteItem {
     stockStatus?: string;
 }
 
+interface MatchedUser {
+    botUserKey?: string;
+    name?: string;
+    phone?: string;
+    company?: string;
+    email?: string;
+    registeredAt?: string;
+    notes?: string;
+}
+
 interface ReviewQueueItem {
     intakeId: string;
     quotationId: string | null;
     receivedAt: string;
     type: 'text' | 'image';
     botUserKey: string;
-    matchedUser?: any;
+    matchedUser?: MatchedUser | null;
     customer: {
         name: string;
         phone: string;
@@ -286,8 +287,9 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
             } else {
                 alert('저장에 실패했습니다.');
             }
-        } catch (e: any) {
-            alert('저장 오류: ' + e.message);
+        } catch (e) {
+            const errorMsg = e instanceof Error ? e.message : String(e);
+            alert('저장 오류: ' + errorMsg);
         } finally {
             setSaving(false);
         }
@@ -337,8 +339,9 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                 const errData = await res.json();
                 alert('대장 저장 실패: ' + (errData.error || '알 수 없는 오류'));
             }
-        } catch (e: any) {
-            alert('견적 대장 확정 중 오류: ' + e.message);
+        } catch (e) {
+            const errorMsg = e instanceof Error ? e.message : String(e);
+            alert('견적 대장 확정 중 오류: ' + errorMsg);
         } finally {
             setSaving(false);
         }
@@ -365,8 +368,9 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                 alert('견적이 반려 처리되었습니다.');
                 await fetchQueue();
             }
-        } catch (e: any) {
-            alert('반려 오류: ' + e.message);
+        } catch (e) {
+            const errorMsg = e instanceof Error ? e.message : String(e);
+            alert('반려 오류: ' + errorMsg);
         } finally {
             setSaving(false);
         }

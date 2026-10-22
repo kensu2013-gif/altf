@@ -5215,6 +5215,13 @@ const server = http.createServer(async (req, res) => {
             // 카카오 초안이 소프트 삭제된 경우 복원하지 않음
             if (draft.isDeleted) continue;
 
+            // 원문 텍스트(utterance) 동기화
+            const matchingIntake = (kakaoBotService.intakes || []).find(it => it.quotationId === draft.id || (it.botUserKey && it.botUserKey === draft.botUserKey));
+            if (matchingIntake && matchingIntake.utterance && !matchingIntake.utterance.startsWith('http')) {
+                draft.rawText = matchingIntake.utterance;
+                draft.utterance = matchingIntake.utterance;
+            }
+
             const idx = db.quotations.findIndex(q => q.id === draft.id);
             if (idx === -1) {
                 db.quotations.unshift(draft);
@@ -5223,6 +5230,11 @@ const server = http.createServer(async (req, res) => {
                 // 이미 db.quotations에서 삭제된 경우 덮어쓰지 않음
                 if (db.quotations[idx].isDeleted) {
                     continue;
+                }
+                if (draft.rawText && !db.quotations[idx].rawText) {
+                    db.quotations[idx].rawText = draft.rawText;
+                    db.quotations[idx].utterance = draft.utterance;
+                    dbQuotesChanged = true;
                 }
                 if (draft.attachments && draft.attachments.length > 0 && (!db.quotations[idx].attachments || db.quotations[idx].attachments.length === 0)) {
                     db.quotations[idx].attachments = draft.attachments;
@@ -5245,7 +5257,15 @@ const server = http.createServer(async (req, res) => {
         }
 
         const limitStr = url.searchParams.get('limit');
-        let quotesToSend = [...db.quotations];
+        let quotesToSend = db.quotations.map(q => {
+            if (!q.rawText && (q.source === 'KAKAO' || q.id?.startsWith('Q-KAKAO') || q.botUserKey)) {
+                const intake = (kakaoBotService.intakes || []).find(it => it.quotationId === q.id || (it.botUserKey && it.botUserKey === q.botUserKey));
+                if (intake && intake.utterance && !intake.utterance.startsWith('http')) {
+                    return { ...q, rawText: intake.utterance, utterance: intake.utterance };
+                }
+            }
+            return q;
+        });
         if (limitStr) {
             const limit = parseInt(limitStr, 10);
             if (!isNaN(limit) && limit > 0) {

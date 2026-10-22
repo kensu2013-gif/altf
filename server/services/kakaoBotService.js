@@ -1030,6 +1030,8 @@ export class KakaoBotService {
             ] : [],
             source: 'KAKAO',
             createdAt: new Date().toISOString(),
+            rawText: (intake.utterance && !intake.utterance.startsWith('http')) ? intake.utterance : '',
+            utterance: intake.utterance || '',
             memo: `카카오톡 채널 인입 (@altf) - ${normalized.remarks || '내일 발송'}`,
             adminResponse: {
                 confirmedPrice: totalAmount,

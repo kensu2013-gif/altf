@@ -158,6 +158,8 @@ export interface Quotation {
     totalAmount: number;
     createdAt: string;
     memo?: string; // Inquiry/Request
+    rawText?: string; // Raw inquiry text (Kakao utterance, email text, etc.)
+    utterance?: string; // Raw Kakao utterance
     adminResponse?: AdminResponse;
     manager?: { name: string; id: string; email: string; }; // Permanent Sales Rep
     isDeleted?: boolean; // Soft Delete Flag
@@ -194,6 +196,7 @@ export interface User {
     id: string;
     email: string;
     contactName: string; // contact_name
+    name?: string; // alias/display name
     password?: string; // Optional, for creation payload
     companyName: string;
     bizNo: string;

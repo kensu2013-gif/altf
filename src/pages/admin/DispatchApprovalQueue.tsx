@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     CheckCircle2,
     XCircle,
@@ -97,7 +97,7 @@ export default function DispatchApprovalQueue() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user: {
-                        name: currentUser?.name || '관리자',
+                        name: currentUser?.name || currentUser?.contactName || '관리자',
                         role: currentUser?.role || 'ADMIN'
                     }
                 })
@@ -130,7 +130,7 @@ export default function DispatchApprovalQueue() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    user: { name: currentUser?.name || '관리자' },
+                    user: { name: currentUser?.name || currentUser?.contactName || '관리자' },
                     reason: rejectReason.trim()
                 })
             });
@@ -158,7 +158,7 @@ export default function DispatchApprovalQueue() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    user: { name: currentUser?.name || '관리자' }
+                    user: { name: currentUser?.name || currentUser?.contactName || '관리자' }
                 })
             });
             const data = await res.json();
