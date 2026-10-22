@@ -69,8 +69,12 @@ export class PurchaseBacklogBotService {
         const curHour = now.getHours();
         const curMinute = now.getMinutes();
 
-        // 오늘 남아있는 영업시간 중 다음 시간 찾기
-        const upcomingToday = BUSINESS_HOURS.find(h => h > curHour || (h === curHour && curMinute < 1));
+        // 오늘 남아있는 영업시간 중 최소 10초 이후의 다음 정시 찾기
+        const upcomingToday = BUSINESS_HOURS.find(h => {
+            const candidate = new Date(now);
+            candidate.setHours(h, 0, 0, 0);
+            return candidate.getTime() - now.getTime() > 10000;
+        });
 
         if (upcomingToday !== undefined) {
             const nextTime = new Date(now);

@@ -467,9 +467,24 @@ async function loadData() {
     }
 }
 
-// Save Data
+// Save Data with Anti-Overwrite Safety Merge Guard
 async function saveData() {
     try {
+        // [안전 장치]: 저장 전 S3의 최신 발주서(orders) 목록을 확인하여, 로컬 메모리에 누락된 신규 주문이 있다면 병합하여 보존
+        try {
+            const remoteDb = await loadDbFromS3();
+            if (remoteDb && Array.isArray(remoteDb.orders) && Array.isArray(db.orders)) {
+                const localOrderIds = new Set(db.orders.map(o => o.id));
+                const missingFromLocal = remoteDb.orders.filter(ro => !localOrderIds.has(ro.id));
+                if (missingFromLocal.length > 0) {
+                    console.log(`🛡️ [Safety Merge Guard] S3에 존재하는 최신 발주서 ${missingFromLocal.length}건을 로컬 메모리에 안전 병합합니다.`);
+                    db.orders = [...missingFromLocal, ...db.orders];
+                }
+            }
+        } catch (mergeErr) {
+            // S3 확인 실패 시 기존 로직대로 저장 진행
+        }
+
         await saveDbToS3(db);
         // console.log('[API] Data saved to S3');
     } catch (e) {
