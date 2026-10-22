@@ -1181,11 +1181,11 @@ export class DaekyungInvoiceService {
 
         const base64Data = fs.readFileSync(pngPath).toString('base64');
         const candidateModels = [
+            'gemini-3.8-flash',
+            'gemini-flash-latest',
             'gemini-3.5-flash',
             'gemini-3.1-flash-lite',
-            'gemini-3-flash-preview',
-            'gemini-flash-latest',
-            'gemini-3.8-flash'
+            'gemini-3-flash-preview'
         ];
 
         const prompt = `너는 대한민국 배관 자재 유통 및 (주)대경벤드 거래명세표 전문 AI 파서야.
