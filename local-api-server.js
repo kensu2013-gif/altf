@@ -2061,6 +2061,93 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ==========================================
+    // 🛒 PUR-08 : 재고발주 사전 적정성 검증 및 품의 상신 API
+    // ==========================================
+    if (url.pathname === '/api/stock-orders/request-approval' && req.method === 'POST') {
+        try {
+            const body = await parseBody(req);
+            const {
+                orderId,
+                poNumber,
+                supplierName,
+                totalItems,
+                totalOrderQty,
+                summary,
+                auditResults
+            } = body || {};
+
+            const timestamp = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+            
+            // 텔레그램 메시지 포맷팅
+            let telegramText = `🛒 <b>[PUR-08 구매봇] 재고발주 사전 품의서</b>\n`;
+            telegramText += `━━━━━━━━━━━━━━━━━━\n`;
+            telegramText += `📋 <b>발주번호:</b> <code>${poNumber || orderId}</code>\n`;
+            telegramText += `🏢 <b>공급처(매입처):</b> ${supplierName || '매입처'}\n`;
+            telegramText += `📦 <b>규모:</b> ${totalItems}개 품목 (총 ${totalOrderQty}개)\n`;
+            telegramText += `⏱️ <b>상신일시:</b> ${timestamp}\n\n`;
+
+            telegramText += `📊 <b>AI 적정성 진단 요약:</b>\n`;
+            if (summary) {
+                telegramText += `• 🟢 적정 권장: <b>${summary.optimalCount}건</b>\n`;
+                if (summary.urgentCount > 0) telegramText += `• 🚨 동시결품 긴급: <b>${summary.urgentCount}건</b>\n`;
+                if (summary.duplicateCount > 0) telegramText += `• ⚠️ 미결 중복의심: <b>${summary.duplicateCount}건</b>\n`;
+                if (summary.excessCount > 0) telegramText += `• 📉 과잉/부진 주의: <b>${summary.excessCount}건</b>\n`;
+                if (summary.transferCount > 0) telegramText += `• 🚛 대경이송 권장: <b>${summary.transferCount}건</b>\n`;
+            }
+
+            if (auditResults && auditResults.length > 0) {
+                telegramText += `\n🔍 <b>품목별 상세 분석 (주요 내역):</b>\n`;
+                auditResults.slice(0, 5).forEach(item => {
+                    telegramText += `• <b>${item.name}</b> ${item.spec}\n`;
+                    telegramText += `  └ 발주: <b>${item.orderQty}개</b> | 시화: ${item.sihwaStock}개 | 90일판매: ${item.recent90dSales}개\n`;
+                    telegramText += `  └ 진단: <b>${item.badgeText}</b> (${item.reason})\n`;
+                });
+                if (auditResults.length > 5) {
+                    telegramText += `  <i>...외 ${auditResults.length - 5}개 품목</i>\n`;
+                }
+            }
+
+            telegramText += `\n💡 <b>종합 의견:</b>\n`;
+            if (summary?.overallStatus === 'CRITICAL') {
+                telegramText += `⚠️ 과잉 재고 위험 및 중복 발주가 다수 감지되었습니다. 발주서 승인 전 수량 조정 검토가 필요합니다.\n`;
+            } else if (summary?.overallStatus === 'WARNING') {
+                telegramText += `주의 품목이 일부 포함되어 있으므로 확인 후 승인해 주시기 바랍니다.\n`;
+            } else {
+                telegramText += `안전재고 미달분을 보충하는 건전하고 적정한 발주입니다.\n`;
+            }
+
+            // 텔레그램 발송 시도
+            if (telegramBotService.config.botToken && telegramBotService.config.chatId) {
+                try {
+                    await telegramBotService.sendMessage(telegramBotService.config.chatId, telegramText);
+                    console.log(`[PUR-08] 대표님 텔레그램으로 재고발주 품의서 발송 완료 (${poNumber})`);
+                } catch (tErr) {
+                    console.error('[PUR-08] 텔레그램 발송 실패:', tErr.message);
+                }
+            }
+
+            // 오더 객체에 결재 상태 업데이트 (메모리 db)
+            if (orderId && db.orders) {
+                const targetOrder = db.orders.find(o => o.id === orderId);
+                if (targetOrder) {
+                    targetOrder.stockAuditStatus = 'PENDING_APPROVAL';
+                    targetOrder.stockAuditSummary = summary;
+                    targetOrder.stockAuditRequestedAt = new Date().toISOString();
+                }
+            }
+
+            sendJsonResponse(req, res, 200, {
+                success: true,
+                message: '대표님 텔레그램으로 사전 검증 리포트 및 품의 상신이 완료되었습니다.',
+                timestamp
+            });
+        } catch (err) {
+            sendJsonResponse(req, res, 500, { success: false, error: err.message });
+        }
+        return;
+    }
+
+    // ==========================================
     // ⚡ DAT-01 : Make.com 크리덴셜 및 Reauthorize/Verify 자동화 REST API
     // ==========================================
     if (url.pathname.startsWith('/api/make/')) {

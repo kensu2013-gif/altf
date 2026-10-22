@@ -551,7 +551,7 @@
       "uptime": "99.9%",
       "tasksToday": 2464
     },
-    "currentTask": "[영업시간 1시간 주기] 발주 2464건 분류 관리 | 미결 467건 | 고객발송준비 466건 (다음: 오늘 15:00)",
+    "currentTask": "[영업시간 1시간 주기] 발주 2464건 분류 관리 | 미결 467건 | 고객발송준비 466건 (다음: 오늘 18:00)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_ORDER_CREATED",
@@ -561,10 +561,10 @@
       "EVENT_BACKLOG_SYNCED"
     ],
     "logs": [
-      "[14:01] [PUR-07] altf.kr 발주 2464건 업체/날짜별 분류 완료",
-      "[14:01] 미결(Pending) 467건 추적 중 (매입발주서 자동 매핑)",
-      "[14:01] QC-01 성적서 교차 대조: 479건 접수 확인",
-      "[14:01] 출고 완료 패키징: 거래명세표+성적서 번들 466건 발송 대기"
+      "[17:00] [PUR-07] altf.kr 발주 2464건 업체/날짜별 분류 완료",
+      "[17:00] 미결(Pending) 467건 추적 중 (매입발주서 자동 매핑)",
+      "[17:00] QC-01 성적서 교차 대조: 479건 접수 확인",
+      "[17:00] 출고 완료 패키징: 거래명세표+성적서 번들 466건 발송 대기"
     ],
     "connectedDeptIds": [
       "quality",
@@ -579,6 +579,48 @@
       "gen-statement-builder",
       "log-dispatch-signal"
     ]
+  },
+  {
+    "id": "pur-08-stock-audit-bot",
+    "code": "PUR-08",
+    "name": "재고발주 적정성 검증 및 사전 품의봇",
+    "deptId": "purchase",
+    "deptName": "구매부",
+    "teamName": "구매SCM팀",
+    "tier": 2,
+    "position": "대리",
+    "role": "주문관리 내 [재고 발주분] 등록 건 실시간 감지, 시화/대경 재고 및 90일 판매 데이터 기반 적정성(과잉·중복·결품) 사전 진단 보고서 생성 및 대표/부장 결재 상신",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "AUTO_RUNNING",
+    "assignedHuman": "사무실 관리자 / 조현진 대표 (최종 결재)",
+    "requiresApproval": true,
+    "metrics": {
+      "speed": 99,
+      "accuracy": 99,
+      "load": 20,
+      "uptime": "99.9%",
+      "tasksToday": 1
+    },
+    "currentTask": "재고 발주 적정성 실시간 감시 대기 중",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_STOCK_ORDER_CHECKED",
+      "EVENT_STOCK_PURCHASE_REQUESTED"
+    ],
+    "emittedEvents": [
+      "EVENT_STOCK_PURCHASE_APPROVED",
+      "EVENT_STOCK_PURCHASE_REJECTED"
+    ],
+    "logs": [
+      "[정상] 실시간 판매 데이터 및 시화/대경 재고 대조 파이프라인 가동"
+    ],
+    "connectedDeptIds": [
+      "purchase",
+      "inventory",
+      "sle"
+    ],
+    "orderIndex": 5
   },
   {
     "id": "qc-email-collector",

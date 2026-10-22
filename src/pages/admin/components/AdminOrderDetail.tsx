@@ -18,6 +18,7 @@ import { renderDocumentHTML } from '../../../lib/documentTemplate';
 import type { DocumentPayload } from '../../../types/document';
 import { PreviewModal } from '../../../components/ui/PreviewModal';
 import { ManagerMultiSelect } from '../../../components/ui/ManagerMultiSelect';
+import { StockOrderAuditPanel } from './StockOrderAuditPanel';
 
 interface AdminOrderDetailProps {
     order: Order;
@@ -3972,6 +3973,27 @@ if (deliveryNoteFiles.length > 0) {
                             </div>
                         </div>
                     </div>
+
+                    {isStockOrderChecked && (
+                        <StockOrderAuditPanel
+                            items={displayedItems}
+                            order={order}
+                            inventory={inventory}
+                            orders={orders}
+                            supplierName={supplierInfo?.company_name}
+                            onApplyRecommendedQty={(idx, recommendedQty) => {
+                                const newItems = [...displayedItems];
+                                if (newItems[idx]) {
+                                    newItems[idx] = {
+                                        ...newItems[idx],
+                                        quantity: recommendedQty,
+                                        amount: (newItems[idx].unitPrice || 0) * recommendedQty
+                                    };
+                                    setDisplayedItems(newItems);
+                                }
+                            }}
+                        />
+                    )}
 
                     {
                         !isSupplierMode && (
