@@ -34,12 +34,17 @@ export class TelegramBotService {
             lastUpdateId: 0
         };
         this.isPollingActive = false;
+        this.processedMessageIds = new Set();
+        this.processingFileIds = new Set();
         this.loadConfig();
         const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
-        if (!isProd && this.config.botToken && this.config.polling !== false) {
+        const isTestEnv = process.env.NODE_ENV === 'test' || process.argv.some(a => a.includes('test'));
+        if (!isProd && !isTestEnv && process.env.DISABLE_TELEGRAM_POLLING !== 'true' && this.config.botToken && this.config.polling !== false) {
             this.startPolling();
         } else if (isProd) {
             console.log('[TelegramBot] Production environment detected. Automatic background polling is disabled.');
+        } else if (isTestEnv) {
+            console.log('[TelegramBot] Test environment detected. Background polling is disabled.');
         }
     }
 
@@ -182,10 +187,12 @@ export class TelegramBotService {
 
             if (res && res.ok && Array.isArray(res.result)) {
                 for (const update of res.result) {
-                    this.config.lastUpdateId = update.update_id;
+                    if (update.update_id > this.config.lastUpdateId) {
+                        this.config.lastUpdateId = update.update_id;
+                        this.saveConfig(); // 즉시 저장하여 다른 프로세스나 재폴링 시 중복 인입 원천 차단
+                    }
                     await this.handleUpdate(update);
                 }
-                this.saveConfig();
             }
         } catch (e) {
             // 폴링 오류 시 5초 후 재시도
@@ -201,7 +208,19 @@ export class TelegramBotService {
      */
     async handleUpdate(update) {
         const msg = update.message;
-        if (!msg) return;
+        if (!msg || !msg.message_id) return;
+
+        // 🛡️ 1. 중복 메시지 감지 및 이중 처리 방지 가드 (Idempotency Lock)
+        const msgKey = `${msg.chat?.id || ''}:${msg.message_id}`;
+        if (this.processedMessageIds.has(msgKey)) {
+            console.log(`[TelegramBot] ⚠️ 이미 처리된 중복 메시지 감지 건너뜀: ${msgKey}`);
+            return;
+        }
+        this.processedMessageIds.add(msgKey);
+        if (this.processedMessageIds.size > 2000) {
+            const first = this.processedMessageIds.values().next().value;
+            this.processedMessageIds.delete(first);
+        }
 
         const chatId = msg.chat.id;
         if (!this.config.chatId) {
@@ -311,6 +330,19 @@ ${(targetInv.items?.length || 0) > 10 ? `... 외 ${targetInv.items.length - 10}�
         if (msg.document) {
             const doc = msg.document;
             const fileName = doc.file_name || '문서';
+
+            // 🛡️ 2. 동일 파일 동시 처리 중복 방지 락 (File Concurrency Lock)
+            if (doc.file_id && this.processingFileIds.has(doc.file_id)) {
+                console.log(`[TelegramBot] ⚠️ 이미 처리 중인 문서 파일 감지 건너뜀: ${fileName} (${doc.file_id})`);
+                return;
+            }
+            if (doc.file_id) {
+                this.processingFileIds.add(doc.file_id);
+                // 2분 후 자동 만료 해제
+                setTimeout(() => {
+                    this.processingFileIds.delete(doc.file_id);
+                }, 120000);
+            }
 
             // A. 대경재고장 엑셀 파일(.xlsx, .xls) 감지 시 전자동 4단계 파이프라인 가동 및 과장 결재 보고
             if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.includes('재고')) {

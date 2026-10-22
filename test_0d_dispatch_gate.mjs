@@ -138,7 +138,9 @@ async function runTests() {
     console.log('\n🎉 ALL 0-D DISPATCH GATE UNIT TESTS PASSED (100%)!');
 }
 
-runTests().catch(err => {
+runTests().then(() => {
+    process.exit(0);
+}).catch(err => {
     console.error('❌ Test failed:', err);
     process.exit(1);
 });
