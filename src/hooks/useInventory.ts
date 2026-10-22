@@ -4,7 +4,10 @@ import { useEffect } from 'react';
 import type { Product } from '../types';
 import { parseSku } from '../lib/sku';
 
-const INVENTORY_URL = (import.meta.env.VITE_API_URL || '') + '/api/inventory/inventory.json';
+const S3_INVENTORY_URL = 'https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/public/inventory/inventory.json';
+const INVENTORY_URL = import.meta.env.VITE_API_URL 
+    ? `${import.meta.env.VITE_API_URL}/api/inventory/inventory.json`
+    : (import.meta.env.DEV ? '/api/inventory/inventory.json' : S3_INVENTORY_URL);
 
 interface RawInventoryItem {
     // S3 snake_case keys
@@ -44,11 +47,42 @@ interface RawInventoryItem {
     [key: string]: unknown; // Allow other properties to pass through
 }
 
-// Fetcher function
+// Fetcher function with resilient S3 CDN fallback
 const fetcher = async (url: string) => {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+    try {
+        const res = await fetch(url);
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+            const data = await res.json();
+            if (data && typeof data === 'object') {
+                (data as Record<string, unknown>).lastModified = res.headers.get('last-modified') || (data as Record<string, unknown>).lastModified || new Date().toISOString();
+            }
+            return data;
+        }
+        if (res.ok) {
+            const text = await res.text();
+            if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+                const data = JSON.parse(text);
+                if (data && typeof data === 'object') {
+                    (data as Record<string, unknown>).lastModified = res.headers.get('last-modified') || (data as Record<string, unknown>).lastModified || new Date().toISOString();
+                }
+                return data;
+            }
+        }
+        console.warn(`[useInventory] ${url} returned non-JSON (${res.status} ${contentType}). Falling back to S3 CDN...`);
+    } catch (err) {
+        console.warn(`[useInventory] Primary fetch failed for ${url}:`, err);
+    }
+
+    // Direct S3 Fallback
+    console.log(`[useInventory] Fetching inventory directly from S3 CDN: ${S3_INVENTORY_URL}`);
+    const s3Res = await fetch(S3_INVENTORY_URL);
+    if (!s3Res.ok) throw new Error(`S3 HTTP ${s3Res.status}`);
+    const s3Data = await s3Res.json();
+    if (s3Data && typeof s3Data === 'object') {
+        (s3Data as Record<string, unknown>).lastModified = s3Res.headers.get('last-modified') || new Date().toISOString();
+    }
+    return s3Data;
 };
 
 export function useInventory() {

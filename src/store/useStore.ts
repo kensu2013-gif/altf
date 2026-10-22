@@ -323,7 +323,12 @@ export const useStore = create<AppState>()(
                 }
 
                 try {
-                    const response = await fetch((import.meta.env.VITE_API_URL || '') + '/api/inventory/inventory.json');
+                    let response = await fetch((import.meta.env.VITE_API_URL || '') + '/api/inventory/inventory.json');
+                    const contentType = response.headers.get('content-type') || '';
+                    if (!response.ok || !contentType.includes('application/json')) {
+                        console.warn('[Store] Local inventory returned non-JSON/HTML. Falling back to S3 CDN...');
+                        response = await fetch('https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/public/inventory/inventory.json');
+                    }
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     // Note: Actual data mapping is currently done in Search.tsx
                     // Ideally we should move it here, but keeping as is for now 
