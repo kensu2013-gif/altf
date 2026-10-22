@@ -70,8 +70,11 @@ export class FittingNormalizerService {
     constructor() {
         this.inventoryMap = new Map();
         this.customers = [];
-        this.loadInventory();
-        this.loadCustomers();
+        const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+        if (!isProd) {
+            this.loadInventory();
+            this.loadCustomers();
+        }
     }
 
     loadInventory() {

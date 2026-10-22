@@ -55,3 +55,7 @@ backup_restore_point_*/
 storage/
 *.jpg
 scripts/debug_keys.txt
+server/data/pur07_order_backlog.json
+server/data/purchase_qc_matches.json
+server/data/purchase_orders.json
+server/data/db_local.json

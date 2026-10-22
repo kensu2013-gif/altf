@@ -50,6 +50,11 @@ export class PurchaseBacklogBotService {
      * 로컬 저장 데이터 복원
      */
     loadInitialData() {
+        const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+        if (isProd) {
+            // [Memory Guard] 프로덕션 환경에서는 35MB 대용량 백로그 파싱을 스킵하여 200MB 메모리 절약
+            return;
+        }
         try {
             if (fs.existsSync(BACKLOG_JSON_PATH)) {
                 const data = JSON.parse(fs.readFileSync(BACKLOG_JSON_PATH, 'utf8'));
