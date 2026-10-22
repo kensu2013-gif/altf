@@ -224,13 +224,67 @@ export default function AdminQuotes() {
         return map;
     }, [quotes]);
 
+    const buildFallbackCandidate = (q: Quotation, sim: any): SimilarityMatchCandidate => {
+        const normItemsA = (q.items || []).map(normalizeLineItem);
+        const relatedDocNo = sim?.relatedDocNo || sim?.targetDocNo || '';
+        const targetQ = relatedDocNo ? quotes.find(other => other.id === relatedDocNo || other.customerNumber === relatedDocNo) : null;
+        const normItemsB = targetQ ? (targetQ.items || []).map(normalizeLineItem) : [];
+
+        if (normItemsA.length > 0 && normItemsB.length > 0 && targetQ) {
+            const docA = {
+                id: q.id,
+                type: 'QUOTATION' as const,
+                docNo: q.id,
+                customerName: q.customerName || '',
+                bizNo: q.customerInfo?.bizNo || '',
+                createdAt: q.createdAt || '',
+                items: normItemsA
+            };
+            const docB = {
+                id: targetQ.id,
+                type: 'QUOTATION' as const,
+                docNo: targetQ.id,
+                customerName: targetQ.customerName || '',
+                bizNo: targetQ.customerInfo?.bizNo || '',
+                createdAt: targetQ.createdAt || '',
+                items: normItemsB
+            };
+            const match = compareTwoNormalizedDocuments(docA, docB, new Map());
+            if (match) return match;
+        }
+
+        return {
+            targetId: relatedDocNo || sim?.targetId || q.id,
+            targetType: sim?.targetType || 'QUOTATION',
+            targetDocNo: relatedDocNo || sim?.targetDocNo || '대조 문서',
+            customerName: sim?.targetCustomer || sim?.customerName || '대조 고객사',
+            similarityType: sim?.topType || 'SAME_PROJECT',
+            totalScore: sim?.topScore || 50,
+            specScore: sim?.specScore || 50,
+            qtyScore: sim?.qtyScore || 50,
+            seqScore: sim?.seqScore || 0,
+            overlapRatio: normItemsA.length > 0 ? (sim?.matchedL1Count || 0) / normItemsA.length : 0,
+            matchedL1Count: sim?.matchedL1Count || 0,
+            matchedL2Count: sim?.matchedL2Count || 0,
+            totalItemsA: normItemsA.length,
+            totalItemsB: normItemsB.length,
+            rareItemsMatchedCount: 0,
+            isScaleVariant: false,
+            rationale: [sim?.rationale || `유사도 ${sim?.topScore || 50}점 감지`],
+            itemsA: normItemsA,
+            itemsB: normItemsB,
+            itemMatchMap: new Map(),
+            createdAt: targetQ?.createdAt || q.createdAt || ''
+        };
+    };
+
     const activeDrawerQuote = quotes.find(q => q.id === drawerQuoteId);
     const activeDrawerData = useMemo(() => {
         if (!drawerQuoteId) return null;
         const fromMap = similarityMap.get(drawerQuoteId);
         if (fromMap) return fromMap;
         if (activeDrawerQuote?.similarity && (activeDrawerQuote.similarity.topScore ?? 0) >= 50) {
-            const top = activeDrawerQuote.similarity as unknown as SimilarityMatchCandidate;
+            const top = buildFallbackCandidate(activeDrawerQuote, activeDrawerQuote.similarity);
             return {
                 topType: activeDrawerQuote.similarity.topType,
                 topScore: activeDrawerQuote.similarity.topScore,
@@ -554,12 +608,15 @@ export default function AdminQuotes() {
                                 return false;
                             };
 
-                            const simInfo = similarityMap.get(quote.id) || (quote.similarity && (quote.similarity.topScore ?? 0) >= 50 ? {
-                                topType: quote.similarity.topType,
-                                topScore: quote.similarity.topScore,
-                                topMatch: quote.similarity as unknown as SimilarityMatchCandidate,
-                                candidates: [quote.similarity as unknown as SimilarityMatchCandidate]
-                            } : null);
+                            const simInfo = similarityMap.get(quote.id) || (quote.similarity && (quote.similarity.topScore ?? 0) >= 50 ? (() => {
+                                const top = buildFallbackCandidate(quote, quote.similarity);
+                                return {
+                                    topType: quote.similarity.topType,
+                                    topScore: quote.similarity.topScore,
+                                    topMatch: top,
+                                    candidates: [top]
+                                };
+                            })() : null);
 
                             const isStockQuote = (() => {
                                 const cName = (displayCompany || quote.customerName || '').toLowerCase().replace(/\s+/g, '');

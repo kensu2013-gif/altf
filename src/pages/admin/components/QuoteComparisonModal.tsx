@@ -20,10 +20,15 @@ export const QuoteComparisonModal: React.FC<QuoteComparisonModalProps> = ({
     if (!isOpen || !candidate) return null;
 
     const isReadOnly = candidate.similarityType === 'SAME_PROJECT';
-    const isStale = (new Date().getTime() - new Date(candidate.createdAt).getTime()) / (1000 * 60 * 60 * 24) > 60;
+    const isStale = candidate.createdAt ? (new Date().getTime() - new Date(candidate.createdAt).getTime()) / (1000 * 60 * 60 * 24) > 60 : false;
 
-    const itemsA = candidate.itemsA;
-    const itemsB = candidate.itemsB;
+    // 🔥 방어적 배열 및 Map 보장 (TypeError: reading 'map' 원천 차단)
+    const itemsA = Array.isArray(candidate.itemsA) ? candidate.itemsA : [];
+    const itemsB = Array.isArray(candidate.itemsB) ? candidate.itemsB : [];
+    const itemMatchMap: Map<number, { matchType: 'L1' | 'L2' | 'NONE'; targetIndex?: number; scoreRatio: number }> = 
+        candidate.itemMatchMap instanceof Map 
+            ? candidate.itemMatchMap 
+            : new Map();
 
     const handleToggleAll = () => {
         if (selectedIndices.size === itemsA.length) {
@@ -31,8 +36,8 @@ export const QuoteComparisonModal: React.FC<QuoteComparisonModalProps> = ({
         } else {
             const all = new Set<number>();
             itemsA.forEach((_, idx) => {
-                const match = candidate.itemMatchMap.get(idx);
-                if (match && match.targetIndex !== undefined && itemsB[match.targetIndex].unitPrice > 0) {
+                const match = itemMatchMap.get(idx);
+                if (match && match.targetIndex !== undefined && itemsB[match.targetIndex]?.unitPrice > 0) {
                     all.add(idx);
                 }
             });
@@ -51,10 +56,10 @@ export const QuoteComparisonModal: React.FC<QuoteComparisonModalProps> = ({
         if (!onApplyPrices || isReadOnly) return;
         const priceMap = new Map<number, { unitPrice: number; discountRate?: number }>();
         selectedIndices.forEach(idxA => {
-            const match = candidate.itemMatchMap.get(idxA);
+            const match = itemMatchMap.get(idxA);
             if (match && match.targetIndex !== undefined) {
                 const matchedItemB = itemsB[match.targetIndex];
-                if (matchedItemB.unitPrice > 0) {
+                if (matchedItemB && matchedItemB.unitPrice > 0) {
                     priceMap.set(idxA, {
                         unitPrice: matchedItemB.unitPrice,
                         discountRate: matchedItemB.reverseRate ?? undefined
@@ -127,37 +132,55 @@ export const QuoteComparisonModal: React.FC<QuoteComparisonModalProps> = ({
 
                 {/* Table Content */}
                 <div className="flex-1 overflow-auto p-4 custom-scrollbar">
-                    <table className="w-full text-xs text-left border-collapse">
-                        <thead>
-                            <tr className="bg-slate-100/70 border-b border-slate-200 text-[11px] font-bold text-slate-600">
-                                {!isReadOnly && (
-                                    <th className="py-2.5 px-3 text-center w-10">
-                                        <button type="button" onClick={handleToggleAll} className="cursor-pointer">
-                                            {selectedIndices.size > 0 && selectedIndices.size === itemsA.length ? (
-                                                <CheckSquare className="w-4 h-4 text-teal-600" />
-                                            ) : (
-                                                <Square className="w-4 h-4 text-slate-400" />
-                                            )}
-                                        </button>
-                                    </th>
-                                )}
-                                <th className="py-2.5 px-2 text-center w-12">순번</th>
-                                <th className="py-2.5 px-3">현재 품목 규격</th>
-                                <th className="py-2.5 px-3 text-center w-16">수량</th>
-                                <th className="py-2.5 px-3 text-right w-24">현재 단가</th>
-                                <th className="py-2.5 px-2 text-center w-24">일치 구분</th>
-                                <th className="py-2.5 px-3">비교 대상 규격</th>
-                                <th className="py-2.5 px-3 text-center w-20">비교 수량</th>
-                                <th className="py-2.5 px-3 text-right w-24">비교 단가</th>
-                                <th className="py-2.5 px-3 text-right w-24 bg-teal-50/50">추정 요율(%)</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {itemsA.map((itA, idxA) => {
-                                const match = candidate.itemMatchMap.get(idxA);
-                                const matchType = match?.matchType ?? 'NONE';
-                                const targetIdx = match?.targetIndex;
-                                const itB = targetIdx !== undefined ? itemsB[targetIdx] : null;
+                    {itemsA.length === 0 ? (
+                        <div className="py-16 text-center text-slate-500 flex flex-col items-center justify-center">
+                            <AlertTriangle className="w-10 h-10 text-amber-500 mb-3" />
+                            <h4 className="text-sm font-extrabold text-slate-800 mb-1">상세 품목 대조 데이터 안내</h4>
+                            <p className="text-xs text-slate-500 max-w-md mb-4 leading-relaxed">
+                                대조 대상: <b className="text-slate-700">{candidate.customerName || candidate.targetDocNo}</b> (유사도 {candidate.totalScore}점)<br />
+                                정밀 대조 데이터가 연산 중이거나 요약 정보로 제공된 건입니다. 새 창에서 원본 문서를 바로 확인하실 수 있습니다.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={handleOpenInNewTab}
+                                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                            >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                <span>대조 문서 ({candidate.targetDocNo}) 새 창에서 직접 확인</span>
+                            </button>
+                        </div>
+                    ) : (
+                        <table className="w-full text-xs text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-100/70 border-b border-slate-200 text-[11px] font-bold text-slate-600">
+                                    {!isReadOnly && (
+                                        <th className="py-2.5 px-3 text-center w-10">
+                                            <button type="button" onClick={handleToggleAll} className="cursor-pointer">
+                                                {selectedIndices.size > 0 && selectedIndices.size === itemsA.length ? (
+                                                    <CheckSquare className="w-4 h-4 text-teal-600" />
+                                                ) : (
+                                                    <Square className="w-4 h-4 text-slate-400" />
+                                                )}
+                                            </button>
+                                        </th>
+                                    )}
+                                    <th className="py-2.5 px-2 text-center w-12">순번</th>
+                                    <th className="py-2.5 px-3">현재 품목 규격</th>
+                                    <th className="py-2.5 px-3 text-center w-16">수량</th>
+                                    <th className="py-2.5 px-3 text-right w-24">현재 단가</th>
+                                    <th className="py-2.5 px-2 text-center w-24">일치 구분</th>
+                                    <th className="py-2.5 px-3">비교 대상 규격</th>
+                                    <th className="py-2.5 px-3 text-center w-20">비교 수량</th>
+                                    <th className="py-2.5 px-3 text-right w-24">비교 단가</th>
+                                    <th className="py-2.5 px-3 text-right w-24 bg-teal-50/50">추정 요율(%)</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {itemsA.map((itA, idxA) => {
+                                    const match = itemMatchMap.get(idxA);
+                                    const matchType = match?.matchType ?? 'NONE';
+                                    const targetIdx = match?.targetIndex;
+                                    const itB = targetIdx !== undefined ? itemsB[targetIdx] : null;
 
                                 const isL1 = matchType === 'L1';
                                 const isL2 = matchType === 'L2';
@@ -252,6 +275,7 @@ export const QuoteComparisonModal: React.FC<QuoteComparisonModalProps> = ({
                             })}
                         </tbody>
                     </table>
+                    )}
                 </div>
 
                 {/* Footer Controls */}
