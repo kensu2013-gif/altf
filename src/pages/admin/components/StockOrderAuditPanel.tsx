@@ -12,7 +12,7 @@ import {
     Layers,
     Info,
     Warehouse,
-    Truck
+    Building2
 } from 'lucide-react';
 import type { Product, Order, LineItem } from '../../types';
 import { analyzeStockPurchaseItem, type StockPurchaseAnalysisResult } from '../../../utils/stockPurchaseAnalysis';
@@ -54,7 +54,7 @@ export const StockOrderAuditPanel: React.FC<StockOrderAuditPanelProps> = ({
         let optimalCount = 0;     // 적정 선발주
         let excessCount = 0;      // 과잉/부진 위험
         let duplicateCount = 0;   // 중복 발주 존재
-        let transferCount = 0;    // 대경이송 권장
+        let transferCount = 0;    // 대경공장 발주 권장
 
         auditResults.forEach(res => {
             if (res.suitabilityType === 'DOUBLE_STOCKOUT') urgentCount++;
@@ -288,11 +288,11 @@ export const StockOrderAuditPanel: React.FC<StockOrderAuditPanelProps> = ({
 
                         <div className="bg-slate-800/80 border border-sky-500/30 rounded-lg p-2.5 flex flex-col justify-between">
                             <span className="text-[11px] text-sky-300 font-medium flex items-center gap-1">
-                                <Truck className="w-3.5 h-3.5 text-sky-400" /> 대경공장 이송권장
+                                <Building2 className="w-3.5 h-3.5 text-sky-400" /> 대경공장 발주권장
                             </span>
                             <div className="mt-1 flex items-baseline justify-between">
                                 <span className="text-lg font-mono font-bold text-sky-400">{summary.transferCount}건</span>
-                                <span className="text-[10px] text-sky-300/70 font-sans">신규매입 불필요</span>
+                                <span className="text-[10px] text-sky-300/70 font-sans">대경 매입 우선</span>
                             </div>
                         </div>
                     </div>

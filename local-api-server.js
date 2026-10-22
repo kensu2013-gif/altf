@@ -2092,7 +2092,7 @@ const server = http.createServer(async (req, res) => {
                 if (summary.urgentCount > 0) telegramText += `• 🚨 동시결품 긴급: <b>${summary.urgentCount}건</b>\n`;
                 if (summary.duplicateCount > 0) telegramText += `• ⚠️ 미결 중복의심: <b>${summary.duplicateCount}건</b>\n`;
                 if (summary.excessCount > 0) telegramText += `• 📉 과잉/부진 주의: <b>${summary.excessCount}건</b>\n`;
-                if (summary.transferCount > 0) telegramText += `• 🚛 대경이송 권장: <b>${summary.transferCount}건</b>\n`;
+                if (summary.transferCount > 0) telegramText += `• 🏭 대경공장 발주 권장: <b>${summary.transferCount}건</b>\n`;
             }
 
             if (auditResults && auditResults.length > 0) {

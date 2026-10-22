@@ -186,7 +186,26 @@ export function analyzeStockPurchaseItem(
         safeStock = Math.max(0, Math.ceil(recent90dSales / 3 * 0.5));
     }
 
-    // 6. 미결 중복 발주건 체크 (다른 발주서에서 이미 발주되어 출고대기/입고대기 중인 건)
+/**
+ * 해당 주문이 '재고 발주분'인지 여부 판별
+ * (미결관리 /admin/pending의 [재고 발주분 미결] 탭 분류 기준과 일치)
+ */
+export function isStockPurchaseOrder(order: Order, item?: any): boolean {
+    if (order.isStockOrder) return true;
+    if (item?.isStockItem || item?.stockTargetLocation === 'SIHWA' || item?.stockTargetLocation === 'BUSAN') {
+        return true;
+    }
+    const targetCust = (order.poEndCustomer || (order as any).payload?.customer?.company_name || order.customerName || (order as any).buyerInfo?.company_name || '').toLowerCase().replace(/\s+/g, '');
+    return targetCust.includes('시화재고') ||
+        targetCust.includes('부산재고') ||
+        targetCust.includes('알트에프재고') ||
+        targetCust.includes('알트에프') ||
+        targetCust.includes('altf');
+}
+
+    // 6. 미결 중복 발주건 체크
+    // ★ 사용자 요청: 일반 고객사 납품용 주문은 중복 대상이 아니며,
+    // 오직 미결관리(Pending)의 '재고 발주분'에 이미 등록되어 대기 중인 발주건만 중복으로 체크!
     const pendingMatches: PendingMatch[] = [];
     orders.forEach(otherOrder => {
         if (currentOrderId && otherOrder.id === currentOrderId) return;
@@ -194,7 +213,14 @@ export function analyzeStockPurchaseItem(
         if (!otherOrder.po_items || otherOrder.po_items.length === 0) return;
 
         otherOrder.po_items.forEach(pi => {
-            if (pi.transactionIssued) return; // 이미 마감된 건 제외
+            if (pi.transactionIssued || (pi as any).isCompleted) return; // 이미 마감된 건 제외
+            // ★ 오직 '재고 발주분' 미결 주문만 중복 검사 대상 (한국스텐레스, 카리스테크원 등 타 거래처 제외)
+            if (!isStockPurchaseOrder(otherOrder, pi)) return;
+
+            const piNameLower = (pi.name || '').toLowerCase().trim();
+            const isDcOrFreight = piNameLower === 'd/c' || piNameLower === 'dc' || piNameLower.includes('운임') || piNameLower.includes('배송') || piNameLower.includes('freight') || piNameLower.includes('shipping') || piNameLower.includes('discount') || piNameLower.includes('할인');
+            if (isDcOrFreight) return;
+
             const piSpecKey = normalizeSpecKey(pi.name, pi.thickness, pi.size, pi.material);
             const isMatch = (item.productId && (pi.productId === item.productId || pi.item_id === item.productId)) ||
                             (itemSpecKey && piSpecKey === itemSpecKey);
@@ -204,7 +230,7 @@ export function analyzeStockPurchaseItem(
                     poNumber: otherOrder.poNumber || otherOrder.id.slice(-6),
                     poDate: new Date(otherOrder.createdAt).toLocaleDateString(),
                     quantity: Number(pi.quantity || 0),
-                    customerName: otherOrder.poEndCustomer || otherOrder.customerName || '재고발주'
+                    customerName: otherOrder.poEndCustomer || otherOrder.customerName || '알트에프 재고'
                 });
             }
         });
@@ -240,11 +266,11 @@ export function analyzeStockPurchaseItem(
         suitabilityReason = `최근 90일 무판매 품목이며 시화에 ${sihwaStock}개가 이미 보유되어 있어 신규 추가 매입을 비권장합니다.`;
     } else if (effectiveStock < safeStock && daekyungStock >= (safeStock - effectiveStock) && daekyungStock > 20) {
         suitabilityType = 'DAEKYUNG_TRANSFER';
-        badgeText = '🚛 대경이송 권장';
+        badgeText = '🏭 대경공장 발주 권장';
         bgClass = 'bg-sky-50';
         textClass = 'text-sky-700';
         borderClass = 'border-sky-200';
-        suitabilityReason = `대경공장에 ${daekyungStock}개 재고가 넉넉히 있으므로, 외부 신규 매입 대신 대경공장 재고 이송/직송이 유리합니다.`;
+        suitabilityReason = `대경공장에 ${daekyungStock}개 재고가 넉넉히 있으므로, 타 매입처 신규 구매 대신 대경 매입 발주를 권장합니다.`;
     } else if (effectiveStock < safeStock) {
         suitabilityType = 'URGENT_UNMET';
         badgeText = '✅ 적정 선발주 권장';
