@@ -87,22 +87,45 @@ export class InvoiceArchiveService {
             });
         });
 
+        // 스마트 피팅 규격 매칭 함수 (Type + Size + Material + Schedule)
+        const matchFittingCert = (item, candidateCerts) => {
+            const itemName = (item.name || '').toUpperCase().replace(/[\s\-_()]/g, '');
+            const itemSpec = (item.spec || item.rawLine || '').toUpperCase();
+
+            const sizeMatch = itemSpec.match(/(\d+A?)\s*[*Xx=]\s*(\d+A?)/i) || itemSpec.match(/(\d+A)\b/i);
+            const sizeToken = sizeMatch ? sizeMatch[0].replace(/[\s*]/g, 'X').toUpperCase() : '';
+            const matToken = itemSpec.includes('316L') ? '316L' : (itemSpec.includes('304L') ? '304L' : (itemSpec.includes('304') ? '304' : ''));
+            const schToken = (itemSpec.match(/S\/?(10S|20S|40S|80S)/i) || itemSpec.match(/\b(10S|20S|40S|80S)\b/i))?.[1] || '';
+
+            // 1차: PO 번호 내 정밀 토큰 매칭
+            for (const c of candidateCerts) {
+                const desc = (c.description || c['DESCRIPTION'] || '').toUpperCase();
+                const cMat = (c.specMaterial || c.material || '').toUpperCase();
+                let ok = true;
+                if (sizeToken && !desc.includes(sizeToken) && !desc.includes(sizeToken.replace(/A/g, ''))) ok = false;
+                if (matToken && !desc.includes(matToken) && !cMat.includes(matToken)) ok = false;
+                if (schToken && !desc.includes(schToken)) ok = false;
+                if (ok) return c;
+            }
+
+            // 2차: 완화 매칭 (Size + Type)
+            for (const c of candidateCerts) {
+                const desc = (c.description || c['DESCRIPTION'] || '').toUpperCase();
+                if (sizeToken && (desc.includes(sizeToken) || desc.includes(sizeToken.replace(/A/g, '')))) {
+                    if (itemName && desc.includes(itemName)) return c;
+                }
+            }
+
+            // 3차: PO 일치 시 첫번째 성적서 연동
+            if (candidateCerts.length > 0) return candidateCerts[0];
+            return null;
+        };
+
         // 2. 품목별 성적서 1:1 대조
         for (const it of items) {
             if (it.type === 'FREIGHT') continue;
 
-            const itemName = (it.name || '').toUpperCase();
-            const itemSpec = (it.spec || it.rawLine || '').toUpperCase();
-
-            // 규격 또는 품명 매칭
-            const matchedCert = certsForPo.find(c => {
-                const desc = (c.description || c['DESCRIPTION'] || '').toUpperCase();
-                return desc.includes(itemName) || (itemSpec && desc.includes(itemSpec));
-            }) || certs.find(c => {
-                // PO 무관 전사 성적서 중 규격 매칭
-                const desc = (c.description || c['DESCRIPTION'] || '').toUpperCase();
-                return itemSpec && desc && desc.includes(itemSpec);
-            });
+            const matchedCert = matchFittingCert(it, certsForPo) || matchFittingCert(it, certs);
 
             if (matchedCert) {
                 const certNo = matchedCert.certNo || matchedCert['CERT-No'] || 'DKB-CERT';

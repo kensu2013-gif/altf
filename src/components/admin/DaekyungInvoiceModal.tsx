@@ -29,6 +29,7 @@ interface SupplierInvoice {
     id: string;
     fileName?: string;
     invoiceNo: string;
+    displayInvoiceNo?: string;
     invoiceDate: string;
     supplier?: {
         name: string;
@@ -578,7 +579,7 @@ export const DaekyungInvoiceModal: React.FC<DaekyungInvoiceModalProps> = ({
                                         {invoices.map((inv, idx) => (
                                             <tr key={inv.id || idx} className="hover:bg-cyan-950/20 transition-colors">
                                                 <td className="py-2.5 px-3 font-bold text-cyan-300 whitespace-nowrap">
-                                                    {inv.invoiceNo}
+                                                    {inv.displayInvoiceNo || inv.invoiceNo}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap">
                                                     {inv.invoiceDate}

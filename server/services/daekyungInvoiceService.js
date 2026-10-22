@@ -805,11 +805,47 @@ export class DaekyungInvoiceService {
             }
         };
 
-        // 기존 동일 번호 있으면 업데이트, 없으면 신규 추가
-        const existingIdx = this.invoices.findIndex(inv => inv.invoiceNo === invoiceData.invoiceNo && inv.invoiceDate === invoiceData.invoiceDate);
+        // 🛡️ 고유 식별자(Canonical Key): 일자 + 4자리 전표번호 기반 영구 중복 방지 및 다중 페이지 자동 통합
+        const extractBaseNo = (no) => {
+            const m = (no || '').match(/\b\d{4}\b/);
+            if (m) return m[0];
+            return (no || '').replace(/\D/g, '').slice(-4).padStart(4, '0') || no;
+        };
+
+        const currentBaseNo = extractBaseNo(invoiceData.invoiceNo);
+        const currentDate = (invoiceData.invoiceDate || '').slice(0, 10);
+
+        const existingIdx = this.invoices.findIndex(inv => {
+            const existingBaseNo = extractBaseNo(inv.invoiceNo);
+            const existingDate = (inv.invoiceDate || '').slice(0, 10);
+            return existingBaseNo === currentBaseNo && existingDate === currentDate;
+        });
+
         if (existingIdx >= 0) {
+            // 다중 페이지 통합 및 최신 확정 금액으로 병합
+            const existing = this.invoices[existingIdx];
+            const mergedItems = [...(existing.items || [])];
+            for (const it of (invoiceData.items || [])) {
+                if (!mergedItems.some(m => m.name === it.name && m.spec === it.spec && m.quantity === it.quantity)) {
+                    mergedItems.push({ ...it, itemNo: mergedItems.length + 1 });
+                }
+            }
+            invoiceRecord.items = mergedItems;
+            invoiceRecord.itemCount = mergedItems.length;
+            invoiceRecord.poNumbers = Array.from(new Set([...(existing.poNumbers || []), ...(invoiceData.poNumbers || [])]));
+            invoiceRecord.invoiceNo = `No:${currentBaseNo}`;
+
+            // 최신 또는 2페이지 합계금액 우선 적용
+            if ((invoiceData.pricing?.grandTotal || 0) >= (existing.pricing?.grandTotal || 0)) {
+                invoiceRecord.pricing = invoiceData.pricing;
+                invoiceRecord.accounting.subtotal = invoiceData.pricing.subtotal;
+                invoiceRecord.accounting.vat = invoiceData.pricing.vat;
+                invoiceRecord.accounting.grandTotal = invoiceData.pricing.grandTotal;
+            }
             this.invoices[existingIdx] = invoiceRecord;
+            console.log(`[DaekyungInvoiceService] 🔄 [${currentDate}] No:${currentBaseNo} 기존 전표 통합 갱신 (중복 방지 완결)`);
         } else {
+            invoiceRecord.invoiceNo = `No:${currentBaseNo}`;
             this.invoices.unshift(invoiceRecord);
         }
         this.saveInvoices();
