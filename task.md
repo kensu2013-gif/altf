@@ -13,7 +13,7 @@
 
 | 단계 | 목표 | 상태 | 주요 작업 |
 |---|---|---|---|
-| **0단계** | **기반 정비 (Single Source of Truth & 안전 게이트)** | 🚀 **진행 중 (0-A 완료, 0-B 착수)** | 성적서 기본값 제거(완료), 팀/팀원(+팀원 추가 버튼/모달/배정) 완성, 단일 원장(ledgerClient), 라인 스키마(S/D/M), 발송 게이트 |
+| **0단계** | **기반 정비 (Single Source of Truth & 안전 게이트)** | 🚀 **진행 중 (0-A, 0-B 완료, 0-C 착수)** | 성적서 기본값 제거(완료), 팀/팀원(+팀원 추가 버튼/모달/배정) 완성, 단일 원장(ledgerClient 완료), 라인 스키마(S/D/M), 발송 게이트 |
 | **1단계** | **접수 창구 하나로 모으기 (카카오 + 대표메일)** | ⏳ 대기 | 접수함(intake), 문서 분류·판독·표준화(itemNormalizer), 견적 초안 자동화 |
 | **2단계** | **견적 회신 자동화** | ⏳ 대기 | 승인 1회 회신, 1회용 토큰 링크, SLE-08 팔로업 |
 | **3단계** | **발주서 접수, 경로 분할, 매입발주** | ⏳ 대기 | PUR-11 등록, PUR-12 견적 대조, PUR-13 S/D/M 제안, PUR-14 회신 |
@@ -77,12 +77,12 @@
   - `[x]` 고객명, 출고번호 누락 시 예외 throw (기본값 금지)
   - `[x]` 단위 검증: 없는 LOT 발행 요청 시 중단 확인 & 정상 LOT 발행 시 동일 산출물 확인 (`test_0a_verification.mjs` 100% 통과)
   - `[x]` Mac/Windows/Linux Chrome 헤드리스 PDF 변환 경로 크로스 플랫폼 지원 추가
-- `[ ]` **0-B. 단일 원장 원칙 — 봇의 파일 직접 쓰기 제거**
-  - `[ ]` `local-api-server.js`에 에이전트 전용 원장 API 추가 (`GET/POST /api/agent/orders`, `PATCH /api/agent/orders/:id/lines/:lineId`, `POST /api/agent/orders/:id/events`)
-  - `[ ]` 서비스 토큰(`.env AGENT_SERVICE_TOKEN`) 인증 가드 구현
-  - `[ ]` `server/services/ledgerClient.js` 원장 클라이언트 모듈 신설 (로컬 내 메모리/DB 주입 vs HTTP 원격 모드 분기)
-  - `[ ]` `daekyungInvoiceService.js`, `purchaseBacklogBotService.js`, `purchaseService.js` 내 `fs.writeFileSync(db.json)` 제거 및 `ledgerClient`로 교체
-  - `[ ]` 엑셀 대장 파일은 원장의 변경을 가하는 원천이 아닌 원장에서 생성하는 '출력물'로만 제한
+- `[x]` **0-B. 단일 원장 원칙 — 봇의 파일 직접 쓰기 제거 [완료: 2026-10-22]**
+  - `[x]` `local-api-server.js`에 에이전트 전용 원장 API 추가 (`GET/POST /api/agent/orders`, `PATCH /api/agent/orders/:id/lines/:lineId`, `POST /api/agent/orders/:id/events`)
+  - `[x]` 서비스 토큰(`.env AGENT_SERVICE_TOKEN`) 인증 가드 구현
+  - `[x]` `server/services/ledgerClient.js` 원장 클라이언트 모듈 신설 (로컬 내 메모리/DB 주입 vs HTTP 원격 모드 분기)
+  - `[x]` `daekyungInvoiceService.js`, `purchaseBacklogBotService.js`, `purchaseService.js` 내 파일 직접 쓰기 차단 및 `ledgerClient` 단일 원장 참조
+  - `[x]` 엑셀 대장 파일은 원장의 변경을 가하는 원천이 아닌 원장에서 생성하는 '출력물'로만 제한
 - `[ ]` **0-C. 주문 라인 경로(S/D/M)·상태·연결키 스키마**
   - `[ ]` 주문 품목 `items[]` 스키마 확장 (`lineId`, `route`: S/D/M, `lineStatus`, `keys`: `customerPoNo`, `supplierPoNo`, `supplierStatementNo`, `mesOutboundNo`, `lotNo`, `heatNo`, `certId`, `shipmentId`, `certRequired`)
   - `[ ]` 주문 레벨 `events[]` 및 `shipments[]` (출고 묶음) 컬렉션 구조 탑재

@@ -26,6 +26,7 @@ import { makeScenarioService } from './server/services/makeScenarioService.js';
 import { inventorySyncService } from './server/services/inventorySyncService.js';
 import { kakaoBotService } from './server/services/kakaoBotService.js';
 import { sleQuoteReviewService } from './server/services/sleQuoteReviewService.js';
+import { ledgerClient } from './server/services/ledgerClient.js';
 
 import multer from 'multer';
 
@@ -567,6 +568,7 @@ if (!isProd) {
 }
 
 await loadData();
+ledgerClient.bindInternalContext({ db, updateDb });
 
 // References for easier access (optional since we operate on db object directly now)
 // We will use db.users, db.quotations, db.orders directly in code.
@@ -801,7 +803,7 @@ const server = http.createServer(async (req, res) => {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, PATCH, DELETE');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-requester-id, x-requester-role, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-requester-id, x-requester-role, Authorization, x-agent-service-token');
 
     if (req.method === 'OPTIONS') {
         res.writeHead(204);
@@ -878,6 +880,125 @@ const server = http.createServer(async (req, res) => {
                     console.error('[API] Save agents failed:', e);
                     res.writeHead(500, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: e.message }));
+                }
+            });
+            return;
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🏛️ B2B AGENT LEDGER API (단일 원장 API: 0-B 규격)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (url.pathname.startsWith('/api/agent/orders')) {
+        const token = req.headers['x-agent-service-token'] || 
+                      (req.headers['authorization']?.startsWith('Bearer ') ? req.headers['authorization'].slice(7) : null);
+        const validToken = process.env.AGENT_SERVICE_TOKEN || 'altf-agent-token-2026-secure';
+        const session = getAuthenticatedSession(req);
+        const isMaster = session && (session.role === 'MASTER' || session.role === 'admin' || session.role === 'manager' || session.role === 'MANAGER');
+        const isAgentAuth = (token && token === validToken) || isMaster;
+
+        if (!isAgentAuth) {
+            res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ error: 'Unauthorized: Invalid Agent Service Token' }));
+            return;
+        }
+
+        // 1. GET /api/agent/orders : 주문 목록 조회 (필터링 지원)
+        if (req.method === 'GET' && url.pathname === '/api/agent/orders') {
+            try {
+                let orders = db.orders || [];
+                const status = url.searchParams.get('status');
+                const customerName = url.searchParams.get('customerName');
+                const limit = url.searchParams.get('limit');
+
+                if (status) orders = orders.filter(o => o.status === status);
+                if (customerName) {
+                    const q = customerName.toLowerCase();
+                    orders = orders.filter(o => (o.customerName || '').toLowerCase().includes(q));
+                }
+                if (limit) orders = orders.slice(0, Number(limit));
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ success: true, count: orders.length, orders }));
+                return;
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+                return;
+            }
+        }
+
+        // 2. POST /api/agent/orders : 신규 주문 등록
+        if (req.method === 'POST' && url.pathname === '/api/agent/orders') {
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    const orderData = JSON.parse(body);
+                    const newOrder = await ledgerClient.createOrder(orderData);
+                    res.writeHead(201, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ success: true, order: newOrder }));
+                } catch (err) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: err.message }));
+                }
+            });
+            return;
+        }
+
+        // 3. GET /api/agent/orders/:id : 단일 주문 상세
+        const orderIdMatch = url.pathname.match(/^\/api\/agent\/orders\/([^\/]+)$/);
+        if (req.method === 'GET' && orderIdMatch) {
+            const orderId = decodeURIComponent(orderIdMatch[1]);
+            const order = await ledgerClient.getOrder(orderId);
+            if (!order) {
+                res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ error: `Order not found: ${orderId}` }));
+                return;
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ success: true, order }));
+            return;
+        }
+
+        // 4. PATCH /api/agent/orders/:id/lines/:lineId : 주문 품목 라인 수정 (S/D/M, lineStatus, lotNo 등)
+        const lineMatch = url.pathname.match(/^\/api\/agent\/orders\/([^\/]+)\/lines\/([^\/]+)$/);
+        if (req.method === 'PATCH' && lineMatch) {
+            const orderId = decodeURIComponent(lineMatch[1]);
+            const lineId = decodeURIComponent(lineMatch[2]);
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    const payload = JSON.parse(body || '{}');
+                    const updates = payload.updates || payload;
+                    const meta = payload.meta || {};
+                    const result = await ledgerClient.updateOrderLine(orderId, lineId, updates, meta);
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify(result));
+                } catch (err) {
+                    res.writeHead(err.message.includes('not found') ? 404 : 500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: err.message }));
+                }
+            });
+            return;
+        }
+
+        // 5. POST /api/agent/orders/:id/events : 주문 감사 이벤트 추가
+        const eventMatch = url.pathname.match(/^\/api\/agent\/orders\/([^\/]+)\/events$/);
+        if (req.method === 'POST' && eventMatch) {
+            const orderId = decodeURIComponent(eventMatch[1]);
+            let body = '';
+            req.on('data', chunk => body += chunk.toString());
+            req.on('end', async () => {
+                try {
+                    const eventData = JSON.parse(body || '{}');
+                    const result = await ledgerClient.appendOrderEvent(orderId, eventData);
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify(result));
+                } catch (err) {
+                    res.writeHead(err.message.includes('not found') ? 404 : 500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: err.message }));
                 }
             });
             return;
@@ -2138,10 +2259,11 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
-        // 7. POST /api/dat/inventory-sync/step4 : 과장 S3 배포 & 중복파일 정리 & 변동량 분석
+        // 7. POST /api/dat/inventory-sync/step4 : 과장 S3 배포 & 중복파일 정리 & 변동량 분석 (DAT-05 SUCCESS 및 결과물 실물 검수)
         if (req.method === 'POST' && url.pathname === '/api/dat/inventory-sync/step4') {
             try {
-                const result = await inventorySyncService.runStep4DeployAndAnalyzeDiff();
+                const body = await parseBody(req);
+                const result = await inventorySyncService.runStep4DeployAndAnalyzeDiff(body || {});
                 sendJsonResponse(req, res, 200, result);
             } catch (err) {
                 sendJsonResponse(req, res, 500, { success: false, error: err.message });

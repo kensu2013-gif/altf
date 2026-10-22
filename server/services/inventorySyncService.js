@@ -8,6 +8,7 @@ import { uploadInventoryToS3, hasAwsCredentials } from '../../s3-db.js';
 const CONFIG_PATH = path.resolve(process.cwd(), './server/data/inventory_sync_config.json');
 const STORAGE_DIR = path.resolve(process.cwd(), './storage/inventory');
 const LOCAL_INVENTORY_JSON = path.resolve(process.cwd(), './public/api/inventory/inventory.json');
+const AGENTS_JSON_PATH = path.resolve(process.cwd(), './server/data/agents.json');
 
 export class InventorySyncService {
   constructor() {
@@ -52,6 +53,44 @@ export class InventorySyncService {
         cleanedFiles: [],
         details: null
       },
+      // 🔗 [에이전트 직급별 직전 봇 감시 & SUCCESS 승계 체인]
+      chain: {
+        dat03: {
+          code: 'DAT-03',
+          name: '태일·시화 재고 동기화 봇',
+          roleLevel: '사원',
+          status: 'IDLE', // IDLE | RUNNING | SUCCESS | ERROR
+          lastSuccessAt: null,
+          message: '대기 중'
+        },
+        dat04: {
+          code: 'DAT-04',
+          name: '대경 재고 파일 수신 & 변환 봇',
+          roleLevel: '사원',
+          status: 'IDLE', // IDLE | WAITING_PREVIOUS | RUNNING | SUCCESS | ERROR
+          prerequisite: 'DAT-03 SUCCESS',
+          lastSuccessAt: null,
+          message: '[대기] DAT-03 사원 완료 신호 감시 중'
+        },
+        dat05: {
+          code: 'DAT-05',
+          name: 'ALTF 재고 DB 총괄 & 버퍼링 관제 봇',
+          roleLevel: '대리',
+          status: 'IDLE', // IDLE | WAITING_PREVIOUS | BUFFERING | RUNNING | SUCCESS | ERROR
+          prerequisite: 'DAT-03 & DAT-04 SUCCESS',
+          lastSuccessAt: null,
+          message: '[대기] DAT-03, DAT-04 사원 완료 신호 감시 중'
+        },
+        dat06: {
+          code: 'DAT-06',
+          name: 'S3 배포 & 재고 갱신/변동량 감시 봇',
+          roleLevel: '과장',
+          status: 'IDLE', // IDLE | WAITING_PREVIOUS | RUNNING | SUCCESS | ERROR
+          prerequisite: 'DAT-05 SUCCESS & 신규 결과물 검증 통과',
+          lastSuccessAt: null,
+          message: '[대기] DAT-05 대리 완료 신호 및 결과물 검수 대기 중'
+        }
+      },
       lastFullRun: null,
       error: null
     };
@@ -69,6 +108,37 @@ export class InventorySyncService {
     const dataDir = path.dirname(CONFIG_PATH);
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
+    }
+  }
+
+  // 🤖 에이전트 오피스 대시보드(agents.json) 실시간 상태/과업/로그 동기화
+  _updateAgentStatus(code, taskMessage, logMessage = null, newStatus = null) {
+    try {
+      if (!fs.existsSync(AGENTS_JSON_PATH)) return;
+      const raw = fs.readFileSync(AGENTS_JSON_PATH, 'utf8');
+      const agents = JSON.parse(raw);
+      let updated = false;
+
+      for (const ag of agents) {
+        if (ag.code === code) {
+          if (taskMessage) ag.currentTask = taskMessage;
+          if (newStatus) ag.status = newStatus;
+          ag.lastActive = '방금 전';
+          if (logMessage) {
+            const timeStr = new Date().toLocaleTimeString('ko-KR');
+            if (!Array.isArray(ag.logs)) ag.logs = [];
+            ag.logs = [`[${timeStr}] ${logMessage}`, ...ag.logs.slice(0, 14)];
+          }
+          updated = true;
+          break;
+        }
+      }
+
+      if (updated) {
+        fs.writeFileSync(AGENTS_JSON_PATH, JSON.stringify(agents, null, 2), 'utf8');
+      }
+    } catch (e) {
+      console.warn(`[InventorySyncService] _updateAgentStatus(${code}) warning:`, e.message);
     }
   }
 
@@ -159,12 +229,13 @@ export class InventorySyncService {
       return;
     }
     try {
-      console.log(`[DAT-03 사원] 태일/시화 정기 동기화 시작 (${scheduledTime})`);
-      await this.runStep1TaeilSihwa();
-      console.log(`[DAT-03 사원] 태일/시화 정기 동기화 완료 ➔ DAT-05 대리 호출`);
-      await this.onUpstreamStockUpdated(`TAEIL_SCHEDULE_${scheduledTime}`);
+      console.log(`\n======================================================`);
+      console.log(`🚀 [자동화팀 정기 파이프라인] 하루 3회 정기 동기화 시작 (${scheduledTime})`);
+      console.log(`[순서 규칙] DAT-03(사원) ➔ DAT-04(사원) ➔ DAT-05(대리) ➔ DAT-06(과장)`);
+      console.log(`======================================================\n`);
+      await this.runSequentialPipeline({ source: `SCHEDULE_${scheduledTime}` });
     } catch (err) {
-      console.error(`[DAT-03 사원] 정기 동기화 실패:`, err.message);
+      console.error(`[자동화팀 정기 파이프라인] 실행 실패:`, err.message);
     }
   }
 
@@ -174,7 +245,10 @@ export class InventorySyncService {
   async runStep1TaeilSihwa() {
     this.state.step1.status = 'RUNNING';
     this.state.step1.message = '태일/시화재고 Apps Script 및 원격 API 호출 중...';
+    this.state.chain.dat03.status = 'RUNNING';
+    this.state.chain.dat03.message = '태일/시화재고 Apps Script 및 원격 API 호출 중...';
     this.state.error = null;
+    this._updateAgentStatus('DAT-03', '[가동] 태일/시화재고 구글시트 Apps Script 실행 중...', '태일/시화재고 Apps Script 및 원격 API 호출 시작', 'ACTIVE');
 
     try {
       let appsScriptResult = null;
@@ -217,11 +291,24 @@ export class InventorySyncService {
         timestamp: new Date().toLocaleTimeString('ko-KR')
       };
 
+      // 🔗 DAT-03 완료 신호(SUCCESS) 방출 및 DAT-04 대기 알림
+      this.state.chain.dat03.status = 'SUCCESS';
+      this.state.chain.dat03.lastSuccessAt = new Date().toISOString();
+      this.state.chain.dat03.message = '태일/시화재고 구글시트 Apps Script 동기화 완료 (SUCCESS 신호 방출)';
+      this.state.chain.dat04.message = '[신호 감지] DAT-03 사원 완료 감지 ➔ 대경재고 변환 착수 대기';
+
+      this._updateAgentStatus('DAT-03', '[완료] 태일/시화 동기화 완료 (SUCCESS 신호 방출)', '태일/시화재고 구글시트 동기화 완료 (SUCCESS)', 'ACTIVE');
+      this._updateAgentStatus('DAT-04', '[신호 감지] DAT-03 사원 완료 감지 ➔ 대경재고 변환 착수 대기', '직전 봇 DAT-03의 SUCCESS 신호 감지됨');
+
+      console.log(`[DAT-03 사원] ✅ 태일/시화 동기화 완료 (SUCCESS). 다음 봇 DAT-04 사원에게 바통 터치!`);
       return { success: true, step1: this.state.step1 };
     } catch (err) {
       this.state.step1.status = 'ERROR';
       this.state.step1.message = '태일/시화 동기화 실패: ' + err.message;
+      this.state.chain.dat03.status = 'ERROR';
+      this.state.chain.dat03.message = '태일/시화 동기화 실패: ' + err.message;
       this.state.error = err.message;
+      this._updateAgentStatus('DAT-03', `[실패] 태일/시화 동기화 오류: ${err.message}`, `태일/시화 동기화 실패: ${err.message}`);
       throw err;
     }
   }
@@ -271,10 +358,23 @@ export class InventorySyncService {
     }
   }
 
-  async runStep2Daekyung(fileData = null) {
+  async runStep2Daekyung(fileData = null, options = {}) {
+    // 🛡️ [직전 봇 감시/확인]: 반드시 직전 봇 DAT-03(사원)의 SUCCESS 신호가 감지되어야 작동
+    if (!options.bypassPrerequisite && this.state.chain.dat03.status !== 'SUCCESS') {
+      const errMsg = `[DAT-04 사원 거부] 직전 봇 DAT-03(태일/시화 동기화)의 SUCCESS 신호가 확인되지 않았습니다. (현재 상태: ${this.state.chain.dat03.status})`;
+      console.warn(errMsg);
+      this.state.chain.dat04.status = 'WAITING_PREVIOUS';
+      this.state.chain.dat04.message = errMsg;
+      this._updateAgentStatus('DAT-04', '[거부] 직전 봇 DAT-03 SUCCESS 신호 미확인 ➔ 실행 대기', errMsg);
+      throw new Error(errMsg);
+    }
+
     this.state.step2.status = 'RUNNING';
     this.state.step2.message = '대경재고 원장 파일 수신 및 구글시트 변환 트리거 중...';
+    this.state.chain.dat04.status = 'RUNNING';
+    this.state.chain.dat04.message = '대경재고 원장 파일 수신 및 구글시트 변환 트리거 중...';
     this.state.error = null;
+    this._updateAgentStatus('DAT-04', '[가동] 직전 DAT-03 SUCCESS 확인됨 ➔ 대경재고 원장 접수 및 변환 중...', '대경재고 원장 처리 시작', 'ACTIVE');
 
     try {
       let savedPath = null;
@@ -348,11 +448,24 @@ export class InventorySyncService {
         timestamp: new Date().toLocaleTimeString('ko-KR')
       };
 
+      // 🔗 DAT-04 완료 신호(SUCCESS) 방출 및 DAT-05 대리 대기 알림
+      this.state.chain.dat04.status = 'SUCCESS';
+      this.state.chain.dat04.lastSuccessAt = new Date().toISOString();
+      this.state.chain.dat04.message = `대경재고 원장 접수 및 변환 완료 (SUCCESS 신호 방출)`;
+      this.state.chain.dat05.message = '[신호 감지] DAT-03, DAT-04 사원 완료 감지 ➔ 3~5분 버퍼링 및 ALTF DB 연산 착수 대기';
+
+      this._updateAgentStatus('DAT-04', `[완료] 대경재고 변환 완료 (${itemCount}건, SUCCESS 신호 방출)`, `대경재고 ${itemCount}건 구글시트 변환 완료 (SUCCESS)`);
+      this._updateAgentStatus('DAT-05', '[신호 감지] DAT-03, DAT-04 사원 완료 감지 ➔ 3~5분 버퍼링 및 ALTF DB 대기', '직전 사원 봇들(DAT-03, DAT-04)의 SUCCESS 신호 모두 감지됨');
+
+      console.log(`[DAT-04 사원] ✅ 대경재고 변환 완료 (SUCCESS). 다음 봇 DAT-05 대리에게 바통 터치!`);
       return { success: true, step2: this.state.step2 };
     } catch (err) {
       this.state.step2.status = 'ERROR';
       this.state.step2.message = '대경재고 변환 실패: ' + err.message;
+      this.state.chain.dat04.status = 'ERROR';
+      this.state.chain.dat04.message = '대경재고 변환 실패: ' + err.message;
       this.state.error = err.message;
+      this._updateAgentStatus('DAT-04', `[실패] 대경재고 변환 오류: ${err.message}`, `대경재고 변환 오류: ${err.message}`);
       throw err;
     }
   }
@@ -360,7 +473,21 @@ export class InventorySyncService {
   // ==========================================
   // [대리] DAT-05: 3~5분 버퍼링 카운트다운 & ALTF 재고 DB 실행
   // ==========================================
-  async startStep3BufferAndAltfDb(skipBuffer = false) {
+  async startStep3BufferAndAltfDb(skipBuffer = false, options = {}) {
+    // 🛡️ [직전 사원 봇들 감시/확인]: DAT-03 및 DAT-04가 모두 SUCCESS 완료되어야 작동
+    if (!options.bypassPrerequisite) {
+      const isDat03Ready = this.state.chain.dat03.status === 'SUCCESS';
+      const isDat04Ready = this.state.chain.dat04.status === 'SUCCESS';
+      if (!isDat03Ready || !isDat04Ready) {
+        const errMsg = `[DAT-05 대리 거부] 직전 사원 봇들의 SUCCESS 신호가 모두 확인되지 않았습니다. (DAT-03: ${this.state.chain.dat03.status}, DAT-04: ${this.state.chain.dat04.status}) 사원 작업이 100% 완료된 후에만 버퍼링을 시작할 수 있습니다.`;
+        console.warn(errMsg);
+        this.state.chain.dat05.status = 'WAITING_PREVIOUS';
+        this.state.chain.dat05.message = errMsg;
+        this._updateAgentStatus('DAT-05', '[거부] 직전 사원(DAT-03, DAT-04) SUCCESS 미확인 ➔ 대기 중', errMsg);
+        throw new Error(errMsg);
+      }
+    }
+
     if (this.state.step3.timerActive) {
       return { success: false, message: '이미 버퍼링 타이머가 작동 중입니다.' };
     }
@@ -373,6 +500,10 @@ export class InventorySyncService {
       this.state.step3.status = 'BUFFERING';
       this.state.step3.timerActive = true;
       this.state.step3.message = `구글시트 대용량 수식 연산 안정화 대기 중 (${Math.ceil(waitSeconds / 60)}분)...`;
+
+      this.state.chain.dat05.status = 'BUFFERING';
+      this.state.chain.dat05.message = `[신호 감지 완료] 직전 사원(DAT-03, DAT-04) SUCCESS 확인됨. 구글시트 대용량 수식 안정화 버퍼링 중 (${Math.ceil(waitSeconds / 60)}분)...`;
+      this._updateAgentStatus('DAT-05', `[버퍼링] 직전 사원 SUCCESS 확인됨 ➔ 구글시트 안정화 버퍼링 중 (${Math.ceil(waitSeconds / 60)}분)`, '구글시트 대용량 수식 연산 안정화 버퍼링 가동', 'ACTIVE');
 
       return new Promise((resolve, reject) => {
         if (this.timerInterval) clearInterval(this.timerInterval);
@@ -417,8 +548,11 @@ export class InventorySyncService {
     this.state.step3.status = 'IDLE';
     this.state.step3.bufferRemainingSeconds = 0;
     this.state.step3.message = '버퍼링 카운트다운이 취소되었습니다.';
+    this.state.chain.dat05.status = 'IDLE';
+    this.state.chain.dat05.message = '버퍼링 카운트다운이 취소되었습니다.';
     this.state.isRunning = false;
     this.state.autoPilot = false;
+    this._updateAgentStatus('DAT-05', '[취소] 버퍼링 카운트다운 취소됨', '버퍼링 카운트다운 취소');
     return { success: true, message: '취소 완료' };
   }
 
@@ -452,6 +586,9 @@ export class InventorySyncService {
   async _executeAltfDbAppsScript() {
     this.state.step3.status = 'RUNNING';
     this.state.step3.message = 'ALTF 재고 DATA BASE Apps Script 실행 중 (inventory.json 생성)...';
+    this.state.chain.dat05.status = 'RUNNING';
+    this.state.chain.dat05.message = 'ALTF 재고 DATA BASE Apps Script 실행 중 (최신 inventory.json 생성)...';
+    this._updateAgentStatus('DAT-05', '[가동] ALTF 재고 DB Apps Script 실행 중 (inventory.json 생성)...', 'ALTF DB Apps Script 실행 시작', 'ACTIVE');
 
     try {
       let appsScriptResult = null;
@@ -480,11 +617,24 @@ export class InventorySyncService {
         timestamp: new Date().toLocaleTimeString('ko-KR')
       };
 
+      // 🔗 DAT-05 완료 신호(SUCCESS) 방출 및 DAT-06 과장 대기 알림
+      this.state.chain.dat05.status = 'SUCCESS';
+      this.state.chain.dat05.lastSuccessAt = new Date().toISOString();
+      this.state.chain.dat05.message = 'ALTF DB 연산 완료 및 최신 inventory.json 준비 완료 (SUCCESS 신호 방출)';
+      this.state.chain.dat06.message = '[신호 감지] DAT-05 대리 완료 신호 감지됨 ➔ 생성된 최신 inventory.json 결과물 검수 대기';
+
+      this._updateAgentStatus('DAT-05', '[완료] ALTF DB 연산 완료 및 최신 inventory.json 준비 완료 (SUCCESS 신호 방출)', 'ALTF DB 연산 완료 (SUCCESS)', 'ACTIVE');
+      this._updateAgentStatus('DAT-06', '[신호 감지] DAT-05 대리 완료 신호 감지됨 ➔ 최신 inventory.json 결과물 엄격 검수 대기', '직전 대리 DAT-05의 SUCCESS 신호 감지됨');
+
+      console.log(`[DAT-05 대리] ✅ ALTF DB 연산 완료 (SUCCESS). 다음 봇 DAT-06 과장에게 바통 터치!`);
       return { success: true, step3: this.state.step3 };
     } catch (err) {
       this.state.step3.status = 'ERROR';
       this.state.step3.message = 'ALTF DB 생성 실패: ' + err.message;
+      this.state.chain.dat05.status = 'ERROR';
+      this.state.chain.dat05.message = 'ALTF DB 생성 실패: ' + err.message;
       this.state.error = err.message;
+      this._updateAgentStatus('DAT-05', `[실패] ALTF DB 생성 오류: ${err.message}`, `ALTF DB 생성 실패: ${err.message}`);
       throw err;
     }
   }
@@ -529,41 +679,10 @@ export class InventorySyncService {
   }
 
   /**
-   * 대경 또는 태일/시화 재고 실행 완료 후, 최소 3~5분 대기 후 ALTF DB 앱스크립트 실행
-   * 실패 시 완료될 때까지 3~5분 간격 자동 재시작 루프 수행
-   * 구글드라이브에 inventory.json 만들어지면 DAT-05 역할 종료 및 DAT-06 과장 배포 가동
+   * 상위 재고 반응 감지 시 체인 실행
    */
   async onUpstreamStockUpdated(source = 'UPSTREAM') {
-    this.state.isRunning = true;
-    this.state.currentStep = 3;
-
-    try {
-      console.log(`[DAT-05 대리] 상위 재고(${source}) 반응 감지. 수식 안정화를 위해 3~5분 버퍼링 시작...`);
-      await this.startStep3BufferAndAltfDb(false);
-      await this.waitForStep3Completion();
-
-      // 검증 및 실패 시 재시도 루프
-      await this.runStep3RetryUntilInventoryJsonReady();
-
-      this.state.step3.status = 'SUCCESS';
-      this.state.step3.message = '구글 드라이브 inventory.json 생성 확인 완료 (DAT-05 대리 역할 완결)';
-      console.log('[DAT-05 대리] ✅ 구글 드라이브 최신 inventory.json 생성 확인 완료. 역할 완결! DAT-06 과장 바통 터치');
-
-      // DAT-06 과장 가동: 다운로드 ➔ S3 업로드 (s3://altf-web-data-prod/public/inventory/inventory.json) ➔ 다운로드 파일 삭제 ➔ 대기
-      this.state.currentStep = 4;
-      const step4Res = await this.runStep4DeployAndAnalyzeDiff();
-
-      this.state.isRunning = false;
-      this.state.currentStep = 0;
-      console.log('[DAT-06 과장] ✅ S3 배포 및 다운로드 inventory.json 중복 방지 정리 완료. 다음 신호 대기');
-
-      return { success: true, step4: step4Res.step4 };
-    } catch (err) {
-      this.state.isRunning = false;
-      this.state.error = err.message;
-      console.error('[InventorySyncService] 연계 실행 오류:', err);
-      throw err;
-    }
+    return await this.runSequentialPipeline({ source });
   }
 
   async runStep3RetryUntilInventoryJsonReady(maxRetries = 5) {
@@ -609,10 +728,23 @@ export class InventorySyncService {
   // ==========================================
   // [과장] DAT-06: 중복 방지 파일 정리, S3 배포, 재고 갱신, 시화 변동량 분석
   // ==========================================
-  async runStep4DeployAndAnalyzeDiff() {
+  async runStep4DeployAndAnalyzeDiff(options = {}) {
+    // 🛡️ [직전 대리 봇 감시/확인]: 반드시 DAT-05 대리의 SUCCESS 신호가 감지되어야 작동
+    if (!options.bypassPrerequisite && this.state.chain.dat05.status !== 'SUCCESS') {
+      const errMsg = `[DAT-06 과장 거부] 직전 대리 봇 DAT-05(ALTF DB 총괄)의 SUCCESS 신호가 감지되지 않아 작업을 시작할 수 없습니다. (현재 상태: ${this.state.chain.dat05.status}) 대리 작업 완료 후 검수를 진행합니다.`;
+      console.warn(errMsg);
+      this.state.chain.dat06.status = 'WAITING_PREVIOUS';
+      this.state.chain.dat06.message = errMsg;
+      this._updateAgentStatus('DAT-06', '[거부] 직전 대리 DAT-05 SUCCESS 신호 미확인 ➔ 대기 중', errMsg);
+      throw new Error(errMsg);
+    }
+
     this.state.step4.status = 'RUNNING';
-    this.state.step4.message = '구버전 잔여 파일 정리 및 최신 inventory.json 검증 중...';
+    this.state.step4.message = '구버전 잔여 파일 방지 검수 및 최신 inventory.json 결과물 검증 중...';
+    this.state.chain.dat06.status = 'RUNNING';
+    this.state.chain.dat06.message = '구버전 잔여 파일 방지 검수 및 최신 inventory.json 결과물 검증 중...';
     this.state.error = null;
+    this._updateAgentStatus('DAT-06', '[검수] 직전 대리 SUCCESS 확인됨 ➔ 최신 inventory.json 실물 타임스탬프 및 품목수 검증 중...', '최신 결과물 실물 검수 착수', 'ACTIVE');
 
     try {
       const homedir = os.homedir();
@@ -635,10 +767,44 @@ export class InventorySyncService {
         }
       }
 
+      // 🛡️ [결과물 실물 검수 - 구버전 잔여 파일 업로드 원천 차단 가드]
+      const dat05SuccessTime = this.state.chain.dat05.lastSuccessAt 
+        ? new Date(this.state.chain.dat05.lastSuccessAt).getTime() 
+        : (this.state.step3.lastRun ? new Date(this.state.step3.lastRun).getTime() : 0);
+
+      if (!options.bypassFileValidation) {
+        if (!freshestSourcePath) {
+          const errMsg = '[DAT-06 과장 검수 실패] 구글 드라이브에서 다운로드된 inventory.json 파일을 찾을 수 없습니다. 구글 드라이브에서 최신 파일을 다운로드해 주세요.';
+          this.state.chain.dat06.status = 'ERROR';
+          this.state.chain.dat06.message = errMsg;
+          this._updateAgentStatus('DAT-06', `[검수 실패] ${errMsg}`, errMsg);
+          throw new Error(errMsg);
+        }
+
+        // 파일의 수정시각(mtime)이 DAT-05 완료 시점 이전이거나 20분 이상 경과된 과거 파일인 경우 차단
+        const now = Date.now();
+        const fileAgeMs = now - freshestMtime;
+        // DAT-05 성공 시각보다 60초 이상 이전에 생성된 파일은 구버전 잔여 파일임
+        const isOlderThanDat05 = dat05SuccessTime > 0 && freshestMtime < (dat05SuccessTime - (60 * 1000));
+        const isStaleFile = fileAgeMs > (20 * 60 * 1000); // 20분 이상 경과된 과거 파일
+
+        if (isOlderThanDat05 || isStaleFile) {
+          const reason = isOlderThanDat05 
+            ? `DAT-05 연산 시점(${new Date(dat05SuccessTime).toLocaleTimeString('ko-KR')})보다 이전에 생성된 과거 파일` 
+            : `다운로드 후 20분 이상 경과된 과거 잔여 파일(${Math.round(fileAgeMs / 60000)}분 전)`;
+          const errMsg = `[DAT-06 과장 검수 실패] 감지된 파일(${path.basename(freshestSourcePath)})은 ${reason}(수정시각: ${new Date(freshestMtime).toLocaleTimeString('ko-KR')})입니다. 구버전 파일이 업로드되는 사고를 원천 차단합니다.`;
+          console.error(errMsg);
+          this.state.chain.dat06.status = 'ERROR';
+          this.state.chain.dat06.message = errMsg;
+          this._updateAgentStatus('DAT-06', `[검수 차단] ${reason} ➔ 업로드 차단`, errMsg);
+          throw new Error(errMsg);
+        }
+      }
+
       let inventoryData = null;
 
       if (freshestSourcePath) {
-        console.log(`[Step 4 과장봇] 가장 최신 소스 파일 감지: ${freshestSourcePath}`);
+        console.log(`[Step 4 과장봇] 가장 최신 소스 파일 감지 및 검증 통과: ${freshestSourcePath} (수정: ${new Date(freshestMtime).toLocaleTimeString('ko-KR')})`);
         try {
           const raw = fs.readFileSync(freshestSourcePath, 'utf8');
           inventoryData = JSON.parse(raw);
@@ -647,19 +813,24 @@ export class InventorySyncService {
         }
       }
 
-      // 만약 Downloads에 최신 파일이 없다면 기존 public json 또는 s3_raw.json 폴백 확인
-      if (!inventoryData && fs.existsSync(LOCAL_INVENTORY_JSON)) {
+      // 만약 Downloads에 최신 파일이 없다면 기존 public json 폴백 확인 (수동 우회 모드일 때만)
+      if (!inventoryData && options.bypassFileValidation && fs.existsSync(LOCAL_INVENTORY_JSON)) {
         try {
           inventoryData = JSON.parse(fs.readFileSync(LOCAL_INVENTORY_JSON, 'utf8'));
         } catch (e) {}
       }
 
       if (!inventoryData) {
-        throw new Error('배포할 inventory.json 파일을 찾을 수 없습니다. (다운로드 폴더에 최신 파일이 생성되었는지 확인해주세요)');
+        throw new Error('배포할 inventory.json 파일을 파싱할 수 없습니다. 파일 유효성을 확인해 주세요.');
       }
 
       const itemsArray = Array.isArray(inventoryData) ? inventoryData : (inventoryData.items || []);
+      if (itemsArray.length < 10000 && !options.bypassFileValidation) {
+        throw new Error(`[DAT-06 과장 검수 실패] 유효 품목 수가 부족합니다 (${itemsArray.length}건). 최소 10,000건 이상의 전체 대장이어야 합니다.`);
+      }
+
       this.state.step4.totalItems = itemsArray.length;
+      this._updateAgentStatus('DAT-06', `[검수 통과] 최신 inventory.json (${itemsArray.length.toLocaleString()}건) 검증 완료 ➔ S3 배포 중...`, '결과물 실물 검증 통과', 'ACTIVE');
 
       // 2. AWS S3 업로드
       this.state.step4.message = `최신 재고 (${itemsArray.length.toLocaleString()}건) S3 클라우드 업로드 중...`;
@@ -748,12 +919,23 @@ export class InventorySyncService {
         timestamp: new Date().toLocaleTimeString('ko-KR')
       };
 
+      // 🔗 DAT-06 완료 신호(SUCCESS) 및 체인 완결
+      this.state.chain.dat06.status = 'SUCCESS';
+      this.state.chain.dat06.lastSuccessAt = new Date().toISOString();
+      this.state.chain.dat06.message = `결과물 검수 통과, S3 배포 및 시화 변동량(${diffStats.totalChanges}건) 산출 완료 (SUCCESS)`;
+
       this.state.lastFullRun = new Date().toISOString();
+      this._updateAgentStatus('DAT-06', `[완결] 결과물 검수 통과, S3 배포 및 시화 변동량(${diffStats.totalChanges}건) 산출 완료 (SUCCESS)`, `S3 배포 및 시화 변동량(${diffStats.totalChanges}건: 입고+${diffStats.inboundCount}/출고-${diffStats.outboundCount}) 확정 (SUCCESS)`, 'ACTIVE');
+
+      console.log(`[DAT-06 과장] ✅ 결과물 검수 통과 & S3 배포 완료 (전체 파이프라인 SUCCESS 완결!)`);
       return { success: true, step4: this.state.step4 };
     } catch (err) {
       this.state.step4.status = 'ERROR';
       this.state.step4.message = '배포 및 변동량 분석 실패: ' + err.message;
+      this.state.chain.dat06.status = 'ERROR';
+      this.state.chain.dat06.message = '배포 및 변동량 분석 실패: ' + err.message;
       this.state.error = err.message;
+      this._updateAgentStatus('DAT-06', `[실패] 배포/변동량 분석 오류: ${err.message}`, `배포/변동량 분석 실패: ${err.message}`);
       throw err;
     }
   }
@@ -800,41 +982,69 @@ export class InventorySyncService {
   }
 
   // ==========================================
-  // [전체 원클릭 전자동 오토파일럿] 사원1 ➔ 사원2 ➔ 대리 버퍼 ➔ 과장 배포
+  // [엄격 순차 파이프라인] DAT-03(사원) ➔ DAT-04(사원) ➔ DAT-05(대리) ➔ DAT-06(과장)
   // ==========================================
-  async runAutoPilot(options = {}) {
+  async runSequentialPipeline(options = {}) {
     if (this.state.isRunning) {
       return { success: false, message: '이미 파이프라인이 가동 중입니다.' };
     }
 
     this.state.isRunning = true;
     this.state.autoPilot = true;
-    this.state.currentStep = 1;
     this.state.error = null;
 
     try {
-      // 1단계
-      console.log('[Auto-Pilot] 1단계: 사원1 태일/시화 동기화 시작');
+      // 1단계: 사원 DAT-03 작동
+      console.log('\n[체인 1/4] DAT-03 사원: 태일/시화재고 동기화 시작...');
+      this.state.currentStep = 1;
       await this.runStep1TaeilSihwa();
+      if (this.state.chain.dat03.status !== 'SUCCESS') {
+        throw new Error('[체인 중단] DAT-03 사원 동기화 실패');
+      }
 
-      // 2단계
+      // 2단계: 사원 DAT-04 작동 (DAT-03 SUCCESS 확인 후)
+      console.log('\n[체인 2/4] DAT-04 사원: DAT-03 완료 확인 ➔ 대경재고 변환 시작...');
       this.state.currentStep = 2;
-      console.log('[Auto-Pilot] 2단계: 사원2 대경재고 변환 시작');
       await this.runStep2Daekyung(options.daekyungFile || null);
+      if (this.state.chain.dat04.status !== 'SUCCESS') {
+        throw new Error('[체인 중단] DAT-04 사원 변환 실패');
+      }
 
-      // 3단계
+      // 3단계: 대리 DAT-05 작동 (DAT-03 & DAT-04 SUCCESS 확인 후)
+      console.log('\n[체인 3/4] DAT-05 대리: DAT-03, DAT-04 완료 확인 ➔ 3~5분 버퍼링 및 ALTF DB 연산 시작...');
       this.state.currentStep = 3;
-      console.log('[Auto-Pilot] 3단계: 대리 ALTF DB 3~5분 버퍼링 시작');
-      // startStep3BufferAndAltfDb will proceed to step 4 when buffer expires
       await this.startStep3BufferAndAltfDb(options.skipBuffer || false);
+      await this.waitForStep3Completion();
+      if (this.state.chain.dat05.status !== 'SUCCESS') {
+        throw new Error('[체인 중단] DAT-05 대리 연산 실패');
+      }
 
-      return { success: true, message: '오토파일럿 파이프라인이 정상적으로 시작되었습니다.' };
+      // 4단계: 과장 DAT-06 작동 (DAT-05 SUCCESS 확인 및 결과물 실물 검수 후)
+      console.log('\n[체인 4/4] DAT-06 과장: DAT-05 완료 확인 ➔ 결과물 검수 및 S3 배포 시작...');
+      this.state.currentStep = 4;
+      const step4Res = await this.runStep4DeployAndAnalyzeDiff({
+        bypassFileValidation: options.bypassFileValidation || false
+      });
+
+      this.state.isRunning = false;
+      this.state.autoPilot = false;
+      this.state.currentStep = 0;
+      console.log('\n✨ [체인 완결] DAT-03 ➔ DAT-04 ➔ DAT-05 ➔ DAT-06 전체 파이프라인 100% 정상 완결!\n');
+      return { success: true, chain: this.state.chain, step4: step4Res.step4 };
     } catch (err) {
       this.state.isRunning = false;
       this.state.autoPilot = false;
       this.state.error = err.message;
+      console.error('[파이프라인 오류]', err.message);
       throw err;
     }
+  }
+
+  // ==========================================
+  // [전체 원클릭 전자동 오토파일럿] runSequentialPipeline으로 일원화
+  // ==========================================
+  async runAutoPilot(options = {}) {
+    return await this.runSequentialPipeline(options);
   }
 }
 
