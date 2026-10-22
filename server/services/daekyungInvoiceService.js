@@ -21,6 +21,7 @@ import xlsx from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { createWorker } from 'tesseract.js';
 import { execSync } from 'child_process';
+import { invoiceArchiveService } from './invoiceArchiveService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -109,8 +110,8 @@ export class DaekyungInvoiceService {
             console.log('[DaekyungInvoiceService] PDFParse 텍스트 추출 건너뜀 (스캔본 추정):', e.message);
         }
 
-        // 2) 텍스트가 거의 없거나 0인 경우 -> 스캐너/이미지 기반 PDF (1비트 마스크 + Tesseract OCR 파이프라인 가동)
-        console.log(`[DaekyungInvoiceService] 📸 이미지 기반 스캔 PDF 감지됨 (${totalPages}p) -> OCR 고속 파싱 파이프라인 가동`);
+        // 2) 텍스트가 거의 없거나 0인 경우 -> 스캐너/이미지 기반 PDF (Gemini Vision 우선 + Tesseract OCR 폴백)
+        console.log(`[DaekyungInvoiceService] 📸 이미지 기반 스캔 PDF 감지됨 (${totalPages}p) -> AI 고속 파싱 파이프라인 가동`);
         return await this.parseScannedPdfBuffer(pdfBuffer, originalFileName);
     }
 
@@ -158,7 +159,7 @@ export class DaekyungInvoiceService {
 
                 if (!maskDataName) continue;
 
-                const ocrText = await new Promise((resolve) => {
+                const ocrOutput = await new Promise((resolve) => {
                     page.objs.get(maskDataName, async (obj) => {
                         try {
                             const pbmPath = path.join(tmpDir, `p_${p}.pbm`);
@@ -167,17 +168,95 @@ export class DaekyungInvoiceService {
                             fs.writeFileSync(pbmPath, Buffer.concat([header, Buffer.from(obj.data)]));
                             execSync(`sips -s format png "${pbmPath}" --out "${pngPath}" >/dev/null 2>&1`);
 
+                            // 🔥 1단계: Google Gemini Vision 전문가 모드 (AI High-Precision OCR) 우선 시도
+                            if (process.env.GEMINI_API_KEY) {
+                                try {
+                                    const geminiResult = await this.callGeminiVisionForPage(pngPath, p, totalPages);
+                                    if (geminiResult && (geminiResult.pricing?.subtotal > 0 || (geminiResult.items && geminiResult.items.length > 0))) {
+                                        try { fs.unlinkSync(pbmPath); fs.unlinkSync(pngPath); } catch (e) {}
+                                        resolve({ isGemini: true, data: geminiResult });
+                                        return;
+                                    }
+                                } catch (gErr) {
+                                    console.warn(`[DaekyungInvoiceService] Gemini Vision P${p} 대체 전환: ${gErr.message}`);
+                                }
+                            }
+
                             const ret = await worker.recognize(pngPath);
                             // 파일 정리
                             try { fs.unlinkSync(pbmPath); fs.unlinkSync(pngPath); } catch (e) {}
-                            resolve(ret.data.text || '');
+                            resolve({ isGemini: false, text: ret.data.text || '' });
                         } catch (err) {
                             console.error(`[DaekyungInvoiceService] Page ${p} OCR 에러:`, err.message);
-                            resolve('');
+                            resolve({ isGemini: false, text: '' });
                         }
                     });
                 });
 
+                if (!ocrOutput) continue;
+
+                // Gemini 파싱 성공 시
+                if (ocrOutput.isGemini && ocrOutput.data) {
+                    const gData = ocrOutput.data;
+                    const subtotal = gData.pricing?.subtotal || 0;
+                    const vat = gData.pricing?.vat || Math.round(subtotal * 0.1);
+                    const grandTotal = gData.pricing?.grandTotal || (subtotal + vat);
+
+                    const invoiceObj = {
+                        id: `DKB-INV-AI-${Date.now()}-${p}-${(gData.invoiceNo || `P${p}`).replace(/[^a-zA-Z0-9]/g, '')}`,
+                        fileName: originalFileName,
+                        pdfBuffer,
+                        invoiceNo: gData.invoiceNo || `No:00${p}- 1/ 1`,
+                        invoiceDate: gData.invoiceDate || new Date().toISOString().slice(0, 10),
+                        pageIndex: p,
+                        totalPages,
+                        supplier: {
+                            name: '(주)대경벤드',
+                            bizNo: '606-81-75098',
+                            ceo: '김학철',
+                            address: '경남 양산시 어실로 115',
+                            phone: '055-364-1800'
+                        },
+                        buyer: {
+                            name: '알트에프(ALT.F)',
+                            bizNo: '838-05-01054',
+                            ceo: '조현진',
+                            address: '부산광역시 사상구 낙동대로 1330번길 67'
+                        },
+                        customerName: gData.customerName || '(주)알트에프',
+                        customerNumber: '',
+                        matchedOrderId: null,
+                        items: (gData.items || []).map((it, idx) => ({
+                            itemNo: it.itemNo || idx + 1,
+                            type: 'PRODUCT',
+                            name: it.name || '피팅 자재',
+                            spec: [it.material, it.spec].filter(Boolean).join(' ') || '대경 규격품',
+                            quantity: it.quantity || 1,
+                            unit: it.unit || 'EA',
+                            unitPrice: it.unitPrice || 0,
+                            amount: it.amount || (it.quantity * it.unitPrice) || 0,
+                            poNo: it.poNo || (gData.poNumbers?.[0] || ''),
+                            remarks: it.remarks || ''
+                        })),
+                        itemCount: (gData.items || []).length,
+                        poNumbers: gData.poNumbers || [],
+                        pricing: {
+                            totalSupplyPrice: Math.max(0, subtotal - (gData.pricing?.freightPrice || 0)),
+                            freightPrice: gData.pricing?.freightPrice || 0,
+                            subtotal,
+                            vat,
+                            grandTotal: grandTotal || (subtotal + vat)
+                        },
+                        rawText: JSON.stringify(gData),
+                        engine: 'GEMINI_VISION_EXPERT'
+                    };
+
+                    invoices.push(invoiceObj);
+                    console.log(`[DaekyungInvoiceService] 🌟 [P${p}] Gemini 판독 완료: 전표 ${invoiceObj.invoiceNo} | PO: ${invoiceObj.poNumbers.join(', ')} | 공급가: ${subtotal.toLocaleString()}원 | 합계: ${invoiceObj.pricing.grandTotal.toLocaleString()}원`);
+                    continue;
+                }
+
+                const ocrText = ocrOutput.text || '';
                 if (!ocrText) continue;
 
                 // 1. 일자 파싱
@@ -218,14 +297,24 @@ export class DaekyungInvoiceService {
                 let grandTotal = 0;
                 let freightPrice = 0;
 
-                const subtotalMatch = ocrText.match(/공\s*급\s*가\s*액\s*([\d,]+)/);
+                const subtotalMatch = ocrText.match(/공\s*급\s*가\s*액\s*([0-9,]+)/i);
                 if (subtotalMatch) subtotal = parseInt(subtotalMatch[1].replace(/,/g, ''), 10) || 0;
 
-                const vatMatch = ocrText.match(/부\s*가\s*세\s*([\d,]+)/);
+                const vatMatch = ocrText.match(/부\s*가\s*세\s*([0-9,]+)/i);
                 if (vatMatch) vat = parseInt(vatMatch[1].replace(/,/g, ''), 10) || 0;
 
-                const totalMatch = ocrText.match(/합\s*계\s*([\d,\s]+)/);
+                const totalMatch = ocrText.match(/합\s*[.\s]*계\s*([0-9,\s]+)/i);
                 if (totalMatch) grandTotal = parseInt(totalMatch[1].replace(/[,\s]/g, ''), 10) || 0;
+
+                // 🛡️ 수학적 자동 교차 보정
+                if (subtotal > 0 && vat === 0 && grandTotal > subtotal) {
+                    vat = grandTotal - subtotal;
+                } else if (subtotal > 0 && vat === 0) {
+                    vat = Math.round(subtotal * 0.1);
+                }
+                if (grandTotal === 0 && subtotal > 0) {
+                    grandTotal = subtotal + vat;
+                }
 
                 if (ocrText.includes('운임') || ocrText.includes('운송')) {
                     const freightMatch = ocrText.match(/운임[^\n\d]*([\d,]+)/);
@@ -462,10 +551,15 @@ export class DaekyungInvoiceService {
                     vat = Math.round(subtotal * 0.1);
                     grandTotal = subtotal + vat;
                 }
+                if (grandTotal === 0 && subtotal > 0) {
+                    if (vat === 0) vat = Math.round(subtotal * 0.1);
+                    grandTotal = subtotal + vat;
+                }
 
                 const invoiceObj = {
                     id: `DKB-INV-SCANNED-${Date.now()}-${p}-${invoiceNo.replace(/[^a-zA-Z0-9]/g, '')}`,
                     fileName: originalFileName,
+                    pdfBuffer,
                     invoiceNo,
                     invoiceDate,
                     pageIndex: p,
@@ -729,7 +823,17 @@ export class DaekyungInvoiceService {
         // 4. 출고부 (LOG) 연계: 배송 완료 및 스티커 갱신
         const logSyncResult = this.notifyLogisticsDepartment(invoiceData);
 
-        // 5. 에이전트 실시간 로그 및 관제 상태(agents.json) 갱신
+        // 5. 날짜별 거래명세표 + 성적서(MTC) 동시 물리 보관 및 영구 색인 아카이빙
+        let archiveResult = null;
+        try {
+            archiveResult = await invoiceArchiveService.archive(invoiceRecord, invoiceData.pdfBuffer, invoiceData.fileName);
+            invoiceRecord.archive = archiveResult;
+            this.saveInvoices();
+        } catch (arcErr) {
+            console.warn('[DaekyungInvoiceService] 날짜별 아카이빙 실패 경고:', arcErr.message);
+        }
+
+        // 6. 에이전트 실시간 로그 및 관제 상태(agents.json) 갱신
         this.updateAgentsState(invoiceData, { purSyncResult, qcSyncResult, logSyncResult, crossCheckResult }, timeShort);
 
         return {
@@ -1066,6 +1170,108 @@ export class DaekyungInvoiceService {
         } catch (e) {
             console.error('[DaekyungInvoiceService] agents.json 업데이트 오류:', e.message);
         }
+    }
+
+    /**
+     * 🌟 Google Gemini Vision 고정밀 전문가 모드 OCR
+     */
+    async callGeminiVisionForPage(pngPath, pageNum, totalPages) {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey || !fs.existsSync(pngPath)) return null;
+
+        const base64Data = fs.readFileSync(pngPath).toString('base64');
+        const candidateModels = [
+            'gemini-3.5-flash',
+            'gemini-3.1-flash-lite',
+            'gemini-3-flash-preview',
+            'gemini-flash-latest',
+            'gemini-3.8-flash'
+        ];
+
+        const prompt = `너는 대한민국 배관 자재 유통 및 (주)대경벤드 거래명세표 전문 AI 파서야.
+첨부된 거래명세표 스캔 이미지 (총 ${totalPages}페이지 중 ${pageNum}페이지)를 읽고, 아래 JSON 구조로 정확히 반환해줘:
+{
+  "invoiceNo": "전표번호 (예: No:0014- 2/ 2 또는 No:0014)",
+  "invoiceDate": "YYYY-MM-DD",
+  "customerName": "공급받는자 상호 (예: 알트에프(ALT.F))",
+  "poNumbers": ["비고란의 발주번호 목록 (예: ES261012-2824)"],
+  "items": [
+    {
+      "itemNo": 17,
+      "name": "품명 (예: TEE, ELBOW 90E(L), REDUCER)",
+      "material": "재질 (예: STS 316L-W, STS 304)",
+      "spec": "규격 (예: S/10S ERW 40A * 15A)",
+      "quantity": 15,
+      "unit": "단위 (예: EA)",
+      "unitPrice": 19230,
+      "amount": 288450,
+      "poNo": "비고란 발주번호 (예: ES261012-2824)",
+      "remarks": "비고 (예: 서울재고)"
+    }
+  ],
+  "pricing": {
+    "subtotal": 8362220,
+    "vat": 836222,
+    "grandTotal": 9198442
+  }
+}
+[매우 중요한 규칙]
+1. 하단 표의 공급가액(subtotal), 부가세(vat), 합계(grandTotal)를 절대로 누락하지 말고 정수 숫자로 반환해.
+2. 부가세가 0원 또는 공란인 경우에도, 공급가액과 합계가 다르면 실제 적힌 숫자를 그대로 grandTotal에 넣어.
+3. 비고란의 'ES261012-2824' 같은 발주번호는 반드시 poNumbers 및 각 품목의 poNo에 포함시켜.
+4. 품목 번호(No), 품명, 재질, 규격, 수량, 단가, 금액을 한 행씩 완벽하게 매핑해.
+5. 오직 유효한 JSON 문자열만 출력해.`;
+
+        for (const model of candidateModels) {
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 12000);
+
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [
+                            {
+                                parts: [
+                                    { text: prompt },
+                                    {
+                                        inlineData: {
+                                            mimeType: 'image/png',
+                                            data: base64Data
+                                        }
+                                    }
+                                ]
+                            }
+                        ],
+                        generationConfig: {
+                            responseMimeType: 'application/json',
+                            temperature: 0.1
+                        }
+                    }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeout);
+
+                if (!res.ok) {
+                    continue;
+                }
+
+                const json = await res.json();
+                const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!rawText) continue;
+
+                const parsed = JSON.parse(rawText.replace(/```json\n?|\n?```/g, '').trim());
+                if (parsed && (parsed.pricing?.subtotal > 0 || (parsed.items && parsed.items.length > 0))) {
+                    console.log(`[DaekyungInvoiceService] 🎯 Gemini Vision (${model}) 고정밀 판독 성공! 전표: ${parsed.invoiceNo}, 공급가: ${parsed.pricing?.subtotal?.toLocaleString()}원`);
+                    return parsed;
+                }
+            } catch (err) {
+                // Next candidate model or fallback to Tesseract
+            }
+        }
+        return null;
     }
 }
 

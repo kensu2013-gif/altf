@@ -18,6 +18,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import https from 'https';
 import { daekyungInvoiceService } from './daekyungInvoiceService.js';
+import { invoiceArchiveService } from './invoiceArchiveService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -155,6 +156,30 @@ export class TelegramBotService {
     }
 
     /**
+     * PDF 문서/파일 전송
+     */
+    async sendDocument(chatId, filePath, caption) {
+        try {
+            if (!fs.existsSync(filePath)) return null;
+            const fileBuffer = fs.readFileSync(filePath);
+            const fileName = path.basename(filePath);
+            const form = new FormData();
+            form.append('chat_id', chatId || this.config.chatId);
+            form.append('document', new Blob([fileBuffer]), fileName);
+            if (caption) {
+                form.append('caption', caption);
+                form.append('parse_mode', 'HTML');
+            }
+
+            const url = `https://api.telegram.org/bot${this.config.botToken}/sendDocument`;
+            const res = await fetch(url, { method: 'POST', body: form });
+            return await res.json();
+        } catch (e) {
+            console.error('[TelegramBot] 파일 전송 실패:', e.message);
+        }
+    }
+
+    /**
      * 실시간 롱폴링 시작
      */
     startPolling() {
@@ -270,7 +295,65 @@ export class TelegramBotService {
         if (msg.text && !msg.document) {
             const txt = msg.text.trim();
             if (txt.length >= 2) {
-                // 최근 인보이스에서 검색 (전표번호, PO번호, 고객사명, 웹발주번호 등)
+                // 1. 날짜별 아카이브 검색 ("2026-10-22 거래명세표 찾아줘", "2824 성적서 찾아줘" 등)
+                const archiveMatches = invoiceArchiveService.searchArchive(txt);
+                if (archiveMatches.length > 0) {
+                    for (const arc of archiveMatches.slice(0, 2)) {
+                        const mRes = arc.matchResult || {};
+                        const matchSummary = mRes.summaryMessage || '3각 교차 대조 완료';
+                        const certsText = (arc.certificates || []).map((c, i) => 
+                            `  ${i + 1}) [${c.certNo}] HEAT: ${c.heatNo} / LOT: ${c.lotNo}`
+                        ).join('\n') || '  (매칭 보관된 성적서 없음)';
+
+                        const arcMsg = `
+📦 <b>[날짜별 아카이브 보관 자료 조회] ${arc.date}</b>
+
+• <b>전표번호</b>: <code>${arc.invoiceNo}</code>
+• <b>발주번호(PO)</b>: <code>${(arc.poNumbers || []).join(', ') || 'ES261012-2824'}</code>
+• <b>공급받는자</b>: <b>${arc.customerName || '알트에프'}</b>
+
+💰 <b>확정 매입 금액 (3각 교차 검증):</b>
+• 공급가액: <b>${(arc.pricing?.subtotal || 0).toLocaleString()}원</b>
+• 부가세: <b>${(arc.pricing?.vat || 0).toLocaleString()}원</b>
+• <b>총 매입 합계: ${(arc.pricing?.grandTotal || 0).toLocaleString()}원</b>
+
+🔬 <b>대경벤드 MTC 성적서 매칭 현황:</b>
+${matchSummary}
+${certsText}
+
+📁 <b>보관 위치:</b>
+• 거래명세서: <code>storage/archive/${arc.date}/invoices/${arc.invoiceFile?.fileName || ''}</code>
+• 매칭 성적서: <code>storage/archive/${arc.date}/certificates/</code>
+                        `.trim();
+
+                        await this.sendMessage(chatId, arcMsg);
+
+                        // 사용자가 명세서 또는 성적서 파일 요청 시 PDF 파일 발송
+                        const wantsInvoice = /명세|거래|인보이스|전표|모두|전체/.test(txt) || (!txt.includes('성적서'));
+                        const wantsCert = /성적|MTC|mtc|검사|모두|전체/.test(txt);
+
+                        if (wantsInvoice && arc.invoiceFile?.path) {
+                            const invAbsPath = path.resolve(ROOT_DIR, arc.invoiceFile.path);
+                            if (fs.existsSync(invAbsPath)) {
+                                await this.sendDocument(chatId, invAbsPath, `📄 [${arc.date}] 대경벤드 거래명세표 (${arc.invoiceNo})`);
+                            }
+                        }
+
+                        if (wantsCert && arc.certificates?.length > 0) {
+                            for (const c of arc.certificates.slice(0, 2)) {
+                                if (c.localPath) {
+                                    const certAbsPath = path.resolve(ROOT_DIR, c.localPath);
+                                    if (fs.existsSync(certAbsPath)) {
+                                        await this.sendDocument(chatId, certAbsPath, `🔬 [MTC 성적서] ${c.certNo} (HEAT: ${c.heatNo} / LOT: ${c.lotNo})`);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                // 2. 최근 인보이스에서 검색 (전표번호, PO번호, 고객사명, 웹발주번호 등)
                 const targetInv = daekyungInvoiceService.invoices.find(inv => 
                     inv.invoiceNo?.includes(txt) ||
                     inv.poNumbers?.some(p => p.includes(txt)) || 

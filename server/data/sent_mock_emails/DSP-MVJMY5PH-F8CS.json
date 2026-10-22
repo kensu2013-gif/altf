@@ -1,0 +1,12 @@
+{
+  "id": "DSP-MVJMY5PH-F8CS",
+  "timestamp": "2026-10-22T14:27:45.127Z",
+  "from": "altf@altf.kr",
+  "to": "customer@example.com",
+  "originalTo": "customer@example.com",
+  "replyTo": "sales@altf.kr",
+  "subject": "[ALTF 출고서류] 거래명세표 및 성적서",
+  "body": "출고 서류 일체 송부",
+  "attachments": [],
+  "safeModeNote": "로컬 안전 테스트 모드 (Local Test Mode) 격리 가드 적용 완료"
+}

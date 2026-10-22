@@ -1,0 +1,17 @@
+{
+  "id": "DSP-MVJMY5OY-6VX6",
+  "timestamp": "2026-10-22T14:27:45.121Z",
+  "from": "altf@altf.kr",
+  "to": "customer@example.com",
+  "originalTo": "customer@example.com",
+  "replyTo": "sales-rep@altf.kr",
+  "subject": "[ALTF 견적서] 태형산업 견적 회신",
+  "body": "첨부 견적서를 확인해 주십시오.",
+  "attachments": [
+    {
+      "fileName": "quote_태형산업.pdf",
+      "path": "/dummy/quote.pdf"
+    }
+  ],
+  "safeModeNote": "로컬 안전 테스트 모드 (Local Test Mode) 격리 가드 적용 완료"
+}

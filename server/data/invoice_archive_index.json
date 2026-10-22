@@ -1,0 +1,288 @@
+[
+  {
+    "id": "ARC-2026-10-22-No_0014-_2__2",
+    "date": "2026-10-22",
+    "invoiceNo": "No:0014- 2/ 2",
+    "poNumbers": [
+      "ES261012-2824"
+    ],
+    "customerName": "알트에프(ALT.F)",
+    "pricing": {
+      "totalSupplyPrice": 8362220,
+      "freightPrice": 0,
+      "subtotal": 8362220,
+      "vat": 836222,
+      "grandTotal": 9198442
+    },
+    "invoiceFile": {
+      "fileName": "No_0014-_2__2_대경벤드_거래명세표_2824_P2.pdf",
+      "path": "storage/archive/2026-10-22/invoices/No_0014-_2__2_대경벤드_거래명세표_2824_P2.pdf",
+      "sizeBytes": 41
+    },
+    "certificates": [
+      {
+        "certNo": "YR-26-10005",
+        "heatNo": "SD79569",
+        "lotNo": "KJL0314",
+        "fileName": "261016_알트에프.261012-2824 (10-12-54).pdf",
+        "localPath": "storage/archive/2026-10-22/certificates/261016_알트에프.261012-2824 (10-12-54).pdf"
+      },
+      {
+        "certNo": "YR-26-10005",
+        "heatNo": "SD79569",
+        "lotNo": "KJL0314",
+        "fileName": "261016_알트에프.261012-2824 (10-12-54).pdf",
+        "localPath": "storage/archive/2026-10-22/certificates/261016_알트에프.261012-2824 (10-12-54).pdf"
+      },
+      {
+        "certNo": "YR-26-10005",
+        "heatNo": "SD79569",
+        "lotNo": "KJL0314",
+        "fileName": "261016_알트에프.261012-2824 (10-12-54).pdf",
+        "localPath": "storage/archive/2026-10-22/certificates/261016_알트에프.261012-2824 (10-12-54).pdf"
+      },
+      {
+        "certNo": "YR-26-10005",
+        "heatNo": "SD79569",
+        "lotNo": "KJL0314",
+        "fileName": "261016_알트에프.261012-2824 (10-12-54).pdf",
+        "localPath": "storage/archive/2026-10-22/certificates/261016_알트에프.261012-2824 (10-12-54).pdf"
+      },
+      {
+        "certNo": "YR-26-10005",
+        "heatNo": "SD79569",
+        "lotNo": "KJL0314",
+        "fileName": "261016_알트에프.261012-2824 (10-12-54).pdf",
+        "localPath": "storage/archive/2026-10-22/certificates/261016_알트에프.261012-2824 (10-12-54).pdf"
+      },
+      {
+        "certNo": "YR-26-10005",
+        "heatNo": "SD79569",
+        "lotNo": "KJL0314",
+        "fileName": "261016_알트에프.261012-2824 (10-12-54).pdf",
+        "localPath": "storage/archive/2026-10-22/certificates/261016_알트에프.261012-2824 (10-12-54).pdf"
+      },
+      {
+        "certNo": "YR-26-10005",
+        "heatNo": "SD79569",
+        "lotNo": "KJL0314",
+        "fileName": "261016_알트에프.261012-2824 (10-12-54).pdf",
+        "localPath": "storage/archive/2026-10-22/certificates/261016_알트에프.261012-2824 (10-12-54).pdf"
+      },
+      {
+        "certNo": "YR-26-10005",
+        "heatNo": "SD79569",
+        "lotNo": "KJL0314",
+        "fileName": "261016_알트에프.261012-2824 (10-12-54).pdf",
+        "localPath": "storage/archive/2026-10-22/certificates/261016_알트에프.261012-2824 (10-12-54).pdf"
+      },
+      {
+        "certNo": "YR-26-10005",
+        "heatNo": "SD79569",
+        "lotNo": "KJL0314",
+        "fileName": "261016_알트에프.261012-2824 (10-12-54).pdf",
+        "localPath": "storage/archive/2026-10-22/certificates/261016_알트에프.261012-2824 (10-12-54).pdf"
+      },
+      {
+        "certNo": "YR-26-10005",
+        "heatNo": "SD79569",
+        "lotNo": "KJL0314",
+        "fileName": "261016_알트에프.261012-2824 (10-12-54).pdf",
+        "localPath": "storage/archive/2026-10-22/certificates/261016_알트에프.261012-2824 (10-12-54).pdf"
+      }
+    ],
+    "itemsCount": 10,
+    "matchResult": {
+      "matchStatus": "ALL_MATCHED",
+      "totalItems": 10,
+      "matchedCount": 10,
+      "matchedCerts": [
+        {
+          "itemNo": 17,
+          "itemName": "TEE",
+          "spec": "STS 316L-W S/10S ERW 40A * 15A",
+          "qty": 15,
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314",
+          "pdfUrl": "261016_알트에프.261012-2824 (10-12-54).pdf"
+        },
+        {
+          "itemNo": 18,
+          "itemName": "TEE",
+          "spec": "STS 316L-W S/10S ERW 40A * 20A",
+          "qty": 15,
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314",
+          "pdfUrl": "261016_알트에프.261012-2824 (10-12-54).pdf"
+        },
+        {
+          "itemNo": 19,
+          "itemName": "TEE",
+          "spec": "STS 316L-W S/10S ERW 100A * 40A",
+          "qty": 2,
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314",
+          "pdfUrl": "261016_알트에프.261012-2824 (10-12-54).pdf"
+        },
+        {
+          "itemNo": 20,
+          "itemName": "TEE",
+          "spec": "STS 316L-W S/10S ERW 125A * 50A",
+          "qty": 2,
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314",
+          "pdfUrl": "261016_알트에프.261012-2824 (10-12-54).pdf"
+        },
+        {
+          "itemNo": 21,
+          "itemName": "TEE",
+          "spec": "STS 316L-W S/10S ERW 125A * 65A",
+          "qty": 2,
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314",
+          "pdfUrl": "261016_알트에프.261012-2824 (10-12-54).pdf"
+        },
+        {
+          "itemNo": 22,
+          "itemName": "TEE",
+          "spec": "STS 316L-W S/10S ERW 150A * 50A",
+          "qty": 2,
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314",
+          "pdfUrl": "261016_알트에프.261012-2824 (10-12-54).pdf"
+        },
+        {
+          "itemNo": 23,
+          "itemName": "TEE",
+          "spec": "STS 316L-W S/10S ERW 150A * 80A",
+          "qty": 2,
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314",
+          "pdfUrl": "261016_알트에프.261012-2824 (10-12-54).pdf"
+        },
+        {
+          "itemNo": 24,
+          "itemName": "TEE",
+          "spec": "STS 316L-W S/10S ERW 150A * 100A",
+          "qty": 2,
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314",
+          "pdfUrl": "261016_알트에프.261012-2824 (10-12-54).pdf"
+        },
+        {
+          "itemNo": 25,
+          "itemName": "TEE",
+          "spec": "STS 316L-W S/10S ERW 200A * 125A",
+          "qty": 2,
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314",
+          "pdfUrl": "261016_알트에프.261012-2824 (10-12-54).pdf"
+        },
+        {
+          "itemNo": 26,
+          "itemName": "TEE",
+          "spec": "STS 316L-W S/10S ERW 200A * 150A",
+          "qty": 2,
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314",
+          "pdfUrl": "261016_알트에프.261012-2824 (10-12-54).pdf"
+        }
+      ],
+      "itemVerification": [
+        {
+          "itemNo": 17,
+          "name": "TEE",
+          "status": "MATCHED",
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314"
+        },
+        {
+          "itemNo": 18,
+          "name": "TEE",
+          "status": "MATCHED",
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314"
+        },
+        {
+          "itemNo": 19,
+          "name": "TEE",
+          "status": "MATCHED",
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314"
+        },
+        {
+          "itemNo": 20,
+          "name": "TEE",
+          "status": "MATCHED",
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314"
+        },
+        {
+          "itemNo": 21,
+          "name": "TEE",
+          "status": "MATCHED",
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314"
+        },
+        {
+          "itemNo": 22,
+          "name": "TEE",
+          "status": "MATCHED",
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314"
+        },
+        {
+          "itemNo": 23,
+          "name": "TEE",
+          "status": "MATCHED",
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314"
+        },
+        {
+          "itemNo": 24,
+          "name": "TEE",
+          "status": "MATCHED",
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314"
+        },
+        {
+          "itemNo": 25,
+          "name": "TEE",
+          "status": "MATCHED",
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314"
+        },
+        {
+          "itemNo": 26,
+          "name": "TEE",
+          "status": "MATCHED",
+          "certNo": "YR-26-10005",
+          "heatNo": "SD79569",
+          "lotNo": "KJL0314"
+        }
+      ],
+      "isConfirmed": true,
+      "summaryMessage": "✅ [3각 대조 완결] 발주 품목 10개 중 10개 성적서 1:1 완벽 일치 확정"
+    },
+    "archivedAt": "2026-10-22T14:52:13.439Z"
+  }
+]

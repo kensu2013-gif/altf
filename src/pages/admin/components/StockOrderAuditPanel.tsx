@@ -48,8 +48,8 @@ export const StockOrderAuditPanel: React.FC<StockOrderAuditPanelProps> = ({
 
     // 2. 종합 통계 계산
     const summary = useMemo(() => {
-        let totalItems = auditResults.length;
-        let totalOrderQty = items.reduce((acc, it) => acc + (Number(it.quantity) || 0), 0);
+        const totalItems = auditResults.length;
+        const totalOrderQty = items.reduce((acc, it) => acc + (Number(it.quantity) || 0), 0);
         let urgentCount = 0;      // 동시결품
         let optimalCount = 0;     // 적정 선발주
         let excessCount = 0;      // 과잉/부진 위험
@@ -132,7 +132,7 @@ export const StockOrderAuditPanel: React.FC<StockOrderAuditPanelProps> = ({
                 setApprovalSentSuccess(true);
                 setApprovalMessage(data.message || '사전 품의 리포트가 시스템 결재 큐에 정상 상신되었습니다.');
             }
-        } catch (err: any) {
+        } catch {
             setApprovalSentSuccess(true);
             setApprovalMessage('구매 검증 리포트가 결재 큐에 등록되었습니다. (대표 승인 대기)');
         } finally {
