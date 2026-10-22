@@ -1,6 +1,6 @@
 
 import type { Quotation, LineItem, Order } from '../../../types';
-import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User, Image, RefreshCw, Sliders, X, ChevronDown, ShoppingCart, Copy, Check } from 'lucide-react';
+import { FileText, Package, Download, Send, Calendar, MessageSquare, Trash2, Plus, User, Image, RefreshCw, Sliders, X, ChevronDown, ShoppingCart, Copy, Check, Maximize2, ChevronUp, ZoomIn, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { formatCurrency } from '../../../lib/utils';
 import { useState, useCallback, useMemo, useEffect, startTransition, useRef } from 'react';
@@ -299,12 +299,25 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
     });
 
     // 💬 카카오톡 고객 접수 원문 텍스트 연동
-    const [rawKakaoText, setRawKakaoText] = useState<string>(quote.rawText || quote.utterance || '');
+    const isRealUserText = (txt?: string) => {
+        if (!txt) return false;
+        const t = txt.trim();
+        return !t.startsWith('http://') && !t.startsWith('https://') && !t.startsWith('카카오톡 채널 인입') && t.length > 0;
+    };
+
+    const initialRawText = (quote.rawText && isRealUserText(quote.rawText)) ? quote.rawText :
+                           (quote.utterance && isRealUserText(quote.utterance)) ? quote.utterance : '';
+    const [rawKakaoText, setRawKakaoText] = useState<string>(initialRawText);
     const [isRawKakaoCopied, setIsRawKakaoCopied] = useState<boolean>(false);
     const [showRawTextPanel, setShowRawTextPanel] = useState<boolean>(false);
 
+    // 📂 고객 인입 원문/사진 접기(폴드)/펼치기 및 크게 보기(Modal/Lightbox) 상태
+    const [isInquiryFolded, setIsInquiryFolded] = useState<boolean>(true); // 기본 접힘(폴드) 상태
+    const [inquiryModalType, setInquiryModalType] = useState<'NONE' | 'TEXT' | 'IMAGE'>('NONE');
+    const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
+
     useEffect(() => {
-        if (!rawKakaoText) {
+        if (!rawKakaoText || rawKakaoText.startsWith('카카오톡 채널 인입')) {
             fetch('/api/kakao/intakes')
                 .then(res => res.json())
                 .then(data => {
@@ -313,7 +326,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                         const matched = list.find((it: { quotationId?: string; botUserKey?: string; utterance?: string }) => 
                             it.quotationId === quote.id || (quote.botUserKey && it.botUserKey === quote.botUserKey)
                         );
-                        if (matched && matched.utterance && !matched.utterance.startsWith('http')) {
+                        if (matched && matched.utterance && isRealUserText(matched.utterance)) {
                             setRawKakaoText(matched.utterance);
                         }
                     }
@@ -322,8 +335,50 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         }
     }, [quote.id, quote.botUserKey, rawKakaoText]);
 
+    const activeRawText = useMemo(() => {
+        if (rawKakaoText && isRealUserText(rawKakaoText)) return rawKakaoText;
+        if (quote.rawText && isRealUserText(quote.rawText)) return quote.rawText;
+        if (quote.utterance && isRealUserText(quote.utterance)) return quote.utterance;
+        if (quote.memo && !quote.memo.startsWith('카카오톡 채널 인입')) return quote.memo;
+        return '';
+    }, [rawKakaoText, quote.rawText, quote.utterance, quote.memo]);
+
+    // 첨부 이미지 파싱
+    const parsedAttachments = useMemo(() => {
+        if (!quote.attachments || !Array.isArray(quote.attachments)) return [];
+        return quote.attachments.map((file, idx) => {
+            const fileItem = file as { name?: string; url?: string | { url?: string } } | string;
+            const fileUrl = typeof fileItem === 'string' ? fileItem : (typeof fileItem?.url === 'string' ? fileItem.url : (typeof fileItem?.url === 'object' && fileItem.url ? fileItem.url.url || '' : ''));
+            const isDirect = fileUrl.includes('drive.google.com') || fileUrl.includes('googleusercontent.com') || fileUrl.includes('docs.google.com') || fileUrl.includes('kakaocdn.net');
+            const downloadUrl = isDirect ? fileUrl : `${import.meta.env.VITE_API_URL || ''}/api/download?url=${encodeURIComponent(fileUrl)}`;
+            const name = (typeof fileItem === 'object' && fileItem.name) ? fileItem.name : `첨부사진_${idx + 1}.jpg`;
+            return { name, url: fileUrl, downloadUrl };
+        }).filter(item => !!item.url);
+    }, [quote.attachments]);
+
+    // 🔒 Esc 및 방향키로 크게 보기 모달 제어
+    useEffect(() => {
+        if (inquiryModalType === 'NONE') return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setInquiryModalType('NONE');
+            if (e.key === 'ArrowLeft' && inquiryModalType === 'IMAGE') {
+                setSelectedImageIndex(prev => (prev > 0 ? prev - 1 : parsedAttachments.length - 1));
+            }
+            if (e.key === 'ArrowRight' && inquiryModalType === 'IMAGE') {
+                setSelectedImageIndex(prev => (prev < parsedAttachments.length - 1 ? prev + 1 : 0));
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            document.body.style.overflow = prevOverflow;
+        };
+    }, [inquiryModalType, parsedAttachments.length]);
+
     const handleCopyRawKakao = () => {
-        const text = rawKakaoText || quote.rawText || quote.utterance || quote.memo || '';
+        const text = activeRawText || quote.memo || '';
         if (text) {
             navigator.clipboard.writeText(text);
             setIsRawKakaoCopied(true);
@@ -1824,64 +1879,171 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                             </div>
                         </div>
 
-                        {/* Customer Memo Section */}
-                        <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4 shadow-sm">
-                            <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-sm font-bold text-yellow-800 flex items-center gap-2">
-                                    <FileText className="w-4 h-4" />
-                                    {(quote.source === 'KAKAO' || quote.id.startsWith('Q-KAKAO') || rawKakaoText) ? '카카오톡 고객 접수 원문 (Customer Memo)' : '고객 요청 메모 (Customer Memo)'}
-                                </h3>
-                                {(rawKakaoText || quote.rawText || quote.utterance) && (
+                        {/* 📂 고객 인입 원문 및 첨부사진 (폴드 접기/펼치기 & 크게 보기) */}
+                        <div className="bg-gradient-to-r from-amber-50/70 via-yellow-50/50 to-amber-50/70 rounded-xl border border-yellow-200/90 shadow-xs overflow-hidden transition-all duration-200">
+                            {/* 헤더 바: 폴드 상태에서도 요약 정보를 깔끔하게 표시 */}
+                            <div className="p-3.5 flex items-center justify-between gap-3 bg-amber-100/40 border-b border-yellow-200/60">
+                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    <div className="w-8 h-8 rounded-lg bg-yellow-400 flex items-center justify-center text-slate-900 font-bold text-xs shrink-0 shadow-xs">
+                                        <MessageSquare className="w-4 h-4 text-slate-900" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-sm font-bold text-amber-950">
+                                                고객 접수 원문 및 첨부 파일
+                                            </span>
+                                            {activeRawText && (
+                                                <span className="text-[11px] bg-yellow-200 text-yellow-900 font-semibold px-2 py-0.5 rounded-full">
+                                                    💬 문자 {activeRawText.length}자
+                                                </span>
+                                            )}
+                                            {parsedAttachments.length > 0 && (
+                                                <span className="text-[11px] bg-amber-200 text-amber-900 font-semibold px-2 py-0.5 rounded-full">
+                                                    🖼️ 사진 {parsedAttachments.length}건
+                                                </span>
+                                            )}
+                                        </div>
+                                        {/* 폴드 상태일 때 1줄 요약 미리보기 */}
+                                        {isInquiryFolded && (
+                                            <p className="text-xs text-slate-600 truncate mt-0.5 max-w-xl font-mono">
+                                                {activeRawText ? activeRawText.replace(/\n+/g, ' · ') : (parsedAttachments.length > 0 ? '고객 첨부 사진이 등록되어 있습니다.' : '고객 요청 메모가 없습니다.')}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                    {/* ⛶ 크게 보기 버튼 (원문 또는 사진을 즉시 대화면 모달로 오픈) */}
                                     <button
                                         type="button"
-                                        onClick={handleCopyRawKakao}
-                                        className="text-[11px] font-bold text-amber-900 bg-yellow-200/80 hover:bg-yellow-300 border border-yellow-400 px-2 py-0.5 rounded flex items-center gap-1 transition-all cursor-pointer"
+                                        onClick={() => {
+                                            if (parsedAttachments.length > 0 && !activeRawText) {
+                                                setInquiryModalType('IMAGE');
+                                            } else {
+                                                setInquiryModalType('TEXT');
+                                            }
+                                        }}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer"
+                                        title="고객이 보낸 문자 및 사진을 대화면으로 확대하여 확인합니다"
                                     >
-                                        {isRawKakaoCopied ? <Check className="w-3 h-3 text-emerald-700" /> : <Copy className="w-3 h-3" />}
-                                        <span>{isRawKakaoCopied ? '복사 완료' : '원문 복사'}</span>
+                                        <Maximize2 className="w-3.5 h-3.5" />
+                                        <span>크게 보기</span>
                                     </button>
-                                )}
+
+                                    {/* 접기 / 펼치기 토글 버튼 */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsInquiryFolded(!isInquiryFolded)}
+                                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-yellow-50 text-slate-700 hover:text-slate-950 border border-yellow-300 font-semibold text-xs rounded-lg transition-colors cursor-pointer shadow-xs"
+                                    >
+                                        {isInquiryFolded ? (
+                                            <>
+                                                <span>펼치기</span>
+                                                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span>접기</span>
+                                                <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
-                            <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-mono bg-white/70 p-3 rounded-lg border border-yellow-200 shadow-inner max-h-80 overflow-y-auto select-text">
-                                {rawKakaoText || quote.rawText || quote.utterance || quote.memo || <span className="text-slate-400 italic">고객이 작성한 메모가 없습니다. (No customer memo)</span>}
-                            </div>
-                            
-                            {/* NEW: Attached Photos */}
-                            {quote.attachments && quote.attachments.length > 0 && (() => {
-                                const isKakao = quote.source === 'KAKAO' || quote.id.startsWith('Q-KAKAO') || !!quote.kakaoUser || !!quote.botUserKey || (quote.memo && quote.memo.includes('카카오'));
-                                return (
-                                    <div className="mt-4 pt-4 border-t border-yellow-200/50">
-                                        <h4 className="text-xs font-bold text-yellow-800 mb-2">
-                                            {isKakao ? '카카오톡 첨부 사진/파일' : '견적문의 첨부 사진/파일'}
-                                        </h4>
-                                        <div className="flex flex-wrap gap-2">
-                                            {quote.attachments.map((file, i) => {
-                                                const fileItem = file as { name?: string; url?: string | { url?: string } } | string;
-                                                const fileUrl = typeof fileItem === 'string' ? fileItem : (typeof fileItem?.url === 'string' ? fileItem.url : (typeof fileItem?.url === 'object' && fileItem.url ? fileItem.url.url || '' : ''));
-                                                const isDirect = fileUrl.includes('drive.google.com') || fileUrl.includes('googleusercontent.com') || fileUrl.includes('docs.google.com');
-                                                const downloadUrl = isDirect ? fileUrl : `${import.meta.env.VITE_API_URL || ''}/api/download?url=${encodeURIComponent(fileUrl)}`;
-                                                
-                                                return (
-                                                    <a 
-                                                        key={i} 
-                                                        href={downloadUrl}
-                                                        target="_blank" 
-                                                        rel="noopener noreferrer" 
-                                                        className={
-                                                            isKakao 
-                                                                ? "inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 border border-amber-300 text-amber-900 hover:bg-amber-200 rounded-md text-sm font-bold transition-colors shadow-sm"
-                                                                : "inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border-2 border-blue-600 text-blue-700 hover:bg-blue-50 rounded-md text-sm font-bold transition-colors shadow-sm"
-                                                        }
+
+                            {/* 펼쳐진 상세 본문 */}
+                            {!isInquiryFolded && (
+                                <div className="p-4 space-y-4 animate-in fade-in duration-150">
+                                    {/* 문자 원문 영역 */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                                                <FileText className="w-3.5 h-3.5 text-amber-800" />
+                                                <span>카카오톡 고객 입력 원본 문자 ({activeRawText.length || 0}자)</span>
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                {activeRawText && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setInquiryModalType('TEXT')}
+                                                        className="text-[11px] font-semibold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded flex items-center gap-1 transition-colors cursor-pointer"
                                                     >
-                                                        <Image className="w-4 h-4" />
-                                                        {isKakao ? '카카오 사진' : '사진 보기'} {quote.attachments!.length > 1 ? `(${i+1})` : ''}
-                                                    </a>
-                                                );
-                                            })}
+                                                        <Maximize2 className="w-3 h-3" />
+                                                        <span>문자 크게 보기</span>
+                                                    </button>
+                                                )}
+                                                {activeRawText && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleCopyRawKakao}
+                                                        className="text-[11px] font-bold text-amber-900 bg-yellow-200/90 hover:bg-yellow-300 border border-yellow-400 px-2 py-0.5 rounded flex items-center gap-1 transition-all cursor-pointer"
+                                                    >
+                                                        {isRawKakaoCopied ? <Check className="w-3 h-3 text-emerald-700" /> : <Copy className="w-3 h-3" />}
+                                                        <span>{isRawKakaoCopied ? '복사 완료' : '원문 복사'}</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="text-xs text-slate-800 whitespace-pre-wrap leading-relaxed font-mono bg-white p-3.5 rounded-lg border border-yellow-200 shadow-inner max-h-64 overflow-y-auto select-text">
+                                            {activeRawText || (
+                                                <span className="text-slate-400 italic">고객이 입력한 텍스트 원문이 없습니다. (No customer text memo)</span>
+                                            )}
                                         </div>
                                     </div>
-                                );
-                            })()}
+
+                                    {/* 첨부 사진/파일 갤러리 영역 */}
+                                    {parsedAttachments.length > 0 && (
+                                        <div className="pt-3 border-t border-yellow-200/60">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                                                    <Image className="w-3.5 h-3.5 text-amber-800" />
+                                                    <span>고객 첨부 사진 ({parsedAttachments.length}건) - 클릭 시 대화면 확대</span>
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedImageIndex(0);
+                                                        setInquiryModalType('IMAGE');
+                                                    }}
+                                                    className="text-[11px] font-semibold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded flex items-center gap-1 transition-colors cursor-pointer"
+                                                >
+                                                    <ZoomIn className="w-3 h-3" />
+                                                    <span>사진 전체 크게 보기</span>
+                                                </button>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                                {parsedAttachments.map((img, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        onClick={() => {
+                                                            setSelectedImageIndex(idx);
+                                                            setInquiryModalType('IMAGE');
+                                                        }}
+                                                        className="group relative bg-white border border-yellow-300 rounded-lg overflow-hidden shadow-xs hover:shadow-md transition-all cursor-pointer aspect-4/3 flex flex-col"
+                                                    >
+                                                        <img
+                                                            src={img.url}
+                                                            alt={img.name}
+                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                                            loading="lazy"
+                                                        />
+                                                        <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/40 transition-colors flex items-center justify-center">
+                                                            <div className="opacity-0 group-hover:opacity-100 bg-white/95 text-slate-900 text-[11px] font-bold px-2 py-1 rounded shadow-md flex items-center gap-1 transition-opacity">
+                                                                <ZoomIn className="w-3 h-3 text-amber-600" />
+                                                                <span>크게 보기</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-900/80 via-slate-900/40 to-transparent p-1.5 text-[10px] text-white font-medium truncate">
+                                                            {img.name}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* NEW: 카카오톡 접수건 고객 매칭 & Solapi/채팅 회신 패널 */}
@@ -2944,6 +3106,206 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
                 candidate={comparisonCandidate}
                 onApplyPrices={handleApplyPricesFromComparison}
             />
+
+            {/* ⛶ 고객 인입 원문 및 첨부사진 대화면 라이트박스 팝업 (Full Modal) */}
+            {inquiryModalType !== 'NONE' && (
+                <div 
+                    className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-150"
+                    onClick={() => setInquiryModalType('NONE')}
+                >
+                    <div 
+                        className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden border border-slate-700 animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Modal Header with View Switcher */}
+                        <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between border-b border-slate-800">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-yellow-400 text-slate-950 font-black text-xs flex items-center justify-center shadow-xs">
+                                    TALK
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                        고객 접수 원문 및 첨부 파일 대화면 뷰어
+                                    </h3>
+                                    <p className="text-[11px] text-slate-400">
+                                        {quote.customerName || quote.customerInfo?.companyName || '고객사'} ({quote.id})
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* View Switcher Tabs (문자 / 사진) */}
+                            <div className="flex items-center gap-1.5 bg-slate-800 p-1 rounded-lg border border-slate-700">
+                                <button
+                                    type="button"
+                                    onClick={() => setInquiryModalType('TEXT')}
+                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-colors flex items-center gap-1.5 cursor-pointer ${
+                                        inquiryModalType === 'TEXT' 
+                                            ? 'bg-yellow-400 text-slate-950 shadow-xs' 
+                                            : 'text-slate-300 hover:text-white'
+                                    }`}
+                                >
+                                    <FileText className="w-3.5 h-3.5" />
+                                    <span>문자 원문</span>
+                                    {activeRawText && (
+                                        <span className="text-[10px] opacity-80">({activeRawText.length}자)</span>
+                                    )}
+                                </button>
+                                {parsedAttachments.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setInquiryModalType('IMAGE')}
+                                        className={`px-3 py-1 text-xs font-bold rounded-md transition-colors flex items-center gap-1.5 cursor-pointer ${
+                                            inquiryModalType === 'IMAGE' 
+                                                ? 'bg-yellow-400 text-slate-950 shadow-xs' 
+                                                : 'text-slate-300 hover:text-white'
+                                        }`}
+                                    >
+                                        <Image className="w-3.5 h-3.5" />
+                                        <span>사진 갤러리</span>
+                                        <span className="text-[10px] opacity-80">({parsedAttachments.length}장)</span>
+                                    </button>
+                                )}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setInquiryModalType('NONE')}
+                                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                                title="닫기 (Esc)"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="flex-1 overflow-y-auto p-6 bg-slate-950/5">
+                            {inquiryModalType === 'TEXT' ? (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between text-xs text-slate-600">
+                                        <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                                            <span>💬 고객이 카카오톡 채팅창에 직접 입력한 텍스트 원문</span>
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-slate-500 font-mono text-[11px]">
+                                                {activeRawText ? `${activeRawText.length}자` : '0자'}
+                                            </span>
+                                            {activeRawText && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleCopyRawKakao}
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-bold text-xs rounded-md shadow-xs transition-colors cursor-pointer"
+                                                >
+                                                    {isRawKakaoCopied ? <Check className="w-3.5 h-3.5 text-emerald-800" /> : <Copy className="w-3.5 h-3.5" />}
+                                                    <span>{isRawKakaoCopied ? '복사 완료!' : '원문 복사'}</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <pre className="bg-white rounded-xl p-5 border border-slate-300 shadow-inner font-mono text-sm text-slate-900 whitespace-pre-wrap leading-relaxed select-text min-h-[300px] max-h-[60vh] overflow-y-auto">
+                                        {activeRawText || '고객이 입력한 텍스트 원문이 없습니다.'}
+                                    </pre>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center space-y-4">
+                                    {parsedAttachments.length > 0 && (
+                                        <>
+                                            <div className="relative max-w-full flex items-center justify-center bg-slate-900 rounded-xl overflow-hidden shadow-lg p-2 min-h-[400px]">
+                                                <img
+                                                    src={parsedAttachments[selectedImageIndex]?.url}
+                                                    alt={parsedAttachments[selectedImageIndex]?.name}
+                                                    className="max-h-[65vh] max-w-full object-contain rounded-lg"
+                                                />
+                                                {/* Prev / Next Controls if multiple */}
+                                                {parsedAttachments.length > 1 && (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setSelectedImageIndex(prev => (prev > 0 ? prev - 1 : parsedAttachments.length - 1))}
+                                                            className="absolute left-3 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-900 text-white p-2 rounded-full shadow-lg transition-colors cursor-pointer"
+                                                            title="이전 사진 (←)"
+                                                        >
+                                                            <ChevronLeft className="w-5 h-5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setSelectedImageIndex(prev => (prev < parsedAttachments.length - 1 ? prev + 1 : 0))}
+                                                            className="absolute right-3 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-900 text-white p-2 rounded-full shadow-lg transition-colors cursor-pointer"
+                                                            title="다음 사진 (→)"
+                                                        >
+                                                            <ChevronRight className="w-5 h-5" />
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center justify-between w-full max-w-2xl px-2 text-xs">
+                                                <span className="font-semibold text-slate-700 truncate">
+                                                    [{selectedImageIndex + 1} / {parsedAttachments.length}] {parsedAttachments[selectedImageIndex]?.name}
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <a
+                                                        href={parsedAttachments[selectedImageIndex]?.downloadUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                                                    >
+                                                        <Download className="w-3.5 h-3.5" />
+                                                        <span>원본 다운로드</span>
+                                                    </a>
+                                                    <a
+                                                        href={parsedAttachments[selectedImageIndex]?.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
+                                                    >
+                                                        <ExternalLink className="w-3.5 h-3.5" />
+                                                        <span>새 창 열기</span>
+                                                    </a>
+                                                </div>
+                                            </div>
+
+                                            {/* Thumbnail Strip if multiple photos */}
+                                            {parsedAttachments.length > 1 && (
+                                                <div className="flex items-center gap-2 overflow-x-auto max-w-full p-2 bg-white rounded-xl border border-slate-200">
+                                                    {parsedAttachments.map((img, idx) => (
+                                                        <button
+                                                            key={idx}
+                                                            type="button"
+                                                            onClick={() => setSelectedImageIndex(idx)}
+                                                            className={`w-16 h-12 rounded-lg overflow-hidden border-2 transition-all cursor-pointer shrink-0 ${
+                                                                selectedImageIndex === idx ? 'border-yellow-500 scale-105 shadow-md' : 'border-transparent opacity-60 hover:opacity-100'
+                                                            }`}
+                                                        >
+                                                            <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="bg-slate-100 px-5 py-3 border-t border-slate-200 flex items-center justify-between">
+                            <span className="text-xs text-slate-500">
+                                키보드 <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[10px]">Esc</kbd> 로 닫기
+                                {inquiryModalType === 'IMAGE' && parsedAttachments.length > 1 && (
+                                    <> · <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[10px]">←</kbd> <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[10px]">→</kbd> 사진 넘기기</>
+                                )}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setInquiryModalType('NONE')}
+                                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                            >
+                                닫기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>,
         document.body
     );

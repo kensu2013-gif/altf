@@ -149,9 +149,21 @@ export class KakaoBotService {
 
     saveData() {
         try {
-            fs.writeFileSync(INTAKES_FILE, JSON.stringify(this.intakes.slice(0, 500), null, 2), 'utf8');
-            fs.writeFileSync(DRAFT_QUOTES_FILE, JSON.stringify(this.draftQuotations.slice(0, 500), null, 2), 'utf8');
-            fs.writeFileSync(USERS_FILE, JSON.stringify(this.users, null, 2), 'utf8');
+            const safeAtomicWrite = (filePath, data) => {
+                const tmpPath = `${filePath}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 6)}`;
+                fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
+                try {
+                    fs.renameSync(tmpPath, filePath);
+                } catch (renameErr) {
+                    // Fallback on systems where cross-device rename or locks occur
+                    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+                    try { fs.unlinkSync(tmpPath); } catch (_) {}
+                }
+            };
+
+            safeAtomicWrite(INTAKES_FILE, this.intakes.slice(0, 500));
+            safeAtomicWrite(DRAFT_QUOTES_FILE, this.draftQuotations.slice(0, 500));
+            safeAtomicWrite(USERS_FILE, this.users);
         } catch (e) {
             console.error('[KakaoBotService] 데이터 저장 실패:', e.message);
         }
@@ -1002,6 +1014,7 @@ export class KakaoBotService {
 
         return {
             id: quoteId,
+            intakeId: intake.id,
             userId: 'c7410ecb-2684-4054-b5b7-2ad060299c63', // 박조나단 과장 (시화)
             customerName: custName,
             customerNumber: custName,
@@ -1032,7 +1045,9 @@ export class KakaoBotService {
             createdAt: new Date().toISOString(),
             rawText: (intake.utterance && !intake.utterance.startsWith('http')) ? intake.utterance : '',
             utterance: intake.utterance || '',
-            memo: `카카오톡 채널 인입 (@altf) - ${normalized.remarks || '내일 발송'}`,
+            memo: (intake.utterance && !intake.utterance.startsWith('http')) 
+                ? intake.utterance 
+                : (normalized.remarks ? `카카오톡 채널 인입 (@altf) - ${normalized.remarks}` : '카카오톡 견적 접수'),
             adminResponse: {
                 confirmedPrice: totalAmount,
                 deliveryDate: '내일 발송',

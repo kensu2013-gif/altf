@@ -1,6 +1,6 @@
 import { useState, useEffect, useDeferredValue, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FileText, Calendar, Download, Trash2, ArchiveRestore, Search, Image, MessageSquare, Copy, Check, X } from 'lucide-react';
+import { FileText, Calendar, Download, Trash2, ArchiveRestore, Search, Image, MessageSquare, Copy, Check, X, Loader2 } from 'lucide-react';
 import { AdminQuoteDetail } from './components/AdminQuoteDetail';
 import { QuoteSimilarityDrawer } from './components/QuoteSimilarityDrawer';
 import { QuoteComparisonModal } from './components/QuoteComparisonModal';
@@ -169,7 +169,9 @@ export default function AdminQuotes() {
     // 💬 카카오톡 원문 텍스트 퀵 뷰어 모달 상태
     const [kakaoRawTextQuote, setKakaoRawTextQuote] = useState<Quotation | null>(null);
     const [copiedRawText, setCopiedRawText] = useState(false);
-    const [intakesCache, setIntakesCache] = useState<Array<{ quotationId?: string; botUserKey?: string; utterance?: string }>>([]);
+    const [intakesCache, setIntakesCache] = useState<Array<{ id?: string; quotationId?: string; botUserKey?: string; utterance?: string }>>([]);
+    const [rawTextModalContent, setRawTextModalContent] = useState<string>('');
+    const [rawTextModalLoading, setRawTextModalLoading] = useState<boolean>(false);
 
     useEffect(() => {
         fetch('/api/kakao/intakes')
@@ -183,14 +185,106 @@ export default function AdminQuotes() {
             .catch(() => {});
     }, []);
 
+    // 💬 카카오 원문 모달 오픈 시 실시간 최신 원문(utterance) 매칭 및 지연 로딩
+    useEffect(() => {
+        if (!kakaoRawTextQuote) {
+            setRawTextModalContent('');
+            setRawTextModalLoading(false);
+            return;
+        }
+
+        const isValidCustomerText = (txt?: string) => {
+            if (!txt) return false;
+            const t = txt.trim();
+            if (t.startsWith('http://') || t.startsWith('https://')) return false;
+            if (t.startsWith('카카오톡 채널 인입')) return false;
+            return t.length > 0;
+        };
+
+        // 1. 견적 객체 자체에 고객 원문이 있는 경우
+        if (isValidCustomerText(kakaoRawTextQuote.rawText)) {
+            setRawTextModalContent(kakaoRawTextQuote.rawText!);
+            setRawTextModalLoading(false);
+            return;
+        }
+        if (isValidCustomerText(kakaoRawTextQuote.utterance)) {
+            setRawTextModalContent(kakaoRawTextQuote.utterance!);
+            setRawTextModalLoading(false);
+            return;
+        }
+
+        // 2. 이미 캐시된 intakes 리스트에서 해당 견적서 고유 매칭 (타 견적 유입 방지)
+        const matched = intakesCache.find(it => 
+            it.quotationId === kakaoRawTextQuote.id || 
+            (kakaoRawTextQuote.intakeId && it.id === kakaoRawTextQuote.intakeId)
+        );
+        if (matched && isValidCustomerText(matched.utterance)) {
+            setRawTextModalContent(matched.utterance!);
+            setRawTextModalLoading(false);
+            return;
+        }
+
+        // 3. 서버에서 실시간 intake 다시 가져오기
+        setRawTextModalLoading(true);
+        fetch('/api/kakao/intakes')
+            .then(res => res.json())
+            .then(data => {
+                const list = data.items || data.intakes || [];
+                if (Array.isArray(list)) {
+                    setIntakesCache(list);
+                    const found = list.find((it: { id?: string; quotationId?: string; botUserKey?: string; utterance?: string }) => 
+                        it.quotationId === kakaoRawTextQuote.id || 
+                        (kakaoRawTextQuote.intakeId && it.id === kakaoRawTextQuote.intakeId)
+                    );
+                    if (found && isValidCustomerText(found.utterance)) {
+                        setRawTextModalContent(found.utterance!);
+                        return;
+                    }
+                }
+                if (isValidCustomerText(kakaoRawTextQuote.memo)) {
+                    setRawTextModalContent(kakaoRawTextQuote.memo!);
+                } else {
+                    setRawTextModalContent('고객이 카카오톡 채팅창에 직접 입력한 텍스트 원문이 없습니다.');
+                }
+            })
+            .catch(() => {
+                if (isValidCustomerText(kakaoRawTextQuote.memo)) {
+                    setRawTextModalContent(kakaoRawTextQuote.memo!);
+                } else {
+                    setRawTextModalContent('카카오톡 원문 텍스트를 불러오지 못했습니다.');
+                }
+            })
+            .finally(() => {
+                setRawTextModalLoading(false);
+            });
+    }, [kakaoRawTextQuote, intakesCache]);
+
+    // 🔒 Esc 키로 모달 닫기 및 스크롤 락 (모달 안정화)
+    useEffect(() => {
+        if (!kakaoRawTextQuote) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setKakaoRawTextQuote(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            document.body.style.overflow = prevOverflow;
+        };
+    }, [kakaoRawTextQuote]);
+
     const getQuoteRawText = (q: Quotation): string => {
-        if (q.rawText) return q.rawText;
-        if (q.utterance && !q.utterance.startsWith('http')) return q.utterance;
-        const matched = intakesCache.find(it => it.quotationId === q.id || (q.botUserKey && it.botUserKey === q.botUserKey));
+        if (q.rawText && !q.rawText.startsWith('카카오톡 채널 인입')) return q.rawText;
+        if (q.utterance && !q.utterance.startsWith('http') && !q.utterance.startsWith('카카오톡 채널 인입')) return q.utterance;
+        const matched = intakesCache.find(it => it.quotationId === q.id || (q.intakeId && it.id === q.intakeId));
         if (matched && matched.utterance && !matched.utterance.startsWith('http')) {
             return matched.utterance;
         }
-        return q.memo || '카카오톡 원문 텍스트가 없습니다.';
+        if (q.memo && !q.memo.startsWith('카카오톡 채널 인입')) return q.memo;
+        return '카카오톡 원문 텍스트가 없습니다.';
     };
 
     // Handle incoming URL query parameter (?quoteId=...) for direct search & open
@@ -1041,25 +1135,34 @@ export default function AdminQuotes() {
                                 <span className="font-semibold text-amber-950 flex items-center gap-1">
                                     <span>💬 고객이 카카오톡 채팅창에 입력한 원본 내용:</span>
                                 </span>
-                                <span className="text-[11px] text-slate-400">
-                                    {getQuoteRawText(kakaoRawTextQuote).length}자
+                                <span className="text-[11px] text-slate-500 font-semibold">
+                                    {rawTextModalLoading ? '조회 중...' : `${(rawTextModalContent || getQuoteRawText(kakaoRawTextQuote)).length}자`}
                                 </span>
                             </div>
-                            <pre className="bg-white rounded-xl p-4 border border-yellow-200 shadow-inner font-mono text-xs text-slate-800 whitespace-pre-wrap leading-relaxed select-text min-h-[160px] max-h-[380px] overflow-y-auto">
-                                {getQuoteRawText(kakaoRawTextQuote)}
-                            </pre>
+                            {rawTextModalLoading ? (
+                                <div className="bg-white rounded-xl p-8 border border-yellow-200 shadow-inner flex flex-col items-center justify-center gap-2 min-h-[160px]">
+                                    <Loader2 className="w-6 h-6 animate-spin text-amber-600" />
+                                    <span className="text-xs text-amber-900 font-medium">카카오톡 원문 텍스트 불러오는 중...</span>
+                                </div>
+                            ) : (
+                                <pre className="bg-white rounded-xl p-4 border border-yellow-200 shadow-inner font-mono text-xs text-slate-800 whitespace-pre-wrap leading-relaxed select-text min-h-[160px] max-h-[380px] overflow-y-auto">
+                                    {rawTextModalContent || getQuoteRawText(kakaoRawTextQuote)}
+                                </pre>
+                            )}
                         </div>
 
                         {/* Footer Actions */}
                         <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
                             <button
                                 type="button"
+                                disabled={rawTextModalLoading || !(rawTextModalContent || getQuoteRawText(kakaoRawTextQuote))}
                                 onClick={() => {
-                                    navigator.clipboard.writeText(getQuoteRawText(kakaoRawTextQuote));
+                                    const textToCopy = rawTextModalContent || getQuoteRawText(kakaoRawTextQuote);
+                                    navigator.clipboard.writeText(textToCopy);
                                     setCopiedRawText(true);
                                     setTimeout(() => setCopiedRawText(false), 2000);
                                 }}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer"
+                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer"
                             >
                                 {copiedRawText ? <Check className="w-4 h-4 text-emerald-800" /> : <Copy className="w-4 h-4" />}
                                 <span>{copiedRawText ? '복사 완료!' : '원문 복사'}</span>

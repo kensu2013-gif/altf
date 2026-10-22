@@ -178,6 +178,7 @@ export interface Quotation {
         targetCustomer?: string;
     };
     botUserKey?: string;
+    intakeId?: string;
     isKakaoRegistered?: boolean;
     kakaoUser?: {
         botUserKey?: string;

@@ -5215,8 +5215,11 @@ const server = http.createServer(async (req, res) => {
             // 카카오 초안이 소프트 삭제된 경우 복원하지 않음
             if (draft.isDeleted) continue;
 
-            // 원문 텍스트(utterance) 동기화
-            const matchingIntake = (kakaoBotService.intakes || []).find(it => it.quotationId === draft.id || (it.botUserKey && it.botUserKey === draft.botUserKey));
+            // 원문 텍스트(utterance) 동기화 - 특정 견적서 ID 또는 intakeId와 엄격 1:1 매칭 (이전/타 견적 데이터 오염 방지)
+            const matchingIntake = (kakaoBotService.intakes || []).find(it => 
+                it.quotationId === draft.id || 
+                (draft.intakeId && it.id === draft.intakeId)
+            );
             if (matchingIntake && matchingIntake.utterance && !matchingIntake.utterance.startsWith('http')) {
                 draft.rawText = matchingIntake.utterance;
                 draft.utterance = matchingIntake.utterance;
@@ -5259,7 +5262,11 @@ const server = http.createServer(async (req, res) => {
         const limitStr = url.searchParams.get('limit');
         let quotesToSend = db.quotations.map(q => {
             if (!q.rawText && (q.source === 'KAKAO' || q.id?.startsWith('Q-KAKAO') || q.botUserKey)) {
-                const intake = (kakaoBotService.intakes || []).find(it => it.quotationId === q.id || (it.botUserKey && it.botUserKey === q.botUserKey));
+                // 개별 견적 고유 ID로만 엄격 매칭하여 타 견적 문구 혼입 원천 차단
+                const intake = (kakaoBotService.intakes || []).find(it => 
+                    it.quotationId === q.id || 
+                    (q.intakeId && it.id === q.intakeId)
+                );
                 if (intake && intake.utterance && !intake.utterance.startsWith('http')) {
                     return { ...q, rawText: intake.utterance, utterance: intake.utterance };
                 }
