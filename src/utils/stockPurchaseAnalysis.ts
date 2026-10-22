@@ -56,6 +56,23 @@ export function normalizeSpecKey(name?: string, thickness?: string, size?: strin
 }
 
 /**
+ * 해당 주문이 '재고 발주분'인지 여부 판별
+ * (미결관리 /admin/pending의 [재고 발주분 미결] 탭 분류 기준과 일치)
+ */
+export function isStockPurchaseOrder(order: Order, item?: Partial<LineItem> | null): boolean {
+    if (order.isStockOrder) return true;
+    if (item?.isStockItem || item?.stockTargetLocation === 'SIHWA' || item?.stockTargetLocation === 'BUSAN') {
+        return true;
+    }
+    const targetCust = (order.poEndCustomer || order.payload?.customer?.company_name || order.customerName || order.buyerInfo?.company_name || '').toLowerCase().replace(/\s+/g, '');
+    return targetCust.includes('시화재고') ||
+        targetCust.includes('부산재고') ||
+        targetCust.includes('알트에프재고') ||
+        targetCust.includes('알트에프') ||
+        targetCust.includes('altf');
+}
+
+/**
  * 특정 품목에 대한 재고 구매(가견적/발주) 의사결정 분석 실행
  */
 export function analyzeStockPurchaseItem(
@@ -186,23 +203,6 @@ export function analyzeStockPurchaseItem(
         safeStock = Math.max(0, Math.ceil(recent90dSales / 3 * 0.5));
     }
 
-/**
- * 해당 주문이 '재고 발주분'인지 여부 판별
- * (미결관리 /admin/pending의 [재고 발주분 미결] 탭 분류 기준과 일치)
- */
-export function isStockPurchaseOrder(order: Order, item?: any): boolean {
-    if (order.isStockOrder) return true;
-    if (item?.isStockItem || item?.stockTargetLocation === 'SIHWA' || item?.stockTargetLocation === 'BUSAN') {
-        return true;
-    }
-    const targetCust = (order.poEndCustomer || (order as any).payload?.customer?.company_name || order.customerName || (order as any).buyerInfo?.company_name || '').toLowerCase().replace(/\s+/g, '');
-    return targetCust.includes('시화재고') ||
-        targetCust.includes('부산재고') ||
-        targetCust.includes('알트에프재고') ||
-        targetCust.includes('알트에프') ||
-        targetCust.includes('altf');
-}
-
     // 6. 미결 중복 발주건 체크
     // ★ 사용자 요청: 일반 고객사 납품용 주문은 중복 대상이 아니며,
     // 오직 미결관리(Pending)의 '재고 발주분'에 이미 등록되어 대기 중인 발주건만 중복으로 체크!
@@ -213,7 +213,7 @@ export function isStockPurchaseOrder(order: Order, item?: any): boolean {
         if (!otherOrder.po_items || otherOrder.po_items.length === 0) return;
 
         otherOrder.po_items.forEach(pi => {
-            if (pi.transactionIssued || (pi as any).isCompleted) return; // 이미 마감된 건 제외
+            if (pi.transactionIssued || pi.isCompleted) return; // 이미 마감된 건 제외
             // ★ 오직 '재고 발주분' 미결 주문만 중복 검사 대상 (한국스텐레스, 카리스테크원 등 타 거래처 제외)
             if (!isStockPurchaseOrder(otherOrder, pi)) return;
 

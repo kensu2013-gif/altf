@@ -171,7 +171,7 @@ export default function PendingOrders() {
         if (user.id) headers['x-requester-id'] = user.id;
         if (user.role) headers['x-requester-role'] = user.role;
 
-        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`;
+        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=10000`;
 
         let lastFetchTime = 0;
         const fetchOrders = () => {

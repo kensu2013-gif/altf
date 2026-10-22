@@ -97,7 +97,7 @@ export default function PilotSplitPO() {
       'x-requester-id': user.id || '',
       'x-requester-role': user.role || ''
     };
-    const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`;
+    const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=10000`;
     
     fetch(endpoint, { headers, cache: 'no-store' })
       .then(res => {
@@ -1093,7 +1093,7 @@ export default function PilotSplitPO() {
         'x-requester-id': user?.id || '',
         'x-requester-role': user?.role || ''
       };
-      const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`;
+      const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=10000`;
       const refreshRes = await fetch(endpoint, { headers: requesterHeaders, cache: 'no-store' });
       if (refreshRes.ok) {
         const freshOrders = await refreshRes.json();

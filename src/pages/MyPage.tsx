@@ -128,7 +128,7 @@ export default function MyPage() {
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
             // Fetch Quotations
-            const quotesRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations?userId=${user?.id}&limit=2000`, { 
+            const quotesRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations?userId=${user?.id}&limit=10000`, { 
                 headers,
                 cache: 'no-store' 
             });
@@ -138,7 +138,7 @@ export default function MyPage() {
             }
 
             // Fetch Orders
-            const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders?userId=${user?.id}&limit=2000`, { 
+            const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders?userId=${user?.id}&limit=10000`, { 
                 headers,
                 cache: 'no-store' 
             });

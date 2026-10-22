@@ -62,6 +62,7 @@ export interface LineItem {
     poSent?: boolean; // Track if this line item has been ordered
     vendorName?: string; // Track which vendor it was sent to
     transactionIssued?: boolean; // [NEW] True if transaction statement has been issued
+    isCompleted?: boolean; // [NEW] True if line item is marked as completed/closed
     comments?: { author: string; timestamp: string; content: string; authorId?: string }[]; // [NEW] Chat/Comments per item
 
     // Legacy Fields (Snake Case)

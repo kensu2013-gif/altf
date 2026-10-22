@@ -398,8 +398,8 @@ export default function Customers() {
                 if (user?.id) orderHeaders['x-requester-id'] = user.id;
                 if (user?.role) orderHeaders['x-requester-role'] = user.role;
 
-                const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`, { headers: orderHeaders });
-                const quotesRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations?limit=2000`, { headers: orderHeaders });
+                const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=10000`, { headers: orderHeaders });
+                const quotesRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations?limit=10000`, { headers: orderHeaders });
                 if (ordersRes.ok) {
                     const ordersData = await ordersRes.json();
                     if (isMounted && Array.isArray(ordersData)) {

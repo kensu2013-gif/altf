@@ -14,8 +14,8 @@ import {
     Warehouse,
     Building2
 } from 'lucide-react';
-import type { Product, Order, LineItem } from '../../types';
-import { analyzeStockPurchaseItem, type StockPurchaseAnalysisResult } from '../../../utils/stockPurchaseAnalysis';
+import type { Product, Order, LineItem } from '../../../types';
+import { analyzeStockPurchaseItem } from '../../../utils/stockPurchaseAnalysis';
 
 interface StockOrderAuditPanelProps {
     items: LineItem[];

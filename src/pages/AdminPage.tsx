@@ -52,7 +52,7 @@ export default function AdminPage() {
         if (user.role) headers['x-requester-role'] = user.role;
 
         // [MOD] Ensure we use VITE_API_URL and the correct endpoint (/api/my/orders handles admin scope)
-        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`;
+        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=10000`;
 
         let lastFetchTime = 0;
         const fetchOrders = () => {

@@ -820,7 +820,7 @@ export function AdminQuoteDetail({ quote, onClose: _onClose, onSuccess }: AdminQ
         if (user.id) headers['x-requester-id'] = user.id;
         if (user.role) headers['x-requester-role'] = user.role;
 
-        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`;
+        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=10000`;
         fetch(endpoint, { headers, cache: 'no-store' })
             .then(res => {
                 if (res.ok) return res.json();

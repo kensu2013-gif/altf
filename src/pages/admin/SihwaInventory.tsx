@@ -516,7 +516,7 @@ export default function SihwaInventory() {
         if (user.id) headers['x-requester-id'] = user.id;
         if (user.role) headers['x-requester-role'] = user.role;
 
-        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=2000`;
+        const endpoint = `${import.meta.env.VITE_API_URL || ''}/api/my/orders?limit=10000`;
 
         let lastFetchTime = 0;
         const fetchOrders = () => {
@@ -535,7 +535,7 @@ export default function SihwaInventory() {
         };
 
         const fetchQuotes = () => {
-            fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations?limit=2000`, { headers, cache: 'no-store' })
+            fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations?limit=10000`, { headers, cache: 'no-store' })
                 .then(res => {
                     if (res.ok) return res.json();
                     throw new Error('Failed to fetch quotes');
