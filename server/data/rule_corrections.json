@@ -1,0 +1,42 @@
+[
+  {
+    "id": "RULE-CORR-1792716964141-HUYP",
+    "quotationId": "TEST-QUOTE-001",
+    "timestamp": "2026-10-23T00:56:04.141Z",
+    "source": "WEB_OFFICE_ADMIN",
+    "customerName": "주식회사 시흥에스티",
+    "totalItemsBefore": 1,
+    "totalItemsAfter": 1,
+    "changeCount": 1,
+    "changes": [
+      {
+        "type": "ITEM_MODIFIED",
+        "index": 0,
+        "before": {
+          "itemId": "T(R)-S40S-40A X 20A-WP316L-W",
+          "type": "T(R)",
+          "schedule": "S40S",
+          "size": "40A X 20A",
+          "material": "WP316L-W",
+          "qty": 5
+        },
+        "after": {
+          "itemId": "T(R)-S40S-1-1/2\" X 3/4\"-WP316L-W",
+          "type": "T(R)",
+          "schedule": "S40S",
+          "size": "1-1/2\" X 3/4\"",
+          "material": "WP316L-W",
+          "qty": 5
+        },
+        "fieldDiffs": [
+          {
+            "field": "size",
+            "from": "40A X 20A",
+            "to": "1-1/2\" X 3/4\""
+          }
+        ],
+        "inferredRule": "[ASTM 인치 정규화] WP 재질(WP316L-W)에는 A 규격(40A X 20A) 대신 인치 규격(1-1/2\" X 3/4\")을 적용해야 함"
+      }
+    ]
+  }
+]

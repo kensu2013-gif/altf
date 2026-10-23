@@ -31,6 +31,7 @@ import { sleQuoteReviewService } from './server/services/sleQuoteReviewService.j
 import { ledgerClient } from './server/services/ledgerClient.js';
 import { agentControlManager } from './server/services/agentControlManager.js';
 import { dispatchGate } from './server/services/dispatchGate.js';
+import { ruleCorrectionAgent } from './server/services/ruleCorrectionAgent.js';
 
 import multer from 'multer';
 
@@ -2459,7 +2460,38 @@ const server = http.createServer(async (req, res) => {
         if (req.method === 'POST' && url.pathname === '/api/kakao/update-draft') {
             try {
                 const body = await parseBody(req);
+                const beforeQuote = (kakaoBotService.draftQuotations || []).find(q => q.id === body.quotationId);
+                const beforeItems = beforeQuote && Array.isArray(beforeQuote.items) ? JSON.parse(JSON.stringify(beforeQuote.items)) : [];
+
                 const result = kakaoBotService.updateDraftQuote(body);
+
+                // 규칙 수정 감지봇(RULES-01 / INT-06) 실시간 학습 트리거
+                if (beforeItems.length > 0 && body.items && Array.isArray(body.items)) {
+                    ruleCorrectionAgent.detectAndLearn(
+                        body.quotationId,
+                        beforeItems.map(it => ({
+                            type: it.type || it.name,
+                            schedule: it.schedule || it.thickness,
+                            size: it.size,
+                            material: it.material,
+                            qty: it.quantity || it.qty || 1,
+                            itemId: it.itemId || it.productId
+                        })),
+                        body.items.map(it => ({
+                            type: it.type || it.name,
+                            schedule: it.schedule || it.thickness,
+                            size: it.size,
+                            material: it.material,
+                            qty: it.quantity || it.qty || 1,
+                            itemId: it.itemId || it.productId
+                        })),
+                        {
+                            source: 'KAKAO_UPDATE_DRAFT',
+                            customerName: body.customerName || beforeQuote?.customerName
+                        }
+                    );
+                }
+
                 sendJsonResponse(req, res, 200, result);
             } catch (err) {
                 sendJsonResponse(req, res, 500, { success: false, error: err.message });
@@ -2515,6 +2547,22 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // 8-1. GET /api/kakao/rules-corrections : 규칙 수정 감지봇(RULES-01 / INT-06) 실시간 학습 이력 조회
+        if (req.method === 'GET' && (url.pathname === '/api/kakao/rules-corrections' || url.pathname === '/api/agent/rules-corrections')) {
+            try {
+                const limit = parseInt(url.searchParams?.get('limit') || '50', 10);
+                const list = ruleCorrectionAgent.getCorrections(limit);
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    totalLearnedRecords: list.length,
+                    corrections: list
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
         // 9. POST /api/kakao/event-push : 0원 카카오 i 오픈빌더 챗봇 이벤트 푸시 발송
         if (req.method === 'POST' && url.pathname === '/api/kakao/event-push') {
             try {
@@ -2559,6 +2607,22 @@ const server = http.createServer(async (req, res) => {
             }
             return;
         }
+    }
+
+    // 8-1. GET /api/agent/rules-corrections : 규칙 수정 감지봇(RULES-01 / INT-06) 실시간 학습 이력 조회
+    if (req.method === 'GET' && url.pathname === '/api/agent/rules-corrections') {
+        try {
+            const limit = parseInt(url.searchParams?.get('limit') || '50', 10);
+            const list = ruleCorrectionAgent.getCorrections(limit);
+            sendJsonResponse(req, res, 200, {
+                success: true,
+                totalLearnedRecords: list.length,
+                corrections: list
+            });
+        } catch (err) {
+            sendJsonResponse(req, res, 500, { success: false, error: err.message });
+        }
+        return;
     }
 
     // ==========================================
@@ -5331,6 +5395,34 @@ const server = http.createServer(async (req, res) => {
                 // kakaoBotService 동기화
                 if (updates.hasOwnProperty('isDeleted') && typeof kakaoBotService.markQuotationDeleted === 'function') {
                     kakaoBotService.markQuotationDeleted(id, !!updates.isDeleted);
+                }
+
+                // 규칙 수정 감지봇(RULES-01 / INT-06) 실시간 학습 트리거 (품목 변경 Diff 감지)
+                if (updates.items && Array.isArray(updates.items)) {
+                    const beforeItems = targetQuote.items || [];
+                    ruleCorrectionAgent.detectAndLearn(
+                        id,
+                        beforeItems.map(it => ({
+                            type: it.type || it.name,
+                            schedule: it.schedule || it.thickness,
+                            size: it.size,
+                            material: it.material,
+                            qty: it.quantity || it.qty || 1,
+                            itemId: it.itemId || it.productId
+                        })),
+                        updates.items.map(it => ({
+                            type: it.type || it.name,
+                            schedule: it.schedule || it.thickness,
+                            size: it.size,
+                            material: it.material,
+                            qty: it.quantity || it.qty || 1,
+                            itemId: it.itemId || it.productId
+                        })),
+                        {
+                            source: 'WEB_ADMIN_QUOTE_DETAIL',
+                            customerName: targetQuote.customerInfo?.name || targetQuote.customerName
+                        }
+                    );
                 }
 
                 const updatedQuote = await updateDb(() => {
