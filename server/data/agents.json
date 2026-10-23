@@ -61,7 +61,7 @@
       "accuracy": 98,
       "load": 25,
       "uptime": "99.9%",
-      "tasksToday": 36
+      "tasksToday": 37
     },
     "currentTask": "카카오톡 채널(@altf) 및 솔라피 인입 실시간 수신 대기 중",
     "lastActive": "방금 전",
@@ -72,6 +72,7 @@
       "EVENT_INTAKE_CLASSIFIED"
     ],
     "logs": [
+      "[오전 11:24:49] 카톡 수신 완료: https://talk.kakaocdn.net/dna/cxmL8...",
       "[오전 9:35:08] 카톡 수신 완료: https://talk.kakaocdn.net/dna/9kWig...",
       "[오전 9:34:33] 카톡 수신 완료: https://talk.kakaocdn.net/dna/ed1T3...",
       "[오전 12:06:23] 카톡 수신 완료: https://talk.kakaocdn.net/dna/wvx9z...",
@@ -80,15 +81,14 @@
       "[오후 10:55:05] 카톡 수신 완료: 견적문의...",
       "[오후 10:47:27] 카톡 수신 완료: https://talk.kakaocdn.net/dna/QxvfE...",
       "[오후 10:39:10] 카톡 수신 완료: https://talk.kakaocdn.net/dna/QxvfE...",
-      "[오후 8:01:55] 카톡 수신 완료: [견적 요청 사진 첨부]...",
-      "[오후 7:40:34] 카톡 수신 완료: https://talk.kakaocdn.net/dna/t8tBT..."
+      "[오후 8:01:55] 카톡 수신 완료: [견적 요청 사진 첨부]..."
     ],
     "connectedDeptIds": [
       "sle",
       "purchase"
     ],
     "orderIndex": 1,
-    "processedCount": 12,
+    "processedCount": 13,
     "supervisorId": "",
     "connectedAgentIds": [],
     "scheduleInterval": "REALTIME"
@@ -113,7 +113,7 @@
       "accuracy": 96,
       "load": 30,
       "uptime": "99.8%",
-      "tasksToday": 25
+      "tasksToday": 26
     },
     "currentTask": "비정형 문서·사진 Vision OCR 판독 엔진 대기 중",
     "lastActive": "방금 전",
@@ -124,6 +124,7 @@
       "EVENT_DOC_PARSED"
     ],
     "logs": [
+      "[오전 11:24:49] 견적서 사진 수신 (KAKAO-1792722266445-TBXD) -> OCR 파싱 착수",
       "[오전 9:35:08] 견적서 사진 수신 (KAKAO-1792715680845-XV1O) -> OCR 파싱 착수",
       "[오전 9:34:33] 견적서 사진 수신 (KAKAO-1792715646122-ESEM) -> OCR 파싱 착수",
       "[오전 12:06:23] 견적서 사진 수신 (KAKAO-1792595135537-F7VH) -> OCR 파싱 착수",
@@ -132,14 +133,13 @@
       "[오후 10:47:27] 견적서 사진 수신 (KAKAO-1792590424082-4YF9) -> OCR 파싱 착수",
       "[오후 10:39:10] 견적서 사진 수신 (KAKAO-1792589950540-DPE1) -> OCR 파싱 착수",
       "[오후 8:01:55] 견적서 사진 수신 (KAKAO-1792580515653-HF2B) -> OCR 파싱 착수",
-      "[오후 7:40:34] 견적서 사진 수신 (KAKAO-1792579234717-KRAE) -> OCR 파싱 착수",
-      "[오후 7:34:25] 견적서 사진 수신 (KAKAO-1792578865106-OLNC) -> OCR 파싱 착수"
+      "[오후 7:40:34] 견적서 사진 수신 (KAKAO-1792579234717-KRAE) -> OCR 파싱 착수"
     ],
     "connectedDeptIds": [
       "sle"
     ],
     "orderIndex": 2,
-    "processedCount": 10,
+    "processedCount": 11,
     "supervisorId": "",
     "connectedAgentIds": [],
     "scheduleInterval": "REALTIME"
@@ -203,7 +203,7 @@
       "accuracy": 98,
       "load": 22,
       "uptime": "99.9%",
-      "tasksToday": 44
+      "tasksToday": 45
     },
     "currentTask": "14,136건 ALTF 표준 마스터 품목 규격 정규화 대기 중",
     "lastActive": "방금 전",
@@ -216,6 +216,7 @@
       "EVENT_ITEMS_NORMALIZED"
     ],
     "logs": [
+      "[오전 11:24:49] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792722266445-TBXD]",
       "[오전 9:35:08] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792715680845-XV1O]",
       "[오전 9:34:33] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792715646122-ESEM]",
       "[오전 12:06:23] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792595135537-F7VH]",
@@ -224,8 +225,7 @@
       "[오후 10:55:05] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792590905531-Z5HO]",
       "[오후 10:47:27] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792590424082-4YF9]",
       "[오후 10:39:10] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792589950540-DPE1]",
-      "[오후 8:01:55] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792580515653-HF2B]",
-      "[오후 7:40:34] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792579234717-KRAE]"
+      "[오후 8:01:55] 피팅 규격 분석 및 표준화 매칭 착수: [KAKAO-1792580515653-HF2B]"
     ],
     "connectedDeptIds": [
       "sle",
@@ -233,7 +233,7 @@
       "executive"
     ],
     "orderIndex": 4,
-    "processedCount": 12,
+    "processedCount": 13,
     "supervisorId": "",
     "connectedAgentIds": [
       "int-06-rule-corrector"
@@ -307,9 +307,9 @@
       "accuracy": 97,
       "load": 18,
       "uptime": "99.9%",
-      "tasksToday": 24
+      "tasksToday": 25
     },
-    "currentTask": "견적서 초안 자동 생성 [Q261023-002] - (주)성우스틸 (1개 품목, 1,399,450원)",
+    "currentTask": "견적서 초안 자동 생성 [Q261023-003] - 주식회사 시흥에스티 (3개 품목, 416,820원)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_ITEMS_NORMALIZED"
@@ -318,6 +318,7 @@
       "EVENT_QUOTE_DRAFT_CREATED"
     ],
     "logs": [
+      "[오전 11:24:49] 주식회사 시흥에스티 견적 초안 발행 완료: 416,820원",
       "[오전 9:35:08] (주)성우스틸 견적 초안 발행 완료: 1,399,450원",
       "[오전 9:34:33] (주)성우스틸 견적 초안 발행 완료: 395,870원",
       "[오전 12:06:23] 주식회사 시흥에스티 견적 초안 발행 완료: 3,049,080원",
@@ -326,15 +327,14 @@
       "[오후 10:47:27] 주식회사 시흥에스티 견적 초안 발행 완료: 3,049,080원",
       "[오후 10:39:10] 주식회사 시흥에스티 견적 초안 발행 완료: 3,049,080원",
       "[오후 8:01:55] (주)성우스틸 견적 초안 발행 완료: 234,450원",
-      "[오후 7:40:34] (주)성우스틸 견적 초안 발행 완료: 234,450원",
-      "[오후 4:59:48] 경기배관 견적 초안 발행 완료: 139,920원"
+      "[오후 7:40:34] (주)성우스틸 견적 초안 발행 완료: 234,450원"
     ],
     "connectedDeptIds": [
       "sle",
       "executive"
     ],
     "orderIndex": 5,
-    "processedCount": 10
+    "processedCount": 11
   },
   {
     "id": "sle-02-quote-dispatcher",
@@ -356,7 +356,7 @@
       "accuracy": 100,
       "load": 10,
       "uptime": "100%",
-      "tasksToday": 19
+      "tasksToday": 20
     },
     "currentTask": "단가 요율 및 시화/양산 실시간 재고 검증 대기",
     "lastActive": "방금 전",
@@ -367,6 +367,7 @@
       "EVENT_QUOTE_DISPATCHED"
     ],
     "logs": [
+      "[오전 11:24:49] 주식회사 시흥에스티 단가 요율 및 재고 검증 통과",
       "[오전 9:35:08] (주)성우스틸 단가 요율 및 재고 검증 통과",
       "[오전 9:34:33] (주)성우스틸 단가 요율 및 재고 검증 통과",
       "[오전 12:06:23] 주식회사 시흥에스티 단가 요율 및 재고 검증 통과",
@@ -375,17 +376,64 @@
       "[오후 10:47:27] 주식회사 시흥에스티 단가 요율 및 재고 검증 통과",
       "[오후 10:39:10] 주식회사 시흥에스티 단가 요율 및 재고 검증 통과",
       "[오후 8:01:55] (주)성우스틸 단가 요율 및 재고 검증 통과",
-      "[오후 7:40:34] (주)성우스틸 단가 요율 및 재고 검증 통과",
-      "[오후 4:59:48] 경기배관 단가 요율 및 재고 검증 통과"
+      "[오후 7:40:34] (주)성우스틸 단가 요율 및 재고 검증 통과"
     ],
     "connectedDeptIds": [
       "sle",
       "executive"
     ],
     "orderIndex": 6,
-    "processedCount": 10,
+    "processedCount": 11,
     "supervisorId": "",
-    "connectedAgentIds": [],
+    "connectedAgentIds": [
+      "sle-07-rate-inspector"
+    ],
+    "scheduleInterval": "REALTIME"
+  },
+  {
+    "id": "sle-07-rate-inspector",
+    "code": "SLE-07",
+    "name": "요율점검봇",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "teamName": "영업1팀",
+    "tier": 2,
+    "position": "과장",
+    "role": "품목코드별 시스템 표준 요율(SMLS 25%, ERW 50% 등) 검증, 거래처 최근 견적/발주 이력 요율 검색 및 텍스트 요율 변경 요청 기록/반영",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "AUTO_RUNNING",
+    "assignedHuman": "영업팀장 / 단가 검토자",
+    "requiresApproval": false,
+    "metrics": {
+      "speed": 99,
+      "accuracy": 100,
+      "load": 12,
+      "uptime": "100%",
+      "tasksToday": 18
+    },
+    "currentTask": "품목코드별 시스템 요율 대조 및 최근 거래처 요율 이력 상시 모니터링",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_ITEMS_NORMALIZED",
+      "EVENT_RATE_OVERRIDE_REQUESTED"
+    ],
+    "emittedEvents": [
+      "EVENT_RATE_VERIFIED",
+      "EVENT_RATE_RECOMMENDED"
+    ],
+    "logs": [
+      "[정상 가동] 품목코드별 요율 대조 및 최근 거래처 요율 검색 엔진 가동 (SMLS 25% / ERW 50% 시스템 디폴트 준수)"
+    ],
+    "connectedDeptIds": [
+      "sle"
+    ],
+    "orderIndex": 7,
+    "supervisorId": "",
+    "connectedAgentIds": [
+      "sle-01-quote-drafter",
+      "sle-02-quote-dispatcher"
+    ],
     "scheduleInterval": "REALTIME"
   },
   {
@@ -601,9 +649,9 @@
       "accuracy": 99,
       "load": 100,
       "uptime": "99.9%",
-      "tasksToday": 2477
+      "tasksToday": 2480
     },
-    "currentTask": "[영업시간 1시간 주기] 발주 2477건 분류 관리 | 미결 482건 | 고객발송준비 466건 (다음: 오늘 10:00)",
+    "currentTask": "[영업시간 1시간 주기] 발주 2480건 분류 관리 | 미결 483건 | 고객발송준비 468건 (다음: 오늘 12:00)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_ORDER_CREATED",
@@ -613,10 +661,10 @@
       "EVENT_BACKLOG_SYNCED"
     ],
     "logs": [
-      "[09:00] [PUR-07] altf.kr 발주 2477건 업체/날짜별 분류 완료",
-      "[09:00] 미결(Pending) 482건 추적 중 (매입발주서 자동 매핑)",
-      "[09:00] QC-01 성적서 교차 대조: 479건 접수 확인",
-      "[09:00] 출고 완료 패키징: 거래명세표+성적서 번들 466건 발송 대기"
+      "[11:00] [PUR-07] altf.kr 발주 2480건 업체/날짜별 분류 완료",
+      "[11:00] 미결(Pending) 483건 추적 중 (매입발주서 자동 매핑)",
+      "[11:00] QC-01 성적서 교차 대조: 482건 접수 확인",
+      "[11:00] 출고 완료 패키징: 거래명세표+성적서 번들 468건 발송 대기"
     ],
     "connectedDeptIds": [
       "quality",

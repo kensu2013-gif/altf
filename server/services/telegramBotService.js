@@ -818,6 +818,7 @@ ${listText.trim()}
             getAgentSummary('INT-03'), // OCR
             getAgentSummary('INT-05'), // 품목정규화
             getAgentSummary('INT-06'), // 규칙수정감지
+            getAgentSummary('SLE-07'), // 요율점검봇
             '',
             '🔬 <b>[품질부 - 외주 성적서 1,652건 대장 관리]</b>',
             getAgentSummary('QC-01'), // 메일플러그 수집

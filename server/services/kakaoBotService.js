@@ -23,6 +23,7 @@ import { fittingNormalizerService } from './fittingNormalizerService.js';
 import { fittingVisionOcrService } from './fittingVisionOcrService.js';
 import { sleQuoteReviewService } from './sleQuoteReviewService.js';
 import { agentControlManager } from './agentControlManager.js';
+import { rateReviewService } from './rateReviewService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -977,38 +978,21 @@ export class KakaoBotService {
      * 알트에프 표준 견적서 초안 생성
      */
     createDraftQuotation(intake, normalized) {
-        const rate = normalized.discountRate || 50;
         const custName = normalized.customer ? normalized.customer.name : '카카오톡 고객';
         const quoteId = this.generateQuotationId();
 
-        let totalAmount = 0;
-        const items = normalized.items.map((it, idx) => {
-            const discountedUnitPrice = Math.round(it.basePrice * (1 - rate / 100));
-            const amount = discountedUnitPrice * it.qty;
-            totalAmount += amount;
-
-            return {
-                id: `item-${Date.now()}-${idx}`,
-                productId: it.itemId,
-                itemId: it.itemId,
-                name: it.type,
-                thickness: it.schedule,
-                size: it.size,
-                material: it.material,
-                quantity: it.qty,
-                unitPrice: discountedUnitPrice,
-                userUnitPrice: discountedUnitPrice,
-                amount,
-                base_price: it.basePrice,
-                discountRate: rate,
-                currentStock: it.currentStock,
-                location: it.location,
-                maker: '대경',
-                stockStatus: it.stockStatus,
-                isVerified: true,
-                isSelected: true
-            };
+        // ⚡ [SLE-07 요율점검봇 가동]:
+        // 시스템 전체 요율 로직을 훼손하지 않고, 뒷단 시스템(SMLS 25%, ERW 50% 등 inventory.json 기준)을 100% 존중하여 적용.
+        // 발화 텍스트 내 명시적 요청이 있을 때만 사유를 시스템에 기록하고 해당 요율 적용.
+        const evaluated = rateReviewService.evaluateQuotationRates({
+            items: normalized.items,
+            customerName: custName,
+            rawUtterance: `${intake.utterance || ''} ${normalized.remarks || ''}`
         });
+
+        const items = evaluated.items;
+        const totalAmount = evaluated.totalAmount;
+        const rateReport = evaluated.rateReport;
 
         const rawImgUrl = typeof intake.imageUrl === 'string' ? intake.imageUrl : (intake.imageUrl?.url || '');
 
@@ -1053,6 +1037,7 @@ export class KakaoBotService {
                 deliveryDate: '내일 발송',
                 note: normalized.remarks || ''
             },
+            rateReport,
             manager: {
                 name: '박조나단 과장',
                 id: 'c7410ecb-2684-4054-b5b7-2ad060299c63',
