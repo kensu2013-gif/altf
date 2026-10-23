@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-23T13:39:52.105Z",
+  "timestamp": "2026-10-23T13:51:15.539Z",
   "filename": "pending_2026-10-23T04-19-36-969Z_알트에프 미결 리스트 (10.20).xlsx",
   "archivePath": "pending_2026-10-23T04-19-36-969Z_알트에프 미결 리스트 (10.20).xlsx",
   "summary": {
@@ -39919,8 +39919,8 @@
     }
   ],
   "chaserReport": {
-    "reportId": "CHASER-1792762792097",
-    "createdAt": "2026-10-23T13:39:52.097Z",
+    "reportId": "CHASER-1792763475531",
+    "createdAt": "2026-10-23T13:51:15.531Z",
     "summary": {
       "totalRows": 615,
       "alertCount": 529,
@@ -95742,7 +95742,7 @@
     }
   },
   "leadtimeStats": {
-    "lastUpdated": "2026-10-23T13:39:52.101Z",
+    "lastUpdated": "2026-10-23T13:51:15.536Z",
     "sampleCount": 57,
     "newSamplesAdded": 0,
     "categoryStats": [
