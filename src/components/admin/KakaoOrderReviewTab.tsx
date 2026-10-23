@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Check,
     Trash2,
@@ -59,6 +59,18 @@ export interface CorrectionSummaryReport {
     recentCorrections: CorrectionRecord[];
 }
 
+export interface KakaoOrderProductItem {
+    id?: string;
+    name: string;
+    spec?: string;
+    size?: string;
+    thickness?: string;
+    material?: string;
+    quantity: number;
+    unitPrice: number;
+    amount: number;
+}
+
 export interface KakaoOrderItem {
     id: string;
     orderNo: string;
@@ -87,17 +99,7 @@ export interface KakaoOrderItem {
     assignedAgents: string[];
     utterance: string;
     imageUrl?: string | null;
-    items: Array<{
-        id?: string;
-        name: string;
-        spec?: string;
-        size?: string;
-        thickness?: string;
-        material?: string;
-        quantity: number;
-        unitPrice: number;
-        amount: number;
-    }>;
+    items: KakaoOrderProductItem[];
     itemCount: number;
     totalAmount: number;
     relatedQuotationId?: string | null;
@@ -130,9 +132,9 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
     const [editFreight, setEditFreight] = useState<string>('');
     const [editRecipient, setEditRecipient] = useState<string>('');
     const [editPhone, setEditPhone] = useState<string>('');
-    const [editItems, setEditItems] = useState<any[]>([]);
+    const [editItems, setEditItems] = useState<KakaoOrderProductItem[]>([]);
 
-    const fetchOrders = async () => {
+    const fetchOrders = useCallback(async () => {
         setLoading(true);
         try {
             const res = await fetch('/api/kakao/orders');
@@ -140,8 +142,8 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                 const data = await res.json();
                 if (data.success && Array.isArray(data.orders)) {
                     setOrders(data.orders);
-                    if (data.orders.length > 0 && !selectedOrderId) {
-                        setSelectedOrderId(data.orders[0].id);
+                    if (data.orders.length > 0) {
+                        setSelectedOrderId(prev => prev || data.orders[0].id);
                     }
                 }
             }
@@ -150,11 +152,11 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchOrders();
-    }, []);
+    }, [fetchOrders]);
 
     const activeOrder = orders.find(o => o.id === selectedOrderId) || orders[0] || null;
 
@@ -167,7 +169,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
             setEditPhone(activeOrder.phone || '');
             setEditItems(JSON.parse(JSON.stringify(activeOrder.items || [])));
         }
-    }, [activeOrder?.id]);
+    }, [activeOrder]);
 
     // Filtering
     const filteredOrders = orders.filter(order => {
@@ -194,9 +196,12 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
     const canApprove = !isDestinationEmpty && !isFreightEmpty && activeOrder?.status !== 'APPROVED';
 
     // Item handlers
-    const handleItemChange = (index: number, field: string, value: any) => {
+    const handleItemChange = (index: number, field: keyof KakaoOrderProductItem, value: string | number) => {
         const updated = [...editItems];
-        updated[index][field] = value;
+        updated[index] = {
+            ...updated[index],
+            [field]: value
+        };
         if (field === 'quantity' || field === 'unitPrice') {
             const qty = Number(updated[index].quantity) || 0;
             const price = Number(updated[index].unitPrice) || 0;
@@ -249,8 +254,8 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                 const data = await res.json();
                 alert('저장 실패: ' + (data.error || '오류 발생'));
             }
-        } catch (e: any) {
-            alert('저장 오류: ' + e.message);
+        } catch (e) {
+            alert('저장 오류: ' + (e instanceof Error ? e.message : String(e)));
         } finally {
             setSaving(false);
         }
@@ -265,8 +270,8 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                 setCorrectionReport(data);
                 setShowCorrectionModal(true);
             }
-        } catch (e: any) {
-            alert('수정 리포트 조회 실패: ' + e.message);
+        } catch (e) {
+            alert('수정 리포트 조회 실패: ' + (e instanceof Error ? e.message : String(e)));
         }
     };
 
@@ -313,8 +318,8 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                 const data = await res.json();
                 alert('승인 실패: ' + (data.error || '오류 발생'));
             }
-        } catch (e: any) {
-            alert('승인 오류: ' + e.message);
+        } catch (e) {
+            alert('승인 오류: ' + (e instanceof Error ? e.message : String(e)));
         } finally {
             setSaving(false);
         }
@@ -336,8 +341,8 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                 alert('발주서가 반려 처리되었습니다.');
                 await fetchOrders();
             }
-        } catch (e: any) {
-            alert('반려 오류: ' + e.message);
+        } catch (e) {
+            alert('반려 오류: ' + (e instanceof Error ? e.message : String(e)));
         } finally {
             setSaving(false);
         }
@@ -362,8 +367,8 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
             } else {
                 alert('삭제 실패');
             }
-        } catch (e: any) {
-            alert('삭제 오류: ' + e.message);
+        } catch (e) {
+            alert('삭제 오류: ' + (e instanceof Error ? e.message : String(e)));
         } finally {
             setSaving(false);
         }
@@ -391,8 +396,8 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
             } else {
                 alert('AI 분석 실패');
             }
-        } catch (e: any) {
-            alert('AI 분석 오류: ' + e.message);
+        } catch (e) {
+            alert('AI 분석 오류: ' + (e instanceof Error ? e.message : String(e)));
         } finally {
             setAnalyzing(false);
         }

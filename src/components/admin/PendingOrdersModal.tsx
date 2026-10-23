@@ -74,7 +74,17 @@ export interface PendingOrderItem {
     isStockOrder: boolean;
     alertReason?: string | null;
     alertSeverity?: 'NORMAL' | 'WARNING' | 'CRITICAL';
+    priority?: PendingPriority;
+    priorityLabel?: string;
+    priorityReason?: string;
+    delayDays?: number;
+    isActuallyDelayed?: boolean;
+    delayBasis?: 'CUSTOMER_DUE' | 'STANDARD_LEADTIME' | 'UNKNOWN' | null;
+    expectedSlipDays?: number;
 }
+
+// 미결관리팀 확인 순서: P1 필수확인 → P2 지연·임박 독촉 → P3 예상 문제 → P4 모니터링
+export type PendingPriority = 'P1' | 'P2' | 'P3' | 'P4' | 'DONE';
 
 export interface ClientDiagnosis {
     clientName: string;
@@ -112,7 +122,25 @@ export interface OrderAnalysis {
     riskLabel: string; // '위험' | '경계' | '안정' | '입고완료'
     riskReason: string;
     actionItem: string;
+    priority?: PendingPriority;
+    priorityLabel?: string;
+    priorityReason?: string;
+    mustCheckCount?: number;
+    delayChaseCount?: number;
+    forecastRiskCount?: number;
+    maxDelayDays?: number;
+    minProgressPct?: number;
     items?: PendingOrderItem[];
+}
+
+export interface PriorityBoard {
+    counts: Record<PendingPriority, number>;
+    actualDelayedCount: number;
+    noDueDateCount: number;
+    mustCheckOrders: Array<OrderAnalysis & { mustCheckItems: PendingOrderItem[] }>;
+    mustCheckItems: PendingOrderItem[];
+    delayChaseItems: PendingOrderItem[];
+    forecastRiskItems: PendingOrderItem[];
 }
 
 export interface PendingAnalysisSummary {
@@ -171,6 +199,7 @@ export interface PendingAnalysisData {
     orderAnalyses?: OrderAnalysis[];
     longestStagnantItems?: PendingOrderItem[];
     criticalDueRiskItems?: PendingOrderItem[];
+    priorityBoard?: PriorityBoard;
     chaserReport?: {
         reportId: string;
         createdAt: string;
@@ -228,7 +257,7 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
     const [severityFilter, setSeverityFilter] = useState<'ALL' | 'ALERT_ONLY' | 'CRITICAL' | 'WARNING' | 'DUE_RISK'>('ALL');
     const [clientFilter, setClientFilter] = useState<string>('ALL');
     const [copiedReport, setCopiedReport] = useState(false);
-    const [activeTab, setActiveTab] = useState<'TABLE' | 'CLIENTS' | 'STAGNANT' | 'CHASER_REPORT' | 'LEADTIME'>('TABLE');
+    const [activeTab, setActiveTab] = useState<'PRIORITY' | 'TABLE' | 'CLIENTS' | 'STAGNANT' | 'CHASER_REPORT' | 'LEADTIME'>('PRIORITY');
     const [stagnantSubTab, setStagnantSubTab] = useState<'DUE_DEFICIT' | 'ELAPSED_DAYS'>('DUE_DEFICIT');
     const [uploading, setUploading] = useState(false);
     const [showExpandedMetrics, setShowExpandedMetrics] = useState(false);
@@ -238,6 +267,7 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
     const [orderRiskFilter, setOrderRiskFilter] = useState<'ALL' | 'DANGER' | 'WARNING' | 'SAFE' | 'COMPLETED'>('ALL');
     const [orderSearchKeyword, setOrderSearchKeyword] = useState('');
     const [expandedOrderKey, setExpandedOrderKey] = useState<string | null>(null);
+    const [expandedMustCheckOrder, setExpandedMustCheckOrder] = useState<string | null>(null);
 
     // Client diagnosis search in CLIENTS tab
     const [clientSearch, setClientSearch] = useState('');
@@ -480,6 +510,7 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
     const clientDiagnoses = data?.clientDiagnoses || [];
     const longestStagnantItems = data?.longestStagnantItems || [];
     const criticalDueRiskItems = data?.criticalDueRiskItems || [];
+    const priorityBoard = data?.priorityBoard;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
@@ -508,6 +539,21 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
 
                     {/* Navigation Tabs (Streamlined) */}
                     <div className="flex items-center bg-slate-800/90 rounded-xl p-1 border border-slate-700/80 shadow-inner">
+                        <button
+                            onClick={() => setActiveTab('PRIORITY')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                activeTab === 'PRIORITY'
+                                    ? 'bg-red-600 text-white shadow-md'
+                                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                            }`}
+                        >
+                            <ShieldAlert className="w-3.5 h-3.5 text-red-200" />
+                            <span>확인 순서</span>
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-red-950/70 text-red-200 border border-red-400/30 font-bold">
+                                필수 {priorityBoard?.counts.P1 ?? 0}
+                            </span>
+                        </button>
+
                         <button
                             onClick={() => setActiveTab('TABLE')}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
@@ -719,6 +765,129 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                     </div>
                 )}
 
+                {/* TAB 0: 미결관리팀 확인 순서 (① 실지연 판정 → ② P1 필수확인 → ③ P2 독촉 → ④ P3 예상 문제) */}
+                {activeTab === 'PRIORITY' && (
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-900/60">
+                        {!priorityBoard ? (
+                            <div className="p-6 text-center text-sm text-slate-400 border border-slate-800 rounded-xl">
+                                우선순위 판정 데이터가 없습니다. 미결 엑셀을 다시 업로드하거나 새로고침(재분석)해 주세요.
+                            </div>
+                        ) : (
+                            <>
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                                    {[
+                                        { step: '①', label: '실지연 판정', count: priorityBoard.actualDelayedCount, desc: '잔량 有 · 창고입고 前 · 납기 경과', cls: 'border-slate-600 text-slate-200' },
+                                        { step: '②', label: 'P1 필수확인', count: priorityBoard.counts.P1, desc: '지연/임박 + 공정진행률 50% 미만', cls: 'border-red-500/60 text-red-300 bg-red-950/30' },
+                                        { step: '③', label: 'P2 지연·임박 독촉', count: priorityBoard.counts.P2, desc: '공정 후반 · 재고 배정 → 출고 독촉', cls: 'border-orange-500/50 text-orange-300' },
+                                        { step: '④', label: 'P3 예상 문제', count: priorityBoard.counts.P3, desc: '잔여 공정일수 > 남은 납기 → 사전 예방', cls: 'border-yellow-500/50 text-yellow-300' },
+                                        { step: '⑤', label: 'P4 모니터링', count: priorityBoard.counts.P4, desc: '정상 진행 · 정기 감시', cls: 'border-emerald-600/40 text-emerald-300' }
+                                    ].map(card => (
+                                        <div key={card.step} className={`rounded-xl border p-3 ${card.cls}`}>
+                                            <div className="text-[11px] font-semibold opacity-80">{card.step} {card.label}</div>
+                                            <div className="text-2xl font-bold font-mono mt-1">{card.count}<span className="text-xs font-normal ml-1 opacity-70">건</span></div>
+                                            <div className="text-[10px] text-slate-400 mt-1">{card.desc}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {priorityBoard.noDueDateCount > 0 && (
+                                    <p className="text-[11px] text-slate-500">※ 고객납기 미등록 {priorityBoard.noDueDateCount}건은 발주일 경과일 vs 품목 표준 리드타임으로 지연 여부를 추정했습니다.</p>
+                                )}
+
+                                <section className="rounded-xl border border-red-500/40 bg-slate-950/40">
+                                    <header className="px-3 py-2 border-b border-red-500/30 text-sm font-bold text-red-300">
+                                        🔴 반드시 확인 — 대경 공장 확인 요청 발주 ({priorityBoard.mustCheckOrders.length}건 / 품목 {priorityBoard.counts.P1}건)
+                                    </header>
+                                    {priorityBoard.mustCheckOrders.length === 0 ? (
+                                        <div className="p-4 text-xs text-slate-400">필수확인 대상 없음</div>
+                                    ) : priorityBoard.mustCheckOrders.map((o, idx) => {
+                                        const key = `${o.client}__${o.orderNo}`;
+                                        const open = expandedMustCheckOrder === key;
+                                        const top = o.mustCheckItems[0];
+                                        return (
+                                            <div key={key} className="border-b border-slate-800 last:border-0">
+                                                <button
+                                                    onClick={() => setExpandedMustCheckOrder(open ? null : key)}
+                                                    className="w-full flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-left text-xs hover:bg-slate-800/50"
+                                                >
+                                                    <span className="w-5 text-slate-500 font-mono">{idx + 1}</span>
+                                                    <span className="font-bold text-white min-w-[120px]">{o.client}</span>
+                                                    <span className="font-mono text-amber-300">{o.orderNo}</span>
+                                                    <span className="text-red-300 font-semibold">{top.delayDays ? `${top.delayDays}일 지연` : `D-${top.remainingCustomerDays}`}</span>
+                                                    <span className="text-slate-300">최저 진행률 <b className="text-red-300">{o.minProgressPct}%</b></span>
+                                                    <span className="text-slate-400">필수확인 {o.mustCheckCount}건 / 전체 {o.totalItems}품목</span>
+                                                    <span className="ml-auto text-slate-500">{open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}</span>
+                                                </button>
+                                                {open && (
+                                                    <table className="w-full text-[11px] mb-2">
+                                                        <thead className="text-slate-500">
+                                                            <tr>
+                                                                <th className="text-left px-3 py-1 font-medium">LOT</th>
+                                                                <th className="text-left px-2 py-1 font-medium">품명 / 규격</th>
+                                                                <th className="text-left px-2 py-1 font-medium">고객납기</th>
+                                                                <th className="text-left px-2 py-1 font-medium">현재 공정</th>
+                                                                <th className="text-right px-2 py-1 font-medium">잔량</th>
+                                                                <th className="text-left px-2 py-1 font-medium">확인 사유</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {o.mustCheckItems.map(it => (
+                                                                <tr key={`${it.lotNo}-${it.rowIdx}`} className="text-slate-300 border-t border-slate-800/60">
+                                                                    <td className="px-3 py-1 font-mono">{it.lotNo}</td>
+                                                                    <td className="px-2 py-1">{it.itemName} {it.size} ({it.thickness})</td>
+                                                                    <td className="px-2 py-1">{it.customerDueDate || '미등록'}</td>
+                                                                    <td className="px-2 py-1">{it.stage} <b className="text-red-300">{it.progressPct}%</b></td>
+                                                                    <td className="px-2 py-1 text-right">{it.remainQty}</td>
+                                                                    <td className="px-2 py-1 text-slate-400">{it.priorityReason}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </section>
+
+                                <section className="rounded-xl border border-yellow-500/30 bg-slate-950/40">
+                                    <header className="px-3 py-2 border-b border-yellow-500/20 text-sm font-bold text-yellow-300">
+                                        🟡 예상 문제 지점 — 사전 예방 ({priorityBoard.counts.P3}건)
+                                    </header>
+                                    {priorityBoard.forecastRiskItems.length === 0 ? (
+                                        <div className="p-4 text-xs text-slate-400">현재 공정일수 기준 예상 문제 없음</div>
+                                    ) : (
+                                        <table className="w-full text-[11px]">
+                                            <thead className="text-slate-500">
+                                                <tr>
+                                                    <th className="text-left px-3 py-1.5 font-medium">납품처</th>
+                                                    <th className="text-left px-2 py-1.5 font-medium">발주번호</th>
+                                                    <th className="text-left px-2 py-1.5 font-medium">품명 / 규격</th>
+                                                    <th className="text-left px-2 py-1.5 font-medium">고객납기</th>
+                                                    <th className="text-left px-2 py-1.5 font-medium">현재 공정</th>
+                                                    <th className="text-right px-2 py-1.5 font-medium">잔여 공정</th>
+                                                    <th className="text-right px-3 py-1.5 font-medium">예상 지연</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {priorityBoard.forecastRiskItems.map(it => (
+                                                    <tr key={`${it.lotNo}-${it.rowIdx}`} className="text-slate-300 border-t border-slate-800/60">
+                                                        <td className="px-3 py-1">{it.deliveryTo || it.customerName}</td>
+                                                        <td className="px-2 py-1 font-mono text-amber-300">{it.orderNo}</td>
+                                                        <td className="px-2 py-1">{it.itemName} {it.size} ({it.thickness})</td>
+                                                        <td className="px-2 py-1">{it.customerDueDate ? `${it.customerDueDate} (D-${it.remainingCustomerDays})` : '미등록'}</td>
+                                                        <td className="px-2 py-1">{it.stage} {it.progressPct}%</td>
+                                                        <td className="px-2 py-1 text-right">{it.remainingProductionDays}일</td>
+                                                        <td className="px-3 py-1 text-right font-bold text-yellow-300">{it.expectedSlipDays}일</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </section>
+                            </>
+                        )}
+                    </div>
+                )}
+
                 {/* 3. TAB 1: 제품 공정 대장 (Expanded Full-Screen Ledger View) */}
                 {activeTab === 'TABLE' && (
                     <div className="flex-1 flex flex-col min-h-0 bg-slate-900/60 overflow-hidden">
@@ -855,7 +1024,7 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                                         <th className="py-2.5 px-3 text-center min-w-[90px]">진행률</th>
                                         <th className="py-2.5 px-3 min-w-[80px]">절단일</th>
                                         <th className="py-2.5 px-3 min-w-[80px]">입고일</th>
-                                        <th className="py-2.5 px-3 min-w-[200px]">병목 진단 / 납기 독촉 사유</th>
+                                        <th className="py-2.5 px-3 min-w-50">병목 진단 / 납기 독촉 사유</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/60 font-mono">
@@ -2203,7 +2372,7 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                                                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                                     🚨 대경벤드 생산 미결 및 긴급 납기 독촉 공문
                                                     <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400 font-normal">
-                                                        PUR-04 과장봇 작성
+                                                        PUR-04 팀장봇 작성
                                                     </span>
                                                 </h3>
                                                 <p className="text-xs text-slate-400 mt-1">

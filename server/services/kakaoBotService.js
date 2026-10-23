@@ -24,6 +24,7 @@ import { fittingVisionOcrService } from './fittingVisionOcrService.js';
 import { sleQuoteReviewService } from './sleQuoteReviewService.js';
 import { agentControlManager } from './agentControlManager.js';
 import { rateReviewService } from './rateReviewService.js';
+import { orderRuleCorrectionAgent } from './orderRuleCorrectionAgent.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1243,9 +1244,59 @@ export class KakaoBotService {
         // 3. 발화 정밀 파싱 (발송업체, 도착지, 운송비, 수령인, 품목, 요율조정)
         const parsed = this.parseKakaoOrderUtterance(utterance, recentQuote);
 
+        // 📸 3-1. 발주서 사진 첨부 시 Gemini / GPT Vision OCR 정밀 판독 (영업3팀 SLE-11 가동)
+        if (effectiveImageUrl) {
+            try {
+                console.log(`[KakaoBot] 📸 [영업3팀 SLE-11] 발주서 이미지 Gemini/GPT Vision OCR 판독 착수: ${effectiveImageUrl}`);
+                let imgBuf = null;
+                let contentType = 'image/jpeg';
+                if (effectiveImageUrl.startsWith('data:')) {
+                    const matches = effectiveImageUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+                    if (matches) {
+                        contentType = matches[1];
+                        imgBuf = Buffer.from(matches[2], 'base64');
+                    }
+                } else if (effectiveImageUrl.startsWith('http')) {
+                    const fetch = (await import('node-fetch')).default;
+                    const imgRes = await fetch(effectiveImageUrl);
+                    if (imgRes.ok) {
+                        contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+                        imgBuf = await imgRes.buffer();
+                    }
+                }
+
+                if (imgBuf) {
+                    const ocrResult = await fittingVisionOcrService.recognizeAndNormalize(imgBuf, contentType);
+                    if (ocrResult && Array.isArray(ocrResult.items) && ocrResult.items.length > 0) {
+                        console.log(`[KakaoBot] ✅ [영업3팀 SLE-11/12] 발주서 이미지에서 ${ocrResult.items.length}개 품목 Vision OCR 추출 성공!`);
+                        if (!parsed.items || parsed.items.length === 0) {
+                            parsed.items = ocrResult.items.map((it, idx) => ({
+                                id: `ORD-ITEM-${idx}-${Date.now()}`,
+                                name: it.type || it.name || '배관 피팅',
+                                material: it.material || 'STS304-W',
+                                size: it.size || '',
+                                thickness: it.schedule || it.thickness || 'S10S',
+                                quantity: it.qty || it.quantity || 1,
+                                unitPrice: it.basePrice || it.unitPrice || 0,
+                                amount: (it.basePrice || it.unitPrice || 0) * (it.qty || it.quantity || 1)
+                            }));
+                        }
+                        if ((!parsed.customerName || parsed.customerName === '카카오톡 고객사') && ocrResult.customer?.name) {
+                            parsed.customerName = ocrResult.customer.name;
+                        }
+                    }
+                }
+            } catch (ocrErr) {
+                console.warn('[KakaoBot] 영업3팀 발주서 비전 OCR 오류 (로컬 파서 폴백):', ocrErr.message);
+            }
+        }
+
         const customerName = parsed.customerName || matchedUser?.company || recentQuote?.customerInfo?.company || matchedUser?.name || '카카오톡 고객사';
         const phone = parsed.phone || matchedUser?.phone || recentQuote?.customerInfo?.phone || '';
-        const orderNo = `PO-KKO-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        // 🛡️ 발주번호 임의 생성 절대 금지: 접수 대기 단계에서는 번호를 부여하지 않고 null 유지
+        // 담당자가 웹 화면에서 확인 및 저장/승인을 누르는 순간 정식 순차 발주번호(예: ES261023-2901 등) 채번!
+        const orderNo = null;
 
         // 4. 견적 연계 요율 변경 요청이 있다면 기존 견적서에도 피드백 기록
         if (recentQuote && (parsed.quoteAdj.seamless || parsed.quoteAdj.erwUnder100 || parsed.quoteAdj.targetVendor)) {
@@ -1258,13 +1309,14 @@ export class KakaoBotService {
             if (this.onQuotationUpdated) this.onQuotationUpdated(recentQuote);
         }
 
-        // 5. 발주서 접수대기 레코드 생성 (출처: 카카오톡 명시, 상태: PENDING_REVIEW)
+        // 5. 발주서 접수대기 레코드 생성 (영업3팀 배속, 출처: 카카오톡 스티커 부착, 상태: PENDING_REVIEW 대기)
         const orderRecord = {
             id: `ORD-KKO-${Date.now()}`,
-            orderNo,
+            orderNo: null, // 🔥 담당자 승인 시 정식 ES 순차 발주번호 부여
             channel: '카카오톡',
             source: '카카오톡',
             orderChannel: '카카오톡',
+            channelTag: '카카오톡', // 🏷️ 사무실과 봇들만 식별하는 '카카오톡' 스티커 태그
             type: effectiveImageUrl ? (utterance ? 'image_and_text' : 'image') : 'text',
             botUserKey,
             customerName,
@@ -1273,18 +1325,19 @@ export class KakaoBotService {
             recipient: parsed.recipient || matchedUser?.name || '',
             phone,
             quoteAdj: parsed.quoteAdj || {},
-            status: 'PENDING_REVIEW', // 🔥 뒷단 db.orders 오염 방지용 접수대기 상태
+            status: 'PENDING_REVIEW', // 🔥 주문접수에 '대기' 형태로 두고 확인 작업
             validationStatus: parsed.validationStatus, // 'VALID' or 'INCOMPLETE'
             missingFields: parsed.missingFields,
             reviewStatus: 'PENDING',
             receivedAt,
-            assignedDept: 'purchase',
-            assignedAgents: ['EXE-02', 'PUR-01', 'PUR-07'],
+            assignedDept: 'sle',
+            assignedTeam: '영업3팀',
+            assignedAgents: ['SLE-11', 'SLE-12', 'SLE-13', 'SLE-14', 'SLE-15'],
             utterance,
             imageUrl: effectiveImageUrl || null,
-            items: parsed.items,
+            items: parsed.items, // 품목명-두께-사이즈-재질-수량만 정확히 파악
             itemCount: parsed.items.length,
-            totalAmount: parsed.items.reduce((sum, it) => sum + (it.amount || ((it.unitPrice || 0) * (it.quantity || 1))), 0),
+            totalAmount: 0, // 봇이 가격 임의 계산 절대 금지 (웹 주문관리 자동산정)
             relatedQuotationId: recentQuote?.id || null
         };
 
@@ -1292,12 +1345,12 @@ export class KakaoBotService {
         this.stats.totalOrders = this.orders.length;
         this.saveData();
 
-        // 6. 전사 에이전트(EXE-02, PUR-01, PUR-07) 상태 및 로그 실시간 업데이트
+        // 6. 전사 에이전트(SLE-11~15, PUR-01, PUR-07) 상태 및 로그 실시간 업데이트
         this.dispatchOrderToAgents(orderRecord);
 
         // 7. 카카오톡 회신 메시지 (사무실 확인 필수 안내)
         const statusNotice = orderRecord.validationStatus === 'VALID' 
-            ? '✅ [필수항목 완비] 사무실 담당 직원이 검토 후 즉시 정식 발주 승인됩니다.'
+            ? '✅ [필수항목 완비] 사무실 담당 직원이 검토 후 즉시 정식 발주 승인 및 순차 발주번호가 부여됩니다.'
             : `⚠️ [확인 필요] 도착지 또는 운송비 조건 보완 후 정식 승인됩니다. (누락: ${orderRecord.missingFields.join(', ')})`;
 
         return {
@@ -1306,7 +1359,7 @@ export class KakaoBotService {
                 outputs: [
                     {
                         simpleText: {
-                            text: `📋 [알트에프(AltF) 카카오 발주서 접수 센터]\n고객님의 발주서가 [접수대기] 상태로 안전하게 등록되었습니다!\n━━━━━━━━━━━━━━━━━━━━\n• 접수번호: ${orderNo} [카카오톡 접수]\n• 발송업체명: ${customerName} 귀하\n• 도착지: ${orderRecord.destination || '⚠️ [사무실 확인/지정 필요]'}\n• 운송조건: ${orderRecord.freightTerms || '⚠️ [사무실 확인/선불·현불 지정 필요]'}\n• 접수품목: ${orderRecord.itemCount > 0 ? `${orderRecord.itemCount}개 품목` : '발주서 사진/내역 판독 중'}\n━━━━━━━━━━━━━━━━━━━━\n${statusNotice}\n📞 직통문의: 051-303-3751 (알트에프 구매팀)`
+                            text: `📋 [알트에프(AltF) 카카오 발주서 접수 센터]\n고객님의 발주서가 [주문접수 대기] 상태로 안전하게 인입되었습니다!\n━━━━━━━━━━━━━━━━━━━━\n• 접수상태: ⏳ [주문접수 대기] (사무실 확인 후 정식 발주번호 발급)\n• 발송업체명: ${customerName} 귀하\n• 도착지: ${orderRecord.destination || '⚠️ [사무실 확인/지정 필요]'}\n• 운송조건: ${orderRecord.freightTerms || '⚠️ [사무실 확인/선불·현불 지정 필요]'}\n• 접수품목: ${orderRecord.itemCount > 0 ? `${orderRecord.itemCount}개 품목 (규격 파악 완료)` : '발주서 사진/내역 판독 중'}\n━━━━━━━━━━━━━━━━━━━━\n${statusNotice}\n📞 직통문의: 051-303-3751 (알트에프 구매팀)`
                         }
                     }
                 ],
@@ -1319,7 +1372,7 @@ export class KakaoBotService {
     }
 
     /**
-     * 🛒 카카오 발주서 인입 시 구매부 에이전트(PUR-01, PUR-07, EXE-02) 상태 및 로그 업데이트
+     * 🛒 카카오 발주서 인입 시 영업3팀(SLE-11~15) 및 구매부 에이전트 상태/로그 실시간 연동
      */
     async dispatchOrderToAgents(orderRecord) {
         try {
@@ -1327,39 +1380,66 @@ export class KakaoBotService {
             const agents = JSON.parse(fs.readFileSync(AGENTS_FILE, 'utf8'));
             const timeStr = new Date().toLocaleTimeString('ko-KR');
 
-            // 1. EXE-02 (카카오톡 인바운드 분배봇)
-            const exe02 = agents.find(a => a.code === 'EXE-02' || a.id === 'exe-02-kakao-classifier');
-            if (exe02) {
-                exe02.lastActive = '방금 전';
-                exe02.currentTask = `카카오 발주 접수대기 등록 [${orderRecord.orderNo}] (검증: ${orderRecord.validationStatus})`;
-                if (!Array.isArray(exe02.logs)) exe02.logs = [];
-                exe02.logs.unshift(`[${timeStr}] 👑 [EXE-02] 카카오 발주 인입 [${orderRecord.orderNo}] (${orderRecord.customerName} | 도착지: ${orderRecord.destination || '누락'} | 운송: ${orderRecord.freightTerms || '누락'} | 상태: ${orderRecord.validationStatus})`);
-                exe02.logs = exe02.logs.slice(0, 10);
-                if (exe02.metrics) exe02.metrics.tasksToday = (exe02.metrics.tasksToday || 0) + 1;
+            // 1. SLE-11 (카카오 발주 비전 OCR 판독봇)
+            const sle11 = agents.find(a => a.code === 'SLE-11' || a.id === 'sle-11-order-vision-ocr');
+            if (sle11) {
+                sle11.lastActive = '방금 전';
+                sle11.currentTask = orderRecord.imageUrl ? `발주서 이미지/전표 OCR 판독 완료 [${orderRecord.customerName}]` : '카카오 텍스트 발주서 인입 확인';
+                if (!Array.isArray(sle11.logs)) sle11.logs = [];
+                sle11.logs.unshift(`[${timeStr}] 📸 [SLE-11] 발주서 인입: ${orderRecord.imageUrl ? '이미지 OCR 판독 완료' : '텍스트 수신'} (${orderRecord.itemCount}개 품목 규격 파악)`);
+                sle11.logs = sle11.logs.slice(0, 10);
             }
 
-            // 2. PUR-01 (알트에프 재고 발주 동기화봇) - 도착지/운송비 검증 가드
+            // 2. SLE-12 (발주 품목·규격 AI 분석봇)
+            const sle12 = agents.find(a => a.code === 'SLE-12' || a.id === 'sle-12-order-ai-parser');
+            if (sle12) {
+                sle12.lastActive = '방금 전';
+                sle12.currentTask = `품목 5대 요소(품명-두께-규격-재질-수량) 파악: (${orderRecord.customerName})`;
+                if (!Array.isArray(sle12.logs)) sle12.logs = [];
+                sle12.logs.unshift(`[${timeStr}] 🔬 [SLE-12] 품목 5대 요소 정밀 파악 완료: 총 ${orderRecord.itemCount}개 품목 (임의 가격 계산 배제)`);
+                sle12.logs = sle12.logs.slice(0, 10);
+            }
+
+            // 3. SLE-13 (발주 필수조건 검증봇)
+            const sle13 = agents.find(a => a.code === 'SLE-13' || a.id === 'sle-13-order-terms-verifier');
+            if (sle13) {
+                sle13.lastActive = '방금 전';
+                sle13.currentTask = `도착지/운송조건 검증: (${orderRecord.validationStatus})`;
+                if (!Array.isArray(sle13.logs)) sle13.logs = [];
+                if (orderRecord.validationStatus === 'INCOMPLETE') {
+                    sle13.logs.unshift(`[${timeStr}] ⚠️ [SLE-13 경보] 필수조건 [${orderRecord.missingFields.join(', ')}] 누락 ➔ 사무실 보완 대기`);
+                } else {
+                    sle13.logs.unshift(`[${timeStr}] 🚚 [SLE-13 검증완료] 도착지(${orderRecord.destination}) & 운송조건(${orderRecord.freightTerms}) 완비 확인`);
+                }
+                sle13.logs = sle13.logs.slice(0, 10);
+            }
+
+            // 4. SLE-14 (발주 확정 & 구매부 이첩봇)
+            const sle14 = agents.find(a => a.code === 'SLE-14' || a.id === 'sle-14-order-pur-dispatcher');
+            if (sle14) {
+                sle14.lastActive = '방금 전';
+                sle14.currentTask = `영업3팀 대기열 관리: (${orderRecord.customerName} - 승인 시 정식 순차 발주번호 부여 및 구매부 이첩)`;
+                if (!Array.isArray(sle14.logs)) sle14.logs = [];
+                sle14.logs.unshift(`[${timeStr}] 📋 [SLE-14] 영업3팀 주문접수 대기 등록 [${orderRecord.customerName}] (승인 시 순차 발주번호 발급)`);
+                sle14.logs = sle14.logs.slice(0, 10);
+            }
+
+            // 5. SLE-15 (발주서 수정관찰 & 규칙 학습봇)
+            const sle15 = agents.find(a => a.code === 'SLE-15' || a.id === 'sle-15-order-rule-watcher');
+            if (sle15) {
+                sle15.lastActive = '방금 전';
+                sle15.currentTask = `수정 관찰 대기: (${orderRecord.customerName})`;
+                if (!Array.isArray(sle15.logs)) sle15.logs = [];
+                sle15.logs.unshift(`[${timeStr}] 🧠 [SLE-15] 발주서 인입 감지: 담당자 수정 사항(품목/운송비) 실시간 학습 대기`);
+                sle15.logs = sle15.logs.slice(0, 10);
+            }
+
+            // 6. PUR-01, PUR-07 (구매부 인계 대기 알림)
             const pur01 = agents.find(a => a.code === 'PUR-01' || a.id === 'pur-01-order-collector');
             if (pur01) {
-                pur01.lastActive = '방금 전';
                 if (!Array.isArray(pur01.logs)) pur01.logs = [];
-                if (orderRecord.validationStatus === 'INCOMPLETE') {
-                    pur01.logs.unshift(`[${timeStr}] ⚠️ [PUR-01 경보] 카카오 발주(${orderRecord.orderNo}) [${orderRecord.missingFields.join(', ')}] 미비 ➔ 사무실 직원 확인 대기 (정식 등록 차단)`);
-                } else {
-                    pur01.logs.unshift(`[${timeStr}] 📦 [PUR-01 준비] 카카오 발주(${orderRecord.orderNo}) 필수항목 완비 ➔ 사무실 승인 대기`);
-                }
+                pur01.logs.unshift(`[${timeStr}] 🛒 [PUR-01] 영업3팀 신규 발주 접수 감지: (${orderRecord.customerName}, 영업부 검토 대기 중)`);
                 pur01.logs = pur01.logs.slice(0, 10);
-            }
-
-            // 3. PUR-07 (발주 분류 및 미결 통합 관제봇)
-            const pur07 = agents.find(a => a.code === 'PUR-07' || a.id === 'pur-07-order-router');
-            if (pur07) {
-                pur07.lastActive = '방금 전';
-                pur07.currentTask = `카카오 발주 접수대기 관제: ${orderRecord.orderNo}`;
-                if (!Array.isArray(pur07.logs)) pur07.logs = [];
-                pur07.logs.unshift(`[${timeStr}] 🛒 [PUR-07] 카카오 발주(${orderRecord.orderNo}) 대기열 적재 ➔ 납기/출고경로(화물/직송) 모니터링 준비`);
-                pur07.logs = pur07.logs.slice(0, 10);
-                if (pur07.metrics) pur07.metrics.tasksToday = (pur07.metrics.tasksToday || 0) + 1;
             }
 
             fs.writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2), 'utf8');
@@ -1370,21 +1450,29 @@ export class KakaoBotService {
 
     /**
      * 사무실 담당자가 카카오 발주서 보완 수정 (도착지, 운송비, 품목 등)
+     * 🧠 발주서 수정관찰봇(SLE-15)으로 수정 전/후 Diff를 감지하여 누적 학습 저장
      */
-    updateOrder(orderId, updateData) {
+    updateOrder(orderId, updateData, modifiedBy = '사무실 관리자') {
         const idx = this.orders.findIndex(o => o.id === orderId || o.orderNo === orderId);
         if (idx === -1) throw new Error('발주서를 찾을 수 없습니다.');
 
         const order = this.orders[idx];
+        const beforeOrder = JSON.parse(JSON.stringify(order));
+
         if (updateData.customerName) order.customerName = updateData.customerName;
         if (updateData.destination !== undefined) order.destination = updateData.destination;
         if (updateData.freightTerms !== undefined) order.freightTerms = updateData.freightTerms;
         if (updateData.recipient !== undefined) order.recipient = updateData.recipient;
         if (updateData.phone !== undefined) order.phone = updateData.phone;
         if (Array.isArray(updateData.items)) {
-            order.items = updateData.items;
+            order.items = updateData.items.map(it => ({
+                ...it,
+                itemCode: `${it.name || ''}-${it.thickness || ''}-${it.size || ''}-${it.material || ''}`,
+                unitPrice: it.unitPrice || 0,
+                amount: it.amount || 0
+            }));
             order.itemCount = updateData.items.length;
-            order.totalAmount = updateData.items.reduce((s, it) => s + (it.amount || ((it.unitPrice || 0) * (it.quantity || 1))), 0);
+            order.totalAmount = order.items.reduce((s, it) => s + (it.amount || 0), 0);
         }
         if (updateData.memo) order.memo = updateData.memo;
 
@@ -1399,18 +1487,141 @@ export class KakaoBotService {
         order.validationStatus = missing.length === 0 ? 'VALID' : 'INCOMPLETE';
         order.updatedAt = new Date().toISOString();
 
+        // 🧠 발주서 수정관찰봇(SLE-15) 수정 사항 감지 및 누적 학습 저장
+        try {
+            orderRuleCorrectionAgent.detectAndLearn({
+                orderId: order.id,
+                orderNo: order.orderNo,
+                beforeOrder,
+                afterOrder: order,
+                modifiedBy
+            });
+        } catch (e) {
+            console.warn('[KakaoBot] orderRuleCorrectionAgent 감지 오류:', e.message);
+        }
+
         this.saveData();
         return order;
     }
 
     /**
+     * 🤖 영업3팀 SLE-11(비전 OCR) & SLE-12(AI 품목분석) 연계 정밀 발주서 분석
+     * 봇은 절대로 가격을 임의 계산하지 않으며, 오직 '품목명-두께-사이즈-재질-수량' 5대 요소만 정확히 파악하여 업로드!
+     */
+    async analyzeOrder({ orderId, utterance, imageUrl }) {
+        let targetOrder = null;
+        if (orderId) {
+            targetOrder = this.orders.find(o => o.id === orderId || o.orderNo === orderId);
+        }
+
+        const textToAnalyze = utterance || targetOrder?.utterance || '';
+        const imageToAnalyze = imageUrl || targetOrder?.imageUrl || null;
+
+        // 1. 텍스트 자연어 파싱 (거래처, 도착지, 운송비, 담당자, 기본 품목)
+        const parsed = this.parseKakaoOrderUtterance(textToAnalyze);
+
+        // 2. 비전 OCR 연동 (이미지 존재 시 Gemini Vision / GPT Vision + 규칙 0~11)
+        if (imageToAnalyze) {
+            try {
+                let imgBuf = null;
+                let contentType = 'image/jpeg';
+                if (imageToAnalyze.startsWith('data:')) {
+                    const matches = imageToAnalyze.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+                    if (matches) {
+                        contentType = matches[1];
+                        imgBuf = Buffer.from(matches[2], 'base64');
+                    }
+                } else if (imageToAnalyze.startsWith('http')) {
+                    const fetch = (await import('node-fetch')).default;
+                    const imgRes = await fetch(imageToAnalyze);
+                    if (imgRes.ok) {
+                        contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+                        imgBuf = await imgRes.buffer();
+                    }
+                }
+
+                if (imgBuf) {
+                    const ocrResult = await fittingVisionOcrService.recognizeAndNormalize(imgBuf, contentType);
+                    if (ocrResult && Array.isArray(ocrResult.items) && ocrResult.items.length > 0) {
+                        parsed.items = ocrResult.items.map((it, idx) => ({
+                            id: `ORD-ITEM-${idx}-${Date.now()}`,
+                            name: it.type || it.name || '배관 피팅',
+                            material: it.material || 'STS304-W',
+                            size: it.size || '',
+                            thickness: it.schedule || it.thickness || 'S10S',
+                            quantity: it.qty || it.quantity || 1,
+                            itemCode: `${it.type || it.name || '배관 피팅'}-${it.schedule || it.thickness || 'S10S'}-${it.size || ''}-${it.material || 'STS304-W'}`,
+                            unitPrice: 0, // 웹 주문관리 자동 산정 (임의 가격 계산 금지)
+                            amount: 0
+                        }));
+                        if ((!parsed.customerName || parsed.customerName === '카카오톡 고객사') && ocrResult.customer?.name) {
+                            parsed.customerName = ocrResult.customer.name;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('[KakaoBot] analyzeOrder Vision OCR 오류:', err.message);
+            }
+        }
+
+        // 3. 봇은 품목코드(품목ID)만 정확히 생성하고 가격은 웹 주문관리에 일임 (임의 계산 절대 금지)
+        if (Array.isArray(parsed.items)) {
+            for (const item of parsed.items) {
+                item.itemCode = `${item.name}-${item.thickness}-${item.size}-${item.material}`;
+                item.unitPrice = 0;
+                item.amount = 0;
+            }
+        }
+
+        // 4. 기존 발주서 레코드가 있다면 병합 업데이트
+        if (targetOrder) {
+            const beforeOrder = JSON.parse(JSON.stringify(targetOrder));
+            if (parsed.customerName && (!targetOrder.customerName || targetOrder.customerName === '카카오톡 고객사')) {
+                targetOrder.customerName = parsed.customerName;
+            }
+            if (parsed.destination && !targetOrder.destination) targetOrder.destination = parsed.destination;
+            if (parsed.freightTerms && !targetOrder.freightTerms) targetOrder.freightTerms = parsed.freightTerms;
+            if (parsed.recipient && !targetOrder.recipient) targetOrder.recipient = parsed.recipient;
+            if (parsed.phone && !targetOrder.phone) targetOrder.phone = parsed.phone;
+            if (parsed.items && parsed.items.length > 0) {
+                targetOrder.items = parsed.items;
+                targetOrder.itemCount = parsed.items.length;
+                targetOrder.totalAmount = 0; // 임의 가격 산출 배제
+            }
+            targetOrder.validationStatus = parsed.validationStatus;
+            targetOrder.missingFields = parsed.missingFields;
+            targetOrder.updatedAt = new Date().toISOString();
+            this.saveData();
+
+            // 🧠 발주서 수정관찰봇(SLE-15) 수정 감지
+            try {
+                orderRuleCorrectionAgent.detectAndLearn({
+                    orderId: targetOrder.id,
+                    orderNo: targetOrder.orderNo,
+                    beforeOrder,
+                    afterOrder: targetOrder,
+                    modifiedBy: '영업3팀 AI 정밀 분석봇'
+                });
+            } catch (_) {}
+
+            // 영업3팀 SLE-11/12/13/14/15 에이전트 실시간 로그 기록
+            this.dispatchOrderToAgents(targetOrder);
+            return targetOrder;
+        }
+
+        return parsed;
+    }
+
+    /**
      * 사무실 담당자가 카카오 발주서를 최종 승인하여 정식 뒷단 원장(db.orders)으로 이관
+     * 🏷️ 담당자가 확인하여 저장을 누르는 순간 정식 순차 발주번호(ES261023-2901 등) 생성!
      */
     async approveOrder(orderId, approvedBy = '사무실 관리자') {
         const idx = this.orders.findIndex(o => o.id === orderId || o.orderNo === orderId);
         if (idx === -1) throw new Error('발주서를 찾을 수 없습니다.');
 
         const order = this.orders[idx];
+        const beforeOrder = JSON.parse(JSON.stringify(order));
 
         // 🛡️ 핵심 가드: 도착지 정보와 운송비 조건이 없으면 정식 발주서 접수 차단!
         if (!order.destination || !order.destination.trim()) {
@@ -1420,38 +1631,71 @@ export class KakaoBotService {
             throw new Error('운송비 조건(선불/현불청구/착불 등)이 명확해야 정식 발주서로 접수됩니다.');
         }
 
+        // 🏷️ 담당자가 확인하여 저장을 누르는 순간 정식 순차 발주번호 생성! (번호 건너뜀 및 꼬임 완전 방지)
+        const nextPoNo = (typeof this.getNextPoNumber === 'function') 
+            ? this.getNextPoNumber() 
+            : `ES${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-2991`;
+
+        order.orderNo = nextPoNo;
+        order.poNumber = nextPoNo;
+        order.convertedOrderId = nextPoNo;
+        order.channelTag = '카카오톡'; // 🏷️ 사무실과 봇들만 식별하는 '카카오톡' 스티커 태그
         order.status = 'APPROVED';
         order.reviewStatus = 'APPROVED';
         order.approvedBy = approvedBy;
         order.approvedAt = new Date().toISOString();
-        order.convertedOrderId = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-KKO-${Math.floor(1000 + Math.random() * 9000)}`;
+        order.transferredFrom = '영업3팀';
+        order.assignedDept = 'purchase';
+        order.assignedAgents = ['PUR-01', 'PUR-07'];
 
         this.saveData();
+
+        // 🧠 발주서 수정관찰봇(SLE-15) 최종 승인 스냅샷 기록
+        try {
+            orderRuleCorrectionAgent.detectAndLearn({
+                orderId: order.id,
+                orderNo: order.orderNo,
+                beforeOrder,
+                afterOrder: order,
+                modifiedBy: approvedBy
+            });
+        } catch (e) {
+            console.warn('[KakaoBot] approveOrder correction 감지 오류:', e.message);
+        }
 
         // 뒷단 콜백 호출 (db.orders에 안전하게 승격 등록)
         if (typeof this.onOrderApproved === 'function') {
             await this.onOrderApproved(order);
         }
 
-        // 에이전트 로그 업데이트
+        // 에이전트 로그 업데이트 (영업3팀 SLE-14 ➔ 구매부 PUR-01/07 인계)
         try {
-            if (fs.existsSync(AGENTS_FILE)) {
-                const agents = JSON.parse(fs.readFileSync(AGENTS_FILE, 'utf8'));
-                const timeStr = new Date().toLocaleTimeString('ko-KR');
-                const pur01 = agents.find(a => a.code === 'PUR-01' || a.id === 'pur-01-order-collector');
-                if (pur01) {
-                    if (!Array.isArray(pur01.logs)) pur01.logs = [];
-                    pur01.logs.unshift(`[${timeStr}] 🚀 [PUR-01 승인] 카카오 발주(${order.orderNo}) 정식 원장(db.orders: ${order.convertedOrderId}) 등록 및 대장 연동 완료`);
-                    pur01.logs = pur01.logs.slice(0, 10);
-                }
-                const pur07 = agents.find(a => a.code === 'PUR-07' || a.id === 'pur-07-order-router');
-                if (pur07) {
-                    if (!Array.isArray(pur07.logs)) pur07.logs = [];
-                    pur07.logs.unshift(`[${timeStr}] 🚚 [PUR-07 확정] 카카오 발주(${order.orderNo}) 출고 경로(${order.destination} / ${order.freightTerms}) 관제 개시`);
-                    pur07.logs = pur07.logs.slice(0, 10);
-                }
-                fs.writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2), 'utf8');
+            if (!fs.existsSync(AGENTS_FILE)) return order;
+            const agents = JSON.parse(fs.readFileSync(AGENTS_FILE, 'utf8'));
+            const timeStr = new Date().toLocaleTimeString('ko-KR');
+
+            const sle14 = agents.find(a => a.code === 'SLE-14' || a.id === 'sle-14-order-pur-dispatcher');
+            if (sle14) {
+                if (!Array.isArray(sle14.logs)) sle14.logs = [];
+                sle14.logs.unshift(`[${timeStr}] 🚀 [SLE-14 이첩완료] 영업3팀 발주 승인 [${order.orderNo}] ➔ 구매부(PUR-01/07) 정식 인계 완료`);
+                sle14.logs = sle14.logs.slice(0, 10);
             }
+
+            const pur01 = agents.find(a => a.code === 'PUR-01' || a.id === 'pur-01-order-collector');
+            if (pur01) {
+                if (!Array.isArray(pur01.logs)) pur01.logs = [];
+                pur01.logs.unshift(`[${timeStr}] 📦 [PUR-01 수신] 영업3팀으로부터 발주서(${order.orderNo}) 정식 인계 수신 ➔ 대장 등록 및 재고 매칭`);
+                pur01.logs = pur01.logs.slice(0, 10);
+            }
+
+            const pur07 = agents.find(a => a.code === 'PUR-07' || a.id === 'pur-07-order-router');
+            if (pur07) {
+                if (!Array.isArray(pur07.logs)) pur07.logs = [];
+                pur07.logs.unshift(`[${timeStr}] 🚚 [PUR-07 확정] 카카오 발주(${order.orderNo}) 출고 경로(${order.destination} / ${order.freightTerms}) 관제 개시`);
+                pur07.logs = pur07.logs.slice(0, 10);
+            }
+
+            fs.writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2), 'utf8');
         } catch (e) {
             console.error('[KakaoBot] approveOrder 에이전트 로그 기록 실패:', e.message);
         }

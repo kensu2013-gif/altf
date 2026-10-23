@@ -15,6 +15,9 @@ export type AgentStatus = 'ACTIVE' | 'STANDBY' | 'IDLE' | 'OFFLINE';
 
 export type AgentPosition = '부장' | '팀장' | '과장' | '대리' | '사원';
 
+// 업무 성격 ↔ 직급: 접수=사원, 실행=대리, 검증·관찰=과장, 팀 종합 관찰·보고=팀장, 부서 총괄=부장
+export type AgentRoleType = 'INTAKE' | 'EXECUTE' | 'REVIEW' | 'MONITOR' | 'REPORT';
+
 // 👑 부서별 5단계 직위 체계 및 권한 메타데이터
 export const POSITION_CONFIG: Record<AgentPosition, {
     label: string;
@@ -99,6 +102,9 @@ export interface AgentUnit {
     connectedAgentIds?: string[]; // 연계 대상 특정 에이전트 ID 목록
     position?: AgentPosition; // 부서 내 직위 (팀장, 과장, 대리, 사원)
     supervisorId?: string; // 직속 결재/확인 상위 직위자 에이전트 ID
+    roleType?: AgentRoleType; // 업무 성격 (접수/실행/검증/관찰/보고)
+    mainDeptId?: string; // 주관(메인) 부서
+    subDeptIds?: string[]; // 협업(서브) 부서
     approvalStatus?: 'APPROVED' | 'PENDING' | 'REJECTED' | 'AUTO_RUNNING'; // 결재 상태
     orderIndex?: number; // 조직도 내 서열/배치 순서
     teamName?: string; // 소속 팀
@@ -162,8 +168,8 @@ export const DEPARTMENTS: Department[] = [
         icon: '💼',
         description: '메일·카카오톡·OCR·엑셀 다채널 견적 인입, AI 표준화 및 전사 재고·요율 반영 웹 견적서 자동화',
         headRole: '영업 총괄 관리',
-        totalUnits: 8,
-        teams: ['영업1팀', '영업2팀']
+        totalUnits: 12,
+        teams: ['영업1팀', '영업2팀', '영업3팀']
     },
     {
         id: 'purchase',
@@ -417,6 +423,126 @@ const RAW_INITIAL_AGENTS: AgentUnit[] = [
         logs: ['[정상] 미주문 견적 스케줄러 대기'],
         connectedDeptIds: ['sle'],
         orderIndex: 7
+    },
+    {
+        id: 'sle-11-order-vision-ocr',
+        code: 'SLE-11',
+        name: '카카오 발주 비전 OCR 판독봇',
+        deptId: 'sle',
+        deptName: '영업부',
+        teamName: '영업3팀',
+        tier: 2,
+        position: '대리',
+        role: '카카오톡으로 인입된 수기 발주서, 사진 캡처, 전표 이미지에서 Gemini Vision / GPT-4o-mini 비전 AI를 가동하여 텍스트 및 품목 표 정밀 추출',
+        status: 'ACTIVE',
+        isCreated: true,
+        approvalStatus: 'AUTO_RUNNING',
+        assignedHuman: '발주서 판독 담당자',
+        requiresApproval: false,
+        metrics: { speed: 96, accuracy: 98, load: 20, uptime: '99.9%', tasksToday: 18 },
+        currentTask: '카카오 발주 사진/전표 Vision OCR 대기',
+        lastActive: '방금 전',
+        triggerEvents: ['EVENT_KAKAO_ORDER_IMAGE'],
+        emittedEvents: ['EVENT_ORDER_DOC_PARSED'],
+        logs: ['[정상] Gemini Vision & GPT-4o-mini 발주서 OCR 엔진 가동 중'],
+        connectedDeptIds: ['sle', 'executive'],
+        orderIndex: 8
+    },
+    {
+        id: 'sle-12-order-ai-parser',
+        code: 'SLE-12',
+        name: '발주 품목·규격 AI 분석봇',
+        deptId: 'sle',
+        deptName: '영업부',
+        teamName: '영업3팀',
+        tier: 3,
+        position: '과장',
+        role: '배관·피팅 품목분석 프롬프트(규칙 0~11) + Gemini/GPT + 14,136개 재고 DB 대조하여 품명, 규격, 재질(WP/STS, -S/-W), 두께, 수량, 단가 정밀 매칭',
+        status: 'ACTIVE',
+        isCreated: true,
+        approvalStatus: 'AUTO_RUNNING',
+        assignedHuman: '기술영업 과장 / 발주 정밀 분석관',
+        requiresApproval: false,
+        metrics: { speed: 98, accuracy: 99, load: 25, uptime: '100%', tasksToday: 24 },
+        currentTask: '인입 발주 텍스트 ➔ 배관 피팅 정밀 품목 및 단가 매칭 대기',
+        lastActive: '방금 전',
+        triggerEvents: ['EVENT_ORDER_DOC_PARSED', 'EVENT_KAKAO_ORDER_TEXT'],
+        emittedEvents: ['EVENT_ORDER_ITEMS_ANALYZED'],
+        logs: ['[정상] 배관 피팅 정밀 품목 분석 프롬프트 엔진 대기 중'],
+        connectedDeptIds: ['sle', 'purchase'],
+        orderIndex: 9
+    },
+    {
+        id: 'sle-13-order-terms-verifier',
+        code: 'SLE-13',
+        name: '발주 필수조건 검증봇',
+        deptId: 'sle',
+        deptName: '영업부',
+        teamName: '영업3팀',
+        tier: 2,
+        position: '대리',
+        role: '고객 발주서의 필수 4대 항목(도착지 화물지점/주소, 수령인, 연락처, 운송조건 선불/착불) 충족 여부를 분석하고 누락 시 미비(INCOMPLETE) 분류 및 담당자 알림',
+        status: 'ACTIVE',
+        isCreated: true,
+        approvalStatus: 'AUTO_RUNNING',
+        assignedHuman: '영업 담당자',
+        requiresApproval: false,
+        metrics: { speed: 99, accuracy: 100, load: 15, uptime: '100%', tasksToday: 24 },
+        currentTask: '도착지 정보 및 운송조건(선불/착불) 무결점 검증 대기',
+        lastActive: '방금 전',
+        triggerEvents: ['EVENT_ORDER_ITEMS_ANALYZED'],
+        emittedEvents: ['EVENT_ORDER_TERMS_VERIFIED'],
+        logs: ['[정상] 도착지 지점 및 운송비 조건(선불/착불) 판별기 작동 중'],
+        connectedDeptIds: ['sle', 'purchase'],
+        orderIndex: 10
+    },
+    {
+        id: 'sle-14-order-pur-dispatcher',
+        code: 'SLE-14',
+        name: '발주 확정 & 구매부 이첩봇',
+        deptId: 'sle',
+        deptName: '영업부',
+        teamName: '영업3팀',
+        tier: 4,
+        position: '팀장',
+        role: '영업3팀 담당자 2차 검토 후 최종 승인 시, 정식 발주서 대장에 적재하고 구매부(PUR-01 재고 발주 & PUR-07 미결 관제)로 안전하게 인계',
+        status: 'ACTIVE',
+        isCreated: true,
+        approvalStatus: 'AUTO_RUNNING',
+        assignedHuman: '영업3팀장',
+        requiresApproval: true,
+        metrics: { speed: 99, accuracy: 100, load: 18, uptime: '100%', tasksToday: 24 },
+        currentTask: '영업3팀 검토 확정 발주서 ➔ 구매부(PUR-01/07) 실시간 이첩 대기',
+        lastActive: '방금 전',
+        triggerEvents: ['EVENT_ORDER_TERMS_VERIFIED'],
+        emittedEvents: ['EVENT_ORDER_TRANSFERRED_TO_PUR'],
+        logs: ['[정상] 구매부 SCM 연동 게이트 대기 중'],
+        connectedDeptIds: ['sle', 'purchase', 'shipping'],
+        orderIndex: 11
+    },
+    {
+        id: 'sle-15-order-rule-watcher',
+        code: 'SLE-15',
+        name: '발주서 수정관찰 & 규칙 학습봇',
+        deptId: 'sle',
+        deptName: '영업부',
+        teamName: '영업3팀',
+        tier: 3,
+        position: '과장',
+        role: '사무실 담당자의 발주서 수정 내역(품명-두께-규격-재질-수량 및 운송조건)을 실시간 Diff 감지하여 누적 저장하고 정기 보고서 생성 및 AI 규칙 학습 피드백 주입',
+        status: 'ACTIVE',
+        isCreated: true,
+        approvalStatus: 'AUTO_RUNNING',
+        assignedHuman: '영업3팀장',
+        requiresApproval: false,
+        metrics: { speed: 99, accuracy: 100, load: 12, uptime: '100%', tasksToday: 24 },
+        currentTask: '사무실 발주서 수정 Diff 실시간 감시 및 누적 규칙 학습 대기',
+        lastActive: '방금 전',
+        triggerEvents: ['EVENT_ORDER_UPDATED', 'EVENT_ORDER_APPROVED'],
+        emittedEvents: ['EVENT_ORDER_RULE_LEARNED'],
+        logs: ['[정상] 발주서 품목 5대 요소 및 운송조건 수정 관찰기 가동 중'],
+        connectedDeptIds: ['sle', 'quality'],
+        orderIndex: 12
     },
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

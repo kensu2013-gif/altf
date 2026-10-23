@@ -431,7 +431,7 @@ export class PurchaseBacklogBotService {
             const { nextTime, label } = this.getNextBusinessHour(now);
 
             agents[pur07Idx].name = '발주 분류 및 미결 통합 관제봇';
-            agents[pur07Idx].position = '대리';
+            agents[pur07Idx].position = '팀장'; // 구매SCM팀 팀장 (팀 관찰·보고)
             // 사용자가 대시보드에서 명시적으로 OFFLINE(OFF) 또는 IDLE로 설정한 경우 덮어쓰지 않고 절대 우선 유지!
             if (agents[pur07Idx].status !== 'OFFLINE' && agents[pur07Idx].status !== 'OFF' && agents[pur07Idx].status !== 'IDLE') {
                 agents[pur07Idx].status = 'ACTIVE';
@@ -439,10 +439,10 @@ export class PurchaseBacklogBotService {
             agents[pur07Idx].approvalStatus = 'AUTO_RUNNING';
             agents[pur07Idx].connectedDeptIds = ['quality', 'general', 'shipping', 'sle'];
             agents[pur07Idx].connectedAgentIds = [
-                'qc-inbound-ingest', // QC-01
-                'qc-cert-builder',   // QC-02
-                'gen-statement-builder', // GEN-01
-                'log-dispatch-signal' // LOG-01
+                'qc-email-collector', // QC-01
+                'qc-cert-issuer',     // QC-06
+                'gen-01-statement-maker', // GEN-01
+                'log-13-mes-matcher'  // LOG-13
             ];
             agents[pur07Idx].metrics = {
                 speed: 98,

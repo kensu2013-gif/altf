@@ -32,6 +32,7 @@ import { ledgerClient } from './server/services/ledgerClient.js';
 import { agentControlManager } from './server/services/agentControlManager.js';
 import { dispatchGate } from './server/services/dispatchGate.js';
 import { ruleCorrectionAgent } from './server/services/ruleCorrectionAgent.js';
+import { orderRuleCorrectionAgent } from './server/services/orderRuleCorrectionAgent.js';
 import { dailyBackupService } from './server/services/dailyBackupService.js';
 import { pendingListService } from './server/services/pendingListService.js';
 
@@ -626,27 +627,61 @@ kakaoBotService.onQuotationUpdated = (updatedQuote) => {
     }
 };
 
+// 🏷️ 순차 발주번호 생성기 (ES + YYMMDD + - + 4자리 순번, 번호 건너뜀 및 꼬임 완전 방지)
+export function generateNextSequentialPoNumber(orders = []) {
+    const today = new Date();
+    const yy = String(today.getFullYear()).slice(-2);
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayPrefix = `ES${yy}${mm}${dd}`;
+
+    let maxSeq = 0;
+    // 전체 주문 목록에서 ESxxxxxx-NNNN 패턴 검사 (가장 최신 순번 검출)
+    for (const o of orders) {
+        const po = o.poNumber || o.id || o.orderNo;
+        if (!po || typeof po !== 'string') continue;
+        const match = po.match(/^ES\d{6}-(\d{4})/i);
+        if (match) {
+            const seq = parseInt(match[1], 10);
+            if (seq > maxSeq && seq < 9000) {
+                maxSeq = seq;
+            }
+        }
+    }
+
+    // 최신 발주번호에서 정확히 +1 증가 (예: 2990 ➔ 2991)
+    const nextSeq = maxSeq > 0 ? maxSeq + 1 : 2991;
+    return `${todayPrefix}-${String(nextSeq).padStart(4, '0')}`;
+}
+
+// 🛡️ 카카오톡 봇 서비스에 순차 발주번호 채번 함수 주입 (담당자가 확인·저장 누르는 순간 채번)
+kakaoBotService.getNextPoNumber = () => {
+    return generateNextSequentialPoNumber(db.orders || []);
+};
+
 // 🛡️ 카카오톡 발주서 정식 승인 시 db.orders 안전 등록 훅 (Human-in-the-Loop 검증 후 승격)
 kakaoBotService.onOrderApproved = async (approvedKakaoOrder) => {
     try {
         if (!db.orders) db.orders = [];
 
-        // 중복 등록 방지 가드
-        const officialId = approvedKakaoOrder.convertedOrderId || `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-KKO-${Math.floor(1000 + Math.random() * 9000)}`;
-        const existingIdx = db.orders.findIndex(o => o.id === officialId || o.poNumber === approvedKakaoOrder.orderNo);
+        // 정식 순차 발주번호 확정 (ES261023-2901 등)
+        const officialPoNumber = approvedKakaoOrder.orderNo || kakaoBotService.getNextPoNumber();
+        const existingIdx = db.orders.findIndex(o => o.id === officialPoNumber || o.poNumber === officialPoNumber);
         if (existingIdx !== -1) {
-            console.log(`[API] ℹ️ 이미 등록된 카카오 발주서 건너뜀: ${approvedKakaoOrder.orderNo}`);
+            console.log(`[API] ℹ️ 이미 등록된 카카오 발주서 건너뜀: ${officialPoNumber}`);
             return;
         }
 
+        // 봇은 절대로 가격/요율을 임의 계산하지 않으며, 품목명-두께-사이즈-재질-수량만 정확히 전달하여 웹 주문관리에서 자동 가격 산출
         const officialOrder = {
-            id: officialId,
+            id: officialPoNumber,
             userId: approvedKakaoOrder.matchedUser?.userId || 'kakao-channel-user',
             customerName: approvedKakaoOrder.customerName || '카카오톡 고객사',
-            orderChannel: '카카오톡',
+            orderChannel: '카카오톡', // 🏷️ 사무실과 봇들만 식별하는 '카카오톡' 스티커 태그
             source: '카카오톡',
-            poNumber: approvedKakaoOrder.orderNo,
-            poTitle: `[카카오톡 발주] ${approvedKakaoOrder.customerName}`,
+            channelTag: '카카오톡',
+            poNumber: officialPoNumber,
+            poTitle: `[카카오톡 접수] ${approvedKakaoOrder.customerName}`,
             status: 'RECEIVED',
             createdAt: approvedKakaoOrder.receivedAt || new Date().toISOString(),
             destination: approvedKakaoOrder.destination || '',
@@ -656,8 +691,8 @@ kakaoBotService.onOrderApproved = async (approvedKakaoOrder) => {
             memo: [
                 `배송:${approvedKakaoOrder.destination || '미기재'}`,
                 `담당자:${approvedKakaoOrder.recipient || approvedKakaoOrder.customerName} (${approvedKakaoOrder.phone || ''})`,
-                `요청사항:${approvedKakaoOrder.freightTerms || '착불'}`,
-                `[카카오톡 접수번호: ${approvedKakaoOrder.orderNo}]`
+                `운송조건:${approvedKakaoOrder.freightTerms || '착불'}`,
+                `[카카오톡 접수 - 영업3팀 검토 승인]`
             ].join('\n'),
             items: (approvedKakaoOrder.items || []).map((it, idx) => ({
                 id: `ORD-ITEM-${idx}-${Date.now()}`,
@@ -666,13 +701,13 @@ kakaoBotService.onOrderApproved = async (approvedKakaoOrder) => {
                 size: it.size || '',
                 material: it.material || 'STS304-W',
                 quantity: it.quantity || 1,
-                unitPrice: it.unitPrice || 0,
-                amount: (it.unitPrice || 0) * (it.quantity || 1),
+                itemCode: `${it.name || ''}-${it.thickness || ''}-${it.size || ''}-${it.material || ''}`,
+                unitPrice: 0, // 웹 주문관리 자동 산출 연동 (임의 가격 계산 절대 금지)
+                amount: 0,
                 isSelected: true,
-                isVerified: true,
-                discountRate: it.discountRate || 50
+                isVerified: true
             })),
-            totalAmount: approvedKakaoOrder.totalAmount || 0,
+            totalAmount: 0, // 웹 주문관리에서 품목코드 기반 자동 가격 산출
             isStockOrder: false,
             poSent: false,
             approvedBy: approvedKakaoOrder.approvedBy || '사무실 관리자',
@@ -2755,6 +2790,32 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // 3-0-1-A. POST /api/kakao/orders/analyze : 영업3팀 SLE-11/12 발주서 AI 비전 OCR & 품목 정밀 분석 (Gemini/GPT & Rules 0~11)
+        if (req.method === 'POST' && url.pathname === '/api/kakao/orders/analyze') {
+            try {
+                const body = await parseBody(req);
+                const result = await kakaoBotService.analyzeOrder(body);
+                sendJsonResponse(req, res, 200, { success: true, result });
+            } catch (err) {
+                sendJsonResponse(req, res, 400, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 3-0-1-B. POST /api/kakao/orders/:id/analyze : 특정 발주 건에 대한 영업3팀 AI 정밀 재분석
+        const orderAnalyzeMatch = url.pathname.match(/^\/api\/kakao\/orders\/([^\/]+)\/analyze$/);
+        if (req.method === 'POST' && orderAnalyzeMatch) {
+            try {
+                const orderId = orderAnalyzeMatch[1];
+                const body = await parseBody(req).catch(() => ({}));
+                const updated = await kakaoBotService.analyzeOrder({ orderId, ...body });
+                sendJsonResponse(req, res, 200, { success: true, order: updated });
+            } catch (err) {
+                sendJsonResponse(req, res, 400, { success: false, error: err.message });
+            }
+            return;
+        }
+
         // 3-0-2. POST /api/kakao/orders/:id/approve : 사무실 직원의 카카오 발주서 정식 승인 (db.orders로 안전 이관)
         const orderApproveMatch = url.pathname.match(/^\/api\/kakao\/orders\/([^\/]+)\/approve$/);
         if (req.method === 'POST' && orderApproveMatch) {
@@ -2793,6 +2854,13 @@ const server = http.createServer(async (req, res) => {
             const orderId = orderDeleteMatch[1];
             const ok = kakaoBotService.deleteOrder(orderId);
             sendJsonResponse(req, res, ok ? 200 : 404, { success: ok, orderId });
+            return;
+        }
+
+        // 3-0-5. GET /api/kakao/orders/corrections : 발주서 수정관찰봇(SLE-15) 누적 학습 내역 및 보고서
+        if (req.method === 'GET' && url.pathname === '/api/kakao/orders/corrections') {
+            const report = orderRuleCorrectionAgent.getSummaryReport();
+            sendJsonResponse(req, res, 200, { success: true, ...report });
             return;
         }
 

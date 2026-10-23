@@ -95,6 +95,30 @@ export function sortAgents(a: AgentUnit, b: AgentUnit): number {
     return (a.code || '').localeCompare(b.code || '');
 }
 
+// 서버 저장 여부 판단용 조직 구조 스냅샷 (로그·지표 등 실시간 값은 제외)
+function agentStructureSnapshot(list: AgentUnit[]): string {
+    return JSON.stringify(list.map(a => ({
+        id: a.id,
+        code: a.code,
+        name: a.name,
+        role: a.role,
+        status: a.status,
+        position: a.position,
+        roleType: a.roleType,
+        deptId: a.deptId,
+        isCreated: a.isCreated,
+        teamName: a.teamName,
+        assignedHuman: a.assignedHuman,
+        requiresApproval: a.requiresApproval,
+        orderIndex: a.orderIndex,
+        supervisorId: a.supervisorId,
+        connectedDeptIds: a.connectedDeptIds,
+        connectedAgentIds: a.connectedAgentIds,
+        subDeptIds: a.subDeptIds,
+        scheduleInterval: a.scheduleInterval
+    })));
+}
+
 // 에이전트 직위 초기화 헬퍼 (팀장 1, 과장 2, 대리 3, 사원 나머지)
 function initAgentPositions(rawAgents: AgentUnit[]): AgentUnit[] {
     const deptCountMap: Record<string, number> = {};
@@ -285,6 +309,8 @@ export default function AgentOfficeDashboard() {
     const [activeNetworkStep, setActiveNetworkStep] = useState<number | null>(null);
     const [simulationLog, setSimulationLog] = useState<string[]>([]);
     const lastSavedStructureRef = React.useRef<string>('');
+    // 서버 목록을 받기 전에는 저장 금지 (localStorage 의 옛 목록이 서버 최신본을 덮어쓰는 것 방지)
+    const serverAgentsLoadedRef = React.useRef(false);
 
     // 에이전트 상태 (로컬 스토리지에 영구 보존 및 직위 체계 보정)
     const [agents, setAgents] = useState<AgentUnit[]>(() => {
@@ -310,28 +336,15 @@ export default function AgentOfficeDashboard() {
                 if (res.ok) {
                     const data = await res.json();
                     if (data.success && Array.isArray(data.agents) && data.agents.length > 0) {
-                        const structureSnapshot = JSON.stringify(data.agents.map((a: AgentUnit) => ({
-                            id: a.id,
-                            code: a.code,
-                            name: a.name,
-                            role: a.role,
-                            status: a.status,
-                            position: a.position,
-                            deptId: a.deptId,
-                            isCreated: a.isCreated,
-                            teamName: a.teamName,
-                            orderIndex: a.orderIndex,
-                            supervisorId: a.supervisorId,
-                            connectedDeptIds: a.connectedDeptIds,
-                            connectedAgentIds: a.connectedAgentIds
-                        })));
-                        lastSavedStructureRef.current = structureSnapshot;
+                        lastSavedStructureRef.current = agentStructureSnapshot(data.agents);
                         setAgents(data.agents);
                         localStorage.setItem(STORAGE_KEY, JSON.stringify(data.agents));
                     }
                 }
             } catch {
                 console.warn('[AgentOffice] Backend /api/agents unreachable, using local storage cache.');
+            } finally {
+                serverAgentsLoadedRef.current = true;
             }
         };
         fetchServerAgents();
@@ -345,24 +358,9 @@ export default function AgentOfficeDashboard() {
             console.error('Failed to save agents to localStorage:', e);
         }
 
-        const structureSnapshot = JSON.stringify(agents.map(a => ({
-            id: a.id,
-            code: a.code,
-            name: a.name,
-            role: a.role,
-            status: a.status,
-            position: a.position,
-            deptId: a.deptId,
-            isCreated: a.isCreated,
-            teamName: a.teamName,
-            assignedHuman: a.assignedHuman,
-            requiresApproval: a.requiresApproval,
-            orderIndex: a.orderIndex,
-            supervisorId: a.supervisorId,
-            connectedDeptIds: a.connectedDeptIds,
-            connectedAgentIds: a.connectedAgentIds,
-            scheduleInterval: a.scheduleInterval
-        })));
+        if (!serverAgentsLoadedRef.current) return;
+
+        const structureSnapshot = agentStructureSnapshot(agents);
 
         // 구조적 변경이 없으면 백엔드 파일 재작성 및 네트워크 요청을 방지함
         if (lastSavedStructureRef.current === structureSnapshot) {
@@ -3036,25 +3034,25 @@ export default function AgentOfficeDashboard() {
                         </span>
                     </button>
 
-                    {/* 📋 카카오톡 발주서 접수대기 검토 관제 퀵 버튼 */}
+                    {/* 📋 [영업3팀] 카카오톡 발주서 접수대기 & AI 정밀 분석 관제 퀵 버튼 */}
                     <button
                         onClick={() => { setKakaoModalTab('ORDERS'); setShowKakaoQuoteModal(true); }}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/50 bg-gradient-to-r from-emerald-950/50 to-teal-950/50 hover:from-emerald-900/70 hover:to-teal-900/70 hover:border-emerald-400 text-emerald-300 text-xs font-bold transition-all cursor-pointer shadow-xs"
-                        title="카카오톡 메신저로 접수된 발주서(원진철강 등)의 도착지, 운송비, 품목 규격을 검토하고 정식 원장 승인/삭제를 진행합니다."
+                        title="[영업3팀 SLE-11~14] 영업2팀 견적봇과 동일한 Gemini/GPT Vision & 규칙 0~11 AI 품목 분석, 도착지·운송비 검증 후 구매부(PUR-01/07)로 발주서를 이첩합니다."
                     >
                         <ClipboardList className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>발주서 접수대기 (카톡)</span>
+                        <span>📋 [영업3팀] 카톡 발주 접수·분석</span>
                         <span className="px-1.5 py-0.2 rounded-full bg-emerald-500 text-black text-[10px] font-black">1</span>
                     </button>
 
-                    {/* 💬 카카오톡 메신저 견적 검토 관제 퀵 버튼 */}
+                    {/* 💬 [영업2팀] 카카오톡 메신저 견적 검토 관제 퀵 버튼 */}
                     <button
                         onClick={() => { setKakaoModalTab('QUOTES'); setShowKakaoQuoteModal(true); }}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-950/30 hover:bg-amber-950/60 hover:border-amber-400 text-amber-300 text-xs font-bold transition-all cursor-pointer shadow-xs"
-                        title="카카오톡 메신저로 인입된 원본 텍스트(txt)를 확인하고 담당자가 견적을 확정·회신합니다."
+                        title="[영업2팀 INT-03/05] 카카오톡 메신저로 인입된 원본 텍스트(txt)를 확인하고 담당자가 견적을 확정·회신합니다."
                     >
                         <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
-                        <span>카톡 견적 검토</span>
+                        <span>💬 [영업2팀] 카톡 견적 검토</span>
                     </button>
 
                     {/* 🏭 대경 생산 미결 & 납기 정밀 분석 직통 버튼 */}
@@ -3188,11 +3186,11 @@ export default function AgentOfficeDashboard() {
                                     <div className="flex items-center gap-2.5">
                                         <ClipboardList className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
                                         <div>
-                                            <div className="text-xs font-bold text-slate-200 group-hover:text-emerald-300">📋 [구매팀] 카톡 발주 접수대기</div>
-                                            <div className="text-[10px] text-slate-400">도착지·운송비 검증 & 정식 발주 승인/영구 삭제</div>
+                                            <div className="text-xs font-bold text-slate-200 group-hover:text-emerald-300">📋 [영업3팀] 카톡 발주 접수 & AI 정밀 분석</div>
+                                            <div className="text-[10px] text-slate-400">규칙 0~11 AI 품목분석 & 승인 시 구매부(PUR-01/07) 이첩</div>
                                         </div>
                                     </div>
-                                    <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded font-mono">발주 1</span>
+                                    <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded font-mono">영업3팀</span>
                                 </button>
                             </div>
                         )}

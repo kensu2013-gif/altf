@@ -158,15 +158,40 @@ export class TelegramBotService {
      * 메시지 전송
      */
     async sendMessage(chatId, text) {
-        try {
-            return await this.makeRequest('sendMessage', {
-                chat_id: chatId || this.config.chatId,
-                text,
-                parse_mode: 'HTML'
-            });
-        } catch (e) {
-            console.error('[TelegramBot] 메시지 전송 실패:', e.message);
+        const target = chatId || this.config.chatId;
+        let last;
+        for (const chunk of this.splitMessage(String(text ?? ''))) {
+            try {
+                last = await this.makeRequest('sendMessage', { chat_id: target, text: chunk, parse_mode: 'HTML' });
+                // HTML 태그가 청크 경계에서 깨지는 등 파싱 실패 시 태그를 제거한 평문으로 재전송 (메시지 유실 방지)
+                if (last && last.ok === false && /parse entities/i.test(last.description || '')) {
+                    const plain = chunk.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+                    last = await this.makeRequest('sendMessage', { chat_id: target, text: plain });
+                }
+                if (last && last.ok === false) console.error('[TelegramBot] 메시지 전송 거부:', last.description);
+            } catch (e) {
+                console.error('[TelegramBot] 메시지 전송 실패:', e.message);
+            }
         }
+        return last;
+    }
+
+    /**
+     * 텔레그램 4096자 제한 대응: 줄 단위로 3800자 이하 청크 분할
+     */
+    splitMessage(text, limit = 3800) {
+        if (text.length <= limit) return [text];
+        const chunks = [];
+        let cur = '';
+        for (const line of text.split('\n')) {
+            if (cur && cur.length + line.length + 1 > limit) {
+                chunks.push(cur);
+                cur = '';
+            }
+            cur = cur ? `${cur}\n${line}` : line.slice(0, limit);
+        }
+        if (cur) chunks.push(cur);
+        return chunks;
     }
 
     /**
@@ -330,7 +355,7 @@ export class TelegramBotService {
             try {
                 const { inventorySyncService } = await import('./inventorySyncService.js');
                 const waitMin = inventorySyncService.config.bufferWaitMinutes || 3.5;
-                await this.sendMessage(chatId, `⏳ <b>[DAT-05 대리 & DAT-06 과장 가동]</b>\n구글시트 대용량 수식 연산(IMPORTRANGE) 안정화를 위해 ${waitMin}분 카운트다운을 시작합니다.\n타이머 만료 후 S3 업로드, 웹 갱신 및 시화 재고 변동량 분석을 마치고 <b>DAT-06 과장이 최종 결재 보고</b>를 올리겠습니다!`);
+                await this.sendMessage(chatId, `⏳ <b>[DAT-05 대리 & DAT-06 팀장 가동]</b>\n구글시트 대용량 수식 연산(IMPORTRANGE) 안정화를 위해 ${waitMin}분 카운트다운을 시작합니다.\n타이머 만료 후 S3 업로드, 웹 갱신 및 시화 재고 변동량 분석을 마치고 <b>DAT-06 팀장이 최종 결재 보고</b>를 올리겠습니다!`);
 
                 inventorySyncService.startStep3BufferAndAltfDb(false).then(async () => {
                     await inventorySyncService.waitForStep3Completion();
@@ -341,7 +366,7 @@ export class TelegramBotService {
                         step4Res
                     });
                 }).catch(async (err) => {
-                    await this.sendMessage(chatId, `❌ <b>[DAT-06 과장 긴급 보고]</b>\n재고 동기화 진행 중 오류 발생: ${err.message}`);
+                    await this.sendMessage(chatId, `❌ <b>[DAT-06 팀장 긴급 보고]</b>\n재고 동기화 진행 중 오류 발생: ${err.message}`);
                 });
             } catch (cmdErr) {
                 await this.sendMessage(chatId, `❌ 명령어 실행 오류: ${cmdErr.message}`);
@@ -355,9 +380,15 @@ export class TelegramBotService {
 
             // 🎩 [경영총괄부 비서실장 MGT-01] /보고, /이슈, 부서명, 봇코드 등 정형 보고 명령 우선 처리
             const { executiveAiService } = await import('./executiveAiService.js');
-            const chiefReply = executiveAiService.handleCommand(txt);
+            const chiefReply = executiveAiService.tryCommand(txt);
             if (chiefReply) {
                 await this.sendMessage(chatId, chiefReply);
+                return;
+            }
+
+            // 🗣 "성적서 매칭했으니 알림 그만" 같은 대표님 지시는 명세표 검색 등 다른 핸들러보다 먼저 비서실장이 이행
+            if (executiveAiService.isInstruction(txt)) {
+                await this.sendMessage(chatId, await executiveAiService.askExecutiveAI(txt));
                 return;
             }
 
@@ -680,7 +711,7 @@ ${matchedOrdersList}
     }
 
     /**
-     * 📊 대경재고 파일 수신 시 전자동 4단계 파이프라인 가동 및 DAT-06 과장의 최종 결재 보고
+     * 📊 대경재고 파일 수신 시 전자동 4단계 파이프라인 가동 및 DAT-06 팀장의 최종 결재 보고
      */
     async executeFullDaekyungToS3Pipeline(chatId, fileName, buffer) {
         const { inventorySyncService } = await import('./inventorySyncService.js');
@@ -694,7 +725,7 @@ ${matchedOrdersList}
 조현진 대표님, 지시사항에 따라 대경재고 수신 즉시 <b>태일·시화 Apps Script를 동시 실행</b>합니다:
 1️⃣ ⚡ <b>[DAT-04 사원 & DAT-03 사원 동시 가동]</b> 대경재고 원장 파싱 & 태일·시화 Apps Script 동시 실행
 2️⃣ ⏳ <b>[DAT-05 대리]</b> 두 사원 SUCCESS 완료 확인 후 ALTF 재고 DB 버퍼링 관제 (3분 30초 대기)
-3️⃣ 🚀 <b>[DAT-06 과장]</b> 신규 inventory.json 실물 검수 & S3 배포 ➔ <b>과장 최종 결재 보고</b>
+3️⃣ 🚀 <b>[DAT-06 팀장]</b> 신규 inventory.json 실물 검수 & S3 배포 ➔ <b>과장 최종 결재 보고</b>
             `.trim());
 
             // ⚡ [사원 동시 병렬 실행]: 대경재고 파싱과 태일/시화 Apps Script를 그 순간 동시에 실행!
@@ -710,7 +741,7 @@ ${matchedOrdersList}
 ⏳ <b>[DAT-05 대리 관제]</b> 대경(<b>${daekyungCount.toLocaleString()}개 규격</b>) 및 태일·시화 시트 동시 반영이 모두 SUCCESS 완료되었습니다!
 'ALTF 재고 DATA BASE' 구글시트 대용량 수식 연산(IMPORTRANGE) 안정화를 위해 <b>${waitMin}분 버퍼링 카운트다운</b>에 진입합니다.
 
-(카운트다운 종료 즉시 <b>DAT-06 과장</b>이 신규 결과물을 엄격 검수한 뒤 S3 배포를 완결하고 최종 결재 보고를 올리겠습니다.)
+(카운트다운 종료 즉시 <b>DAT-06 팀장</b>이 신규 결과물을 엄격 검수한 뒤 S3 배포를 완결하고 최종 결재 보고를 올리겠습니다.)
             `.trim());
 
             // Step 3: 버퍼링 타이머 가동 & 실패 시 성공할 때까지 3~5분 간격 자동 재시작
@@ -718,10 +749,10 @@ ${matchedOrdersList}
             await inventorySyncService.waitForStep3Completion();
             await inventorySyncService.runStep3RetryUntilInventoryJsonReady();
 
-            // Step 4: DAT-06 과장 배포 (중복 다운로드 삭제, S3 업로드, 웹 갱신, 시화 변동량)
+            // Step 4: DAT-06 팀장 배포 (중복 다운로드 삭제, S3 업로드, 웹 갱신, 시화 변동량)
             const step4Res = await inventorySyncService.runStep4DeployAndAnalyzeDiff();
 
-            // 최종 DAT-06 과장 명의의 완결 결재 보고서 전송!
+            // 최종 DAT-06 팀장 명의의 완결 결재 보고서 전송!
             await this.sendManagerInventoryReport(chatId, {
                 fileName,
                 daekyungCount,
@@ -731,7 +762,7 @@ ${matchedOrdersList}
         } catch (err) {
             console.error('[TelegramBot] 대경재고 ➔ S3 파이프라인 실패:', err);
             await this.sendMessage(chatId, `
-❌ <b>[DAT-06 과장 긴급 보고]</b>
+❌ <b>[DAT-06 팀장 긴급 보고]</b>
 재고 동기화 파이프라인 진행 중 오류가 발생했습니다.
 • 오류 내용: <code>${err.message}</code>
 관리자 확인 후 재시도 부탁드립니다.
@@ -740,7 +771,7 @@ ${matchedOrdersList}
     }
 
     /**
-     * 📋 DAT-06 과장 명의의 전사 재고 동기화 및 S3 배포 완결 결재 보고
+     * 📋 DAT-06 팀장 명의의 전사 재고 동기화 및 S3 배포 완결 결재 보고
      */
     async sendManagerInventoryReport(chatId, { fileName, daekyungCount, step4Res }) {
         const totalItems = step4Res?.step4?.totalItems || 0;
@@ -766,7 +797,7 @@ ${matchedOrdersList}
 
         const report = `
 📋 <b>[결재/완료 보고] 전사 재고 동기화 및 S3 배포 완결</b>
-<b>보고자:</b> 데이터관리팀 재고배포·감시 총괄 <b>DAT-06 과장</b>
+<b>보고자:</b> 데이터관리팀 재고배포·감시 총괄 <b>DAT-06 팀장</b>
 <b>수신:</b> 조현진 대표님
 <b>일시:</b> <code>${nowStr}</code>
 
@@ -787,7 +818,7 @@ ${matchedOrdersList}
   - 대용량 수식(IMPORTRANGE) 연산 안정화 (3분 30초 버퍼 준수)
   - 'ALTF 재고 DATA BASE' 최신 inventory.json 정상 생성
 
-• <b>[DAT-06 과장] S3 배포 및 시스템 갱신</b>:
+• <b>[DAT-06 팀장] S3 배포 및 시스템 갱신</b>:
   - ☁️ <b>AWS S3 업로드</b>: 총 <b>${totalItems.toLocaleString()}개</b> 품목 클라우드 적재 완료
   - 🖥️ <b>altf.kr admin 재고 화면</b>: <b>${adminDateStr}</b> (오른쪽 하단 기준 일시 최신화 완료)
   - 🧹 <b>다운로드 정리</b>: ${cleanedFiles.length > 0 ? `${cleanedFiles.join(', ')} 중복 파일 정리 완료` : '잔여 파일 정리 완료'}
@@ -998,14 +1029,14 @@ ${keyHighlights}
 
 조현진 대표님, 대경벤드 생산 미결 엑셀이 접수되어 구매부 미결관리팀 및 전사 연계 봇을 긴급 가동합니다:
 1️⃣ 📥 <b>[PUR-01 사원]</b> 미결 원장 수신 및 안전 아카이빙
-2️⃣ 🔍 <b>[PUR-02 사원]</b> 전 행/열 정밀 파싱 (L열 작업유형 및 공정일자 검증)
-3️⃣ 🔗 <b>[PUR-03 대리]</b> Y열 주문번호 ↔ 우리 발주번호 매칭 & 9단계 공정 진행도 추적
-4️⃣ 🚨 <b>[PUR-04 과장]</b> 1주일 이상 검토 정체 / 절단 누락 품목 독촉 보고서 자동 생성
+2️⃣ 🔍 <b>[PUR-02 대리]</b> 전 행/열 정밀 파싱 (L열 작업유형 및 공정일자 검증)
+3️⃣ 🔗 <b>[PUR-03 과장]</b> Y열 주문번호 ↔ 우리 발주번호 매칭 → 잔량(pending)·지연일수로 실지연 판정
+4️⃣ 🚨 <b>[PUR-04 팀장]</b> 지연/임박 중 공정진행률 저조 건 필수확인(P1) 지시 → 독촉(P2) → 예상 문제(P3) 순 보고
 5️⃣ 🏢 <b>[SAL-03 대리 & DAT-07 과장]</b> 고객사 납기 알림 동기화 & 품목별 제조 리드타임 통계 산출
             `.trim());
 
             const result = await pendingListService.processPendingListPipeline(buffer, fileName);
-            const { summary, stageCounts, chaserReport, leadtimeStats } = result;
+            const { summary, stageCounts, leadtimeStats } = result;
 
             const stageReport = [
                 `• 검토정체: <b>${stageCounts.검토정체 || 0}건</b> ⚠️`,
@@ -1019,25 +1050,19 @@ ${keyHighlights}
                 `• 창고입고완료: <b>${stageCounts.창고입고완료 || 0}건</b> ✅`
             ].join('\n');
 
-            const alertItemsText = (result.rows.filter(r => r.alertSeverity === 'CRITICAL').slice(0, 5).map(r => 
-                `• <code>${r.orderNo}</code> (${r.customerName}): <b>${r.itemName}</b> ${r.size} - 🚨 ${r.alertReason}`
-            ).join('\n') || '긴급 독촉 항목 없음');
-
             const leadtimeText = (leadtimeStats?.categoryStats || []).map(c => 
                 `• <b>${c.category}</b>: 평균 <b>${c.avgDays}일</b> 소요 (${c.minDays}~${c.maxDays}일)`
             ).join('\n') || '데이터 산출 중';
 
             const replyMsg = `
-<b>✅ [구매부 미결관리팀 분석 완료 보고 - PUR-04 과장]</b>
+<b>✅ [구매부 미결관리팀 분석 완료 보고 - PUR-04 팀장]</b>
 📊 <b>총 미결 품목</b>: <b>${summary.totalRows.toLocaleString()}건</b>
 🔗 <b>발주 매칭</b>: <b>${summary.matchedCount.toLocaleString()}건</b> (재고 발주: ${summary.stockOrderCount}건)
-🚨 <b>독촉 경보 대상</b>: 총 <b>${summary.alertCount}건</b> (긴급: ${chaserReport.summary?.criticalCount || 0}건, 경고: ${chaserReport.summary?.warningCount || 0}건)
+
+${this.formatPriorityBoard(result.priorityBoard)}
 
 🏭 <b>공정 단계별 현황</b>:
 ${stageReport}
-
-⚡ <b>주요 긴급 독촉 발주건 (절단 미착수/정체)</b>:
-${alertItemsText}
 
 ⏱️ <b>DAT-07 분석팀 품목별 실제 제조 리드타임 (견적팀 제공)</b>:
 ${leadtimeText}
@@ -1051,6 +1076,34 @@ ${leadtimeText}
             console.error('[TelegramBot] Pending pipeline failed:', e);
             await this.sendMessage(chatId, `❌ 미결 리스트 처리 중 오류: ${e.message}`);
         }
+    }
+
+    /**
+     * 미결관리팀 확인 순서 (① 실지연 판정 → ② P1 필수확인 → ③ P2 독촉 → ④ P3 예상 문제)
+     */
+    formatPriorityBoard(board) {
+        if (!board) return '';
+        const due = (it) => it.delayDays > 0 ? `${it.delayDays}일 지연` : `D-${it.remainingCustomerDays ?? '?'}`;
+        const p1Orders = (board.mustCheckOrders || []).slice(0, 5).map(o => {
+            const it = o.mustCheckItems[0];
+            return `• <b>${o.client}</b> <code>${o.orderNo}</code> — ${o.mustCheckCount}건, ${due(it)} · 최저 진행률 ${o.minProgressPct}%\n  ↳ ${it.itemName} ${it.size} (${it.stage})`;
+        }).join('\n') || '• 해당 없음';
+        const p3 = (board.forecastRiskItems || []).slice(0, 3).map(it =>
+            `• ${it.deliveryTo || it.customerName} <code>${it.orderNo}</code> ${it.itemName} ${it.size} — 약 ${it.expectedSlipDays}일 지연 예상 (${it.stage})`
+        ).join('\n') || '• 해당 없음';
+
+        return `
+<b>📌 미결관리팀 확인 순서</b>
+① 실지연 판정: <b>${board.actualDelayedCount}건</b> (잔량 有·창고입고 前·납기 경과)
+② 🔴 <b>필수확인 P1: ${board.counts.P1}건</b> (지연/임박 + 공정진행률 50% 미만)
+③ 🟠 지연·임박 독촉 P2: ${board.counts.P2}건 (공정 후반·재고 배정)
+④ 🟡 예상 문제 P3: ${board.counts.P3}건 (잔여 공정일수 > 남은 납기)
+
+🔴 <b>반드시 확인 — 대경 공장 확인 요청 발주</b>:
+${p1Orders}
+
+🟡 <b>예상 문제 지점 (사전 예방)</b>:
+${p3}`.trim();
     }
 
     /**
@@ -1086,7 +1139,7 @@ ${leadtimeText}
         if (wantsChaserReport && latest.chaserReport?.markdown) {
             // 독촉장 상세 리포트 회신
             const reportMsg = `
-<b>🚨 [대경벤드 긴급 납기 독촉 보고서 - PUR-04 과장]</b>
+<b>🚨 [대경벤드 긴급 납기 독촉 보고서 - PUR-04 팀장]</b>
 기준 일시: <code>${latest.chaserReport.createdAt?.slice(0, 10) || '오늘'}</code>
 총 경보: <b>${latest.summary.alertCount}건</b> (긴급: ${latest.chaserReport.summary?.criticalCount || 0}건)
 
@@ -1111,7 +1164,8 @@ ${Object.entries(latest.chaserReport.groupByOrder || {}).slice(0, 5).map(([ordNo
 
 • 총 미결 품목: <b>${latest.summary.totalRows.toLocaleString()}건</b>
 • 발주 매칭: <b>${latest.summary.matchedCount.toLocaleString()}건</b>
-• 🚨 지연/정체 경보: <b>${latest.summary.alertCount}건</b>
+
+${this.formatPriorityBoard(latest.priorityBoard)}
 
 🏭 <b>공정 단계별 현황</b>:
 • 검토 정체: <b>${st.검토정체 || 0}건</b>

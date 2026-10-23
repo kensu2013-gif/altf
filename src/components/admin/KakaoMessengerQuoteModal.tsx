@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     X,
     MessageSquare,
@@ -104,7 +104,7 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
     const [editCustomerPhone, setEditCustomerPhone] = useState<string>('');
 
     // Fetch review queue
-    const fetchQueue = async () => {
+    const fetchQueue = useCallback(async () => {
         setLoading(true);
         try {
             const res = await fetch('/api/kakao/review-queue');
@@ -112,8 +112,8 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                 const data = await res.json();
                 if (data.success && Array.isArray(data.queue)) {
                     setQueue(data.queue);
-                    if (data.queue.length > 0 && !selectedId) {
-                        setSelectedId(data.queue[0].intakeId);
+                    if (data.queue.length > 0) {
+                        setSelectedId(prev => prev || data.queue[0].intakeId);
                     }
                 }
             }
@@ -122,13 +122,13 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         if (isOpen) {
             fetchQueue();
         }
-    }, [isOpen]);
+    }, [isOpen, fetchQueue]);
 
     // Active selected item
     const activeItem = queue.find(q => q.intakeId === selectedId) || queue[0] || null;
@@ -408,14 +408,22 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                         <div>
                             <div className="flex items-center gap-2">
                                 <h2 className="text-lg font-bold text-white tracking-wide">
-                                    카카오톡 메신저 견적 인입 & 담당자 2차 검토 관제 (Human-in-the-Loop)
+                                    {mainTab === 'ORDERS' 
+                                        ? '[영업3팀] 카카오톡 발주 접수 & AI 정밀 분석 관제 (Human-in-the-Loop)' 
+                                        : '[영업2팀] 카카오톡 견적 인입 & 규격표준화 관제 (Human-in-the-Loop)'}
                                 </h2>
-                                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                                    검토 대기: {pendingCount}건
+                                <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
+                                    mainTab === 'ORDERS'
+                                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                }`}>
+                                    {mainTab === 'ORDERS' ? '영업3팀 ➔ 구매부(PUR-01/07) 이첩 대기' : `검토 대기: ${pendingCount}건`}
                                 </span>
                             </div>
                             <p className="text-xs text-gray-400 mt-0.5">
-                                메신저로 들어온 비정형 txt 원문을 확인하고, 규격·단가표 매칭 데이터를 검토·수정하여 정식 견적서 대장으로 확정 적재합니다. (고객 문자발송은 일시중단)
+                                {mainTab === 'ORDERS'
+                                    ? '영업2팀 견적봇과 동일한 Gemini/GPT Vision & 규칙 0~11 프롬프트로 품목·도착지·운송비를 정밀 분석하며, 최종 승인 시 구매부로 안전하게 인계합니다.'
+                                    : '메신저로 들어온 비정형 txt 원문을 확인하고, 규격·단가표 매칭 데이터를 검토·수정하여 정식 견적서 대장으로 확정 적재합니다.'}
                             </p>
                         </div>
                     </div>
@@ -430,7 +438,7 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                             }`}
                         >
                             <span className="px-1 py-0.2 rounded bg-black/20 text-[10px]">PO</span>
-                            <span>📋 발주서 접수대기 (카카오톡)</span>
+                            <span>📋 [영업3팀] 발주서 접수대기</span>
                         </button>
                         <button
                             onClick={() => setMainTab('QUOTES')}
@@ -441,7 +449,7 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                             }`}
                         >
                             <span className="px-1 py-0.2 rounded bg-black/20 text-[10px]">EST</span>
-                            <span>💬 견적 의뢰 접수대기</span>
+                            <span>💬 [영업2팀] 견적 의뢰 접수대기</span>
                             {pendingCount > 0 && (
                                 <span className="ml-1 px-1.5 py-0.2 rounded-full bg-black/30 text-[10px] font-bold">
                                     {pendingCount}

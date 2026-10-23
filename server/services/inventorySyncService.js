@@ -662,7 +662,7 @@ export class InventorySyncService {
         timestamp: new Date().toLocaleTimeString('ko-KR')
       };
 
-      // 🔗 DAT-05 완료 신호(SUCCESS) 방출 및 DAT-06 과장 대기 알림
+      // 🔗 DAT-05 완료 신호(SUCCESS) 방출 및 DAT-06 팀장 대기 알림
       this.state.chain.dat05.status = 'SUCCESS';
       this.state.chain.dat05.lastSuccessAt = new Date().toISOString();
       this.state.chain.dat05.message = 'ALTF DB 연산 완료 및 최신 inventory.json 준비 완료 (SUCCESS 신호 방출)';
@@ -671,7 +671,7 @@ export class InventorySyncService {
       this._updateAgentStatus('DAT-05', '[완료] ALTF DB 연산 완료 및 최신 inventory.json 준비 완료 (SUCCESS 신호 방출)', 'ALTF DB 연산 완료 (SUCCESS)', 'ACTIVE');
       this._updateAgentStatus('DAT-06', '[신호 감지] DAT-05 대리 완료 신호 감지됨 ➔ 최신 inventory.json 결과물 엄격 검수 대기', '직전 대리 DAT-05의 SUCCESS 신호 감지됨');
 
-      console.log(`[DAT-05 대리] ✅ ALTF DB 연산 완료 (SUCCESS). 다음 봇 DAT-06 과장에게 바통 터치!`);
+      console.log(`[DAT-05 대리] ✅ ALTF DB 연산 완료 (SUCCESS). 다음 봇 DAT-06 팀장에게 바통 터치!`);
       return { success: true, step3: this.state.step3 };
     } catch (err) {
       this.state.step3.status = 'ERROR';
@@ -771,7 +771,7 @@ export class InventorySyncService {
   }
 
   /**
-   * 🤖 [DAT-06 과장 자동 직수신] 구글 드라이브에서 최신 inventory.json을 백그라운드로 자동 다이렉트 다운로드
+   * 🤖 [DAT-06 팀장 자동 직수신] 구글 드라이브에서 최신 inventory.json을 백그라운드로 자동 다이렉트 다운로드
    */
   async downloadLatestInventoryFromGoogleDrive() {
     const fileId = this.config.googleDriveFileId || '1_ZAnMjzbZyw8UQRgybVhaOYpWHpGe9U0';
@@ -779,7 +779,7 @@ export class InventorySyncService {
 
     try {
       this._updateAgentStatus('DAT-06', '[자동 수신] 구글 드라이브에서 최신 inventory.json 직접 다운로드 중...', '구글 드라이브 직수신 착수', 'ACTIVE');
-      console.log(`[DAT-06 과장] 구글 드라이브에서 최신 inventory.json 직접 다운로드 시도 (File ID: ${fileId})...`);
+      console.log(`[DAT-06 팀장] 구글 드라이브에서 최신 inventory.json 직접 다운로드 시도 (File ID: ${fileId})...`);
 
       const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
       const controller = new AbortController();
@@ -814,10 +814,10 @@ export class InventorySyncService {
       if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
       fs.writeFileSync(path.join(storageDir, 'inventory.json'), text, 'utf8');
 
-      console.log(`[DAT-06 과장] ✅ 구글 드라이브로부터 최신 inventory.json (${items.length.toLocaleString()}건) 직수신 완료: ${targetPath}`);
+      console.log(`[DAT-06 팀장] ✅ 구글 드라이브로부터 최신 inventory.json (${items.length.toLocaleString()}건) 직수신 완료: ${targetPath}`);
       return { path: targetPath, count: items.length };
     } catch (err) {
-      console.warn(`[DAT-06 과장] 구글 드라이브 자동 다운로드 경고 (기존 파일 탐색으로 대체):`, err.message);
+      console.warn(`[DAT-06 팀장] 구글 드라이브 자동 다운로드 경고 (기존 파일 탐색으로 대체):`, err.message);
       return null;
     }
   }
@@ -828,7 +828,7 @@ export class InventorySyncService {
   async runStep4DeployAndAnalyzeDiff(options = {}) {
     // 🛡️ [직전 대리 봇 감시/확인]: 반드시 DAT-05 대리의 SUCCESS 신호가 감지되어야 작동
     if (!options.bypassPrerequisite && this.state.chain.dat05.status !== 'SUCCESS') {
-      const errMsg = `[DAT-06 과장 거부] 직전 대리 봇 DAT-05(ALTF DB 총괄)의 SUCCESS 신호가 감지되지 않아 작업을 시작할 수 없습니다. (현재 상태: ${this.state.chain.dat05.status}) 대리 작업 완료 후 검수를 진행합니다.`;
+      const errMsg = `[DAT-06 팀장 거부] 직전 대리 봇 DAT-05(ALTF DB 총괄)의 SUCCESS 신호가 감지되지 않아 작업을 시작할 수 없습니다. (현재 상태: ${this.state.chain.dat05.status}) 대리 작업 완료 후 검수를 진행합니다.`;
       console.warn(errMsg);
       this.state.chain.dat06.status = 'WAITING_PREVIOUS';
       this.state.chain.dat06.message = errMsg;
@@ -877,7 +877,7 @@ export class InventorySyncService {
 
       if (!options.bypassFileValidation) {
         if (!freshestSourcePath) {
-          const errMsg = '[DAT-06 과장 검수 실패] 구글 드라이브에서 다운로드된 inventory.json 파일을 찾을 수 없습니다. 구글 드라이브에서 최신 파일을 다운로드해 주세요.';
+          const errMsg = '[DAT-06 팀장 검수 실패] 구글 드라이브에서 다운로드된 inventory.json 파일을 찾을 수 없습니다. 구글 드라이브에서 최신 파일을 다운로드해 주세요.';
           this.state.chain.dat06.status = 'ERROR';
           this.state.chain.dat06.message = errMsg;
           this._updateAgentStatus('DAT-06', `[검수 실패] ${errMsg}`, errMsg);
@@ -895,7 +895,7 @@ export class InventorySyncService {
           const reason = isOlderThanDat05 
             ? `DAT-05 연산 시점(${new Date(dat05SuccessTime).toLocaleTimeString('ko-KR')})보다 이전에 생성된 과거 파일` 
             : `다운로드 후 20분 이상 경과된 과거 잔여 파일(${Math.round(fileAgeMs / 60000)}분 전)`;
-          const errMsg = `[DAT-06 과장 검수 실패] 감지된 파일(${path.basename(freshestSourcePath)})은 ${reason}(수정시각: ${new Date(freshestMtime).toLocaleTimeString('ko-KR')})입니다. 구버전 파일이 업로드되는 사고를 원천 차단합니다.`;
+          const errMsg = `[DAT-06 팀장 검수 실패] 감지된 파일(${path.basename(freshestSourcePath)})은 ${reason}(수정시각: ${new Date(freshestMtime).toLocaleTimeString('ko-KR')})입니다. 구버전 파일이 업로드되는 사고를 원천 차단합니다.`;
           console.error(errMsg);
           this.state.chain.dat06.status = 'ERROR';
           this.state.chain.dat06.message = errMsg;
@@ -929,7 +929,7 @@ export class InventorySyncService {
 
       const itemsArray = Array.isArray(inventoryData) ? inventoryData : (inventoryData.items || []);
       if (itemsArray.length < 10000 && !options.bypassFileValidation) {
-        throw new Error(`[DAT-06 과장 검수 실패] 유효 품목 수가 부족합니다 (${itemsArray.length}건). 최소 10,000건 이상의 전체 대장이어야 합니다.`);
+        throw new Error(`[DAT-06 팀장 검수 실패] 유효 품목 수가 부족합니다 (${itemsArray.length}건). 최소 10,000건 이상의 전체 대장이어야 합니다.`);
       }
 
       this.state.step4.totalItems = itemsArray.length;
@@ -1030,7 +1030,7 @@ export class InventorySyncService {
       this.state.lastFullRun = new Date().toISOString();
       this._updateAgentStatus('DAT-06', `[완결] 결과물 검수 통과, S3 배포 및 시화 변동량(${diffStats.totalChanges}건) 산출 완료 (SUCCESS)`, `S3 배포 및 시화 변동량(${diffStats.totalChanges}건: 입고+${diffStats.inboundCount}/출고-${diffStats.outboundCount}) 확정 (SUCCESS)`, 'ACTIVE');
 
-      console.log(`[DAT-06 과장] ✅ 결과물 검수 통과 & S3 배포 완료 (전체 파이프라인 SUCCESS 완결!)`);
+      console.log(`[DAT-06 팀장] ✅ 결과물 검수 통과 & S3 배포 완료 (전체 파이프라인 SUCCESS 완결!)`);
       return { success: true, step4: this.state.step4 };
     } catch (err) {
       this.state.step4.status = 'ERROR';
@@ -1123,7 +1123,7 @@ export class InventorySyncService {
       }
 
       // 4단계: 과장 DAT-06 작동 (DAT-05 SUCCESS 확인 및 결과물 실물 검수 후)
-      console.log('\n[체인 4/4] DAT-06 과장: DAT-05 완료 확인 ➔ 결과물 검수 및 S3 배포 시작...');
+      console.log('\n[체인 4/4] DAT-06 팀장: DAT-05 완료 확인 ➔ 결과물 검수 및 S3 배포 시작...');
       this.state.currentStep = 4;
       const step4Res = await this.runStep4DeployAndAnalyzeDiff({
         bypassFileValidation: options.bypassFileValidation || false

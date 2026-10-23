@@ -22,10 +22,12 @@
     "icon": "💼",
     "description": "메일·카카오톡·OCR·엑셀 다채널 견적 인입, AI 표준화 및 전사 재고·요율 반영 웹 견적서 자동화",
     "headRole": "영업 총괄 관리",
-    "totalUnits": 8,
+    "totalUnits": 15,
     "teams": [
       "영업1팀",
-      "영업2팀"
+      "영업2팀",
+      "영업3팀",
+      "영업관리팀"
     ]
   },
   {
@@ -37,7 +39,7 @@
     "icon": "🛒",
     "description": "고객 발주서 등록, 견적 대조, S/D/M 경로 판별, 대경 매입발주 및 생산 미결 공정 관제",
     "headRole": "구매/SCM 총괄",
-    "totalUnits": 9,
+    "totalUnits": 10,
     "teams": [
       "구매SCM팀",
       "미결관리팀"
@@ -52,7 +54,10 @@
     "icon": "🔬",
     "description": "외주 성적서 수집, 26개 컬럼 파싱, 시화 성적서 무결점 발행 및 누락 경보",
     "headRole": "품질 보증(QA) 총괄",
-    "totalUnits": 5
+    "totalUnits": 5,
+    "teams": [
+      "품질보증팀"
+    ]
   },
   {
     "id": "shipping",
@@ -63,7 +68,10 @@
     "icon": "🚚",
     "description": "시화 창고 출고 지시, 포장 완료 신호 감지, MES 출고 번호 및 LOT 연동",
     "headRole": "물류/출고 총괄",
-    "totalUnits": 3
+    "totalUnits": 3,
+    "teams": [
+      "물류출고팀"
+    ]
   },
   {
     "id": "general",
@@ -74,7 +82,10 @@
     "icon": "📑",
     "description": "매출 거래명세표 생성, 성적서 결합 서류 패키징 번들링, CRM 거래처 마스터",
     "headRole": "경리/총무 총괄",
-    "totalUnits": 3
+    "totalUnits": 3,
+    "teams": [
+      "경리총무팀"
+    ]
   },
   {
     "id": "executive",

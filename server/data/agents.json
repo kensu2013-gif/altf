@@ -6,7 +6,7 @@
     "deptId": "management",
     "deptName": "경영총괄부",
     "teamName": "비서실",
-    "tier": 3,
+    "tier": 5,
     "position": "부장",
     "role": "전사 모든 부서·봇(영업/구매/품질/출고/총무/관제/데이터 및 신규 부서) 가동·업무 이상 관제, 대표님 텔레그램 질의에 결론 먼저·예외만 간결 보고, 긴급 경보 및 평일 08:30/17:30 정기 브리핑",
     "status": "ACTIVE",
@@ -19,7 +19,7 @@
       "accuracy": 100,
       "load": 10,
       "uptime": "100%",
-      "tasksToday": 17
+      "tasksToday": 18
     },
     "currentTask": "전사 관제 및 대표님 텔레그램 보고 대기 (긴급 감시 10분 주기)",
     "lastActive": "방금 전",
@@ -34,6 +34,7 @@
       "EVENT_CRITICAL_ALERT"
     ],
     "logs": [
+      "[오전 12:15:24] [긴급 경보] 1건",
       "[오전 12:05:12] [GPT 답변] 왜 일신프렌지는 없지?",
       "[오전 12:04:10] [긴급 경보] 1건",
       "[오후 11:51:53] [긴급 경보] 1건",
@@ -42,8 +43,7 @@
       "[오후 11:43:34] [AI 답변] 성적서 누락을 자세하게 설명",
       "[오후 11:42:59] [AI 답변] 나에게만 보고가되는게 맞아?",
       "[오후 11:32:39] [긴급 경보] 1건",
-      "[오후 11:25:23] [승진·전보] 관제·게이트부 EXE-AI(과장) ➔ 경영총괄부 MGT-01(부장) 비서실장 취임",
-      "[오후 11:13:19] [답변 완료] 지금 미결중에 가장 급하게 연락해야되는것이 뭐"
+      "[오후 11:25:23] [승진·전보] 관제·게이트부 EXE-AI(과장) ➔ 경영총괄부 MGT-01(부장) 비서실장 취임"
     ],
     "connectedDeptIds": [
       "management",
@@ -56,12 +56,24 @@
       "dat"
     ],
     "orderIndex": 0,
-    "lastActiveAt": "2026-10-23T15:05:12.035Z"
+    "lastActiveAt": "2026-10-23T15:15:24.470Z",
+    "roleType": "REPORT",
+    "mainDeptId": "management",
+    "subDeptIds": [
+      "sle",
+      "purchase",
+      "quality",
+      "shipping",
+      "general",
+      "executive",
+      "dat"
+    ],
+    "supervisorId": ""
   },
   {
     "id": "pur-01-pending-intake",
     "code": "PUR-01",
-    "name": "미결 리스트 수신 봇",
+    "name": "미결 리스트 수신봇",
     "deptId": "purchase",
     "deptName": "구매부",
     "teamName": "미결관리팀",
@@ -80,7 +92,7 @@
       "uptime": "99.9%",
       "tasksToday": 18
     },
-    "currentTask": "업무시간 1일 2회 정기 감시 대기 중 (다음: 내일 오전 10:00, 미결 1009건 관리)",
+    "currentTask": "업무시간 1일 2회 정기 감시 대기 중 (다음: 오늘 오전 10:00, 미결 1009건 관리)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_PENDING_EXCEL_RECEIVED"
@@ -89,32 +101,40 @@
       "EVENT_PENDING_EXCEL_STORED"
     ],
     "logs": [
+      "[00:44] [PUR-01] altf.kr API 재고 발주 동기화 완료: 총 1410건 (입고: 348건, 미결: 1009건)",
+      "[오전 12:44:42] 📦 [PUR-01 수신] 영업3팀으로부터 발주서(ES261024-2992) 정식 인계 수신 ➔ 대장 등록 및 재고 매칭",
+      "[00:44] [PUR-01] altf.kr API 재고 발주 동기화 완료: 총 1410건 (입고: 348건, 미결: 1009건)",
+      "[오전 12:44:26] 📦 [PUR-01 수신] 영업3팀으로부터 발주서(ES261024-2991) 정식 인계 수신 ➔ 대장 등록 및 재고 매칭",
+      "[00:23] [PUR-01] altf.kr API 재고 발주 동기화 완료: 총 1410건 (입고: 348건, 미결: 1009건)",
+      "[오전 12:23:56] 📦 [PUR-01 수신] 영업3팀으로부터 발주서(PO-20261023-KKO-2830) 정식 인계 수신 ➔ 대장 등록 및 재고 매칭",
+      "[오전 12:23:08] 🛒 [PUR-01] 영업3팀 신규 발주 접수 감지: PO-KKO-261023-7381 (영업부 검토 진행 중)",
+      "[오전 12:15:09] 미결 파일 접수 및 아카이빙",
       "[23:32] [PUR-01] altf.kr API 재고 발주 동기화 완료: 총 1410건 (입고: 348건, 미결: 1009건)",
       "[오후 11:40:00] 📦 [PUR-01 준비] 카카오 발주(PO-KKO-261023-7381, 원진철강) 필수항목 완비 ➔ 사무실 승인 대기",
-      "[오후 11:17:33] 📦 [PUR-01] 카카오 발주서 품목 재고 대조 시작 (PO-KKO-261023-5853)",
-      "[오후 11:16:48] 📦 [PUR-01] 카카오 발주서 품목 재고 대조 시작 (PO-KKO-261023-7542)",
-      "[22:55] [PUR-01] altf.kr API 재고 발주 동기화 완료: 총 1410건 (입고: 348건, 미결: 1009건)",
-      "[오후 10:55:24] 미결 파일 접수 및 아카이빙",
-      "[오후 10:55:24] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)",
-      "[22:55] [PUR-01] altf.kr API 재고 발주 동기화 완료: 총 1410건 (입고: 348건, 미결: 1009건)",
-      "[오후 10:55:21] 미결 파일 접수 및 아카이빙"
+      "[오후 11:17:33] 📦 [PUR-01] 카카오 발주서 품목 재고 대조 시작 (PO-KKO-261023-5853)"
     ],
     "connectedDeptIds": [
       "purchase",
       "dat"
     ],
-    "orderIndex": 1
+    "orderIndex": 1,
+    "roleType": "INTAKE",
+    "mainDeptId": "purchase",
+    "subDeptIds": [
+      "dat"
+    ],
+    "supervisorId": "pur-04-leadtime-alert"
   },
   {
     "id": "pur-02-pending-parser",
     "code": "PUR-02",
-    "name": "미결 엑셀 분석 봇",
+    "name": "미결 엑셀 파싱봇",
     "deptId": "purchase",
     "deptName": "구매부",
     "teamName": "미결관리팀",
-    "tier": 1,
-    "position": "사원",
-    "role": "수신된 대경 미결 엑셀 658행 전 행/열 정밀 파싱, L열(작업유형) 및 공정 일자 유효성 검증",
+    "tier": 2,
+    "position": "대리",
+    "role": "[확인순서 1단계] 수신된 대경 미결 엑셀 전 행/열 파싱 — 잔량(I열 pending)·L열 작업유형·P~V열 공정일자 유효성 검증, 비제품 행 제외",
     "status": "ACTIVE",
     "isCreated": true,
     "approvalStatus": "AUTO_RUNNING",
@@ -136,6 +156,8 @@
       "EVENT_PENDING_ROWS_PARSED"
     ],
     "logs": [
+      "[오전 12:15:09] 제조 품목 615건 / 비제품(네고·시편 등) 4건 제외",
+      "[오전 12:15:09] 미결 엑셀 파싱 착수",
       "[오후 10:55:24] 제조 품목 615건 / 비제품(네고·시편 등) 4건 제외",
       "[오후 10:55:24] 미결 엑셀 파싱 착수",
       "[오후 10:55:24] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)",
@@ -148,25 +170,27 @@
       "[오후 10:39:51] 제조 품목 615건 / 비제품(네고·시편 등) 4건 제외",
       "[오후 10:39:51] 미결 엑셀 파싱 착수",
       "[오후 10:39:51] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)",
-      "[오후 10:39:22] 제조 품목 615건 / 비제품(네고·시편 등) 4건 제외",
-      "[오후 10:39:22] 미결 엑셀 파싱 착수",
-      "[오후 10:39:22] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)"
+      "[오후 10:39:22] 제조 품목 615건 / 비제품(네고·시편 등) 4건 제외"
     ],
     "connectedDeptIds": [
       "purchase"
     ],
-    "orderIndex": 2
+    "orderIndex": 2,
+    "roleType": "EXECUTE",
+    "mainDeptId": "purchase",
+    "subDeptIds": [],
+    "supervisorId": "pur-04-leadtime-alert"
   },
   {
     "id": "pur-03-process-matcher",
     "code": "PUR-03",
-    "name": "진행공정 확인 봇",
+    "name": "발주 매칭·실지연 판정봇",
     "deptId": "purchase",
     "deptName": "구매부",
     "teamName": "미결관리팀",
-    "tier": 2,
-    "position": "대리",
-    "role": "Y열 주문번호 ↔ 우리 발주번호(poNumber) 및 품목 매칭, 절단~성형~열처리~교정~가공~산세~창고입고 단계 추적",
+    "tier": 3,
+    "position": "과장",
+    "role": "[확인순서 2단계] Y열 주문번호 ↔ 우리 주문관리 발주번호(poNumber) 매칭 → 잔량·창고입고 여부·고객납기 대비 지연일수로 실지연 판정(납기 미등록 건은 표준 리드타임 추정), 공정진행률 산출 후 P1~P4 우선순위 분류",
     "status": "ACTIVE",
     "isCreated": true,
     "approvalStatus": "AUTO_RUNNING",
@@ -179,7 +203,7 @@
       "uptime": "99.9%",
       "tasksToday": 24
     },
-    "currentTask": "발주 매칭 579건, 거래처 29개, 발주서 매트릭스 37개 분석 완료",
+    "currentTask": "발주 매칭 579건 · 실지연 424건 판정 · 필수확인(P1) 96건 / 예상문제(P3) 2건",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_PENDING_ROWS_PARSED"
@@ -188,6 +212,8 @@
       "EVENT_PROCESS_MATCHED"
     ],
     "logs": [
+      "[오전 12:15:09] 매칭 579건 / 실지연 424건 / P1 96 · P2 362 · P3 2",
+      "[오전 12:15:09] 발주번호 및 공정 매칭 착수",
       "[오후 10:55:24] 매칭 579건 / 발주 매트릭스 37건 / 납기 위험 50건",
       "[오후 10:55:24] 발주번호 및 공정 매칭 착수",
       "[오후 10:55:24] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)",
@@ -200,26 +226,30 @@
       "[오후 10:39:52] 매칭 579건 / 발주 매트릭스 37건 / 납기 위험 50건",
       "[오후 10:39:51] 발주번호 및 공정 매칭 착수",
       "[오후 10:39:51] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)",
-      "[오후 10:39:22] 매칭 579건 / 발주 매트릭스 37건 / 납기 위험 50건",
-      "[오후 10:39:22] 발주번호 및 공정 매칭 착수",
-      "[오후 10:39:22] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)"
+      "[오후 10:39:22] 매칭 579건 / 발주 매트릭스 37건 / 납기 위험 50건"
     ],
     "connectedDeptIds": [
       "purchase",
       "sle"
     ],
-    "orderIndex": 3
+    "orderIndex": 3,
+    "roleType": "REVIEW",
+    "mainDeptId": "purchase",
+    "subDeptIds": [
+      "sle"
+    ],
+    "supervisorId": "pur-04-leadtime-alert"
   },
   {
     "id": "pur-04-leadtime-alert",
     "code": "PUR-04",
-    "name": "공정 진행도 파악 & 독촉 보고서 생성 봇",
+    "name": "미결 우선순위·독촉 보고봇",
     "deptId": "purchase",
     "deptName": "구매부",
     "teamName": "미결관리팀",
-    "tier": 3,
-    "position": "과장",
-    "role": "공정 지연(1주일 이상 검토 정체, 절단 누락 등) 감지 및 대경벤드 납기 독촉 보고서 자동 생성",
+    "tier": 4,
+    "position": "팀장",
+    "role": "[확인순서 3단계] 납기 지연·임박 품목 중 공정진행률 저조(50% 미만) 건을 P1 필수확인으로 지시, P2 지연·임박 독촉, 공정일수 기반 P3 예상 문제 지점 사전 경보 — 납기지연 예방 보고서·대경 독촉 공문 생성",
     "status": "ACTIVE",
     "isCreated": true,
     "approvalStatus": "APPROVED",
@@ -232,7 +262,7 @@
       "uptime": "99.9%",
       "tasksToday": 16
     },
-    "currentTask": "대경 정밀 납기 분석 보고서 생성 완료 (위험 26건 / 경계 6건)",
+    "currentTask": "확인 순서 보고서 생성: 필수확인 P1 96건(발주 20건) → 독촉 P2 362건 → 예상문제 P3 2건",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_PROCESS_MATCHED"
@@ -241,6 +271,8 @@
       "EVENT_CHASER_REPORT_GENERATED"
     ],
     "logs": [
+      "[오전 12:15:09] 우선순위 보고서 작성 완료 (P1 96 / P2 362 / P3 2)",
+      "[오전 12:15:09] 납기 정밀 보고서 작성 착수",
       "[오후 10:55:24] 납기 정밀 분석 보고서 및 공문 작성 완료",
       "[오후 10:55:24] 납기 정밀 보고서 작성 착수",
       "[오후 10:55:24] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)",
@@ -253,27 +285,32 @@
       "[오후 10:39:52] 납기 정밀 분석 보고서 및 공문 작성 완료",
       "[오후 10:39:52] 납기 정밀 보고서 작성 착수",
       "[오후 10:39:51] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)",
-      "[오후 10:39:22] 납기 정밀 분석 보고서 및 공문 작성 완료",
-      "[오후 10:39:22] 납기 정밀 보고서 작성 착수",
-      "[오후 10:39:22] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)"
+      "[오후 10:39:22] 납기 정밀 분석 보고서 및 공문 작성 완료"
     ],
     "connectedDeptIds": [
       "purchase",
       "executive",
       "sle"
     ],
-    "orderIndex": 4
+    "orderIndex": 4,
+    "roleType": "REPORT",
+    "mainDeptId": "purchase",
+    "subDeptIds": [
+      "executive",
+      "sle"
+    ],
+    "supervisorId": "mgt-01-chief-of-staff"
   },
   {
     "id": "sal-03-customer-leadtime",
     "code": "SAL-03",
-    "name": "고객 납기 예상 브리핑 봇",
+    "name": "고객 납기 예상 브리핑봇",
     "deptId": "sle",
     "deptName": "영업부",
     "teamName": "영업관리팀",
     "tier": 2,
     "position": "대리",
-    "role": "구매부 미결 공정 상태 연계하여 고객사(customerName) 및 담당자에게 공정 진행(빠름/지연) 실시간 브리핑",
+    "role": "PUR-04 우선순위 연계 — P1 필수확인·P3 예상 문제 발주의 고객사(customerName) 및 담당자에게 납기 사전 조율·공정 진행 브리핑",
     "status": "ACTIVE",
     "isCreated": true,
     "approvalStatus": "AUTO_RUNNING",
@@ -295,6 +332,7 @@
       "EVENT_CUSTOMER_LEADTIME_BRIEFED"
     ],
     "logs": [
+      "[오전 12:15:09] 고객 납기 안내 준비 완료",
       "[오후 10:55:24] 고객 납기 안내 준비 완료",
       "[오후 10:55:24] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)",
       "[오후 10:55:22] 고객 납기 안내 준비 완료",
@@ -308,19 +346,24 @@
       "[오후 10:36:59] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)",
       "[오후 3:53:27] 고객 납기 안내 준비 완료",
       "[오후 3:47:23] 고객 납기 안내 준비 완료",
-      "[오후 3:47:22] 고객 납기 안내 준비 완료",
-      "[오후 3:36:08] 고객 납기 안내 준비 완료"
+      "[오후 3:47:22] 고객 납기 안내 준비 완료"
     ],
     "connectedDeptIds": [
       "sle",
       "purchase"
     ],
-    "orderIndex": 5
+    "orderIndex": 5,
+    "roleType": "EXECUTE",
+    "mainDeptId": "sle",
+    "subDeptIds": [
+      "purchase"
+    ],
+    "supervisorId": ""
   },
   {
     "id": "dat-07-leadtime-analytics",
     "code": "DAT-07",
-    "name": "공정 리드타임 누적 분석 봇",
+    "name": "공정 리드타임 누적 분석봇",
     "deptId": "dat",
     "deptName": "데이터관리팀",
     "teamName": "공정데이터분석팀",
@@ -348,6 +391,8 @@
       "EVENT_LEADTIME_STATS_UPDATED"
     ],
     "logs": [
+      "[오전 12:15:09] 견적팀 공급용 리드타임 누적 통계 DB 저장 완료",
+      "[오전 12:15:09] 리드타임 분석 착수",
       "[오후 10:55:24] 견적팀 공급용 리드타임 누적 통계 DB 저장 완료",
       "[오후 10:55:24] 리드타임 분석 착수",
       "[오후 10:55:24] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)",
@@ -360,15 +405,19 @@
       "[오후 10:39:52] 견적팀 공급용 리드타임 누적 통계 DB 저장 완료",
       "[오후 10:39:52] 리드타임 분석 착수",
       "[오후 10:39:51] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)",
-      "[오후 10:39:22] 견적팀 공급용 리드타임 누적 통계 DB 저장 완료",
-      "[오후 10:39:22] 리드타임 분석 착수",
-      "[오후 10:39:22] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)"
+      "[오후 10:39:22] 견적팀 공급용 리드타임 누적 통계 DB 저장 완료"
     ],
     "connectedDeptIds": [
       "dat",
       "sle"
     ],
-    "orderIndex": 6
+    "orderIndex": 6,
+    "roleType": "REVIEW",
+    "mainDeptId": "dat",
+    "subDeptIds": [
+      "sle"
+    ],
+    "supervisorId": ""
   },
   {
     "id": "int-01-mail-intake",
@@ -416,7 +465,12 @@
     "orderIndex": 0,
     "supervisorId": "",
     "connectedAgentIds": [],
-    "scheduleInterval": "REALTIME"
+    "scheduleInterval": "REALTIME",
+    "roleType": "INTAKE",
+    "mainDeptId": "sle",
+    "subDeptIds": [
+      "purchase"
+    ]
   },
   {
     "id": "int-02-messenger-intake",
@@ -426,7 +480,7 @@
     "deptName": "영업부",
     "teamName": "영업2팀",
     "tier": 1,
-    "position": "대리",
+    "position": "사원",
     "role": "카카오톡 채널·오픈채팅 및 솔라피(문자/MMS) 인입 텍스트, 사진, 파일 실시간 수신 및 분류",
     "status": "ACTIVE",
     "isCreated": true,
@@ -474,7 +528,12 @@
     "processedCount": 13,
     "supervisorId": "",
     "connectedAgentIds": [],
-    "scheduleInterval": "REALTIME"
+    "scheduleInterval": "REALTIME",
+    "roleType": "INTAKE",
+    "mainDeptId": "sle",
+    "subDeptIds": [
+      "purchase"
+    ]
   },
   {
     "id": "int-03-doc-ocr",
@@ -531,7 +590,10 @@
     "processedCount": 11,
     "supervisorId": "",
     "connectedAgentIds": [],
-    "scheduleInterval": "REALTIME"
+    "scheduleInterval": "REALTIME",
+    "roleType": "EXECUTE",
+    "mainDeptId": "sle",
+    "subDeptIds": []
   },
   {
     "id": "int-04-excel-parser",
@@ -576,16 +638,22 @@
       "sle",
       "dat"
     ],
-    "orderIndex": 3
+    "orderIndex": 3,
+    "roleType": "EXECUTE",
+    "mainDeptId": "sle",
+    "subDeptIds": [
+      "dat"
+    ],
+    "supervisorId": ""
   },
   {
     "id": "int-05-ai-normalizer",
     "code": "INT-05",
-    "name": "배관·피팅 품목정규화 AI 봇",
+    "name": "배관·피팅 품목정규화 AI봇",
     "deptId": "sle",
     "deptName": "영업부",
     "teamName": "영업2팀",
-    "tier": 3,
+    "tier": 2,
     "position": "대리",
     "role": "비표준 은어/약어(엘보, 뽕티, 편심, C타입 등)를 ALTF 표준 품목 키로 정규화 및 1,265개 거래처 CRM 마스터 매칭",
     "status": "ACTIVE",
@@ -639,7 +707,13 @@
     "connectedAgentIds": [
       "int-06-rule-corrector"
     ],
-    "scheduleInterval": "REALTIME"
+    "scheduleInterval": "REALTIME",
+    "roleType": "EXECUTE",
+    "mainDeptId": "sle",
+    "subDeptIds": [
+      "purchase",
+      "executive"
+    ]
   },
   {
     "id": "int-06-rule-corrector",
@@ -648,7 +722,7 @@
     "deptId": "sle",
     "deptName": "영업부",
     "teamName": "영업2팀",
-    "tier": 2,
+    "tier": 3,
     "position": "과장",
     "role": "사무실 웹 화면에서 담당자가 수정한 견적서 항목(품명/두께/규격/재질/수량 Diff)을 실시간 감지하여 INT-03 비전 OCR 규칙 및 정규화 엔진에 피드백 자동 학습",
     "status": "ACTIVE",
@@ -690,9 +764,14 @@
     "supervisorId": "",
     "connectedAgentIds": [
       "int-03-doc-ocr",
-      "int-05-item-normalizer"
+      "int-05-ai-normalizer"
     ],
-    "scheduleInterval": "REALTIME"
+    "scheduleInterval": "REALTIME",
+    "roleType": "REVIEW",
+    "mainDeptId": "sle",
+    "subDeptIds": [
+      "purchase"
+    ]
   },
   {
     "id": "sle-01-quote-drafter",
@@ -747,7 +826,13 @@
       "executive"
     ],
     "orderIndex": 5,
-    "processedCount": 11
+    "processedCount": 11,
+    "roleType": "EXECUTE",
+    "mainDeptId": "sle",
+    "subDeptIds": [
+      "executive"
+    ],
+    "supervisorId": ""
   },
   {
     "id": "sle-02-quote-dispatcher",
@@ -756,8 +841,8 @@
     "deptId": "sle",
     "deptName": "영업부",
     "teamName": "영업1팀",
-    "tier": 3,
-    "position": "과장",
+    "tier": 2,
+    "position": "대리",
     "role": "영업자 승인 시 원메일 In-Reply-To PDF 회신 또는 카카오톡 알림톡/친구톡(솔라피 연동) 견적 링크 자동 발송",
     "status": "ACTIVE",
     "isCreated": true,
@@ -807,7 +892,12 @@
     "connectedAgentIds": [
       "sle-07-rate-inspector"
     ],
-    "scheduleInterval": "REALTIME"
+    "scheduleInterval": "REALTIME",
+    "roleType": "EXECUTE",
+    "mainDeptId": "sle",
+    "subDeptIds": [
+      "executive"
+    ]
   },
   {
     "id": "sle-07-rate-inspector",
@@ -816,7 +906,7 @@
     "deptId": "sle",
     "deptName": "영업부",
     "teamName": "영업1팀",
-    "tier": 2,
+    "tier": 3,
     "position": "과장",
     "role": "품목코드별 시스템 표준 요율(SMLS 25%, ERW 50% 등) 검증, 거래처 최근 견적/발주 이력 요율 검색 및 텍스트 요율 변경 요청 기록/반영",
     "status": "ACTIVE",
@@ -859,7 +949,10 @@
       "sle-01-quote-drafter",
       "sle-02-quote-dispatcher"
     ],
-    "scheduleInterval": "REALTIME"
+    "scheduleInterval": "REALTIME",
+    "roleType": "REVIEW",
+    "mainDeptId": "sle",
+    "subDeptIds": []
   },
   {
     "id": "sle-08-followup",
@@ -868,7 +961,7 @@
     "deptId": "sle",
     "deptName": "영업부",
     "teamName": "영업1팀",
-    "tier": 2,
+    "tier": 3,
     "position": "과장",
     "role": "견적 발송 후 D+2, D+7 동안 미주문 상태인 건을 식별하여 담당 영업자에게 알림 및 카카오톡 리마인드",
     "status": "ACTIVE",
@@ -903,7 +996,252 @@
     "connectedDeptIds": [
       "sle"
     ],
-    "orderIndex": 7
+    "orderIndex": 7,
+    "roleType": "MONITOR",
+    "mainDeptId": "sle",
+    "subDeptIds": [],
+    "supervisorId": ""
+  },
+  {
+    "id": "sle-11-order-vision-ocr",
+    "code": "SLE-11",
+    "name": "카카오 발주 비전 OCR 판독봇",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "teamName": "영업3팀",
+    "tier": 2,
+    "position": "대리",
+    "role": "카카오톡으로 인입된 수기 발주서, 사진 캡처, 전표 이미지에서 Gemini Vision / GPT-4o-mini 비전 AI를 가동하여 텍스트 및 품목 표 정밀 추출",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "AUTO_RUNNING",
+    "assignedHuman": "발주서 판독 담당자",
+    "requiresApproval": false,
+    "metrics": {
+      "speed": 96,
+      "accuracy": 98,
+      "load": 20,
+      "uptime": "99.9%",
+      "tasksToday": 18
+    },
+    "currentTask": "카카오 텍스트 발주서 인입 확인",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_KAKAO_ORDER_IMAGE"
+    ],
+    "emittedEvents": [
+      "EVENT_ORDER_DOC_PARSED"
+    ],
+    "logs": [
+      "[오전 12:23:08] 📸 [SLE-11] 발주서 인입: 텍스트 수신 (2개 품목)",
+      "[오후 11:40:00] 📸 [SLE-11] 카카오 발주서 이미지/전표 OCR 정밀 판독 준비 완료 (Gemini Vision / GPT-4o-mini 연동)",
+      "[정상] Gemini Vision & GPT-4o-mini 발주서 OCR 엔진 가동 중"
+    ],
+    "connectedDeptIds": [
+      "sle",
+      "executive"
+    ],
+    "orderIndex": 8,
+    "roleType": "EXECUTE",
+    "mainDeptId": "sle",
+    "subDeptIds": [
+      "executive"
+    ],
+    "supervisorId": "sle-14-order-pur-dispatcher"
+  },
+  {
+    "id": "sle-12-order-ai-parser",
+    "code": "SLE-12",
+    "name": "발주 품목·규격 AI 분석봇",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "teamName": "영업3팀",
+    "tier": 2,
+    "position": "대리",
+    "role": "배관·피팅 품목분석 프롬프트(규칙 0~11) + Gemini/GPT + 14,136개 재고 DB 대조하여 품명, 규격, 재질(WP/STS, -S/-W), 두께, 수량, 단가 정밀 매칭",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "APPROVED",
+    "assignedHuman": "기술영업 과장 / 발주 정밀 분석관",
+    "requiresApproval": false,
+    "metrics": {
+      "speed": 98,
+      "accuracy": 99,
+      "load": 25,
+      "uptime": "100%",
+      "tasksToday": 24
+    },
+    "currentTask": "배관 피팅 정밀 규격 매칭: PO-KKO-261023-7381 (원진철강)",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_ORDER_DOC_PARSED",
+      "EVENT_KAKAO_ORDER_TEXT"
+    ],
+    "emittedEvents": [
+      "EVENT_ORDER_ITEMS_ANALYZED"
+    ],
+    "logs": [
+      "[오전 12:23:08] 🔬 [SLE-12] 품목 정밀 분석 완료: 총 2개 품목 (규칙 0~11 표준화)",
+      "[오후 11:40:00] 🔬 [SLE-12] 규칙 0~11 기반 배관 피팅 품목 분석 가동: 원진철강 CAP 2종(1-1/2\", 4\" S40S WP304-S) 정밀 매칭 완료",
+      "[정상] 배관 피팅 정밀 품목 분석 프롬프트 엔진 대기 중"
+    ],
+    "connectedDeptIds": [
+      "sle",
+      "purchase"
+    ],
+    "orderIndex": 9,
+    "roleType": "EXECUTE",
+    "mainDeptId": "sle",
+    "subDeptIds": [
+      "purchase"
+    ],
+    "supervisorId": "sle-14-order-pur-dispatcher"
+  },
+  {
+    "id": "sle-13-order-terms-verifier",
+    "code": "SLE-13",
+    "name": "발주 필수조건 검증봇",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "teamName": "영업3팀",
+    "tier": 3,
+    "position": "과장",
+    "role": "고객 발주서의 필수 4대 항목(도착지 화물지점/주소, 수령인, 연락처, 운송조건 선불/착불) 충족 여부를 분석하고 누락 시 미비(INCOMPLETE) 분류 및 담당자 알림",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "AUTO_RUNNING",
+    "assignedHuman": "영업 담당자",
+    "requiresApproval": false,
+    "metrics": {
+      "speed": 99,
+      "accuracy": 100,
+      "load": 15,
+      "uptime": "100%",
+      "tasksToday": 24
+    },
+    "currentTask": "도착지/운송조건 검증: PO-KKO-261023-7381 (VALID)",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_ORDER_ITEMS_ANALYZED"
+    ],
+    "emittedEvents": [
+      "EVENT_ORDER_TERMS_VERIFIED"
+    ],
+    "logs": [
+      "[오전 12:23:08] 🚚 [SLE-13 검증완료] 도착지(대신화물/평택고덕 지점) & 운송조건(선불 화물 발송) 완비 확인",
+      "[오후 11:40:00] 🚚 [SLE-13] 도착지 필수 검증: 원진철강 건 '대신화물/평택고덕 지점' 및 '선불 화물 발송' 완비 확인 (상태: VALID)",
+      "[정상] 도착지 지점 및 운송비 조건(선불/착불) 판별기 작동 중"
+    ],
+    "connectedDeptIds": [
+      "sle",
+      "purchase"
+    ],
+    "orderIndex": 10,
+    "roleType": "REVIEW",
+    "mainDeptId": "sle",
+    "subDeptIds": [
+      "purchase"
+    ],
+    "supervisorId": "sle-14-order-pur-dispatcher"
+  },
+  {
+    "id": "sle-14-order-pur-dispatcher",
+    "code": "SLE-14",
+    "name": "발주 확정 & 구매부 이첩봇",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "teamName": "영업3팀",
+    "tier": 4,
+    "position": "팀장",
+    "role": "영업3팀 담당자 2차 검토 후 최종 승인 시, 정식 발주서 대장에 적재하고 구매부(PUR-01 재고 발주 & PUR-07 미결 관제)로 안전하게 인계",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "APPROVED",
+    "assignedHuman": "영업3팀장",
+    "requiresApproval": true,
+    "metrics": {
+      "speed": 99,
+      "accuracy": 100,
+      "load": 18,
+      "uptime": "100%",
+      "tasksToday": 24
+    },
+    "currentTask": "영업3팀 대기열 관리: PO-KKO-261023-7381 (승인 시 구매부 이첩)",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_ORDER_TERMS_VERIFIED"
+    ],
+    "emittedEvents": [
+      "EVENT_ORDER_TRANSFERRED_TO_PUR"
+    ],
+    "logs": [
+      "[오전 12:44:42] 🚀 [SLE-14 이첩완료] 영업3팀 발주 승인 [ES261024-2992] ➔ 구매부(PUR-01/07) 정식 인계 완료",
+      "[오전 12:44:26] 🚀 [SLE-14 이첩완료] 영업3팀 발주 승인 [ES261024-2991] ➔ 구매부(PUR-01/07) 정식 인계 완료",
+      "[오전 12:23:56] 🚀 [SLE-14 이첩완료] 영업3팀 발주 검토 승인 ➔ 구매부(PUR-01/07)로 발주서 이관 완료: PO-20261023-KKO-2830",
+      "[오전 12:23:08] 📋 [SLE-14] 영업3팀 검토 대기열 적재 완료 [PO-KKO-261023-7381] (원진철강)",
+      "[오후 11:40:00] 🚀 [SLE-14] 영업3팀 발주서 검토 완료 건 대기 중 (사무실 승인 시 구매부 PUR-01/07 즉시 이첩)",
+      "[정상] 구매부 SCM 연동 게이트 대기 중"
+    ],
+    "connectedDeptIds": [
+      "sle",
+      "purchase",
+      "shipping"
+    ],
+    "orderIndex": 11,
+    "roleType": "REPORT",
+    "mainDeptId": "sle",
+    "subDeptIds": [
+      "purchase",
+      "shipping"
+    ],
+    "supervisorId": "mgt-01-chief-of-staff"
+  },
+  {
+    "id": "sle-15-order-rule-watcher",
+    "code": "SLE-15",
+    "name": "발주서 수정관찰 & 규칙 학습봇",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "teamName": "영업3팀",
+    "tier": 3,
+    "position": "과장",
+    "role": "사무실 담당자의 발주서 수정 내역(품명-두께-규격-재질-수량 및 운송조건)을 실시간 Diff 감지하여 누적 저장하고 정기 보고서 생성 및 AI 규칙 학습 피드백 주입",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "APPROVED",
+    "assignedHuman": "영업3팀장",
+    "requiresApproval": false,
+    "metrics": {
+      "speed": 99,
+      "accuracy": 100,
+      "load": 12,
+      "uptime": "100%",
+      "tasksToday": 24
+    },
+    "currentTask": "사무실 발주서 수정 Diff 실시간 감시 및 누적 규칙 학습 대기",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_ORDER_UPDATED",
+      "EVENT_ORDER_APPROVED"
+    ],
+    "emittedEvents": [
+      "EVENT_ORDER_RULE_LEARNED"
+    ],
+    "logs": [
+      "[정상] 발주서 품목 5대 요소(품명-두께-규격-재질-수량) 및 운송조건 수정 관찰기 가동 중",
+      "[대기] 담당자 확인·저장 시 수정 내역 자동 영구 누적 보존"
+    ],
+    "connectedDeptIds": [
+      "sle",
+      "quality"
+    ],
+    "orderIndex": 12,
+    "roleType": "REVIEW",
+    "mainDeptId": "sle",
+    "subDeptIds": [
+      "quality"
+    ],
+    "supervisorId": "sle-14-order-pur-dispatcher"
   },
   {
     "id": "pur-11-po-intake",
@@ -947,7 +1285,11 @@
     "connectedDeptIds": [
       "purchase"
     ],
-    "orderIndex": 0
+    "orderIndex": 0,
+    "roleType": "INTAKE",
+    "mainDeptId": "purchase",
+    "subDeptIds": [],
+    "supervisorId": "pur-backlog-bot"
   },
   {
     "id": "pur-12-cross-checker",
@@ -956,8 +1298,8 @@
     "deptId": "purchase",
     "deptName": "구매부",
     "teamName": "구매SCM팀",
-    "tier": 2,
-    "position": "대리",
+    "tier": 3,
+    "position": "과장",
     "role": "해당 거래처 최근 견적과 품목·수량·단가를 라인별로 대조하여 차이점 자동 표시",
     "status": "ACTIVE",
     "isCreated": true,
@@ -992,7 +1334,13 @@
       "purchase",
       "sle"
     ],
-    "orderIndex": 1
+    "orderIndex": 1,
+    "roleType": "REVIEW",
+    "mainDeptId": "purchase",
+    "subDeptIds": [
+      "sle"
+    ],
+    "supervisorId": "pur-backlog-bot"
   },
   {
     "id": "pur-13-route-planner",
@@ -1037,7 +1385,13 @@
       "purchase",
       "shipping"
     ],
-    "orderIndex": 2
+    "orderIndex": 2,
+    "roleType": "REVIEW",
+    "mainDeptId": "purchase",
+    "subDeptIds": [
+      "shipping"
+    ],
+    "supervisorId": "pur-backlog-bot"
   },
   {
     "id": "pur-14-supplier-order",
@@ -1082,7 +1436,13 @@
       "purchase",
       "quality"
     ],
-    "orderIndex": 3
+    "orderIndex": 3,
+    "roleType": "EXECUTE",
+    "mainDeptId": "purchase",
+    "subDeptIds": [
+      "quality"
+    ],
+    "supervisorId": "pur-backlog-bot"
   },
   {
     "id": "pur-backlog-bot",
@@ -1091,8 +1451,8 @@
     "deptId": "purchase",
     "deptName": "구매부",
     "teamName": "구매SCM팀",
-    "tier": 2,
-    "position": "대리",
+    "tier": 4,
+    "position": "팀장",
     "role": "altf.kr 웹 주문 전체 분류 저장, 매입발주서 연동, 미결 리스트 실시간 추적 및 출고 시 거래명세표·성적서 고객 패키징 총괄",
     "status": "ACTIVE",
     "isCreated": true,
@@ -1116,15 +1476,16 @@
       "EVENT_BACKLOG_SYNCED"
     ],
     "logs": [
+      "[오전 12:44:42] 🚚 [PUR-07 확정] 카카오 발주(ES261024-2992) 출고 경로(대신화물/평택고덕 지점 / 선불 화물 발송) 관제 개시",
+      "[오전 12:44:26] 🚚 [PUR-07 확정] 카카오 발주(ES261024-2991) 출고 경로(대신화물/평택고덕 지점 / 선불 화물 발송) 관제 개시",
+      "[오전 12:23:56] 🚚 [PUR-07 확정] 카카오 발주(PO-KKO-261023-7381) 출고 경로(대신화물/평택고덕 지점 / 선불 화물 발송) 관제 개시",
       "[오후 11:40:00] 📦 [PUR-07 준비] 카카오 발주(PO-KKO-261023-7381, 원진철강) 도착지/선불화물 검증 완료 ➔ 승인 대기",
       "[오후 11:32:30] 🛒 [PUR-07] 카카오 발주(PO-KKO-261023-7381) 대기열 적재 ➔ 납기/출고경로(화물/직송) 모니터링 준비",
       "[오후 11:17:33] 🛒 [PUR-07] 카카오 신규 발주서 접수 (카카오톡 고객사) -> 재고/생산 미결 검토 개시",
       "[오후 11:16:48] 🛒 [PUR-07] 카카오 신규 발주서 접수 (카카오톡 고객사) -> 재고/생산 미결 검토 개시",
       "[22:58] 🔍 [PO 크로스체크] 알트에프(ALT.F) [No:0001- 1/ 1] 전표가: 726,600원 vs 발주가: 1,597,560원 (과소 청구 (-870,960원))",
       "[22:58] 대경벤드 발송 신호 수신: 발주번호 ES261023-2974, 9106602018 미결 해제",
-      "[22:58] [PUR-07] 발주 ES261023-2974 총 2개 품목 '입고완료(대경발송)' 상태 갱신 및 미결 대장 엑셀 저장 완료!",
-      "[22:58] 🔍 [PO 크로스체크] 알트에프(ALT.F) [No:0002- 1/ 1] 전표가: 708,390원 vs 발주가: 743,790원 (과소 청구 (-35,400원))",
-      "[22:58] 대경벤드 발송 신호 수신: 발주번호 ES261023-2980 미결 해제"
+      "[22:58] [PUR-07] 발주 ES261023-2974 총 2개 품목 '입고완료(대경발송)' 상태 갱신 및 미결 대장 엑셀 저장 완료!"
     ],
     "connectedDeptIds": [
       "quality",
@@ -1134,11 +1495,20 @@
     ],
     "orderIndex": 4,
     "connectedAgentIds": [
-      "qc-inbound-ingest",
-      "qc-cert-builder",
-      "gen-statement-builder",
-      "log-dispatch-signal"
-    ]
+      "qc-email-collector",
+      "qc-cert-issuer",
+      "gen-01-statement-maker",
+      "log-13-mes-matcher"
+    ],
+    "roleType": "MONITOR",
+    "mainDeptId": "purchase",
+    "subDeptIds": [
+      "quality",
+      "general",
+      "shipping",
+      "sle"
+    ],
+    "supervisorId": "mgt-01-chief-of-staff"
   },
   {
     "id": "pur-08-stock-audit-bot",
@@ -1147,8 +1517,8 @@
     "deptId": "purchase",
     "deptName": "구매부",
     "teamName": "구매SCM팀",
-    "tier": 2,
-    "position": "대리",
+    "tier": 3,
+    "position": "과장",
     "role": "주문관리 내 [재고 발주분] 등록 건 실시간 감지, 시화/대경 재고 및 90일 판매 데이터 기반 적정성(과잉·중복·결품) 사전 진단 보고서 생성 및 대표/부장 결재 상신",
     "status": "ACTIVE",
     "isCreated": true,
@@ -1186,7 +1556,13 @@
       "inventory",
       "sle"
     ],
-    "orderIndex": 5
+    "orderIndex": 5,
+    "roleType": "REVIEW",
+    "mainDeptId": "purchase",
+    "subDeptIds": [
+      "sle"
+    ],
+    "supervisorId": "pur-backlog-bot"
   },
   {
     "id": "qc-email-collector",
@@ -1230,7 +1606,11 @@
     "connectedDeptIds": [
       "quality"
     ],
-    "orderIndex": 0
+    "orderIndex": 0,
+    "roleType": "INTAKE",
+    "mainDeptId": "quality",
+    "subDeptIds": [],
+    "supervisorId": "qc-missing-chaser"
   },
   {
     "id": "qc-vision-parser",
@@ -1278,7 +1658,11 @@
     "connectedDeptIds": [
       "quality"
     ],
-    "orderIndex": 1
+    "orderIndex": 1,
+    "roleType": "EXECUTE",
+    "mainDeptId": "quality",
+    "subDeptIds": [],
+    "supervisorId": "qc-missing-chaser"
   },
   {
     "id": "qc-cert-issuer",
@@ -1324,7 +1708,14 @@
       "shipping",
       "general"
     ],
-    "orderIndex": 2
+    "orderIndex": 2,
+    "roleType": "REVIEW",
+    "mainDeptId": "quality",
+    "subDeptIds": [
+      "shipping",
+      "general"
+    ],
+    "supervisorId": "qc-missing-chaser"
   },
   {
     "id": "qc-direct-matcher",
@@ -1370,7 +1761,14 @@
       "purchase",
       "general"
     ],
-    "orderIndex": 3
+    "orderIndex": 3,
+    "roleType": "EXECUTE",
+    "mainDeptId": "quality",
+    "subDeptIds": [
+      "purchase",
+      "general"
+    ],
+    "supervisorId": "qc-missing-chaser"
   },
   {
     "id": "qc-missing-chaser",
@@ -1379,7 +1777,7 @@
     "deptId": "quality",
     "deptName": "품질부",
     "teamName": "품질보증팀",
-    "tier": 3,
+    "tier": 4,
     "position": "팀장",
     "role": "성적서 미입고 건 누락 경보 기록(qc_missing_alerts.json) 및 24시간 초과 시 대경 독촉 메일 초안 작성",
     "status": "ACTIVE",
@@ -1415,7 +1813,13 @@
       "quality",
       "executive"
     ],
-    "orderIndex": 4
+    "orderIndex": 4,
+    "roleType": "MONITOR",
+    "mainDeptId": "quality",
+    "subDeptIds": [
+      "executive"
+    ],
+    "supervisorId": "mgt-01-chief-of-staff"
   },
   {
     "id": "log-11-picker",
@@ -1424,8 +1828,8 @@
     "deptId": "shipping",
     "deptName": "출고물류부",
     "teamName": "물류출고팀",
-    "tier": 1,
-    "position": "사원",
+    "tier": 2,
+    "position": "대리",
     "role": "시화재고(S) 경로 확정 라인에 대해 창고 작업자에게 픽업 지시서(품목, 수량, 랙 위치) 전달",
     "status": "ACTIVE",
     "isCreated": true,
@@ -1459,7 +1863,11 @@
     "connectedDeptIds": [
       "shipping"
     ],
-    "orderIndex": 0
+    "orderIndex": 0,
+    "roleType": "EXECUTE",
+    "mainDeptId": "shipping",
+    "subDeptIds": [],
+    "supervisorId": ""
   },
   {
     "id": "log-12-packer",
@@ -1468,8 +1876,8 @@
     "deptId": "shipping",
     "deptName": "출고물류부",
     "teamName": "물류출고팀",
-    "tier": 2,
-    "position": "대리",
+    "tier": 3,
+    "position": "과장",
     "role": "창고의 포장 완료 신호 접수 시 라인 상태를 PACKED로 전이하고 검수 사진 기록",
     "status": "ACTIVE",
     "isCreated": true,
@@ -1503,7 +1911,11 @@
     "connectedDeptIds": [
       "shipping"
     ],
-    "orderIndex": 1
+    "orderIndex": 1,
+    "roleType": "REVIEW",
+    "mainDeptId": "shipping",
+    "subDeptIds": [],
+    "supervisorId": ""
   },
   {
     "id": "log-13-mes-matcher",
@@ -1512,8 +1924,8 @@
     "deptId": "shipping",
     "deptName": "출고물류부",
     "teamName": "물류출고팀",
-    "tier": 3,
-    "position": "과장",
+    "tier": 2,
+    "position": "대리",
     "role": "MES 출고 데이터(출고번호, LOT) 수집 및 원장 S 라인 매칭하여 MES_SHIPPED 확정",
     "status": "ACTIVE",
     "isCreated": true,
@@ -1548,7 +1960,13 @@
       "shipping",
       "quality"
     ],
-    "orderIndex": 2
+    "orderIndex": 2,
+    "roleType": "EXECUTE",
+    "mainDeptId": "shipping",
+    "subDeptIds": [
+      "quality"
+    ],
+    "supervisorId": ""
   },
   {
     "id": "gen-01-statement-maker",
@@ -1559,7 +1977,7 @@
     "teamName": "경리총무팀",
     "tier": 2,
     "position": "대리",
-    "role": "출고 묶음(shipment) 단위로 ALTF 자사 매출 거래명세표 자동 번호 채번 및 작성",
+    "role": "대경벤드 매입 거래명세표 수신·매입 전표 확정 및 우리 발주서(PO) 금액 대조(과소/과다 청구 경보), 구매부 PUR-07 미결 해제 연계",
     "status": "ACTIVE",
     "isCreated": true,
     "approvalStatus": "AUTO_RUNNING",
@@ -1594,7 +2012,12 @@
     "orderIndex": 0,
     "supervisorId": "",
     "connectedAgentIds": [],
-    "scheduleInterval": "24h"
+    "scheduleInterval": "24h",
+    "roleType": "EXECUTE",
+    "mainDeptId": "general",
+    "subDeptIds": [
+      "purchase"
+    ]
   },
   {
     "id": "gen-03-bundler",
@@ -1603,8 +2026,8 @@
     "deptId": "general",
     "deptName": "총무부",
     "teamName": "경리총무팀",
-    "tier": 3,
-    "position": "과장",
+    "tier": 2,
+    "position": "대리",
     "role": "거래명세표 + 품질부 성적서 PDF를 1:1 결합하여 고객 발송 대기 패키지(PACKAGED) 번들링",
     "status": "ACTIVE",
     "isCreated": true,
@@ -1639,7 +2062,13 @@
       "general",
       "executive"
     ],
-    "orderIndex": 1
+    "orderIndex": 1,
+    "roleType": "EXECUTE",
+    "mainDeptId": "general",
+    "subDeptIds": [
+      "executive"
+    ],
+    "supervisorId": ""
   },
   {
     "id": "gen-10-crm-sync",
@@ -1648,8 +2077,8 @@
     "deptId": "general",
     "deptName": "총무부",
     "teamName": "경리총무팀",
-    "tier": 1,
-    "position": "사원",
+    "tier": 2,
+    "position": "대리",
     "role": "1,265개 거래처 마스터 사업자번호, 대표자, 이메일, 팩스, 담당 영업자 동기화",
     "status": "ACTIVE",
     "isCreated": true,
@@ -1684,7 +2113,13 @@
       "general",
       "sle"
     ],
-    "orderIndex": 2
+    "orderIndex": 2,
+    "roleType": "EXECUTE",
+    "mainDeptId": "general",
+    "subDeptIds": [
+      "sle"
+    ],
+    "supervisorId": ""
   },
   {
     "id": "dis-01-gate-keeper",
@@ -1694,7 +2129,7 @@
     "deptName": "관제·게이트부",
     "teamName": "운영관제팀",
     "tier": 3,
-    "position": "팀장",
+    "position": "과장",
     "role": "이메일/카카오/텔레그램 발송 단일 창구. 담당 영업자/사무실 승인 전 발송 원천 차단 및 중복 방지",
     "status": "ACTIVE",
     "isCreated": true,
@@ -1725,7 +2160,14 @@
       "sle",
       "general"
     ],
-    "orderIndex": 0
+    "orderIndex": 0,
+    "roleType": "REVIEW",
+    "mainDeptId": "executive",
+    "subDeptIds": [
+      "sle",
+      "general"
+    ],
+    "supervisorId": "exe-11-monitor"
   },
   {
     "id": "exe-01-telegram-dispatcher",
@@ -1769,7 +2211,15 @@
       "purchase",
       "dat"
     ],
-    "orderIndex": 1
+    "orderIndex": 1,
+    "roleType": "EXECUTE",
+    "mainDeptId": "executive",
+    "subDeptIds": [
+      "general",
+      "purchase",
+      "dat"
+    ],
+    "supervisorId": ""
   },
   {
     "id": "exe-02-kakao-classifier",
@@ -1814,7 +2264,14 @@
       "sle",
       "purchase"
     ],
-    "orderIndex": 2
+    "orderIndex": 2,
+    "roleType": "EXECUTE",
+    "mainDeptId": "executive",
+    "subDeptIds": [
+      "sle",
+      "purchase"
+    ],
+    "supervisorId": ""
   },
   {
     "id": "exe-11-monitor",
@@ -1823,7 +2280,7 @@
     "deptId": "executive",
     "deptName": "관제·게이트부",
     "teamName": "운영관제팀",
-    "tier": 3,
+    "tier": 4,
     "position": "팀장",
     "role": "매일 08:00, 14:00 지연 건(접수 2시간 미배���, 견적 4시간 미승인, 직송 24시간 성적서 미비) 감지 보고",
     "status": "ACTIVE",
@@ -1854,7 +2311,11 @@
     "connectedDeptIds": [
       "executive"
     ],
-    "orderIndex": 4
+    "orderIndex": 4,
+    "roleType": "MONITOR",
+    "mainDeptId": "executive",
+    "subDeptIds": [],
+    "supervisorId": "mgt-01-chief-of-staff"
   },
   {
     "id": "dat-slot-1",
@@ -1863,11 +2324,11 @@
     "deptId": "dat",
     "deptName": "데이터관리팀",
     "teamName": "자동화인프라팀",
-    "tier": 3,
+    "tier": 2,
     "role": "Make.com OAuth 연결 상시 감시, 구글/MS Reauthorize 및 Verify 자동 클릭 검증",
     "status": "ACTIVE",
     "isCreated": true,
-    "position": "사원",
+    "position": "대리",
     "metrics": {
       "speed": 98,
       "accuracy": 100,
@@ -1903,13 +2364,19 @@
       "executive"
     ],
     "connectedAgentIds": [
-      "EXE-11"
+      "exe-11-monitor"
     ],
     "assignedHuman": "조현진 대표",
     "requiresApproval": false,
     "approvalStatus": "AUTO_RUNNING",
     "orderIndex": 0,
-    "scheduleInterval": "24h"
+    "scheduleInterval": "24h",
+    "roleType": "EXECUTE",
+    "mainDeptId": "dat",
+    "subDeptIds": [
+      "executive"
+    ],
+    "supervisorId": ""
   },
   {
     "id": "dat-slot-2",
@@ -1918,11 +2385,11 @@
     "deptId": "dat",
     "deptName": "데이터관리팀",
     "teamName": "자동화인프라팀",
-    "tier": 2,
+    "tier": 3,
     "role": "Make.com 시나리오 Active 상태 상시 감시, 에러 및 미완료 적체 발생 시 Old Data 안전 삭제 및 Active 재활성화",
     "status": "ACTIVE",
     "isCreated": true,
-    "position": "사원",
+    "position": "과장",
     "metrics": {
       "speed": 99,
       "accuracy": 100,
@@ -1961,16 +2428,20 @@
     "requiresApproval": false,
     "approvalStatus": "AUTO_RUNNING",
     "orderIndex": 1,
-    "scheduleInterval": "REALTIME"
+    "scheduleInterval": "REALTIME",
+    "roleType": "MONITOR",
+    "mainDeptId": "dat",
+    "subDeptIds": [],
+    "supervisorId": ""
   },
   {
     "id": "dat-slot-3",
     "code": "DAT-03",
-    "name": "태일·시화 재고 동기화 봇",
+    "name": "태일·시화 재고 동기화봇",
     "deptId": "dat",
     "deptName": "데이터관리팀",
     "teamName": "재고동기화자동화팀",
-    "tier": 3,
+    "tier": 1,
     "role": "태일/시화재고 구글시트 Apps Script 실행 및 완료 신호(SIGNAL_DAT03_SUCCESS) 방출 전담",
     "status": "ACTIVE",
     "isCreated": true,
@@ -2019,16 +2490,19 @@
     "approvalStatus": "AUTO_RUNNING",
     "orderIndex": 2,
     "supervisorId": "dat-slot-5",
-    "scheduleInterval": "3h"
+    "scheduleInterval": "3h",
+    "roleType": "INTAKE",
+    "mainDeptId": "dat",
+    "subDeptIds": []
   },
   {
     "id": "dat-slot-4",
     "code": "DAT-04",
-    "name": "대경 재고 파일 수신 & 변환 봇",
+    "name": "대경 재고 파일 수신 & 변환봇",
     "deptId": "dat",
     "deptName": "데이터관리팀",
     "teamName": "재고동기화자동화팀",
-    "tier": 3,
+    "tier": 1,
     "role": "DAT-03 사원의 SUCCESS 신호 감지 후 대경재고 파일 수신 및 구글시트 변환, 완료 신호(SIGNAL_DAT04_SUCCESS) 방출",
     "status": "ACTIVE",
     "isCreated": true,
@@ -2082,12 +2556,15 @@
     "approvalStatus": "AUTO_RUNNING",
     "orderIndex": 3,
     "supervisorId": "dat-slot-5",
-    "scheduleInterval": "REALTIME"
+    "scheduleInterval": "REALTIME",
+    "roleType": "INTAKE",
+    "mainDeptId": "dat",
+    "subDeptIds": []
   },
   {
     "id": "dat-slot-5",
     "code": "DAT-05",
-    "name": "ALTF 재고 DB 총괄 & 버퍼링 관제 봇",
+    "name": "ALTF 재고 DB 총괄 & 버퍼링 관제봇",
     "deptId": "dat",
     "deptName": "데이터관리팀",
     "teamName": "재고동기화자동화팀",
@@ -2095,7 +2572,7 @@
     "role": "사원(DAT-03, DAT-04) SUCCESS 완료 신호 확인 후 3~5분 구글시트 수식 안정화 버퍼링 관제 및 ALTF 재고 DB Apps Script 실행, inventory.json 생성 신호(SIGNAL_DAT05_SUCCESS) 방출",
     "status": "ACTIVE",
     "isCreated": true,
-    "position": "과장",
+    "position": "대리",
     "metrics": {
       "speed": 95,
       "accuracy": 100,
@@ -2145,16 +2622,19 @@
     "approvalStatus": "APPROVED",
     "orderIndex": 4,
     "supervisorId": "dat-slot-6",
-    "scheduleInterval": "REALTIME"
+    "scheduleInterval": "REALTIME",
+    "roleType": "EXECUTE",
+    "mainDeptId": "dat",
+    "subDeptIds": []
   },
   {
     "id": "dat-slot-6",
     "code": "DAT-06",
-    "name": "S3 배포 & 재고 갱신/변동량 감시 봇",
+    "name": "S3 배포 & 재고 갱신/변동량 감시봇",
     "deptId": "dat",
     "deptName": "데이터관리팀",
     "teamName": "재고동기화자동화팀",
-    "tier": 1,
+    "tier": 4,
     "role": "DAT-05 대리의 SUCCESS 신호 감지 후 최신 inventory.json 결과물 실물 엄격 검수(구버전 차단), S3 클라우드 업로드 및 시화재고 변동량 분석 확정",
     "status": "ACTIVE",
     "isCreated": true,
@@ -2202,13 +2682,18 @@
       "purchase"
     ],
     "connectedAgentIds": [
-      "PUR-01"
+      "pur-01-pending-intake"
     ],
     "assignedHuman": "조현진 대표",
     "requiresApproval": false,
     "approvalStatus": "APPROVED",
     "orderIndex": 5,
-    "supervisorId": "executive-slot-1",
-    "scheduleInterval": "REALTIME"
+    "supervisorId": "mgt-01-chief-of-staff",
+    "scheduleInterval": "REALTIME",
+    "roleType": "REVIEW",
+    "mainDeptId": "dat",
+    "subDeptIds": [
+      "purchase"
+    ]
   }
 ]
