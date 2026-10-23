@@ -828,7 +828,9 @@ ${listText.trim()}
             getAgentSummary('PUR-07'), // 발주/미결 통합 관제
             getAgentSummary('PUR-08'), // 재고발주 사전 품의
             '',
-            '⚡ <b>[데이터관리팀 - 전사 재고 4단계 자동화]</b>',
+            '⚡ <b>[데이터관리팀 - Make.com 인프라 & 재고 4단계 자동화]</b>',
+            getAgentSummary('DAT-01'), // Make.com 크리덴셜 자동 인증
+            getAgentSummary('DAT-02'), // Make.com 시나리오 유지 감시
             getAgentSummary('DAT-03'), // 태일/시화
             getAgentSummary('DAT-04'), // 대경 변환
             getAgentSummary('DAT-05'), // ALTF DB
