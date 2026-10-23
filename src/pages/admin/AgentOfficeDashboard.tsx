@@ -2936,6 +2936,16 @@ export default function AgentOfficeDashboard() {
                         <span>카톡 견적 검토</span>
                     </button>
 
+                    {/* 🏭 대경 생산 미결 & 납기 정밀 분석 직통 버튼 */}
+                    <button
+                        onClick={() => setShowPendingOrdersModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/50 bg-gradient-to-r from-amber-600/25 to-orange-600/25 hover:from-amber-600/45 hover:to-orange-600/45 text-amber-200 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                        title="대경벤드 생산 미결 9단계 추적 & 납기 정밀 분석 보고서"
+                    >
+                        <Factory className="w-3.5 h-3.5 text-amber-400" />
+                        <span>대경 생산미결 & 납기분석</span>
+                    </button>
+
                     {/* 📁 업무 대장 & 관제 도구 통합 드롭다운 (거대 배너 4개를 컴팩트 툴바로 일원화) */}
                     <div className="relative" ref={toolsDropdownRef}>
                         <button

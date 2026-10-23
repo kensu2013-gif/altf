@@ -473,13 +473,14 @@ export class PendingListService {
           alertCount: 0,
           criticalCount: 0,
           warningCount: 0,
-          unstartedCount: 0, // 아무것도 진행 안 됨 (진행률 <= 5%)
+          unstartedCount: 0, // 진행률 <= 5%
           completedCount: 0,
           maxElapsedDays: 0,
           oldestOrderNo: '',
           oldestPoDate: '',
           oldestItemSummary: '',
           cutPendingCount: 0,
+          stockPendingCount: 0,
           reviewPendingCount: 0,
           sampleItems: []
         };
@@ -501,10 +502,15 @@ export class PendingListService {
         c.deficitRiskCount = (c.deficitRiskCount || 0) + 1;
       }
 
-      if (!item.isCompleted && item.progressPct <= 5) {
-        c.unstartedCount++;
-        if (item.workType.includes('생산') && !item.cutDate) c.cutPendingCount++;
-        if (item.workType.includes('검토') && !item.cutDate) c.reviewPendingCount++;
+      if (!item.isCompleted) {
+        if (item.workType.includes('재고') && !item.storeDate) {
+          c.stockPendingCount++;
+        }
+        if (item.progressPct <= 5) {
+          c.unstartedCount++;
+          if (item.workType.includes('생산') && !item.cutDate) c.cutPendingCount++;
+          if (item.workType.includes('검토') && !item.cutDate) c.reviewPendingCount++;
+        }
       }
 
       if (item.elapsedDays > c.maxElapsedDays) {
@@ -523,11 +529,17 @@ export class PendingListService {
     const clientDiagnoses = Object.values(clientMap).map(c => {
       let primaryIssue = '정상 진행 중';
       if ((c.overdueCount || 0) > 0) {
-        primaryIssue = `🚨 고객 약속 납기 초과 ${c.overdueCount}건 (최장 ${c.maxElapsedDays}일 정체)`;
+        if (c.stockPendingCount > 0 && c.cutPendingCount === 0) {
+          primaryIssue = `🚨 고객 약속 납기 초과 ${c.overdueCount}건 (재고 배정 후 출고 정체)`;
+        } else {
+          primaryIssue = `🚨 고객 약속 납기 초과 ${c.overdueCount}건 (최장 ${c.maxElapsedDays}일 정체)`;
+        }
       } else if ((c.deficitRiskCount || 0) > 0) {
         primaryIssue = `🚨 납기 펑크 위험 ${c.deficitRiskCount}건 (고객납기 < 제작필요일수)`;
-      } else if (c.criticalCount > 0) {
-        primaryIssue = `절단 미착수 긴급 ${c.criticalCount}건 (최장 ${c.maxElapsedDays}일 정체)`;
+      } else if (c.cutPendingCount > 0) {
+        primaryIssue = `절단 미착수 긴급 ${c.cutPendingCount}건 (최장 ${c.maxElapsedDays}일 정체)`;
+      } else if (c.stockPendingCount > 0) {
+        primaryIssue = `재고 배정 후 출고 대기 ${c.stockPendingCount}건 (최장 ${c.maxElapsedDays}일 정체)`;
       } else if (c.unstartedCount > 0) {
         primaryIssue = `공정 미착수 ${c.unstartedCount}건 (최장 ${c.maxElapsedDays}일 멈춤)`;
       } else if (c.warningCount > 0) {
@@ -540,7 +552,6 @@ export class PendingListService {
         primaryIssue
       };
     }).sort((a, b) => {
-      // 정렬 우선순위: 납기초과 많은 순 -> 납기위험 많은 순 -> 긴급 많은 순 -> 정체 많은 순 -> 최장 경과일 많은 순
       if ((b.overdueCount || 0) !== (a.overdueCount || 0)) return (b.overdueCount || 0) - (a.overdueCount || 0);
       if ((b.deficitRiskCount || 0) !== (a.deficitRiskCount || 0)) return (b.deficitRiskCount || 0) - (a.deficitRiskCount || 0);
       if (b.criticalCount !== a.criticalCount) return b.criticalCount - a.criticalCount;
@@ -550,14 +561,12 @@ export class PendingListService {
     });
 
     // 5. 발주일 기준 최장 미착수 정체 TOP 리스트 (Longest Stagnant Items)
-    // 조건: 완료되지 않았고 진행률 <= 5% (검토정체 or 절단대기)
     const longestStagnantItems = analyzedRows
       .filter(r => !r.isCompleted && r.progressPct <= 5)
       .sort((a, b) => (b.elapsedDays || 0) - (a.elapsedDays || 0))
       .slice(0, 50);
 
     // 6. 고객 납기 대비 지연 위험 품목 TOP 리스트 (Critical Due Date Risk Items)
-    // 고객 납기일까지 남은 기간보다 대경 제작 소요 예상일이 더 길어 펑크가 확실하거나 이미 지난 품목들
     const criticalDueRiskItems = analyzedRows
       .filter(r => !r.isCompleted && r.dueDateStatus && r.dueDateStatus !== 'COMPLETED' && r.dueDateStatus !== 'SAFE')
       .sort((a, b) => {
@@ -569,7 +578,123 @@ export class PendingListService {
       })
       .slice(0, 50);
 
-    this._updateAgentStatus('PUR-03', `발주 매칭 ${matchedCount}건, 고객 납기 위험 ${criticalDueRiskItems.length}건 분석 완료`, `매칭 ${matchedCount}건 / 거래처 ${clientDiagnoses.length}개 진단 / 납기 위험 ${criticalDueRiskItems.length}건`, 'ACTIVE');
+    // 7. 💡 [핵심] 발주서별(주문번호+납품처) 정밀 납기 위험 분석 매트릭스 (Order-level Risk Matrix)
+    // 구조: 업체명 - 발주번호 - 고객납기 - 현재공정 - 위험(🚨) / 경계(⚠️) / 안정(✅) / 완료(🏁)
+    const orderGroupMap = new Map();
+    analyzedRows.forEach(item => {
+      const client = item.deliveryTo || item.customerName || '자체/미지정';
+      const orderNo = item.orderNo || '주문번호미상';
+      const compositeKey = `${client}____${orderNo}`;
+
+      if (!orderGroupMap.has(compositeKey)) {
+        orderGroupMap.set(compositeKey, {
+          client,
+          orderNo,
+          customerDueDate: item.customerDueDate || null,
+          remainingDays: item.remainingCustomerDays !== undefined ? item.remainingCustomerDays : null,
+          poDate: item.poDate || null,
+          elapsedDays: item.elapsedDays || 0,
+          items: []
+        });
+      }
+      const grp = orderGroupMap.get(compositeKey);
+      grp.items.push(item);
+      if (item.customerDueDate && !grp.customerDueDate) {
+        grp.customerDueDate = item.customerDueDate;
+        grp.remainingDays = item.remainingCustomerDays;
+      }
+      if (item.elapsedDays > grp.elapsedDays) {
+        grp.elapsedDays = item.elapsedDays;
+      }
+    });
+
+    const orderAnalyses = [];
+    for (const [_, grp] of orderGroupMap.entries()) {
+      const items = grp.items;
+      const totalItems = items.length;
+      const totalQty = items.reduce((sum, i) => sum + (i.remainQty || 0), 0);
+      const completedCount = items.filter(i => i.isCompleted).length;
+      const overdueCount = items.filter(i => i.dueDateStatus === 'OVERDUE').length;
+      const impossibleCount = items.filter(i => i.dueDateStatus === 'IMPOSSIBLE_DELAY').length;
+      const tightCount = items.filter(i => i.dueDateStatus === 'TIGHT_WARNING').length;
+      const criticalCount = items.filter(i => i.alertSeverity === 'CRITICAL').length;
+      const warningCount = items.filter(i => i.alertSeverity === 'WARNING').length;
+
+      // 대표 공정 단계 요약
+      const stageMap = {};
+      items.forEach(i => {
+        stageMap[i.stage] = (stageMap[i.stage] || 0) + 1;
+      });
+      const mainStage = Object.entries(stageMap)
+        .sort((a, b) => b[1] - a[1])
+        .map(([st, cnt]) => `${st} ${cnt}건`)
+        .slice(0, 3)
+        .join(', ');
+
+      let riskLevel = 'SAFE'; // DANGER | WARNING | SAFE | COMPLETED
+      let riskLabel = '안정';
+      let riskReason = '고객 약속납기 여유 및 공정 정상 진행';
+      let actionItem = '진행 공정 모니터링 유지';
+
+      if (completedCount === totalItems) {
+        riskLevel = 'COMPLETED';
+        riskLabel = '입고완료';
+        riskReason = '전 품목 대경 창고 입고 완료 (출고 준비)';
+        actionItem = '상차 및 고객사 배송 출고 조율';
+      } else if (overdueCount > 0) {
+        riskLevel = 'DANGER';
+        riskLabel = '위험';
+        const maxOver = Math.max(...items.filter(i => i.dueDateStatus === 'OVERDUE').map(i => Math.abs(i.remainingCustomerDays || 0)));
+        riskReason = `고객 약속납기(${grp.customerDueDate || '-'}) ${maxOver}일 초과 (${overdueCount}건 지연)`;
+        actionItem = items.some(i => i.workType.includes('재고'))
+          ? '대경 창고 출고 즉시 독촉 및 오늘 직송 차량 수배'
+          : '대경 공장장 직통 유선 연락 및 최우선 가공/출고 요청';
+      } else if (impossibleCount > 0) {
+        riskLevel = 'DANGER';
+        riskLabel = '위험';
+        riskReason = `납기 펑크 불가피 (${impossibleCount}건, 남은납기 < 제작필요일수)`;
+        actionItem = '공정 단축 긴급 투입 요청 및 고객사 사전 납기 조율';
+      } else if (tightCount > 0 || criticalCount > 0) {
+        riskLevel = 'WARNING';
+        riskLabel = '경계';
+        riskReason = tightCount > 0 ? `고객 납기 임박 (${tightCount}건)` : `절단/검토 장기 미착수 (${criticalCount}건)`;
+        actionItem = '금일 중 절단/가공 후속 공정 즉시 투입 지시';
+      } else if (warningCount > 0) {
+        riskLevel = 'WARNING';
+        riskLabel = '경계';
+        riskReason = `중간 공정 정체 (${warningCount}건)`;
+        actionItem = '후속 열처리/가공 라인 일정 확인';
+      }
+
+      orderAnalyses.push({
+        client: grp.client,
+        orderNo: grp.orderNo,
+        customerDueDate: grp.customerDueDate,
+        remainingDays: grp.remainingDays,
+        poDate: grp.poDate,
+        elapsedDays: grp.elapsedDays,
+        mainStage,
+        totalItems,
+        totalQty,
+        completedCount,
+        riskLevel,
+        riskLabel,
+        riskReason,
+        actionItem,
+        items
+      });
+    }
+
+    // 정렬: 위험 -> 경계 -> 안정 -> 입고완료 순
+    orderAnalyses.sort((a, b) => {
+      const score = { DANGER: 4, WARNING: 3, SAFE: 2, COMPLETED: 1 };
+      if (score[b.riskLevel] !== score[a.riskLevel]) return score[b.riskLevel] - score[a.riskLevel];
+      const remA = a.remainingDays !== null ? a.remainingDays : 999;
+      const remB = b.remainingDays !== null ? b.remainingDays : 999;
+      return remA - remB;
+    });
+
+    this._updateAgentStatus('PUR-03', `발주 매칭 ${matchedCount}건, 거래처 ${clientDiagnoses.length}개, 발주서 매트릭스 ${orderAnalyses.length}개 분석 완료`, `매칭 ${matchedCount}건 / 발주 매트릭스 ${orderAnalyses.length}건 / 납기 위험 ${criticalDueRiskItems.length}건`, 'ACTIVE');
 
     return {
       totalRows: analyzedRows.length,
@@ -580,6 +705,7 @@ export class PendingListService {
       alertCount: alertItems.length,
       alertItems,
       clientDiagnoses,
+      orderAnalyses,
       longestStagnantItems,
       criticalDueRiskItems,
       rows: analyzedRows
@@ -587,18 +713,22 @@ export class PendingListService {
   }
 
   /**
-   * 3. 대경벤드 납기 독촉 보고서 생성 (PUR-04 과장봇)
-   * 💡 [핵심 원칙]: 창고 입고(V열 storeDate) 완료 건은 출고 직전 상태이므로 독촉 보고서에서 100% 완전 제외!
-   * 💡 Z열(납품처)과 Y열(주문번호) 기준으로 그룹핑하여 대경벤드에 직통 전달 가능한 형식으로 작성
+   * 3. 대경벤드 납기 정밀 분석 보고서 및 독촉 공문 생성 (PUR-04 과장봇)
+   * 💡 [핵심 원칙]: 창고 입고(V열 storeDate) 완료 건은 출고 직전 상태이므로 독촉 대상에서 100% 완전 제외!
+   * 💡 [정밀 매트릭스]: 업체명 - 발주번호 - 고객납기 - 현재공정 - 위험도 판정(위험/경계/안정) 체계 반영
    */
   generateChaserReport(analyzedData) {
-    this._updateAgentStatus('PUR-04', '공정 진행도 종합 분석 및 대경벤드 납기 독촉 보고서 작성 중...', '납기 독촉 리포트 작성 착수', 'ACTIVE');
+    this._updateAgentStatus('PUR-04', '발주서별 정밀 납기 위험 분석 매트릭스 및 대경 공문 생성 중...', '납기 정밀 보고서 작성 착수', 'ACTIVE');
 
-    // 🚨 창고입고 완료 품목은 출고 직전이므로 독촉 대상에서 완전히 배제
     const pendingAlertItems = analyzedData.alertItems.filter(i => !i.isCompleted && !i.storeDate);
-
     const criticalItems = pendingAlertItems.filter(i => i.alertSeverity === 'CRITICAL');
     const warningItems = pendingAlertItems.filter(i => i.alertSeverity === 'WARNING');
+    const orderAnalyses = analyzedData.orderAnalyses || [];
+
+    const dangerOrders = orderAnalyses.filter(o => o.riskLevel === 'DANGER');
+    const warningOrders = orderAnalyses.filter(o => o.riskLevel === 'WARNING');
+    const safeOrders = orderAnalyses.filter(o => o.riskLevel === 'SAFE');
+    const completedOrders = orderAnalyses.filter(o => o.riskLevel === 'COMPLETED');
 
     // Grouping by [주문번호(Y열) + 납품처(Z열)]
     const groupByOrder = {};
@@ -620,32 +750,51 @@ export class PendingListService {
 
     const todayStr = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
-    let markdown = `# 🚨 [알트에프 구매부] 대경벤드 생산 미결 및 긴급 납기 독촉 보고서\n`;
-    markdown += `**작성 일시**: ${todayStr} | **주관**: 구매부 미결관리팀 (PUR-04 과장)\n`;
-    markdown += `**총 미결 항목**: ${analyzedData.totalRows.toLocaleString()}건 | **창고입고 완료(독촉 제외)**: ${(analyzedData.stageCounts?.창고입고완료 || 0).toLocaleString()}건\n`;
-    markdown += `**실제 독촉 대상(공정 멈춤/지연)**: 총 **${pendingAlertItems.length}건** (긴급: ${criticalItems.length}건, 경고: ${warningItems.length}건)\n\n`;
+    let markdown = `# 📊 [알트에프 구매부] 대경벤드 생산 미결 및 납기 정밀 분석 보고서\n`;
+    markdown += `**작성 일시**: ${todayStr} | **분석 총괄**: 구매부 미결관리팀 (PUR-04 과장)\n`;
+    markdown += `**총 분석 품목**: ${analyzedData.totalRows.toLocaleString()}건 | **분석 발주서**: 총 ${orderAnalyses.length}건\n`;
+    markdown += `**위험도 현황**: 🚨 위험 **${dangerOrders.length}건** | ⚠️ 경계 **${warningOrders.length}건** | ✅ 안정 **${safeOrders.length}건** | 🏁 완료 **${completedOrders.length}건**\n\n`;
 
-    markdown += `> 💡 **안내**: 창고 입고(V열)가 완료된 품목은 출고 직전/완료 상태이므로 본 독촉 보고서에서 전면 제외되었으며, 현재 제조 공정이 착수되지 않았거나 중간에 멈춰 있는 품목들만 수록되었습니다.\n\n`;
+    markdown += `> 💡 **판정 기준 안내**:\n`;
+    markdown += `> - **🚨 위험 (DANGER)**: 고객 약속 납기일 이미 초과(OVERDUE) 또는 잔여 납기일보다 제작 소요 일수가 훨씬 길어 펑크가 확정된 건\n`;
+    markdown += `> - **⚠️ 경계 (WARNING)**: 고객 약속 납기 임박(D-3일 이내) 또는 14일 이상 절단/검토 미착수 및 중간 공정 정체 건\n`;
+    markdown += `> - **✅ 안정 (SAFE)**: 고객 납기일까지 일정 여유가 충분하고 정상 공정 진행 중인 건\n`;
+    markdown += `> - **🏁 완료 (COMPLETED)**: 대경 창고 입고(V열) 완료되어 즉시 상차/출고 가능한 건 (독촉 대상 제외)\n\n`;
 
-    markdown += `## ⚡ [납품처 / 주문번호별] 긴급 조치 및 납기 독촉 요청 리스트\n`;
+    markdown += `## 📋 [정밀 매트릭스] 업체명 - 발주번호 - 납기 - 현재공정 - 위험도 판정\n`;
+    markdown += `| 업체명 (납품처) | 발주번호 | 고객납기 (잔여일) | 현재 공정 현황 | 위험도 판정 | 수량 | 권장 긴급 조치사항 |\n`;
+    markdown += `| :--- | :--- | :--- | :--- | :---: | :---: | :--- |\n`;
+
+    orderAnalyses.forEach(o => {
+      const riskBadge = o.riskLevel === 'DANGER' ? '🚨 위험' :
+                        o.riskLevel === 'WARNING' ? '⚠️ 경계' :
+                        o.riskLevel === 'COMPLETED' ? '🏁 완료' : '✅ 안정';
+      const dueText = o.customerDueDate 
+        ? `${o.customerDueDate} (${o.remainingDays < 0 ? `${Math.abs(o.remainingDays)}일 초과` : `D-${o.remainingDays}일`})`
+        : '납기미정';
+      markdown += `| **${o.client}** | \`${o.orderNo}\` | ${dueText} | ${o.mainStage} | **${riskBadge}** | ${o.totalQty.toLocaleString()}개 | ${o.actionItem} |\n`;
+    });
+    markdown += `\n`;
+
+    markdown += `## ⚡ [발주처별 상세 지연 품목 및 독촉 내역]\n`;
     for (const [_, group] of Object.entries(groupByOrder)) {
-      markdown += `### 📌 [주문번호: ${group.orderNo}] 납품처: ${group.deliveryTo} (지연: ${group.items.length}건)\n`;
-      markdown += `| LOT | 품명 | 규격(두께) | 재질 | 작업(L열) | 잔량 | 정체 단계 및 독촉 사유 |\n`;
-      markdown += `| :--- | :--- | :--- | :--- | :---: | :---: | :--- |\n`;
+      markdown += `### 📌 [${group.deliveryTo}] 주문번호: \`${group.orderNo}\` (지연: ${group.items.length}건)\n`;
+      markdown += `| LOT | 품명 | 규격(두께) | 작업(L열) | 잔량 | 정체 단계 및 독촉 사유 |\n`;
+      markdown += `| :--- | :--- | :--- | :---: | :---: | :--- |\n`;
       group.items.slice(0, 8).forEach(it => {
         const icon = it.alertSeverity === 'CRITICAL' ? '🚨' : '⚠️';
-        markdown += `| ${it.lotNo} | ${it.itemName} | ${it.size} (${it.thickness}) | ${it.material} | ${it.workType} | **${it.remainQty}개** | ${icon} ${it.alertReason} |\n`;
+        markdown += `| ${it.lotNo} | ${it.itemName} | ${it.size} (${it.thickness}) | ${it.workType} | **${it.remainQty}개** | ${icon} ${it.alertReason} |\n`;
       });
       if (group.items.length > 8) {
-        markdown += `| ... | 외 ${group.items.length - 8}개 품목 추가 지연 중 | | | | | |\n`;
+        markdown += `| ... | 외 ${group.items.length - 8}개 품목 추가 지연 중 | | | | |\n`;
       }
       markdown += `\n`;
     }
 
-    markdown += `## 💬 영업부 및 출고물류부 연계 가이드라인 (SAL-03 연계)\n`;
-    markdown += `- '생산' 확정 상태이나 절단일자가 없는 ${criticalItems.length}건은 대경 공장장 직통 유선 독촉 요망.\n`;
-    markdown += `- '검토' 상태에서 1주일 이상 멈춰 있는 품목은 즉각 기술 사양 확정 및 생산 라인 투입 요구.\n`;
-    markdown += `- 창고입고 완료된 ${(analyzedData.stageCounts?.창고입고완료 || 0)}건은 출고물류부(LOG-01)와 즉시 연계하여 고객사 상차/배송 일정 조율.\n`;
+    markdown += `## 💬 긴급 현장 조치 가이드라인\n`;
+    markdown += `1. **🚨 위험 등급 발주서 (${dangerOrders.length}건)**: 즉시 대경벤드 영업/공장 직통 통화 및 금일 출고/납품 일정 확인서 요청.\n`;
+    markdown += `2. **재고 배정 품목 (한국스텐레스 등)**: 이미 자재가 확보된 상태이므로 포장/가공 완료 즉시 직송 차량 배차.\n`;
+    markdown += `3. **창고 입고 완료 건 (${completedOrders.length}건)**: 출고물류부(LOG-01) 즉시 연계하여 검사 성적서 확인 후 출고.\n`;
 
     const report = {
       reportId: `CHASER-${Date.now()}`,
@@ -655,13 +804,19 @@ export class PendingListService {
         alertCount: pendingAlertItems.length,
         criticalCount: criticalItems.length,
         warningCount: warningItems.length,
-        excludedCompletedCount: analyzedData.stageCounts?.창고입고완료 || 0
+        excludedCompletedCount: analyzedData.stageCounts?.창고입고완료 || 0,
+        totalOrders: orderAnalyses.length,
+        dangerOrdersCount: dangerOrders.length,
+        warningOrdersCount: warningOrders.length,
+        safeOrdersCount: safeOrders.length,
+        completedOrdersCount: completedOrders.length
       },
+      orderAnalyses,
       markdown,
       groupByOrder
     };
 
-    this._updateAgentStatus('PUR-04', `대경 독촉 보고서 생성 완료 (지연 ${pendingAlertItems.length}건)`, `대경벤드 납기 독촉 리포트 작성 완료 (입고완료 제외)`, 'ACTIVE');
+    this._updateAgentStatus('PUR-04', `대경 정밀 납기 분석 보고서 생성 완료 (위험 ${dangerOrders.length}건 / 경계 ${warningOrders.length}건)`, `납기 정밀 분석 보고서 및 공문 작성 완료`, 'ACTIVE');
     return report;
   }
 
@@ -902,6 +1057,11 @@ export class PendingListService {
     // 6. 결과 전체 저장
     const overdueCount = (analyzed.rows || []).filter(r => r.dueDateStatus === 'OVERDUE').length;
     const deficitRiskCount = (analyzed.rows || []).filter(r => r.dueDateStatus === 'IMPOSSIBLE_DELAY').length;
+    const orderAnalyses = analyzed.orderAnalyses || [];
+    const dangerOrdersCount = orderAnalyses.filter(o => o.riskLevel === 'DANGER').length;
+    const warningOrdersCount = orderAnalyses.filter(o => o.riskLevel === 'WARNING').length;
+    const safeOrdersCount = orderAnalyses.filter(o => o.riskLevel === 'SAFE').length;
+    const completedOrdersCount = orderAnalyses.filter(o => o.riskLevel === 'COMPLETED').length;
 
     const finalResult = {
       timestamp: new Date().toISOString(),
@@ -916,10 +1076,16 @@ export class PendingListService {
         overdueCount,
         deficitRiskCount,
         dueRiskCount: (analyzed.criticalDueRiskItems || []).length,
-        excludedNonProductCount: parsed.excludedNonProductCount || 0
+        excludedNonProductCount: parsed.excludedNonProductCount || 0,
+        totalOrders: orderAnalyses.length,
+        dangerOrdersCount,
+        warningOrdersCount,
+        safeOrdersCount,
+        completedOrdersCount
       },
       stageCounts: analyzed.stageCounts,
       clientDiagnoses: analyzed.clientDiagnoses,
+      orderAnalyses,
       longestStagnantItems: analyzed.longestStagnantItems,
       criticalDueRiskItems: analyzed.criticalDueRiskItems || [],
       chaserReport,
