@@ -1,5 +1,19 @@
 [
   {
+    "id": "management",
+    "name": "경영총괄부",
+    "code": "MGT",
+    "color": "#E2E8F0",
+    "bgGlow": "rgba(226, 232, 240, 0.15)",
+    "icon": "🎩",
+    "description": "대표이사 직속. 전사 부서·봇 관제, 이상 징후 판정 및 대표님 텔레그램 간결 보고(비서실장)",
+    "headRole": "비서실장 (전사 관제·대표 보고 총괄)",
+    "totalUnits": 1,
+    "teams": [
+      "비서실"
+    ]
+  },
+  {
     "id": "sle",
     "name": "영업부",
     "code": "SLE",
@@ -71,7 +85,7 @@
     "icon": "👑",
     "description": "메신저(텔레그램/카톡) 인바운드 분배, 견적·발주 자동 분류, 전사 발송 게이트 통제 및 AI 자율 관제",
     "headRole": "인바운드 분배 & 자율 운영 관제",
-    "totalUnits": 5,
+    "totalUnits": 4,
     "teams": [
       "인바운드게이트팀",
       "운영관제팀"

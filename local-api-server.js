@@ -612,6 +612,72 @@ kakaoBotService.onQuotationUpdated = (updatedQuote) => {
     }
 };
 
+// 🛡️ 카카오톡 발주서 정식 승인 시 db.orders 안전 등록 훅 (Human-in-the-Loop 검증 후 승격)
+kakaoBotService.onOrderApproved = async (approvedKakaoOrder) => {
+    try {
+        if (!db.orders) db.orders = [];
+
+        // 중복 등록 방지 가드
+        const officialId = approvedKakaoOrder.convertedOrderId || `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-KKO-${Math.floor(1000 + Math.random() * 9000)}`;
+        const existingIdx = db.orders.findIndex(o => o.id === officialId || o.poNumber === approvedKakaoOrder.orderNo);
+        if (existingIdx !== -1) {
+            console.log(`[API] ℹ️ 이미 등록된 카카오 발주서 건너뜀: ${approvedKakaoOrder.orderNo}`);
+            return;
+        }
+
+        const officialOrder = {
+            id: officialId,
+            userId: approvedKakaoOrder.matchedUser?.userId || 'kakao-channel-user',
+            customerName: approvedKakaoOrder.customerName || '카카오톡 고객사',
+            orderChannel: '카카오톡',
+            source: '카카오톡',
+            poNumber: approvedKakaoOrder.orderNo,
+            poTitle: `[카카오톡 발주] ${approvedKakaoOrder.customerName}`,
+            status: 'RECEIVED',
+            createdAt: approvedKakaoOrder.receivedAt || new Date().toISOString(),
+            destination: approvedKakaoOrder.destination || '',
+            freightTerms: approvedKakaoOrder.freightTerms || '',
+            recipient: approvedKakaoOrder.recipient || '',
+            phone: approvedKakaoOrder.phone || '',
+            memo: [
+                `배송:${approvedKakaoOrder.destination || '미기재'}`,
+                `담당자:${approvedKakaoOrder.recipient || approvedKakaoOrder.customerName} (${approvedKakaoOrder.phone || ''})`,
+                `요청사항:${approvedKakaoOrder.freightTerms || '착불'}`,
+                `[카카오톡 접수번호: ${approvedKakaoOrder.orderNo}]`
+            ].join('\n'),
+            items: (approvedKakaoOrder.items || []).map((it, idx) => ({
+                id: `ORD-ITEM-${idx}-${Date.now()}`,
+                name: it.name || '배관 피팅',
+                thickness: it.thickness || 'S40S',
+                size: it.size || '',
+                material: it.material || 'STS304-W',
+                quantity: it.quantity || 1,
+                unitPrice: it.unitPrice || 0,
+                amount: (it.unitPrice || 0) * (it.quantity || 1),
+                isSelected: true,
+                isVerified: true,
+                discountRate: it.discountRate || 50
+            })),
+            totalAmount: approvedKakaoOrder.totalAmount || 0,
+            isStockOrder: false,
+            poSent: false,
+            approvedBy: approvedKakaoOrder.approvedBy || '사무실 관리자',
+            approvedAt: approvedKakaoOrder.approvedAt || new Date().toISOString()
+        };
+
+        db.orders.unshift(officialOrder);
+        queueSave();
+        console.log(`[API] 🛡️ [카카오 발주 승인] 정식 db.orders에 안전하게 승격 등록 완료: ${officialOrder.id} (${officialOrder.poTitle})`);
+
+        // 구매부 재고 발주 동기화 호출
+        if (typeof purchaseStockOrderService.syncFromAltfApi === 'function') {
+            purchaseStockOrderService.syncFromAltfApi(false).catch(e => console.warn('[PUR-01] Sync error:', e.message));
+        }
+    } catch (err) {
+        console.error('[API] 카카오 발주서 db.orders 등록 실패:', err.message);
+    }
+};
+
 async function updateDb(updater) {
     try {
         const result = await updater();
@@ -2406,7 +2472,8 @@ const server = http.createServer(async (req, res) => {
                     ...telegramBotService.getStatus()
                 });
             } catch (err) {
-                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+                const status = err.code === 'TELEGRAM_CONFIG_LOCKED' ? 403 : 500;
+                sendJsonResponse(req, res, status, { success: false, error: err.message });
             }
             return;
         }
@@ -2629,6 +2696,61 @@ const server = http.createServer(async (req, res) => {
             const offset = parseInt(urlParams.get('offset') || '0', 10);
             const data = kakaoBotService.getOrders({ limit, offset });
             sendJsonResponse(req, res, 200, { success: true, ...data });
+            return;
+        }
+
+        // 3-0-1. POST /api/kakao/orders/:id/update : 사무실 직원의 카카오 발주서 보완 수정 (도착지, 운송비, 품목 등)
+        const orderUpdateMatch = url.pathname.match(/^\/api\/kakao\/orders\/([^\/]+)\/update$/);
+        if (req.method === 'POST' && orderUpdateMatch) {
+            try {
+                const orderId = orderUpdateMatch[1];
+                const body = await parseBody(req);
+                const updated = kakaoBotService.updateOrder(orderId, body);
+                sendJsonResponse(req, res, 200, { success: true, order: updated });
+            } catch (err) {
+                sendJsonResponse(req, res, 400, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 3-0-2. POST /api/kakao/orders/:id/approve : 사무실 직원의 카카오 발주서 정식 승인 (db.orders로 안전 이관)
+        const orderApproveMatch = url.pathname.match(/^\/api\/kakao\/orders\/([^\/]+)\/approve$/);
+        if (req.method === 'POST' && orderApproveMatch) {
+            try {
+                const orderId = orderApproveMatch[1];
+                const body = await parseBody(req).catch(() => ({}));
+                const session = getAuthenticatedSession(req);
+                const approvedBy = body.approvedBy || session?.name || '사무실 관리자';
+                const approved = await kakaoBotService.approveOrder(orderId, approvedBy);
+                sendJsonResponse(req, res, 200, { success: true, message: '정식 발주서 등록이 완료되었습니다.', order: approved });
+            } catch (err) {
+                sendJsonResponse(req, res, 400, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 3-0-3. POST /api/kakao/orders/:id/reject : 카카오 발주서 반려 처리
+        const orderRejectMatch = url.pathname.match(/^\/api\/kakao\/orders\/([^\/]+)\/reject$/);
+        if (req.method === 'POST' && orderRejectMatch) {
+            try {
+                const orderId = orderRejectMatch[1];
+                const body = await parseBody(req).catch(() => ({}));
+                const session = getAuthenticatedSession(req);
+                const rejectedBy = body.rejectedBy || session?.name || '사무실 관리자';
+                const rejected = kakaoBotService.rejectOrder(orderId, body.reason, rejectedBy);
+                sendJsonResponse(req, res, 200, { success: true, order: rejected });
+            } catch (err) {
+                sendJsonResponse(req, res, 400, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 3-0-4. DELETE /api/kakao/orders/:id : 카카오 발주서 삭제
+        const orderDeleteMatch = url.pathname.match(/^\/api\/kakao\/orders\/([^\/]+)$/);
+        if (req.method === 'DELETE' && orderDeleteMatch) {
+            const orderId = orderDeleteMatch[1];
+            const ok = kakaoBotService.deleteOrder(orderId);
+            sendJsonResponse(req, res, ok ? 200 : 404, { success: ok, orderId });
             return;
         }
 

@@ -12,6 +12,7 @@ import {
     ShieldCheck,
     Save
 } from 'lucide-react';
+import { KakaoOrderReviewTab } from './KakaoOrderReviewTab';
 
 interface QuoteItem {
     id: string;
@@ -78,6 +79,7 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
     isOpen,
     onClose
 }) => {
+    const [mainTab, setMainTab] = useState<'ORDERS' | 'QUOTES'>('ORDERS');
     const [queue, setQueue] = useState<ReviewQueueItem[]>([]);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
@@ -409,6 +411,37 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                             </p>
                         </div>
                     </div>
+                    {/* Tab Navigation (Orders vs Quotes) */}
+                    <div className="flex items-center gap-1.5 bg-gray-900/90 p-1 rounded-xl border border-gray-800">
+                        <button
+                            onClick={() => setMainTab('ORDERS')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                mainTab === 'ORDERS' 
+                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-black shadow-lg shadow-emerald-500/20' 
+                                    : 'text-gray-400 hover:text-white'
+                            }`}
+                        >
+                            <span className="px-1 py-0.2 rounded bg-black/20 text-[10px]">PO</span>
+                            <span>📋 발주서 접수대기 (카카오톡)</span>
+                        </button>
+                        <button
+                            onClick={() => setMainTab('QUOTES')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                mainTab === 'QUOTES' 
+                                    ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' 
+                                    : 'text-gray-400 hover:text-white'
+                            }`}
+                        >
+                            <span className="px-1 py-0.2 rounded bg-black/20 text-[10px]">EST</span>
+                            <span>💬 견적 의뢰 접수대기</span>
+                            {pendingCount > 0 && (
+                                <span className="ml-1 px-1.5 py-0.2 rounded-full bg-black/30 text-[10px] font-bold">
+                                    {pendingCount}
+                                </span>
+                            )}
+                        </button>
+                    </div>
+
                     <div className="flex items-center gap-2">
                         <button
                             onClick={fetchQueue}
@@ -427,8 +460,13 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                     </div>
                 </div>
 
-                {/* Modal Main Body (Split Grid: Left Queue, Right Details) */}
-                <div className="flex-1 flex overflow-hidden">
+                {/* Body Content based on active tab */}
+                {mainTab === 'ORDERS' ? (
+                    <KakaoOrderReviewTab onClose={onClose} />
+                ) : (
+                    <>
+                        {/* Modal Main Body (Split Grid: Left Queue, Right Details) */}
+                        <div className="flex-1 flex overflow-hidden">
                     {/* Left Panel: Inquiries Queue List */}
                     <div className="w-80 border-r border-gray-800/80 bg-[#13151c] flex flex-col flex-shrink-0">
                         {/* Queue Filter Tabs & Search */}
@@ -868,6 +906,8 @@ export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> =
                             </button>
                         </div>
                     </div>
+                )}
+                    </>
                 )}
             </div>
         </div>

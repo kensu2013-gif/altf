@@ -51,6 +51,8 @@ export class KakaoBotService {
         };
         // 🔥 중복 수신 및 무한 루프 격발 차단용 캐시 (60초 TTL)
         this.recentRequests = new Map();
+        // 📸 사용자별 연속 인입(사진 전송 후 텍스트 전달 등) 세션 버퍼 (15분 유지)
+        this.userSessionBuffers = {};
         this.standbyResetTimer = null;
         this.loadData();
         // 기동 시 영업팀 에이전트 실시간 대기 상태로 정돈
@@ -258,13 +260,32 @@ export class KakaoBotService {
 
         const cleanImageUrl = finalImageUrl ? finalImageUrl.split('?')[0] : '';
 
+        // 📸 수신된 사진이 있다면 사용자 세션 버퍼에 즉시 캐싱 (15분간 유효: 사진 후 연속 텍스트 전달 대응)
+        if (finalImageUrl) {
+            if (!this.userSessionBuffers[botUserKey]) this.userSessionBuffers[botUserKey] = {};
+            this.userSessionBuffers[botUserKey].lastImage = {
+                url: finalImageUrl,
+                timestamp: Date.now()
+            };
+            console.log(`[KakaoBot] 📸 [세션 버퍼] 사용자(${botUserKey}) 사진 수신 캐싱 완료`);
+        }
+
         // 3-1. 👑 [EXE-02 카카오톡 인바운드 분배봇: 발주(PO) vs 견적(Quote) 자동 분류]
         const isOrderIntent = (
             /^(발주|발주서|주문|주문서|발주합니다|출고\s*요청|납품\s*요청|진행\s*해주세요|발주\s*진행)$/i.test(utterance) ||
-            utterance.includes('발주서') ||
-            utterance.includes('발주합니다') ||
-            utterance.includes('발주 진행') ||
-            utterance.includes('출고 요청') ||
+            utterance.includes('발주') ||
+            utterance.includes('발송업체명') ||
+            utterance.includes('현불화물') ||
+            utterance.includes('선불화물') ||
+            utterance.includes('선불 화물') ||
+            utterance.includes('화물비청구') ||
+            utterance.includes('화물 발송') ||
+            utterance.includes('착불화물') ||
+            utterance.includes('대신화물') ||
+            utterance.includes('경동화물') ||
+            utterance.includes('동시화') ||
+            utterance.includes('올려주셔요') ||
+            utterance.includes('올려주세요') ||
             utterance.includes('주문합니다')
         );
 
@@ -1078,7 +1099,126 @@ export class KakaoBotService {
     }
 
     /**
+     * 🛒 카카오톡 자연어 발주서 발화 분석 (도착지, 운송비, 발송업체, 품목, 연락처 정밀 추출)
+     */
+    parseKakaoOrderUtterance(text = '', recentQuote = null) {
+        const t = (text || '').trim();
+
+        // 1. 발송업체명 (고객사/상호) 추출
+        const custMatch = t.match(/발송업체명\s*[:：]?\s*([^\n\r,]+)/i) || 
+                          t.match(/(?:업체명|상호명|상호|고객사|거래처)\s*[:：]?\s*([^\n\r,]+)/i) ||
+                          t.match(/(원진철강|에스와이금속|한도금속|대영벤드|상진밴드|진일벤드|태일금속|우주금속|삼정금속|동양피팅)/i);
+        const customerName = custMatch ? (custMatch[1] || custMatch[0]).trim() : '';
+
+        // 2. 도착지 정보 (Destination) 추출
+        const destMatch = t.match(/((?:대신|경동|천일|합동|호남|일양|동양)화물\s*[\/|\s]*[^\n\r,]+)/i) || 
+                          t.match(/(?:도착지|배송지|하차지|납품처)\s*[:：]?\s*([^\n\r]+)/i) ||
+                          t.match(/(동시화|시화공장|양산공장|평택고덕\s*지점|평택고덕|녹산|안산|울산|창원|화성|포항|광양|여수)/i);
+        const destination = destMatch ? (destMatch[1] || destMatch[0]).trim() : '';
+
+        // 3. 운송비 조건 (Freight Terms) 추출
+        const freightMatch = t.match(/(현불화물\s*후\s*화물비청구|현불화물\s*후\s*청구|선불\s*화물\s*발송|선불화물|선불|현불화물|현불|착불화물|착불|운송비청구|직송|용차|택배)/i);
+        const freightTerms = freightMatch ? freightMatch[1].trim() : '';
+
+        // 4. 수령인 / 연락처 추출
+        const contactMatch = t.match(/([가-힣]{2,4}\s*(?:대리님|과장님|차장님|부장님|소장님|이사님|대표님|주임님|반장님|사원님|대리|과장|차장|부장|소장|이사|대표|주임|반장|사원|님))\s*[\/,\s]\s*(01[0-9]-?[0-9]{3,4}-?[0-9]{4})/i);
+        const phoneMatch = t.match(/(01[0-9]-?[0-9]{3,4}-?[0-9]{4})/);
+        const recipient = contactMatch ? contactMatch[1].trim() : '';
+        const phone = contactMatch ? contactMatch[2].trim() : (phoneMatch ? phoneMatch[1].trim() : '');
+
+        // 5. 견적/요율 연계 및 변경 요청 추출 (심레스 -30, erw 100이하 -52 100이상 -55 대영벤드로 등)
+        const quoteAdj = {};
+        const sMatch = t.match(/심레스\s*([-\d]+)/i);
+        if (sMatch) quoteAdj.seamless = parseInt(sMatch[1], 10);
+        const erwMatch = t.match(/erw\s*(?:100이하\s*([-\d]+))?\s*(?:100이상\s*([-\d]+))?/i);
+        if (erwMatch) {
+            if (erwMatch[1]) quoteAdj.erwUnder100 = parseInt(erwMatch[1], 10);
+            if (erwMatch[2]) quoteAdj.erwOver100 = parseInt(erwMatch[2], 10);
+        }
+        const vendorMatch = t.match(/(?:변경해서\s*올려주셔요|올려주세요|수정해서)\s*([^\n\r]+)/i);
+        if (vendorMatch) quoteAdj.targetVendor = vendorMatch[1].trim();
+
+        // 6. 품목 규격 파싱
+        let items = [];
+        const lines = t.split(/[\n\r]+/);
+        let currentType = '';
+        let currentMaterial = '';
+        for (const line of lines) {
+            const trimmed = line.trim();
+            const typeMatch = trimmed.match(/(CAP|90E\(L\)|90E\(S\)|45E\(L\)|45E\(S\)|TEE|REDUCER|엘보|티|캡|레듀샤)\s*([A-Za-z0-9]+)?/i);
+            if (typeMatch) {
+                currentType = typeMatch[1].toUpperCase();
+                if (typeMatch[2]) currentMaterial = typeMatch[2].toUpperCase();
+            }
+            const specMatch = trimmed.match(/([0-9\-\/\."]+)\s*(S\/[0-9]+[A-Za-z]*|S[0-9]+[A-Za-z]*)?\s*-\s*([0-9]+)\s*EA/i);
+            if (specMatch) {
+                const size = specMatch[1].includes('"') ? specMatch[1] : `${specMatch[1]}"`;
+                const sch = (specMatch[2] || 'S40S').replace('S/', 'S');
+                const qty = parseInt(specMatch[3], 10) || 1;
+                items.push({
+                    name: currentType || 'CAP',
+                    material: currentMaterial || 'A403WP304',
+                    size,
+                    thickness: sch,
+                    quantity: qty,
+                    unitPrice: 0,
+                    amount: 0
+                });
+            }
+        }
+
+        if (items.length === 0) {
+            const normalized = fittingNormalizerService.normalize(t);
+            if (normalized.items && normalized.items.length > 0) {
+                items = normalized.items.map(it => ({
+                    name: it.type || '배관 피팅',
+                    material: it.material || 'STS304-W',
+                    size: it.size || '',
+                    thickness: it.schedule || 'S10S',
+                    quantity: it.qty || 1,
+                    unitPrice: it.basePrice || 0,
+                    amount: (it.basePrice || 0) * (it.qty || 1)
+                }));
+            }
+        }
+
+        if (items.length === 0 && recentQuote?.items?.length > 0) {
+            items = recentQuote.items.map(it => ({
+                name: it.name || it.type || '배관 피팅',
+                material: it.material || 'STS304-W',
+                size: it.size || '',
+                thickness: it.thickness || 'S10S',
+                quantity: it.quantity || it.qty || 1,
+                unitPrice: it.unitPrice || 0,
+                amount: it.amount || 0
+            }));
+        }
+
+        // 7. 누락 필수 항목 검증 (도착지 정보, 운송비 조건, 발송업체명)
+        const missingFields = [];
+        if (!customerName) missingFields.push('발송업체명(상호)');
+        if (!destination) missingFields.push('도착지 정보(지점/배송지)');
+        if (!freightTerms) missingFields.push('운송비 조건(선불/착불/현불청구)');
+        if (items.length === 0) missingFields.push('발주 품목/규격');
+
+        const validationStatus = missingFields.length === 0 ? 'VALID' : 'INCOMPLETE';
+
+        return {
+            customerName,
+            destination,
+            freightTerms,
+            recipient,
+            phone,
+            quoteAdj,
+            items,
+            missingFields,
+            validationStatus
+        };
+    }
+
+    /**
      * 🛒 카카오톡 발주서(PO) 인바운드 접수 및 구매부(PUR-01/07) 연계 파이프라인 (EXE-02 전담)
+     * 🛡️ 원장 보호 정책: 뒷단(db.orders)을 직접 오염시키지 않고, 접수대기(PENDING_REVIEW) 상태로 안전 격리 저장
      */
     async handleOrderSkillRequest({ utterance, botUserKey, matchedUser, isImage, finalImageUrl, cleanImageUrl, receivedAt }) {
         console.log(`[KakaoBot] 🛒 [EXE-02] 카카오톡 발주서 인입 감지: "${utterance}" (User: ${matchedUser?.company || botUserKey})`);
@@ -1092,55 +1232,59 @@ export class KakaoBotService {
             )
         );
 
-        const customerName = matchedUser?.company || recentQuote?.customerInfo?.company || matchedUser?.name || '카카오톡 고객사';
-        const phone = matchedUser?.phone || recentQuote?.customerInfo?.phone || '';
-        const orderNo = `PO-KKO-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
-
-        let orderItems = [];
-        let totalAmount = 0;
-
-        // A. 최근 견적서 기반 발주 진행 요청인 경우
-        if (recentQuote && recentQuote.items && recentQuote.items.length > 0) {
-            orderItems = recentQuote.items.map(it => ({
-                name: it.name || it.type || '배관 피팅',
-                spec: [it.thickness, it.material, it.size].filter(Boolean).join(' ') || it.spec || '대경 규격품',
-                quantity: it.quantity || it.qty || 1,
-                unitPrice: it.unitPrice || it.userUnitPrice || 0,
-                amount: it.amount || ((it.quantity || 1) * (it.unitPrice || 0))
-            }));
-            totalAmount = recentQuote.totalAmount || orderItems.reduce((sum, it) => sum + it.amount, 0);
-        } else if (!isImage) {
-            // B. 신규 텍스트 발주서 품목 추출
-            const normalized = fittingNormalizerService.normalize(utterance);
-            if (normalized.items && normalized.items.length > 0) {
-                orderItems = normalized.items.map(it => ({
-                    name: it.type || '배관 피팅',
-                    spec: [it.schedule, it.material, it.size].filter(Boolean).join(' ') || '대경 규격품',
-                    quantity: it.qty || 1,
-                    unitPrice: it.basePrice || 0,
-                    amount: (it.basePrice || 0) * (it.qty || 1)
-                }));
-                totalAmount = orderItems.reduce((sum, it) => sum + it.amount, 0);
-            }
+        // 2. 세션 버퍼에서 최근 업로드된 사진 확인 (사진 전송 후 연속 텍스트 전달 대응, 15분 이내)
+        let effectiveImageUrl = finalImageUrl;
+        const userBuf = this.userSessionBuffers[botUserKey];
+        if (!effectiveImageUrl && userBuf?.lastImage && (Date.now() - userBuf.lastImage.timestamp < 15 * 60 * 1000)) {
+            effectiveImageUrl = userBuf.lastImage.url;
+            console.log(`[KakaoBot] 📸 직전 업로드 사진(${effectiveImageUrl})과 연속 텍스트 결합 완료!`);
         }
 
+        // 3. 발화 정밀 파싱 (발송업체, 도착지, 운송비, 수령인, 품목, 요율조정)
+        const parsed = this.parseKakaoOrderUtterance(utterance, recentQuote);
+
+        const customerName = parsed.customerName || matchedUser?.company || recentQuote?.customerInfo?.company || matchedUser?.name || '카카오톡 고객사';
+        const phone = parsed.phone || matchedUser?.phone || recentQuote?.customerInfo?.phone || '';
+        const orderNo = `PO-KKO-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        // 4. 견적 연계 요율 변경 요청이 있다면 기존 견적서에도 피드백 기록
+        if (recentQuote && (parsed.quoteAdj.seamless || parsed.quoteAdj.erwUnder100 || parsed.quoteAdj.targetVendor)) {
+            const memoLines = [];
+            if (parsed.quoteAdj.seamless) memoLines.push(`심레스 ${parsed.quoteAdj.seamless}%`);
+            if (parsed.quoteAdj.erwUnder100) memoLines.push(`ERW 100이하 ${parsed.quoteAdj.erwUnder100}%`);
+            if (parsed.quoteAdj.erwOver100) memoLines.push(`ERW 100이상 ${parsed.quoteAdj.erwOver100}%`);
+            if (parsed.quoteAdj.targetVendor) memoLines.push(`지정처: ${parsed.quoteAdj.targetVendor}`);
+            recentQuote.memo = (recentQuote.memo ? `${recentQuote.memo} / ` : '') + `[발주 연계 요율조정]: ${memoLines.join(', ')}`;
+            if (this.onQuotationUpdated) this.onQuotationUpdated(recentQuote);
+        }
+
+        // 5. 발주서 접수대기 레코드 생성 (출처: 카카오톡 명시, 상태: PENDING_REVIEW)
         const orderRecord = {
             id: `ORD-KKO-${Date.now()}`,
             orderNo,
-            type: isImage ? 'image' : 'text',
+            channel: '카카오톡',
+            source: '카카오톡',
+            orderChannel: '카카오톡',
+            type: effectiveImageUrl ? (utterance ? 'image_and_text' : 'image') : 'text',
             botUserKey,
             customerName,
+            destination: parsed.destination || '',
+            freightTerms: parsed.freightTerms || '',
+            recipient: parsed.recipient || matchedUser?.name || '',
             phone,
-            status: 'RECEIVED',
+            quoteAdj: parsed.quoteAdj || {},
+            status: 'PENDING_REVIEW', // 🔥 뒷단 db.orders 오염 방지용 접수대기 상태
+            validationStatus: parsed.validationStatus, // 'VALID' or 'INCOMPLETE'
+            missingFields: parsed.missingFields,
+            reviewStatus: 'PENDING',
             receivedAt,
-            channel: '카카오톡 채널 (@altf)',
             assignedDept: 'purchase',
             assignedAgents: ['EXE-02', 'PUR-01', 'PUR-07'],
             utterance,
-            imageUrl: finalImageUrl || null,
-            items: orderItems,
-            itemCount: orderItems.length,
-            totalAmount,
+            imageUrl: effectiveImageUrl || null,
+            items: parsed.items,
+            itemCount: parsed.items.length,
+            totalAmount: parsed.items.reduce((sum, it) => sum + (it.amount || ((it.unitPrice || 0) * (it.quantity || 1))), 0),
             relatedQuotationId: recentQuote?.id || null
         };
 
@@ -1148,28 +1292,13 @@ export class KakaoBotService {
         this.stats.totalOrders = this.orders.length;
         this.saveData();
 
-        // 전사 에이전트(EXE-02, PUR-01, PUR-07) 상태 및 로그 실시간 업데이트
+        // 6. 전사 에이전트(EXE-02, PUR-01, PUR-07) 상태 및 로그 실시간 업데이트
         this.dispatchOrderToAgents(orderRecord);
 
-        // 카카오톡 회신 메시지 템플릿
-        if (recentQuote) {
-            return {
-                version: '2.0',
-                template: {
-                    outputs: [
-                        {
-                            simpleText: {
-                                text: `🎉 [알트에프(AltF) 카카오 발주 접수 완료]\n${customerName} 귀하, 견적서(${recentQuote.id}) 기반 발주가 정상 접수되었습니다!\n━━━━━━━━━━━━━━━━━━━━\n• 접수발주번호: ${orderNo}\n• 의뢰품목: 총 ${orderItems.length}개 품목\n• 발주금액: ₩${totalAmount.toLocaleString()}원 (VAT별도)\n• 처리부서: 구매/주문관제팀 (PUR-01 / PUR-07)\n━━━━━━━━━━━━━━━━━━━━\n📦 시화 창고 출고 지시 및 납기 일정을 확정하여 즉시 안내드리겠습니다.\n📞 직통문의: 051-303-3751 (알트에프)`
-                            }
-                        }
-                    ],
-                    quickReplies: [
-                        { messageText: '진행상황 확인', action: 'message', label: '📊 주문 진행상황 확인' },
-                        { label: '📞 구매/출고팀 전화', action: 'phone', phoneNumber: '0513033751' }
-                    ]
-                }
-            };
-        }
+        // 7. 카카오톡 회신 메시지 (사무실 확인 필수 안내)
+        const statusNotice = orderRecord.validationStatus === 'VALID' 
+            ? '✅ [필수항목 완비] 사무실 담당 직원이 검토 후 즉시 정식 발주 승인됩니다.'
+            : `⚠️ [확인 필요] 도착지 또는 운송비 조건 보완 후 정식 승인됩니다. (누락: ${orderRecord.missingFields.join(', ')})`;
 
         return {
             version: '2.0',
@@ -1177,12 +1306,12 @@ export class KakaoBotService {
                 outputs: [
                     {
                         simpleText: {
-                            text: `📋 [알트에프(AltF) 카카오 발주서 접수 센터]\n고객님의 발주서(주문)가 정상 접수되었습니다!\n━━━━━━━━━━━━━━━━━━━━\n• 접수발주번호: ${orderNo}\n• 발주처: ${customerName} 귀하\n• 접수품목: ${orderItems.length > 0 ? `${orderItems.length}개 품목` : '발주서 사진/문서 분석 중'}\n• 담당부서: 구매/주문관제팀 (PUR-01 / PUR-07)\n━━━━━━━━━━━━━━━━━━━━\n⚡ 전사 실시간 재고 대조 및 출고 납기 일정을 확정하여 신속히 회신드리겠습니다.\n📞 직통문의: 051-303-3751 (알트에프)`
+                            text: `📋 [알트에프(AltF) 카카오 발주서 접수 센터]\n고객님의 발주서가 [접수대기] 상태로 안전하게 등록되었습니다!\n━━━━━━━━━━━━━━━━━━━━\n• 접수번호: ${orderNo} [카카오톡 접수]\n• 발송업체명: ${customerName} 귀하\n• 도착지: ${orderRecord.destination || '⚠️ [사무실 확인/지정 필요]'}\n• 운송조건: ${orderRecord.freightTerms || '⚠️ [사무실 확인/선불·현불 지정 필요]'}\n• 접수품목: ${orderRecord.itemCount > 0 ? `${orderRecord.itemCount}개 품목` : '발주서 사진/내역 판독 중'}\n━━━━━━━━━━━━━━━━━━━━\n${statusNotice}\n📞 직통문의: 051-303-3751 (알트에프 구매팀)`
                         }
                     }
                 ],
                 quickReplies: [
-                    { messageText: '진행상황 확인', action: 'message', label: '📊 주문 진행상황 확인' },
+                    { messageText: '진행상황 확인', action: 'message', label: '📊 발주 진행상황 확인' },
                     { label: '📞 구매/출고팀 전화', action: 'phone', phoneNumber: '0513033751' }
                 ]
             }
@@ -1202,37 +1331,160 @@ export class KakaoBotService {
             const exe02 = agents.find(a => a.code === 'EXE-02' || a.id === 'exe-02-kakao-classifier');
             if (exe02) {
                 exe02.lastActive = '방금 전';
-                exe02.currentTask = `카카오 발주서 인입 감지 -> 구매부 이첩 (${orderRecord.orderNo})`;
+                exe02.currentTask = `카카오 발주 접수대기 등록 [${orderRecord.orderNo}] (검증: ${orderRecord.validationStatus})`;
                 if (!Array.isArray(exe02.logs)) exe02.logs = [];
-                exe02.logs.unshift(`[${timeStr}] 🟡 [EXE-02] 카카오 발주서 인입 [${orderRecord.orderNo}] -> 구매부(PUR-01/07) 주문 대장 이첩`);
+                exe02.logs.unshift(`[${timeStr}] 👑 [EXE-02] 카카오 발주 인입 [${orderRecord.orderNo}] (${orderRecord.customerName} | 도착지: ${orderRecord.destination || '누락'} | 운송: ${orderRecord.freightTerms || '누락'} | 상태: ${orderRecord.validationStatus})`);
                 exe02.logs = exe02.logs.slice(0, 10);
                 if (exe02.metrics) exe02.metrics.tasksToday = (exe02.metrics.tasksToday || 0) + 1;
             }
 
-            // 2. PUR-07 (발주 분류 및 미결 통합 관제봇)
-            const pur07 = agents.find(a => a.code === 'PUR-07' || a.id === 'pur-07-order-router');
-            if (pur07) {
-                pur07.lastActive = '방금 전';
-                pur07.currentTask = `카카오 신규 발주서 접수 검토: ${orderRecord.orderNo}`;
-                if (!Array.isArray(pur07.logs)) pur07.logs = [];
-                pur07.logs.unshift(`[${timeStr}] 🛒 [PUR-07] 카카오 신규 발주서 접수 (${orderRecord.customerName}) -> 재고/생산 미결 검토 개시`);
-                pur07.logs = pur07.logs.slice(0, 10);
-                if (pur07.metrics) pur07.metrics.tasksToday = (pur07.metrics.tasksToday || 0) + 1;
-            }
-
-            // 3. PUR-01 (알트에프 재고 발주 동기화봇)
+            // 2. PUR-01 (알트에프 재고 발주 동기화봇) - 도착지/운송비 검증 가드
             const pur01 = agents.find(a => a.code === 'PUR-01' || a.id === 'pur-01-order-collector');
             if (pur01) {
                 pur01.lastActive = '방금 전';
                 if (!Array.isArray(pur01.logs)) pur01.logs = [];
-                pur01.logs.unshift(`[${timeStr}] 📦 [PUR-01] 카카오 발주서 품목 재고 대조 시작 (${orderRecord.orderNo})`);
+                if (orderRecord.validationStatus === 'INCOMPLETE') {
+                    pur01.logs.unshift(`[${timeStr}] ⚠️ [PUR-01 경보] 카카오 발주(${orderRecord.orderNo}) [${orderRecord.missingFields.join(', ')}] 미비 ➔ 사무실 직원 확인 대기 (정식 등록 차단)`);
+                } else {
+                    pur01.logs.unshift(`[${timeStr}] 📦 [PUR-01 준비] 카카오 발주(${orderRecord.orderNo}) 필수항목 완비 ➔ 사무실 승인 대기`);
+                }
                 pur01.logs = pur01.logs.slice(0, 10);
+            }
+
+            // 3. PUR-07 (발주 분류 및 미결 통합 관제봇)
+            const pur07 = agents.find(a => a.code === 'PUR-07' || a.id === 'pur-07-order-router');
+            if (pur07) {
+                pur07.lastActive = '방금 전';
+                pur07.currentTask = `카카오 발주 접수대기 관제: ${orderRecord.orderNo}`;
+                if (!Array.isArray(pur07.logs)) pur07.logs = [];
+                pur07.logs.unshift(`[${timeStr}] 🛒 [PUR-07] 카카오 발주(${orderRecord.orderNo}) 대기열 적재 ➔ 납기/출고경로(화물/직송) 모니터링 준비`);
+                pur07.logs = pur07.logs.slice(0, 10);
+                if (pur07.metrics) pur07.metrics.tasksToday = (pur07.metrics.tasksToday || 0) + 1;
             }
 
             fs.writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2), 'utf8');
         } catch (e) {
             console.error('[KakaoBot] dispatchOrderToAgents 에러:', e.message);
         }
+    }
+
+    /**
+     * 사무실 담당자가 카카오 발주서 보완 수정 (도착지, 운송비, 품목 등)
+     */
+    updateOrder(orderId, updateData) {
+        const idx = this.orders.findIndex(o => o.id === orderId || o.orderNo === orderId);
+        if (idx === -1) throw new Error('발주서를 찾을 수 없습니다.');
+
+        const order = this.orders[idx];
+        if (updateData.customerName) order.customerName = updateData.customerName;
+        if (updateData.destination !== undefined) order.destination = updateData.destination;
+        if (updateData.freightTerms !== undefined) order.freightTerms = updateData.freightTerms;
+        if (updateData.recipient !== undefined) order.recipient = updateData.recipient;
+        if (updateData.phone !== undefined) order.phone = updateData.phone;
+        if (Array.isArray(updateData.items)) {
+            order.items = updateData.items;
+            order.itemCount = updateData.items.length;
+            order.totalAmount = updateData.items.reduce((s, it) => s + (it.amount || ((it.unitPrice || 0) * (it.quantity || 1))), 0);
+        }
+        if (updateData.memo) order.memo = updateData.memo;
+
+        // 재검증
+        const missing = [];
+        if (!order.customerName || order.customerName === '카카오톡 고객사') missing.push('발송업체명(상호)');
+        if (!order.destination) missing.push('도착지 정보(지점/배송지)');
+        if (!order.freightTerms) missing.push('운송비 조건(선불/착불/현불청구)');
+        if (!order.items || order.items.length === 0) missing.push('발주 품목');
+
+        order.missingFields = missing;
+        order.validationStatus = missing.length === 0 ? 'VALID' : 'INCOMPLETE';
+        order.updatedAt = new Date().toISOString();
+
+        this.saveData();
+        return order;
+    }
+
+    /**
+     * 사무실 담당자가 카카오 발주서를 최종 승인하여 정식 뒷단 원장(db.orders)으로 이관
+     */
+    async approveOrder(orderId, approvedBy = '사무실 관리자') {
+        const idx = this.orders.findIndex(o => o.id === orderId || o.orderNo === orderId);
+        if (idx === -1) throw new Error('발주서를 찾을 수 없습니다.');
+
+        const order = this.orders[idx];
+
+        // 🛡️ 핵심 가드: 도착지 정보와 운송비 조건이 없으면 정식 발주서 접수 차단!
+        if (!order.destination || !order.destination.trim()) {
+            throw new Error('도착지 정보(화물 지점 또는 배송지 주소)가 입력되어야 정식 발주서로 접수됩니다.');
+        }
+        if (!order.freightTerms || !order.freightTerms.trim()) {
+            throw new Error('운송비 조건(선불/현불청구/착불 등)이 명확해야 정식 발주서로 접수됩니다.');
+        }
+
+        order.status = 'APPROVED';
+        order.reviewStatus = 'APPROVED';
+        order.approvedBy = approvedBy;
+        order.approvedAt = new Date().toISOString();
+        order.convertedOrderId = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-KKO-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        this.saveData();
+
+        // 뒷단 콜백 호출 (db.orders에 안전하게 승격 등록)
+        if (typeof this.onOrderApproved === 'function') {
+            await this.onOrderApproved(order);
+        }
+
+        // 에이전트 로그 업데이트
+        try {
+            if (fs.existsSync(AGENTS_FILE)) {
+                const agents = JSON.parse(fs.readFileSync(AGENTS_FILE, 'utf8'));
+                const timeStr = new Date().toLocaleTimeString('ko-KR');
+                const pur01 = agents.find(a => a.code === 'PUR-01' || a.id === 'pur-01-order-collector');
+                if (pur01) {
+                    if (!Array.isArray(pur01.logs)) pur01.logs = [];
+                    pur01.logs.unshift(`[${timeStr}] 🚀 [PUR-01 승인] 카카오 발주(${order.orderNo}) 정식 원장(db.orders: ${order.convertedOrderId}) 등록 및 대장 연동 완료`);
+                    pur01.logs = pur01.logs.slice(0, 10);
+                }
+                const pur07 = agents.find(a => a.code === 'PUR-07' || a.id === 'pur-07-order-router');
+                if (pur07) {
+                    if (!Array.isArray(pur07.logs)) pur07.logs = [];
+                    pur07.logs.unshift(`[${timeStr}] 🚚 [PUR-07 확정] 카카오 발주(${order.orderNo}) 출고 경로(${order.destination} / ${order.freightTerms}) 관제 개시`);
+                    pur07.logs = pur07.logs.slice(0, 10);
+                }
+                fs.writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2), 'utf8');
+            }
+        } catch (e) {
+            console.error('[KakaoBot] approveOrder 에이전트 로그 기록 실패:', e.message);
+        }
+
+        return order;
+    }
+
+    /**
+     * 카카오 발주서 반려 처리
+     */
+    rejectOrder(orderId, reason = '사유 미기재', rejectedBy = '사무실 관리자') {
+        const idx = this.orders.findIndex(o => o.id === orderId || o.orderNo === orderId);
+        if (idx === -1) throw new Error('발주서를 찾을 수 없습니다.');
+        const order = this.orders[idx];
+        order.status = 'REJECTED';
+        order.reviewStatus = 'REJECTED';
+        order.rejectReason = reason;
+        order.rejectedBy = rejectedBy;
+        order.rejectedAt = new Date().toISOString();
+        this.saveData();
+        return order;
+    }
+
+    /**
+     * 카카오 발주서 삭제
+     */
+    deleteOrder(orderId) {
+        const idx = this.orders.findIndex(o => o.id === orderId || o.orderNo === orderId);
+        if (idx === -1) return false;
+        this.orders.splice(idx, 1);
+        this.stats.totalOrders = this.orders.length;
+        this.saveData();
+        return true;
     }
 
     /**

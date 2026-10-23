@@ -59,3 +59,5 @@ server/data/pur07_order_backlog.json
 server/data/purchase_qc_matches.json
 server/data/purchase_orders.json
 server/data/db_local.json
+# 비서실장(MGT-01) 런타임 상태 (하트비트·경보 중복방지)
+server/data/chief_of_staff_state.json

@@ -1,5 +1,102 @@
 [
   {
+    "id": "ORD-KKO-1792765955799",
+    "orderNo": "PO-KKO-261023-6278",
+    "channel": "카카오톡",
+    "source": "카카오톡",
+    "orderChannel": "카카오톡",
+    "type": "text",
+    "botUserKey": "test_buyer_sy",
+    "customerName": "에스와이금속",
+    "destination": "동시화 화물터미널",
+    "freightTerms": "현불화물 후 화물비청구",
+    "recipient": "",
+    "phone": "",
+    "quoteAdj": {},
+    "status": "APPROVED",
+    "validationStatus": "VALID",
+    "missingFields": [],
+    "reviewStatus": "APPROVED",
+    "receivedAt": "2026-10-23T14:32:35.797Z",
+    "assignedDept": "purchase",
+    "assignedAgents": [
+      "EXE-02",
+      "PUR-01",
+      "PUR-07"
+    ],
+    "utterance": "에스와이금속 50\n현불화물 후 화물비청구",
+    "imageUrl": null,
+    "items": [
+      {
+        "name": "90E(L)",
+        "size": "50A",
+        "thickness": "S10S",
+        "material": "STS304-W",
+        "quantity": 10,
+        "unitPrice": 12000,
+        "amount": 120000
+      }
+    ],
+    "itemCount": 1,
+    "totalAmount": 120000,
+    "relatedQuotationId": null,
+    "updatedAt": "2026-10-23T14:32:50.553Z",
+    "approvedBy": "조현진 대표",
+    "approvedAt": "2026-10-23T14:32:58.640Z",
+    "convertedOrderId": "PO-20261023-KKO-9078"
+  },
+  {
+    "id": "ORD-KKO-1792765950763",
+    "orderNo": "PO-KKO-261023-7381",
+    "channel": "카카오톡",
+    "source": "카카오톡",
+    "orderChannel": "카카오톡",
+    "type": "text",
+    "botUserKey": "test_buyer_wonjin",
+    "customerName": "원진철강",
+    "destination": "대신화물/평택고덕 지점",
+    "freightTerms": "선불 화물 발송",
+    "recipient": "김지용 대리님",
+    "phone": "010-2241-4856",
+    "quoteAdj": {},
+    "status": "PENDING_REVIEW",
+    "validationStatus": "VALID",
+    "missingFields": [],
+    "reviewStatus": "PENDING",
+    "receivedAt": "2026-10-23T14:32:30.762Z",
+    "assignedDept": "purchase",
+    "assignedAgents": [
+      "EXE-02",
+      "PUR-01",
+      "PUR-07"
+    ],
+    "utterance": "굿모닝^^\n발주.\n발송업체명: 원진철강\n\nCAP A403WP304 BW\n1-1/2\" S/40S - 2EA\n4\" S/40S - 2EA\n\n대신화물/평택고덕 지점\n김지용 대리님/010-2241-4856\n선불 화물 발송",
+    "imageUrl": null,
+    "items": [
+      {
+        "name": "CAP",
+        "material": "A403WP304",
+        "size": "1-1/2\"",
+        "thickness": "S40S",
+        "quantity": 2,
+        "unitPrice": 0,
+        "amount": 0
+      },
+      {
+        "name": "CAP",
+        "material": "A403WP304",
+        "size": "4\"",
+        "thickness": "S40S",
+        "quantity": 2,
+        "unitPrice": 0,
+        "amount": 0
+      }
+    ],
+    "itemCount": 2,
+    "totalAmount": 0,
+    "relatedQuotationId": null
+  },
+  {
     "id": "ORD-KKO-1792765053519",
     "orderNo": "PO-KKO-261023-5853",
     "type": "text",

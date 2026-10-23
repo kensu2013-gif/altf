@@ -65,7 +65,7 @@ const STORAGE_DEPT_KEY = 'altf_departments_core6_v1';
 
 // 👑 에이전트 정렬 규칙:
 // 1. 실제 생성되어 가동 중인 봇(isCreated === true)이 앞, 아직 만들어지지 않은 봇(isCreated !== true)은 항상 맨 뒤
-// 2. 직급 순서: 팀장(4) > 과장(3) > 대리(2) > 사원(1) ➔ "대리는 앞으로, 사원은 뒤로"
+// 2. 직급 순서: 부장(5) > 팀장(4) > 과장(3) > 대리(2) > 사원(1) ➔ "대리는 앞으로, 사원은 뒤로"
 // 3. 동일 직급 내: orderIndex 및 식별 코드(code) 오름차순 정렬
 export function sortAgents(a: AgentUnit, b: AgentUnit): number {
     const aCreated = a.isCreated === true ? 1 : 0;
@@ -75,6 +75,7 @@ export function sortAgents(a: AgentUnit, b: AgentUnit): number {
     }
 
     const rankWeight: Record<string, number> = {
+        '부장': 5,
         '팀장': 4,
         '과장': 3,
         '대리': 2,
@@ -1799,8 +1800,8 @@ export default function AgentOfficeDashboard() {
         }
     };
 
-    // 직위 승진 (사원 ➔ 대리 ➔ 과장 ➔ 팀장)
-    const POSITIONS_ORDER: AgentPosition[] = ['사원', '대리', '과장', '팀장'];
+    // 직위 승진 (사원 ➔ 대리 ➔ 과장 ➔ 팀장 ➔ 부장)
+    const POSITIONS_ORDER: AgentPosition[] = ['사원', '대리', '과장', '팀장', '부장'];
 
     const handlePromote = (agentId: string, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
@@ -4482,7 +4483,7 @@ export default function AgentOfficeDashboard() {
                                     </span>
                                 </label>
                                 <div className="grid grid-cols-4 gap-1.5">
-                                    {(['팀장', '과장', '대리', '사원'] as const).map(p => {
+                                    {(['부장', '팀장', '과장', '대리', '사원'] as const).map(p => {
                                         const pMeta = POSITION_CONFIG[p];
                                         const isSelected = createForm.position === p;
                                         return (
@@ -4862,7 +4863,7 @@ export default function AgentOfficeDashboard() {
                                         </span>
                                     </label>
                                     <div className="grid grid-cols-4 gap-1">
-                                        {(['팀장', '과장', '대리', '사원'] as const).map(p => {
+                                        {(['부장', '팀장', '과장', '대리', '사원'] as const).map(p => {
                                             const pMeta = POSITION_CONFIG[p];
                                             const isSelected = editForm.position === p;
                                             return (

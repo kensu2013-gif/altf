@@ -13,9 +13,9 @@ export interface AgentMetric {
 
 export type AgentStatus = 'ACTIVE' | 'STANDBY' | 'IDLE' | 'OFFLINE';
 
-export type AgentPosition = '팀장' | '과장' | '대리' | '사원';
+export type AgentPosition = '부장' | '팀장' | '과장' | '대리' | '사원';
 
-// 👑 부서별 4단계 직위 체계 및 권한 메타데이터
+// 👑 부서별 5단계 직위 체계 및 권한 메타데이터
 export const POSITION_CONFIG: Record<AgentPosition, {
     label: string;
     icon: string;
@@ -26,6 +26,16 @@ export const POSITION_CONFIG: Record<AgentPosition, {
     level: number;
     requiresApproval: boolean;
 }> = {
+    '부장': {
+        label: '부장 (Director)',
+        icon: '🎩',
+        color: '#E2E8F0',
+        bg: 'rgba(226, 232, 240, 0.15)',
+        border: 'rgba(226, 232, 240, 0.8)',
+        roleDescription: '전사 부서·봇 관제 및 대표 직보 (비서실장)',
+        level: 5,
+        requiresApproval: true
+    },
     '팀장': {
         label: '팀장 (Head)',
         icon: '👑',
@@ -132,6 +142,18 @@ export interface Department {
 
 export const DEPARTMENTS: Department[] = [
     {
+        id: 'management',
+        name: '경영총괄부',
+        code: 'MGT',
+        color: '#E2E8F0', // Platinum
+        bgGlow: 'rgba(226, 232, 240, 0.15)',
+        icon: '🎩',
+        description: '대표이사 직속. 전사 부서·봇 관제, 이상 징후 판정 및 대표님 텔레그램 간결 보고(비서실장)',
+        headRole: '비서실장 (전사 관제·대표 보고 총괄)',
+        totalUnits: 1,
+        teams: ['비서실']
+    },
+    {
         id: 'sle',
         name: '영업부',
         code: 'SLE',
@@ -196,7 +218,7 @@ export const DEPARTMENTS: Department[] = [
         icon: '👑',
         description: '메신저(텔레그램/카톡) 인바운드 분배, 견적·발주 자동 분류, 전사 발송 게이트 통제 및 AI 자율 관제',
         headRole: '인바운드 분배 & 자율 운영 관제',
-        totalUnits: 5
+        totalUnits: 4
     }
 ];
 
@@ -873,28 +895,28 @@ const RAW_INITIAL_AGENTS: AgentUnit[] = [
         orderIndex: 2
     },
     {
-        id: 'exe-ai-assistant',
-        code: 'EXE-AI',
-        name: '텔레그램 자율 관제 AI 비서',
-        deptId: 'executive',
-        deptName: '관제·게이트부',
-        teamName: '운영관제팀',
+        id: 'mgt-01-chief-of-staff',
+        code: 'MGT-01',
+        name: '비서실장 (경영총괄 AI)',
+        deptId: 'management',
+        deptName: '경영총괄부',
+        teamName: '비서실',
         tier: 3,
-        position: '과장',
-        role: '대표님 텔레그램 자연어 질문 실시간 분석, 전사 대시보드(Make.com, 미결 9단계, 거래명세표, 성적서) 상태 파악 및 즉각 브리핑',
+        position: '부장',
+        role: '전사 모든 부서·봇(영업/구매/품질/출고/총무/관제/데이터 및 신규 부서) 가동·업무 이상 관제, 대표님 텔레그램 질의에 결론 먼저·예외만 간결 보고, 긴급 경보 및 평일 08:30/17:30 정기 브리핑',
         status: 'ACTIVE',
         isCreated: true,
-        approvalStatus: 'AUTO_RUNNING',
+        approvalStatus: 'APPROVED',
         assignedHuman: '대표이사 직속',
         requiresApproval: false,
-        metrics: { speed: 98, accuracy: 100, load: 10, uptime: '100%', tasksToday: 6 },
-        currentTask: '대표님 텔레그램 관제 질의응답 실시간 대기 중',
+        metrics: { speed: 98, accuracy: 100, load: 10, uptime: '100%', tasksToday: 0 },
+        currentTask: '전사 관제 및 대표님 텔레그램 보고 대기 (긴급 감시 10분 주기)',
         lastActive: '방금 전',
-        triggerEvents: ['EVENT_EXECUTIVE_QUESTION'],
-        emittedEvents: ['EVENT_EXECUTIVE_BRIEFING'],
-        logs: ['[정상] 실시간 대시보드 Q&A 인텔리전스 엔진 활성화'],
-        connectedDeptIds: ['executive', 'dat', 'purchase', 'quality'],
-        orderIndex: 3
+        triggerEvents: ['EVENT_EXECUTIVE_QUESTION', 'EVENT_CRON_0830', 'EVENT_CRON_1730', 'EVENT_CRITICAL_ISSUE'],
+        emittedEvents: ['EVENT_EXECUTIVE_BRIEFING', 'EVENT_CRITICAL_ALERT'],
+        logs: ['[정상] 비서실장 전사 관제·보고 엔진 가동'],
+        connectedDeptIds: ['management', 'sle', 'purchase', 'quality', 'shipping', 'general', 'executive', 'dat'],
+        orderIndex: 0
     },
     {
         id: 'exe-11-monitor',

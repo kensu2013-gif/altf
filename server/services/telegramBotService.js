@@ -39,7 +39,12 @@ export class TelegramBotService {
         this.isPollingActive = false;
         this.processedMessageIds = new Set();
         this.processingFileIds = new Set();
+        this.blockedChatIds = new Set();
         this.loadConfig();
+
+        // 🔐 .env 로 지정된 토큰·대표님 chatId 는 파일/API 값보다 우선하며 외부에서 변경 불가
+        if (process.env.TELEGRAM_BOT_TOKEN) this.config.botToken = process.env.TELEGRAM_BOT_TOKEN;
+        if (process.env.TELEGRAM_CHAT_ID) this.config.chatId = process.env.TELEGRAM_CHAT_ID;
         const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
         const isTestEnv = process.env.NODE_ENV === 'test' || process.argv.some(a => a.includes('test'));
         if (!isProd && !isTestEnv && process.env.DISABLE_TELEGRAM_POLLING !== 'true' && this.config.botToken && this.config.polling !== false) {
@@ -73,6 +78,13 @@ export class TelegramBotService {
     }
 
     setConfig({ botToken, chatId }) {
+        const pinned = (botToken !== undefined && process.env.TELEGRAM_BOT_TOKEN && botToken.trim() !== process.env.TELEGRAM_BOT_TOKEN)
+            || (chatId !== undefined && process.env.TELEGRAM_CHAT_ID && String(chatId).trim() !== process.env.TELEGRAM_CHAT_ID);
+        if (pinned) {
+            const err = new Error('봇 토큰/대표 chatId 는 서버 .env 로 고정되어 있어 API 로 변경할 수 없습니다.');
+            err.code = 'TELEGRAM_CONFIG_LOCKED';
+            throw err;
+        }
         if (botToken !== undefined) this.config.botToken = botToken.trim();
         if (chatId !== undefined) this.config.chatId = chatId.trim();
         this.saveConfig();
@@ -194,6 +206,11 @@ export class TelegramBotService {
         this.isPollingActive = true;
         console.log('[TelegramBot] 🚀 텔레그램 거래명세서 수신 봇 폴링 가동 시작 (@Altf_office_auto_bot)');
         this.pollUpdates();
+
+        // 🎩 경영총괄부 비서실장(MGT-01): 긴급 경보·정기 브리핑을 대표님 채팅방으로 선제 보고
+        import('./executiveAiService.js')
+            .then(({ executiveAiService }) => executiveAiService.startWatch(text => this.sendMessage(this.config.chatId, text)))
+            .catch(e => console.error('[TelegramBot] 비서실장 감시 시작 실패:', e.message));
     }
 
     stopPolling() {
@@ -231,6 +248,42 @@ export class TelegramBotService {
     }
 
     /**
+     * 허용 목록: 대표님 chatId(=개인 user id) + 선택적으로 .env 의
+     * TELEGRAM_ALLOWED_CHAT_IDS(그룹방 등), TELEGRAM_ALLOWED_USER_IDS(추가 승인 사용자)
+     */
+    getAllowedIds() {
+        const list = (v) => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
+        const owner = this.config.chatId ? [String(this.config.chatId)] : [];
+        return {
+            chats: new Set([...owner, ...list(process.env.TELEGRAM_ALLOWED_CHAT_IDS)]),
+            users: new Set([...owner, ...list(process.env.TELEGRAM_ALLOWED_USER_IDS)])
+        };
+    }
+
+    /**
+     * 채팅방과 보낸 사람이 모두 허용 목록에 있어야 통과
+     * (허용된 그룹방이라도 승인되지 않은 멤버의 질의는 차단)
+     */
+    isAuthorized(msg) {
+        if (!this.config.chatId) return false; // 대표 chatId 미설정 시 누구에게도 응답하지 않음 (선착순 소유권 탈취 방지)
+        const { chats, users } = this.getAllowedIds();
+        return chats.has(String(msg.chat?.id)) && users.has(String(msg.from?.id));
+    }
+
+    /**
+     * 미승인 접근 시도는 상대에게 아무 응답도 하지 않고, 대표님께만 채팅방당 1회 알림
+     */
+    async reportBlockedAccess(msg) {
+        const chatKey = String(msg.chat?.id);
+        const who = msg.from?.username ? `@${msg.from.username}` : `${msg.from?.first_name || ''} ${msg.from?.last_name || ''}`.trim() || '알 수 없음';
+        console.warn(`[TelegramBot] 🚫 미승인 접근 차단: ${who} (user ${msg.from?.id}, chat ${chatKey})`);
+        if (!this.config.chatId || this.blockedChatIds.has(chatKey)) return;
+        this.blockedChatIds.add(chatKey);
+        const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        await this.sendMessage(this.config.chatId, `🚫 <b>미승인 접근 차단</b>\n${esc(who)} · user <code>${esc(msg.from?.id)}</code> · chat <code>${esc(chatKey)}</code>\n응답하지 않았습니다.`);
+    }
+
+    /**
      * 수신된 텔레그램 메시지 처리
      */
     async handleUpdate(update) {
@@ -250,9 +303,11 @@ export class TelegramBotService {
         }
 
         const chatId = msg.chat.id;
-        if (!this.config.chatId) {
-            this.config.chatId = String(chatId);
-            this.saveConfig();
+
+        // 🔐 대표님(허용된 사용자·채팅방) 외 모든 메시지는 응답 없이 차단
+        if (!this.isAuthorized(msg)) {
+            await this.reportBlockedAccess(msg);
+            return;
         }
 
         // 1. /start 명령어 안내
@@ -265,6 +320,7 @@ export class TelegramBotService {
 1. 📑 <b>대경 거래명세서 PDF 파일</b>: 매입 확정 전표 등록 + 구매부 미결 해제 + MTC 매칭 + 출고 감시 자동화
 2. 📊 <b>대경벤드 재고장 엑셀(.xlsx) 파일</b>: 외부에 계실 때 엑셀 파일을 채팅방에 전달해주시면 <b>DAT-04 사원이 제목 제외 A4:M1168 실제 데이터 영역을 자동 추출</b>하여 구글 시트 반영을 즉시 완결합니다!
 3. ⚡ <b>명령어</b>: <code>/동기화</code> 입력 시 3.5분 수식연산 버퍼링 후 S3 배포 및 웹 재고 갱신까지 원격 실행됩니다.
+4. 🎩 <b>비서실장 보고</b>: <code>/보고</code> 전사 요약 · <code>/이슈</code> · 부서명 · 봇코드 · <code>/도움</code>
             `.trim());
             return;
         }
@@ -297,9 +353,23 @@ export class TelegramBotService {
         if (msg.text && !msg.document) {
             const txt = msg.text.trim();
 
-            // ⚡ [전사 봇 상태 관제] "직원들 상태 확인해줘" 등 직원/에이전트 근무 상태 질의 시 즉각 보고
+            // 🎩 [경영총괄부 비서실장 MGT-01] /보고, /이슈, 부서명, 봇코드 등 정형 보고 명령 우선 처리
+            const { executiveAiService } = await import('./executiveAiService.js');
+            const chiefReply = executiveAiService.handleCommand(txt);
+            if (chiefReply) {
+                await this.sendMessage(chatId, chiefReply);
+                return;
+            }
+
+            // 📋 "상세 품질", "상세 QC-02" 처럼 명시적으로 요청할 때만 부서 봇 전체 목록(장문) 보고
+            if (/^상세\s+/.test(txt)) {
+                await this.handleAgentStatusQuery(chatId, txt.replace(/^상세\s+/, ''));
+                return;
+            }
+
+            // ⚡ [전사 봇 상태 관제] 그 외 직원/에이전트 상태 질의는 비서실장 요약 보고로 간결하게 응답
             if (this.isAgentStatusQuery(txt)) {
-                await this.handleAgentStatusQuery(chatId, txt);
+                await this.sendMessage(chatId, await executiveAiService.askExecutiveAI(txt));
                 return;
             }
 
@@ -414,16 +484,15 @@ ${(targetInv.items?.length || 0) > 10 ? `... 외 ${targetInv.items.length - 10}�
                 }
             }
 
-            // 👑 [관제·게이트부 EXE-AI 자율 총괄 AI 비서 직통 응답]
-            // 대표님의 자연어 질문(Make.com 인증, 미결 현황, 성적서, 재고 등)을 전사 대시보드 실시간 데이터를 바탕으로 즉각 브리핑
+            // 🎩 [경영총괄부 비서실장 MGT-01 직통 응답]
+            // 대표님의 자연어 질문을 전사 상황판(부서별 봇 가동·KPI·이슈)을 근거로 결론 먼저 간결하게 보고
             try {
-                const { executiveAiService } = await import('./executiveAiService.js');
                 const aiAnswer = await executiveAiService.askExecutiveAI(txt);
                 await this.sendMessage(chatId, aiAnswer);
                 return;
             } catch (aiErr) {
-                console.error('[TelegramBot] EXE-AI 질의응답 실패:', aiErr);
-                await this.sendMessage(chatId, `❌ [EXE-AI] 질의 응답 중 오류가 발생했습니다: ${aiErr.message}`);
+                console.error('[TelegramBot] MGT-01 질의응답 실패:', aiErr);
+                await this.sendMessage(chatId, `❌ [MGT-01] 보고 실패: ${aiErr.message}`);
                 return;
             }
         }
@@ -744,7 +813,7 @@ ${matchedOrdersList}
         if (/직원.*상태|직원.*현황|에이전트.*상태|에이전트.*현황|봇.*상태|봇.*현황|봇들.*상태|근무.*상태|업무.*상태|직원들/i.test(t)) return true;
         if (/^(\/agents|\/status|\/staff|직원|에이전트|봇들|업무현황|근무현황)$/i.test(t)) return true;
         if (/(영업|구매|품질|데이터|총무|물류|출고|관제).*(부|팀)?.*(상태|현황|봇|직원)/i.test(t)) return true;
-        if (/^(INT|QC|PUR|DAT|GEN|LOG|DIS|EXE)-\d{2}$/i.test(t)) return true;
+        if (/^(INT|SLE|SAL|QC|PUR|DAT|GEN|LOG|DIS|EXE|MGT)-[A-Z0-9]{2}$/i.test(t)) return true;
         return false;
     }
 
@@ -757,7 +826,7 @@ ${matchedOrdersList}
         const q = queryText.trim().toUpperCase();
 
         // 1. 특정 봇 코드 단독 질의 (예: "QC-02", "INT-03", "DAT-06")
-        const codeMatch = q.match(/\b(INT|QC|PUR|DAT|GEN|LOG|DIS|EXE)-\d{2}\b/i);
+        const codeMatch = q.match(/\b(INT|SLE|SAL|QC|PUR|DAT|GEN|LOG|DIS|EXE|MGT)-[A-Z0-9]{2}\b/i);
         if (codeMatch) {
             const targetCode = codeMatch[0].toUpperCase();
             const agent = agents.find(a => a.code?.toUpperCase() === targetCode || a.id?.toUpperCase() === targetCode);
@@ -797,6 +866,7 @@ ${recentLogs}
         else if (/데이터|재고|DAT/i.test(q)) targetDept = '데이터관리팀';
         else if (/총무|명세|GEN/i.test(q)) targetDept = '총무부';
         else if (/물류|출고|LOG/i.test(q)) targetDept = '출고물류부';
+        else if (/경영|비서|MGT/i.test(q)) targetDept = '경영총괄부';
         else if (/관제|게이트|DIS|EXE/i.test(q)) targetDept = '관제·게이트부';
 
         if (targetDept && !/전체|모든|직원들 상태/i.test(q)) {

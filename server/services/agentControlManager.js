@@ -147,6 +147,7 @@ class AgentControlManager extends EventEmitter {
         if (updates.currentTask !== undefined) agent.currentTask = updates.currentTask;
         if (updates.isCreated !== undefined) agent.isCreated = updates.isCreated;
         agent.lastActive = '방금 전';
+        agent.lastActiveAt = new Date().toISOString();
 
         try {
             fs.writeFileSync(AGENTS_PATH, JSON.stringify(this.agentsCache, null, 2), 'utf8');
@@ -179,6 +180,7 @@ class AgentControlManager extends EventEmitter {
             agent.metrics = { ...(agent.metrics || {}), ...metrics };
         }
         agent.lastActive = '방금 전';
+        agent.lastActiveAt = new Date().toISOString();
 
         try {
             fs.writeFileSync(AGENTS_PATH, JSON.stringify(this.agentsCache, null, 2), 'utf8');
@@ -202,7 +204,7 @@ class AgentControlManager extends EventEmitter {
         const timeStr = now.toLocaleTimeString('ko-KR');
 
         this.agentsCache = this.agentsCache.map(agent => {
-            const isManager = agent.position === '팀장' || agent.position === '과장';
+            const isManager = agent.position === '부장' || agent.position === '팀장' || agent.position === '과장';
             const approval = isManager ? 'APPROVED' : 'AUTO_RUNNING';
             const existingLogs = Array.isArray(agent.logs) ? agent.logs : [];
             const newLog = `[${timeStr}] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)`;
