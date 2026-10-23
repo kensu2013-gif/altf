@@ -104,6 +104,7 @@ export interface AppState {
     trashQuotation: (quoteId: string) => Promise<void>;
     restoreQuotation: (quoteId: string) => Promise<void>;
     permanentDeleteQuotation: (quoteId: string) => Promise<boolean>;
+    emptyTrashQuotations: () => Promise<boolean>;
 
     setQuotes: (quotes: Quotation[]) => void; // Sync action
     setOrders: (orders: Order[]) => void; // Sync action
@@ -719,6 +720,37 @@ export const useStore = create<AppState>()(
                 } catch (e: unknown) {
                     console.error(e);
                     alert(`영구 삭제 오류: ${e instanceof Error ? e.message : String(e)}`);
+                    return false;
+                }
+            },
+
+            emptyTrashQuotations: async () => {
+                try {
+                    const { auth } = get();
+                    const headers: Record<string, string> = {};
+                    if (auth.token) {
+                        headers['Authorization'] = `Bearer ${auth.token}`;
+                    }
+                    if (auth.user) {
+                        headers['x-requester-id'] = auth.user.id;
+                        headers['x-requester-role'] = auth.user.role;
+                    }
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/my/quotations/empty-trash`, {
+                        method: 'POST',
+                        headers
+                    });
+                    if (res.ok) {
+                        set((state) => ({
+                            quotes: state.quotes.filter(q => !q.isDeleted)
+                        }));
+                        return true;
+                    }
+                    const errData = await res.json().catch(() => ({}));
+                    alert(`휴지통 비우기 실패: ${errData.error || res.statusText}`);
+                    return false;
+                } catch (e: unknown) {
+                    console.error(e);
+                    alert(`휴지통 비우기 오류: ${e instanceof Error ? e.message : String(e)}`);
                     return false;
                 }
             },

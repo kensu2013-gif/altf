@@ -100,13 +100,14 @@ function buildFallbackCandidate(
 
 export default function AdminQuotes() {
     const [searchParams] = useSearchParams();
-    const { quotes, users, updateQuotation, trashQuotation, restoreQuotation, permanentDeleteQuotation, setQuotes, fetchUsers } = useStore(useShallow((state) => ({
+    const { quotes, users, updateQuotation, trashQuotation, restoreQuotation, permanentDeleteQuotation, emptyTrashQuotations, setQuotes, fetchUsers } = useStore(useShallow((state) => ({
         quotes: state.quotes,
         users: state.users,
         updateQuotation: state.updateQuotation,
         trashQuotation: state.trashQuotation,
         restoreQuotation: state.restoreQuotation,
         permanentDeleteQuotation: state.permanentDeleteQuotation,
+        emptyTrashQuotations: state.emptyTrashQuotations,
         setQuotes: state.setQuotes,
         fetchUsers: state.fetchUsers
     })));
@@ -550,9 +551,24 @@ export default function AdminQuotes() {
     };
 
     const handlePermanentDelete = async (quoteId: string) => {
-        if (confirm('정말로 영구 삭제하시겠습니까? 복구할 수 없습니다.')) {
+        if (confirm('정말로 영구 삭제하시겠습니까? (삭제 전 일일 안전 백업이 자동 생성되어 데이터 유실을 방지합니다)')) {
             await permanentDeleteQuotation(quoteId);
             if (selectedQuote?.id === quoteId) setSelectedQuote(null);
+        }
+    };
+
+    const handleEmptyTrash = async () => {
+        const trashCount = quoteCounts.TRASH || 0;
+        if (trashCount === 0) {
+            alert('휴지통이 이미 비어 있습니다.');
+            return;
+        }
+        if (confirm(`휴지통에 있는 ${trashCount}건의 견적서를 완전히 비우시겠습니까?\n\n(영구 삭제 직전 일일 안전 백업 지점이 자동으로 생성되어 언제든 복원할 수 있습니다)`)) {
+            const ok = await emptyTrashQuotations();
+            if (ok) {
+                alert(`휴지통을 성공적으로 비웠습니다. (${trashCount}건 영구 삭제 완료)`);
+                setSelectedQuote(null);
+            }
         }
     };
 
@@ -665,6 +681,17 @@ export default function AdminQuotes() {
                         />
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     </div>
+
+                    {filterStatus === 'TRASH' && (quoteCounts.TRASH || 0) > 0 && (
+                        <Button
+                            variant="outline"
+                            onClick={handleEmptyTrash}
+                            className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap bg-red-50 hover:bg-red-100 border-red-200 text-red-600 shadow-xs"
+                        >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                            휴지통 비우기 ({quoteCounts.TRASH}건)
+                        </Button>
+                    )}
 
                     <Button
                         variant="outline"

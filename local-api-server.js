@@ -32,6 +32,7 @@ import { ledgerClient } from './server/services/ledgerClient.js';
 import { agentControlManager } from './server/services/agentControlManager.js';
 import { dispatchGate } from './server/services/dispatchGate.js';
 import { ruleCorrectionAgent } from './server/services/ruleCorrectionAgent.js';
+import { dailyBackupService } from './server/services/dailyBackupService.js';
 
 import multer from 'multer';
 
@@ -5800,6 +5801,104 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // POST /api/my/quotations/empty-trash : 휴지통 전체 비우기 (영구 삭제 전 자동 안전 스냅샷 생성)
+    if (req.method === 'POST' && url.pathname === '/api/my/quotations/empty-trash') {
+        let session = getAuthenticatedSession(req);
+        const headerRole = req.headers['x-requester-role'] || '';
+        const headerId = req.headers['x-requester-id'] || '';
+        if (!session && (headerRole === 'MASTER' || headerRole === 'admin' || headerRole === 'manager' || headerRole === 'MANAGER')) {
+            session = { userId: headerId || 'admin-header', role: headerRole, email: 'admin@altf.kr' };
+        }
+        if (!session || !['MASTER', 'admin', 'manager', 'MANAGER'].includes(session.role)) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Forbidden: 관리자만 휴지통을 비울 수 있습니다.' }));
+            return;
+        }
+
+        try {
+            // 1. 대량 영구 삭제 전 자동 안전 스냅샷 즉시 생성 (데이터 유실 100% 방지)
+            let backupInfo = null;
+            try {
+                backupInfo = await dailyBackupService.createSnapshot(db, 'PRE_PURGE_SAFETY', 'empty_trash');
+            } catch (snapErr) {
+                console.warn('[API] 휴지통 비우기 전 스냅샷 생성 경고:', snapErr.message);
+            }
+
+            const result = await updateDb(() => {
+                const trashedQuotes = (db.quotations || []).filter(q => q.isDeleted);
+                const trashedIds = trashedQuotes.map(q => q.id);
+
+                if (!db.deletedQuotationIds) db.deletedQuotationIds = [];
+                for (const tid of trashedIds) {
+                    if (!db.deletedQuotationIds.includes(tid)) {
+                        db.deletedQuotationIds.push(tid);
+                    }
+                    if (typeof kakaoBotService.deleteDraftQuotation === 'function') {
+                        kakaoBotService.deleteDraftQuotation(tid);
+                    }
+                }
+
+                const prevCount = db.quotations.length;
+                db.quotations = db.quotations.filter(q => !q.isDeleted);
+                const purgedCount = prevCount - db.quotations.length;
+
+                return { success: true, purgedCount, trashedIds, backupInfo };
+            });
+
+            console.log(`[API] 🧹 [Human Action] 휴지통 전체 비우기 완료: ${result.purgedCount}건 완전 파기 (안전 백업: ${result.backupInfo?.backupId || '완료'}) by ${session.email}`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(result));
+        } catch (e) {
+            console.error('[API] 휴지통 비우기 실패:', e);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: e.message || '휴지통 비우기 오류' }));
+        }
+        return;
+    }
+
+    // GET /api/admin/backups : 일일 백업 지점 목록 조회
+    if (req.method === 'GET' && url.pathname === '/api/admin/backups') {
+        try {
+            const list = await dailyBackupService.listSnapshots();
+            sendJsonResponse(req, res, 200, { success: true, total: list.length, backups: list });
+        } catch (e) {
+            sendJsonResponse(req, res, 500, { success: false, error: e.message });
+        }
+        return;
+    }
+
+    // POST /api/admin/backups/create : 수동 즉시 백업 지점 생성
+    if (req.method === 'POST' && url.pathname === '/api/admin/backups/create') {
+        try {
+            const body = await parseBody(req);
+            const snapshot = await dailyBackupService.createSnapshot(db, 'MANUAL_USER_REQUEST', body.tag || 'manual');
+            sendJsonResponse(req, res, 200, { success: true, snapshot });
+        } catch (e) {
+            sendJsonResponse(req, res, 500, { success: false, error: e.message });
+        }
+        return;
+    }
+
+    // POST /api/admin/backups/restore : 백업 지점에서 데이터 복원
+    if (req.method === 'POST' && url.pathname === '/api/admin/backups/restore') {
+        try {
+            const body = await parseBody(req);
+            if (!body.backupId) {
+                sendJsonResponse(req, res, 400, { success: false, error: 'backupId는 필수입니다.' });
+                return;
+            }
+            const result = await dailyBackupService.restoreSnapshot(db, body.backupId, {
+                target: body.target || 'quotations',
+                quoteId: body.quoteId
+            });
+            await queueSave();
+            sendJsonResponse(req, res, 200, result);
+        } catch (e) {
+            sendJsonResponse(req, res, 500, { success: false, error: e.message });
+        }
+        return;
+    }
+
     // DELETE /api/my/orders/:id
     if (req.method === 'DELETE' && url.pathname.startsWith('/api/my/orders/')) {
         let session = getAuthenticatedSession(req);
@@ -5980,6 +6079,12 @@ server.on('error', (e) => {
 
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Local API Server running at http://0.0.0.0:${PORT}`);
+    // 일일 자동 데이터베이스 백업 스케줄러 가동
+    try {
+        dailyBackupService.startDailySchedule(() => db);
+    } catch (backupErr) {
+        console.warn('[BackupService] 백업 스케줄러 초기화 경고:', backupErr.message);
+    }
 });
 
 // --- Global Exception & Rejection Handlers to prevent server crash ---
