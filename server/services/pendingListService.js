@@ -66,17 +66,26 @@ export class PendingListService {
 
     const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:AC700');
     const rows = [];
+    let excludedNonProductCount = 0;
 
     // Row 2 is Header, Data starts at Row 3 (1-based index)
     for (let r = 3; r <= range.e.r + 1; r++) {
       const lotNo = sheet['A' + r]?.v;
       if (!lotNo || String(lotNo).trim() === '') continue;
 
+      const itemName = String(sheet['C' + r]?.v || '').trim();
+
+      // 💡 [비제품 항목 제외]: NEGO, 시편TEST비, 시험비, 운임 등 실제 제조 공정이 없는 행은 전면 제외
+      if (this._isNonProductItem(itemName)) {
+        excludedNonProductCount++;
+        continue;
+      }
+
       const row = {
         rowIdx: r,
         lotNo: String(sheet['A' + r]?.v || '').trim(),
         no: sheet['B' + r]?.v ?? '',
-        itemName: String(sheet['C' + r]?.v || '').trim(),
+        itemName,
         material: String(sheet['D' + r]?.v || '').trim(),
         thickness: String(sheet['E' + r]?.v || '').trim(),
         status: String(sheet['F' + r]?.v || '').trim(), // ERW / SML'S
@@ -108,8 +117,15 @@ export class PendingListService {
       rows.push(row);
     }
 
-    this._updateAgentStatus('PUR-02', `대경 미결 리스트 ${rows.length}행 파싱 완료`, `${rows.length}개 유효 품목 행 파싱 성공`, 'ACTIVE');
-    return { sheetName, totalRows: rows.length, rows };
+    this._updateAgentStatus('PUR-02', `대경 미결 리스트 ${rows.length}개 제조 품목 파싱 완료 (비제품 ${excludedNonProductCount}건 제외)`, `제조 품목 ${rows.length}건 / 비제품(네고·시편 등) ${excludedNonProductCount}건 제외`, 'ACTIVE');
+    return { sheetName, totalRows: rows.length, excludedNonProductCount, rows };
+  }
+
+  _isNonProductItem(itemName) {
+    if (!itemName) return true;
+    const upper = String(itemName).toUpperCase().replace(/\s+/g, '');
+    const nonProductKeywords = ['NEGO', '네고', '시편', 'TEST', '시험', '운임', '운송비', '포장비', '할인', '수수료', 'SAMPLE'];
+    return nonProductKeywords.some(kw => upper.includes(kw));
   }
 
   _formatExcelDate(val) {
@@ -767,7 +783,8 @@ export class PendingListService {
         matchedCount: analyzed.matchedCount,
         unmatchedCount: analyzed.unmatchedCount,
         stockOrderCount: analyzed.stockOrderCount,
-        alertCount: analyzed.alertCount
+        alertCount: analyzed.alertCount,
+        excludedNonProductCount: parsed.excludedNonProductCount || 0
       },
       stageCounts: analyzed.stageCounts,
       clientDiagnoses: analyzed.clientDiagnoses,

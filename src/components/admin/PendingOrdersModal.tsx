@@ -90,6 +90,7 @@ export interface PendingAnalysisSummary {
     unmatchedCount: number;
     stockOrderCount: number;
     alertCount: number;
+    excludedNonProductCount?: number;
 }
 
 export interface LeadtimeCategoryStat {
@@ -569,6 +570,13 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                             <span className="font-bold text-indigo-400 font-mono text-sm">23.5</span>
                             <span className="text-slate-500 text-[11px]">일 (누적 57건 실측)</span>
                         </div>
+                        {summary?.excludedNonProductCount ? (
+                            <div className="pl-4 hidden lg:flex items-center gap-1.5 text-slate-400">
+                                <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 border border-slate-700 font-sans">
+                                    비제품(네고·시편비 등 {summary.excludedNonProductCount}건) 자동 제외
+                                </span>
+                            </div>
+                        ) : null}
                     </div>
 
                     {/* Expand/Collapse Detailed Funnel & Metrics Toggle */}
@@ -1073,7 +1081,10 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                                             </span>
                                         </h3>
                                         <p className="text-xs text-slate-400 mt-1">
-                                            발주(PO)를 넣은 지 수개월이 지나도록 <b>대경벤드에서 절단(P열) 착수조차 안 되고 검토/홀딩 상태로 멈춰 있는</b> 품목들을 경과일수 순으로 정렬했습니다.
+                                            발주(PO)를 넣은 지 수개월이 지나도록 <b>대경벤드에서 절단(P열) 착수조차 안 되고 검토/홀딩 상태로 멈춰 있는</b> 피팅 자재들을 경과일수 순으로 정렬했습니다.
+                                            <span className="text-amber-400 font-medium ml-1">
+                                                (💡 NEGO, 시편TEST비 등 비제품성 정산 행은 자동 제외되어 순수 배관 피팅 자재만 표시됩니다)
+                                            </span>
                                         </p>
                                     </div>
                                     <div className="text-right font-mono">
