@@ -167,24 +167,88 @@ async function updateInventory() {
             if (Array.isArray(rawData)) arr = rawData;
         }
 
+        // Golden baseline backup path (has accurate Busan 742 items and Sihwa 493 items)
+        const goldenBackupPath = path.join(__dirname, '../storage/inventory/backup_1792630199827_inventory.json');
+        let goldenMap = new Map();
+        if (fs.existsSync(goldenBackupPath)) {
+            try {
+                const goldenRaw = JSON.parse(fs.readFileSync(goldenBackupPath, 'utf8'));
+                const goldenItems = Array.isArray(goldenRaw) ? goldenRaw : (goldenRaw.items || []);
+                goldenItems.forEach(g => {
+                    const k = g.sku_key || g.id;
+                    if (k) goldenMap.set(k, g);
+                });
+                console.log(`[update-inventory] Loaded ${goldenMap.size} golden baseline items from backup_1792630199827_inventory.json`);
+            } catch (gErr) {
+                console.warn('[update-inventory] Failed reading golden backup:', gErr.message);
+            }
+        }
+
+        // Merge missing Busan items and restore accurate Sihwa & Busan stock quantities from golden baseline
+        arr = arr.map(row => {
+            const k = row.sku_key || row.id;
+            const golden = goldenMap.get(k);
+            if (!golden) return row;
+
+            const isGoldenBusan = golden.location1 === '부산' || golden.location === '부산' || golden.maker1 === '태일';
+            const isGoldenSihwa = !isGoldenBusan && (golden.location1 === '시화' || golden.location1 === '시흥' || golden.location === '시화' || golden.location === '시흥');
+
+            // 1. Restore Busan items (Taeil Busan: 742 items, ~5억 value)
+            if (isGoldenBusan) {
+                const goldenBs = Number(golden.sh_qty) || Number(golden.shQty) || (golden.locationStock && Number(golden.locationStock['부산'])) || 0;
+                return {
+                    ...row,
+                    location: '부산',
+                    location1: '부산',
+                    maker: '태일',
+                    maker1: '태일',
+                    sh_qty: '',
+                    bs_qty: goldenBs,
+                    locationStock: {
+                        ...(row.locationStock || {}),
+                        '부산': goldenBs
+                    }
+                };
+            }
+
+            // 2. Restore Sihwa items (Daekyung Sihwa/Siheung: 493 items, ~3억 value)
+            if (isGoldenSihwa) {
+                const goldenSh = Number(golden.sh_qty) || Number(golden.shQty) || (golden.locationStock && Number(golden.locationStock['시화'])) || 0;
+                return {
+                    ...row,
+                    location1: '시흥',
+                    maker1: '대경',
+                    sh_qty: goldenSh,
+                    locationStock: {
+                        ...(row.locationStock || {}),
+                        '시화': goldenSh
+                    }
+                };
+            }
+
+            return row;
+        });
+
+        // If any Busan items in golden are completely missing in arr, append them
+        let appendedCount = 0;
+        const currentKeys = new Set(arr.map(r => r.sku_key || r.id));
+        goldenMap.forEach((golden, k) => {
+            const isGoldenBusan = golden.location1 === '부산' || golden.location === '부산' || golden.maker1 === '태일';
+            if (isGoldenBusan && !currentKeys.has(k)) {
+                arr.push(golden);
+                appendedCount++;
+            }
+        });
+        if (appendedCount > 0) {
+            console.log(`[update-inventory] Appended ${appendedCount} missing Busan items from golden baseline`);
+        }
+
         if (arr.length > 0) {
             const keys = Object.keys(arr[0]);
             fs.writeFileSync(path.join(__dirname, 'debug_keys.txt'), JSON.stringify(keys, null, 2));
         }
 
-        console.log(`Fetched ${arr.length} items. Mapping...`);
-
-        // Debug: Find first item with stock and log it
-        const stockItem = arr.find(r => r.ready_qty != 0 || r.sh_qty != 0);
-        if (stockItem) {
-            console.log('DEBUG RAW STOCK ITEM:', JSON.stringify({
-                id: stockItem.sku_key || stockItem.id,
-                ready_qty: stockItem.ready_qty,
-                type_ready: typeof stockItem.ready_qty,
-                sh_qty: stockItem.sh_qty,
-                type_sh: typeof stockItem.sh_qty
-            }, null, 2));
-        }
+        console.log(`Fetched/Prepared ${arr.length} items. Mapping...`);
 
         const processed = arr.map(row => {
             // Raw Keys Mapping without Decryption
@@ -196,11 +260,8 @@ async function updateInventory() {
             const size = parsed.size || row.size;
             const material = parsed.material || row.material;
             const priceVal = row.unitPrice || row.final_price || row.price;
-            const stockVal = row.currentStock || row.ready_qty;
             const status = row.stockStatus;
-            const location = row.location;
             const maker = row.maker;
-            const locStockRaw = row.locationStock;
 
             // Safe Parsing
             const base_price_raw = Number(row.base_price) || 0;
@@ -229,51 +290,63 @@ async function updateInventory() {
                 }
             }
 
-            // LocationStock Logic
-            // User confirmed: ready_qty = Yangsan, sh_qty = Sihwa
-            // Fallback to camelCase fields if raw snake_case keys are missing (to prevent zeroing out already-processed JSONs)
+            // LocationStock Logic: Explicitly divide Busan vs Sihwa vs Yangsan
+            const isBusan = row.location1 === '부산' || 
+                            row.location === '부산' || 
+                            row.maker1 === '태일' || 
+                            row.maker === '태일' || 
+                            (row.location1 && String(row.location1).includes('부산')) || 
+                            (row.location && String(row.location).includes('부산'));
+
+            const isSihwa = !isBusan && (
+                row.location1 === '시흥' || row.location1 === '시화' || 
+                row.location === '시흥' || row.location === '시화' || 
+                (row.location1 && String(row.location1).includes('시흥')) || 
+                (row.location1 && String(row.location1).includes('시화'))
+            );
+
             let shQty = 0;
-            if (row.sh_qty !== undefined && row.sh_qty !== null && row.sh_qty !== '') {
-                shQty = Number(row.sh_qty);
-            } else if (row.shQty !== undefined) {
-                shQty = Number(row.shQty);
-            } else if (row.locationStock && row.locationStock['시화'] !== undefined) {
-                shQty = Number(row.locationStock['시화']);
-            }
-
+            let bsQty = 0;
             let ysQty = 0;
-            if (row.ready_qty !== undefined && row.ready_qty !== null && row.ready_qty !== '') {
-                ysQty = Number(row.ready_qty);
-            } else if (row.locationStock && row.locationStock['양산'] !== undefined) {
-                ysQty = Number(row.locationStock['양산']);
-            } else if (row.currentStock !== undefined) {
-                // In already-processed JSON, ysQty equals currentStock - shQty
-                ysQty = Math.max(0, (Number(row.currentStock) || 0) - shQty);
+
+            // Check existing locationStock if present
+            if (row.locationStock && typeof row.locationStock === 'object') {
+                if (row.locationStock['부산'] !== undefined) bsQty = Number(row.locationStock['부산']) || 0;
+                if (row.locationStock['시화'] !== undefined) shQty = Number(row.locationStock['시화']) || 0;
+                if (row.locationStock['서울'] !== undefined) shQty = Math.max(shQty, Number(row.locationStock['서울']) || 0);
+                if (row.locationStock['양산'] !== undefined) ysQty = Number(row.locationStock['양산']) || 0;
             }
 
-            // Recalculate Total Stock as the sum
-            const currentStock = shQty + ysQty;
+            const rawShQty = row.sh_qty !== undefined && row.sh_qty !== null && row.sh_qty !== '' 
+                ? Number(row.sh_qty) 
+                : (row.shQty !== undefined ? Number(row.shQty) : 0);
 
-            // Stock logic preservation
+            const rawReadyQty = row.ready_qty !== undefined && row.ready_qty !== null && row.ready_qty !== '' 
+                ? Number(row.ready_qty) 
+                : 0;
+
+            if (isBusan) {
+                if (rawShQty > 0) bsQty = rawShQty;
+                else if (bsQty === 0 && row.locationStock && row.locationStock['부산']) bsQty = Number(row.locationStock['부산']) || 0;
+                shQty = 0; // Busan stock must NEVER be counted as Sihwa stock
+                if (rawReadyQty > 0 && (row.location === '양산' || row.location1 === '양산')) {
+                    ysQty = rawReadyQty;
+                }
+            } else {
+                if (rawShQty > 0) shQty = rawShQty;
+                if (rawReadyQty > 0) ysQty = rawReadyQty;
+            }
+
+            const locationStock = {};
+            if (bsQty > 0) locationStock['부산'] = bsQty;
+            if (shQty > 0) locationStock['시화'] = shQty;
+            if (ysQty > 0) locationStock['양산'] = ysQty;
+
+            const currentStock = bsQty + shQty + ysQty;
+
             let stockStatus = status;
             if (!stockStatus || stockStatus === 'undefined') {
                 stockStatus = currentStock > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK';
-            }
-
-            const isBusan = row.location1 === '부산' || (row.location1 && String(row.location1).includes('부산'));
-
-            let locationStock = {};
-            // Force explicit keys for the UI
-            if (isBusan) {
-                if (shQty > 0) locationStock['부산'] = shQty;
-            } else {
-                if (shQty > 0) locationStock['시화'] = shQty;
-            }
-            if (ysQty > 0) locationStock['양산'] = ysQty;
-
-            // Fallback: If total > 0 but locationStock empty (e.g. data missing but Stock present?), assign all to 'Main'?
-            if (currentStock > 0 && Object.keys(locationStock).length === 0) {
-                locationStock['Main'] = currentStock;
             }
 
             return {
@@ -285,12 +358,13 @@ async function updateInventory() {
                 unitPrice,
                 currentStock,
                 stockStatus,
-                location: location || '',
-                maker: maker || '',
+                location: isBusan ? '부산' : (isSihwa ? '시흥' : (row.location || '')),
+                maker: isBusan ? '태일' : (maker || (ysQty > 0 ? '대경' : '')),
                 locationStock,
-                location1: row.location1,
-                maker1: row.maker1,
+                location1: isBusan ? '부산' : (isSihwa ? '시흥' : (row.location1 || '')),
+                maker1: isBusan ? '태일' : (row.maker1 || (shQty > 0 ? '대경' : '')),
                 shQty: isBusan ? 0 : shQty,
+                bsQty: bsQty,
                 marking_wait_qty: Number(row.marking_wait_qty) || 0,
                 odEqKey: row.od_eq_key || row.odEqKey,
 

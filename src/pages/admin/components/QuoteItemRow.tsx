@@ -308,9 +308,10 @@ export const QuoteItemRow = React.memo(({
                                         if (p.locationStock['서울'] !== undefined) aggStock['시화'] += Number(p.locationStock['서울']);
                                         if (p.locationStock['대경'] !== undefined) aggStock['양산'] += Number(p.locationStock['대경']);
                                     } else {
-                                        const pIsSihwa = p.location1 === '시화' || (p.location1 && String(p.location1).includes('시화')) || p.location === '시화' || p.location === '서울' || p.location === '서울재고';
+                                        const pIsBusan = p.location1 === '부산' || (p.location1 && String(p.location1).includes('부산')) || p.location === '부산' || p.maker1 === '태일';
+                                        const pIsSihwa = !pIsBusan && (p.location1 === '시화' || p.location1 === '시흥' || (p.location1 && String(p.location1).includes('시화')) || (p.location1 && String(p.location1).includes('시흥')) || p.location === '시화' || p.location === '시흥' || p.location === '서울' || p.location === '서울재고');
                                         const pIsYangsan = p.location === '양산' || p.location === '대경';
-                                        const shQtyVal = p.shQty ?? p.sh_qty ?? 0;
+                                        const shQtyVal = p.shQty ?? (pIsBusan ? 0 : p.sh_qty) ?? 0;
                                         const ysQtyVal = p.ready_qty ?? p.currentStock ?? 0;
                                         if (pIsSihwa) aggStock['시화'] += Number(shQtyVal);
                                         if (pIsYangsan || p.ready_qty) aggStock['양산'] += Number(ysQtyVal);

@@ -120,6 +120,9 @@ export function useInventory() {
                 const isBusan = item.location1 === '부산' || 
                                 (item.location1 && String(item.location1).includes('부산')) || 
                                 item.location === '부산' || 
+                                (item.location && String(item.location).includes('부산')) ||
+                                item.maker1 === '태일' ||
+                                item.maker === '태일' ||
                                 (item.locationStock && item.locationStock['부산'] !== undefined);
 
                 if (isBusan) {
@@ -162,7 +165,8 @@ export function useInventory() {
                     odEqKey: item.od_eq_key || item.odEqKey,
                     locationStock,
                     maker1: item.maker1,
-                    shQty: isBusan ? 0 : rawShQty,
+                    shQty: isBusan ? 0 : (locationStock['시화'] || 0),
+                    bsQty: locationStock['부산'] || 0,
                     marking_wait_qty: Number(item.marking_wait_qty) || 0
                 } as Product;
             });
@@ -205,6 +209,9 @@ export function useInventory() {
                 const isBusan = item.location1 === '부산' || 
                                 (item.location1 && String(item.location1).includes('부산')) || 
                                 item.location === '부산' || 
+                                (item.location && String(item.location).includes('부산')) ||
+                                item.maker1 === '태일' ||
+                                item.maker === '태일' ||
                                 (item.locationStock && item.locationStock['부산'] !== undefined);
 
                 if (isBusan) {
@@ -232,7 +239,7 @@ export function useInventory() {
                 }
 
                 // Map main location property as well
-                const mappedLocation = (item.location === '서울' || item.location === '서울재고') ? '시화' : item.location;
+                const mappedLocation = isBusan ? '부산' : ((item.location === '서울' || item.location === '서울재고') ? '시화' : item.location);
 
                 const id = (item.sku_key || item.id || '') as string;
                 const parsed = parseSku(id);
@@ -255,7 +262,8 @@ export function useInventory() {
 
                     // User Request: Capture maker1 for conditional display
                     maker1: item.maker1,
-                    shQty: isBusan ? 0 : rawShQty,
+                    shQty: isBusan ? 0 : (locationStock['시화'] || 0),
+                    bsQty: locationStock['부산'] || 0,
                     marking_wait_qty: Number(item.marking_wait_qty) || 0
                 } as Product;
             });
