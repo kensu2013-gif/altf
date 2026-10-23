@@ -51,7 +51,8 @@ import {
     Timer,
     Settings,
     MessageSquare,
-    Factory
+    Factory,
+    ClipboardList
 } from 'lucide-react';
 import { CertificateLedgerModal } from '../../components/admin/CertificateLedgerModal';
 import { PurchaseLedgerModal } from '../../components/admin/PurchaseLedgerModal';
@@ -714,6 +715,7 @@ export default function AgentOfficeDashboard() {
     const [showCertIssuerModal, setShowCertIssuerModal] = useState<boolean>(false);
     const [showDaekyungInvoiceModal, setShowDaekyungInvoiceModal] = useState<boolean>(false);
     const [showKakaoQuoteModal, setShowKakaoQuoteModal] = useState<boolean>(false);
+    const [kakaoModalTab, setKakaoModalTab] = useState<'ORDERS' | 'QUOTES'>('ORDERS');
     const [showRunAllModal, setShowRunAllModal] = useState<boolean>(false);
     const [isExecutingAllBots, setIsExecutingAllBots] = useState<boolean>(false);
     const [runAllResult, setRunAllResult] = useState<{
@@ -3034,9 +3036,20 @@ export default function AgentOfficeDashboard() {
                         </span>
                     </button>
 
+                    {/* 📋 카카오톡 발주서 접수대기 검토 관제 퀵 버튼 */}
+                    <button
+                        onClick={() => { setKakaoModalTab('ORDERS'); setShowKakaoQuoteModal(true); }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/50 bg-gradient-to-r from-emerald-950/50 to-teal-950/50 hover:from-emerald-900/70 hover:to-teal-900/70 hover:border-emerald-400 text-emerald-300 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                        title="카카오톡 메신저로 접수된 발주서(원진철강 등)의 도착지, 운송비, 품목 규격을 검토하고 정식 원장 승인/삭제를 진행합니다."
+                    >
+                        <ClipboardList className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>발주서 접수대기 (카톡)</span>
+                        <span className="px-1.5 py-0.2 rounded-full bg-emerald-500 text-black text-[10px] font-black">1</span>
+                    </button>
+
                     {/* 💬 카카오톡 메신저 견적 검토 관제 퀵 버튼 */}
                     <button
-                        onClick={() => setShowKakaoQuoteModal(true)}
+                        onClick={() => { setKakaoModalTab('QUOTES'); setShowKakaoQuoteModal(true); }}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-950/30 hover:bg-amber-950/60 hover:border-amber-400 text-amber-300 text-xs font-bold transition-all cursor-pointer shadow-xs"
                         title="카카오톡 메신저로 인입된 원본 텍스트(txt)를 확인하고 담당자가 견적을 확정·회신합니다."
                     >
@@ -3154,7 +3167,7 @@ export default function AgentOfficeDashboard() {
 
                                 {/* 5. 카카오톡 견적 검토 관제 (Human-in-the-Loop) */}
                                 <button
-                                    onClick={() => { setShowKakaoQuoteModal(true); setShowToolsDropdown(false); }}
+                                    onClick={() => { setKakaoModalTab('QUOTES'); setShowKakaoQuoteModal(true); setShowToolsDropdown(false); }}
                                     className="w-full text-left p-2 rounded-lg hover:bg-amber-950/40 border border-transparent hover:border-amber-500/30 flex items-center justify-between transition-colors group cursor-pointer"
                                 >
                                     <div className="flex items-center gap-2.5">
@@ -3164,7 +3177,22 @@ export default function AgentOfficeDashboard() {
                                             <div className="text-[10px] text-slate-400">원문 txt 확인 및 단가 검토/카톡 회신</div>
                                         </div>
                                     </div>
-                                    <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded font-mono">신규</span>
+                                    <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded font-mono">견적</span>
+                                </button>
+
+                                {/* 6. 카카오톡 발주서 접수대기 관제 */}
+                                <button
+                                    onClick={() => { setKakaoModalTab('ORDERS'); setShowKakaoQuoteModal(true); setShowToolsDropdown(false); }}
+                                    className="w-full text-left p-2 rounded-lg hover:bg-emerald-950/40 border border-transparent hover:border-emerald-500/30 flex items-center justify-between transition-colors group cursor-pointer"
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <ClipboardList className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                                        <div>
+                                            <div className="text-xs font-bold text-slate-200 group-hover:text-emerald-300">📋 [구매팀] 카톡 발주 접수대기</div>
+                                            <div className="text-[10px] text-slate-400">도착지·운송비 검증 & 정식 발주 승인/영구 삭제</div>
+                                        </div>
+                                    </div>
+                                    <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded font-mono">발주 1</span>
                                 </button>
                             </div>
                         )}
@@ -6941,10 +6969,12 @@ export default function AgentOfficeDashboard() {
             />
 
             {/* 🏭 4-2. 구매부 (PUR) 대경벤드 생산 미결 리스트 9단계 공정 추적 & 납기 독촉 모달 */}
-            <PendingOrdersModal
-                isOpen={showPendingOrdersModal}
-                onClose={() => setShowPendingOrdersModal(false)}
-            />
+            {showPendingOrdersModal && (
+                <PendingOrdersModal
+                    isOpen={showPendingOrdersModal}
+                    onClose={() => setShowPendingOrdersModal(false)}
+                />
+            )}
 
             {/* 📜 5. 품질부 (QC-06) 성적서 발행봇 & DAT-10 아카이빙 모달 */}
             <CertificateIssuerModal
@@ -6973,6 +7003,7 @@ export default function AgentOfficeDashboard() {
             <KakaoMessengerQuoteModal
                 isOpen={showKakaoQuoteModal}
                 onClose={() => setShowKakaoQuoteModal(false)}
+                initialTab={kakaoModalTab}
             />
 
             {/* ⚡ 구글시트 연동 및 버퍼링 설정 모달 */}

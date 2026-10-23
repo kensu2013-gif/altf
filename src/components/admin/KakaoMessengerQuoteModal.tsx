@@ -73,13 +73,21 @@ interface ReviewQueueItem {
 interface KakaoMessengerQuoteModalProps {
     isOpen: boolean;
     onClose: () => void;
+    initialTab?: 'ORDERS' | 'QUOTES';
 }
 
 export const KakaoMessengerQuoteModal: React.FC<KakaoMessengerQuoteModalProps> = ({
     isOpen,
-    onClose
+    onClose,
+    initialTab = 'ORDERS'
 }) => {
-    const [mainTab, setMainTab] = useState<'ORDERS' | 'QUOTES'>('ORDERS');
+    const [mainTab, setMainTab] = useState<'ORDERS' | 'QUOTES'>(initialTab);
+
+    useEffect(() => {
+        if (isOpen && initialTab) {
+            setMainTab(initialTab);
+        }
+    }, [isOpen, initialTab]);
     const [queue, setQueue] = useState<ReviewQueueItem[]>([]);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(false);

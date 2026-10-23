@@ -78,7 +78,7 @@ async function loadData() {
         if (json) {
             db.users = json.users || [];
             db.quotations = json.quotations || [];
-            db.orders = json.orders || [];
+            db.orders = (json.orders || []).filter(o => !o.id?.includes('KKO') && !o.poNumber?.includes('KKO'));
             db.loginLogs = json.loginLogs || [];
             db.inventoryHistory = json.inventoryHistory || [];
             db.inventorySnapshot = json.inventorySnapshot || null; // Keep legacy for fallback
@@ -494,8 +494,9 @@ async function saveData() {
                         const localPoNumbers = new Set(db.orders.map(o => o.poNumber).filter(Boolean));
                         const localOrderNos = new Set(db.orders.map(o => o.orderNo).filter(Boolean));
 
-                        // 원격에는 존재하지만 로컬에 없는 주문 검출 (ID, poNumber, orderNo 종합 검증)
+                        // 원격에는 존재하지만 로컬에 없는 주문 검출 (ID, poNumber, orderNo 종합 검증, 카카오 임시 주문 영구 배제)
                         const missingFromLocal = remoteDb.orders.filter(ro => {
+                            if (ro.id?.includes('KKO') || ro.poNumber?.includes('KKO') || ro.orderChannel === '카카오톡' || ro.source === '카카오톡') return false;
                             if (localOrderIds.has(ro.id)) return false;
                             if (ro.poNumber && localPoNumbers.has(ro.poNumber)) return false;
                             if (ro.orderNo && localOrderNos.has(ro.orderNo)) return false;
@@ -544,7 +545,20 @@ async function saveData() {
             console.warn('[Safety Merge Guard] Warning during S3 verification:', mergeErr.message);
         }
 
-        await saveDbToS3(db);
+        // 🛡️ [배포 전 altf.kr 격리 가드]: 개발/테스트 중인 카카오 발주서는 사용자 명시적 배포 요청 전까지 S3(altf.kr)에 업로드 차단
+        const ordersForS3 = (db.orders || []).filter(o => 
+            !o.id?.includes('KKO') && 
+            !o.poNumber?.includes('KKO') && 
+            o.orderChannel !== '카카오톡' && 
+            o.source !== '카카오톡' &&
+            o.customerName !== '에스와이금속' &&
+            o.customerName !== '원진철강'
+        );
+        const s3Payload = {
+            ...db,
+            orders: ordersForS3
+        };
+        await saveDbToS3(s3Payload);
         // console.log('[API] Data saved to S3');
     } catch (e) {
         console.error('[API] Failed to save data to S3:', e);
@@ -6302,10 +6316,17 @@ const server = http.createServer(async (req, res) => {
         }
 
         const id = url.pathname.split('/').pop();
+        const permanent = url.searchParams.get('permanent') === 'true';
         try {
             const success = await updateDb(() => {
                 const index = db.orders.findIndex(o => o.id === id);
                 if (index !== -1) {
+                    const target = db.orders[index];
+                    if (permanent || target.orderChannel === '카카오톡' || target.id?.includes('KKO') || target.poNumber?.includes('KKO')) {
+                        db.orders.splice(index, 1);
+                        console.log(`[API] 🗑️ Order ${id} permanently purged from db.orders`);
+                        return true;
+                    }
                     // [사람의 명시적 삭제]: 임의 splice 파기 대신 소프트 삭제 + 감사 기록 보존
                     db.orders[index] = {
                         ...db.orders[index],
