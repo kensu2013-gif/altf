@@ -16,8 +16,48 @@ import {
     User,
     FileText,
     Image as ImageIcon,
-    ExternalLink
+    ExternalLink,
+    Sparkles,
+    BookOpen,
+    Tag,
+    X
 } from 'lucide-react';
+
+export interface CorrectionDiff {
+    field: string;
+    from: string | number;
+    to: string | number;
+}
+
+export interface CorrectionItemChange {
+    itemIndex: number;
+    itemName: string;
+    fieldDiffs: CorrectionDiff[];
+    ruleInferred?: string;
+}
+
+export interface CorrectionRecord {
+    id: string;
+    orderId: string;
+    orderNo?: string;
+    timestamp: string;
+    modifiedBy?: string;
+    customerName?: string;
+    channelTag?: string;
+    itemChangesCount: number;
+    conditionChangesCount: number;
+    itemChanges?: CorrectionItemChange[];
+    conditionChanges?: CorrectionDiff[];
+}
+
+export interface CorrectionSummaryReport {
+    success?: boolean;
+    totalCorrections: number;
+    materialCorrectionsCount: number;
+    thicknessCorrectionsCount: number;
+    sizeCorrectionsCount: number;
+    recentCorrections: CorrectionRecord[];
+}
 
 export interface KakaoOrderItem {
     id: string;
@@ -80,6 +120,9 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
     const [searchKeyword, setSearchKeyword] = useState<string>('');
     const [copied, setCopied] = useState<boolean>(false);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [analyzing, setAnalyzing] = useState<boolean>(false);
+    const [showCorrectionModal, setShowCorrectionModal] = useState<boolean>(false);
+    const [correctionReport, setCorrectionReport] = useState<CorrectionSummaryReport | null>(null);
 
     // Selected order editing state
     const [editCustomer, setEditCustomer] = useState<string>('');
@@ -200,7 +243,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                 })
             });
             if (res.ok) {
-                alert('✅ 수정사항이 저장되었습니다.');
+                alert('✅ 수정사항이 저장되었습니다.\n(🧠 SLE-15 발주서 수정관찰봇이 품목 규격 및 운송조건 수정 내역을 실시간 감지하여 누적 학습했습니다.)');
                 await fetchOrders();
             } else {
                 const data = await res.json();
@@ -210,6 +253,20 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
             alert('저장 오류: ' + e.message);
         } finally {
             setSaving(false);
+        }
+    };
+
+    // 🧠 SLE-15 발주서 수정관찰 누적 학습 리포트 조회
+    const fetchCorrectionReport = async () => {
+        try {
+            const res = await fetch('/api/kakao/orders/corrections');
+            if (res.ok) {
+                const data = await res.json();
+                setCorrectionReport(data);
+                setShowCorrectionModal(true);
+            }
+        } catch (e: any) {
+            alert('수정 리포트 조회 실패: ' + e.message);
         }
     };
 
@@ -250,7 +307,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
 
             if (res.ok) {
                 const data = await res.json();
-                alert(`🎉 [정식 발주 승인 완료]\n\n• 공식 발주번호: ${data.order?.convertedOrderId || '발급 완료'}\n• 상태: db.orders 원장 및 구매부(PUR-01/07) 대장 등록 완료`);
+                alert(`🎉 [정식 발주 승인 및 순차 발주번호 발급 완료]\n\n• 순차 발주번호: ${data.order?.orderNo || data.order?.poNumber}\n• 출처 태그: 🏷️ [카카오톡 접수] 스티커 부착\n• 상태: 번호 건너뜀 없이 웹 정식 원장(db.orders) 및 구매부(PUR-01/07) 대장에 안전하게 인계되었습니다.`);
                 await fetchOrders();
             } else {
                 const data = await res.json();
@@ -309,6 +366,35 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
             alert('삭제 오류: ' + e.message);
         } finally {
             setSaving(false);
+        }
+    };
+
+    // 🤖 영업3팀 SLE-11(비전 OCR) & SLE-12(AI 품목분석) 연계 정밀 분석 실행
+    const handleAiAnalyze = async () => {
+        if (!activeOrder) return;
+        setAnalyzing(true);
+        try {
+            const res = await fetch(`/api/kakao/orders/${activeOrder.id}/analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    utterance: activeOrder.utterance,
+                    imageUrl: activeOrder.imageUrl
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success && data.order) {
+                    alert('🤖 [영업3팀 SLE-11/12] AI 비전 OCR 및 품목 정밀 분석(규칙 0~11)이 완료되어 최신 규격과 단가가 반영되었습니다!');
+                    await fetchOrders();
+                }
+            } else {
+                alert('AI 분석 실패');
+            }
+        } catch (e: any) {
+            alert('AI 분석 오류: ' + e.message);
+        } finally {
+            setAnalyzing(false);
         }
     };
 
@@ -413,7 +499,13 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                     </div>
 
                                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-800/50 text-[11px] text-gray-500">
-                                        <span>{item.orderNo}</span>
+                                        <div className="flex items-center gap-1.5">
+                                            {item.orderNo ? (
+                                                <span className="font-mono text-cyan-400 font-bold">{item.orderNo}</span>
+                                            ) : (
+                                                <span className="text-amber-400/90 font-medium">⏳ [주문접수 대기] (번호 미부여)</span>
+                                            )}
+                                        </div>
                                         <div className="flex items-center gap-1.5">
                                             <span className="text-gray-400">{item.type === 'image_and_text' ? '📷 사진+텍스트' : item.type === 'image' ? '📷 사진' : '💬 텍스트'}</span>
                                             <button
@@ -447,11 +539,18 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                     <div className="px-6 py-4 border-b border-gray-800 bg-[#161922] flex items-center justify-between flex-shrink-0">
                         <div>
                             <div className="flex items-center gap-2">
-                                <span className="px-2 py-0.5 text-xs font-bold rounded bg-amber-400 text-black">
-                                    [카카오톡 접수]
+                                <span className="px-2 py-0.5 text-xs font-bold rounded bg-amber-400 text-black flex items-center gap-1">
+                                    <Tag className="w-3 h-3" />
+                                    [카카오톡 접수 스티커]
                                 </span>
                                 <h3 className="text-base font-bold text-white font-mono">
-                                    {activeOrder.orderNo}
+                                    {activeOrder.orderNo ? (
+                                        <span className="text-cyan-400">{activeOrder.orderNo}</span>
+                                    ) : (
+                                        <span className="text-amber-300 font-sans text-xs px-2.5 py-1 rounded bg-amber-950/60 border border-amber-600/50 font-bold">
+                                            ⏳ [주문접수 대기] (사무실 확인 후 승인 시 순차 발주번호 자동 발급)
+                                        </span>
+                                    )}
                                 </h3>
                                 <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
                                     activeOrder.status === 'APPROVED'
@@ -464,11 +563,28 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                 </span>
                             </div>
                             <p className="text-xs text-gray-400 mt-1">
-                                접수일시: {new Date(activeOrder.receivedAt).toLocaleString('ko-KR')} | 담당: 관제 게이트(EXE-02) ➔ 구매부(PUR-01/07)
+                                접수일시: {new Date(activeOrder.receivedAt).toLocaleString('ko-KR')} | 담당: 영업부 영업3팀(SLE-11~15) ➔ [승인 시] 구매부(PUR-01/07) 정식 이첩
                             </p>
                         </div>
 
                         <div className="flex items-center gap-2">
+                            <button
+                                onClick={fetchCorrectionReport}
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-950/50 border border-indigo-500/40 hover:bg-indigo-900/60 text-indigo-300 text-xs font-bold transition-all shadow-sm"
+                                title="발주서 수정관찰봇(SLE-15)의 품목 및 운송조건 누적 학습 내역 확인"
+                            >
+                                <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+                                <span>🧠 [SLE-15] 수정학습 리포트</span>
+                            </button>
+                            <button
+                                onClick={handleAiAnalyze}
+                                disabled={analyzing}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 hover:bg-emerald-500/30 text-emerald-300 text-xs font-bold transition-all shadow-sm"
+                                title="영업2팀 견적봇과 동일한 Gemini/GPT Vision & 규칙 0~11 AI 정밀 품목 분석 실행"
+                            >
+                                <Sparkles className={`w-3.5 h-3.5 ${analyzing ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
+                                <span>{analyzing ? 'AI 정밀 분석 중...' : '🤖 [영업3팀] AI 비전 OCR & 품목 분석'}</span>
+                            </button>
                             <button
                                 onClick={fetchOrders}
                                 disabled={loading}
@@ -686,9 +802,14 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                         {/* Items Table */}
                         <div className="bg-[#151821] border border-gray-800 rounded-xl p-5 space-y-3">
                             <div className="flex items-center justify-between">
-                                <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                                    2. 발주 품목 및 수량 대장 (총 {editItems.length}개 품목)
-                                </h4>
+                                <div>
+                                    <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                                        <span>2. 발주 품목 및 수량 대장 (총 {editItems.length}개 품목)</span>
+                                        <span className="text-[10px] text-amber-300 font-normal bg-amber-950/40 border border-amber-800/40 px-2 py-0.5 rounded">
+                                            ℹ️ 봇 임의 가격 계산 금지 ➔ 웹 주문관리(db.orders)에서 품목코드로 자동 가격 작성
+                                        </span>
+                                    </h4>
+                                </div>
                                 <button
                                     onClick={handleAddItem}
                                     className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40"
@@ -702,12 +823,12 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                     <thead className="bg-[#1b1e27] text-gray-400 font-semibold">
                                         <tr>
                                             <th className="p-2.5">품명</th>
-                                            <th className="p-2.5">규격(Size)</th>
                                             <th className="p-2.5">두께(Sch)</th>
+                                            <th className="p-2.5">규격(Size)</th>
                                             <th className="p-2.5">재질</th>
                                             <th className="p-2.5 text-right">수량</th>
-                                            <th className="p-2.5 text-right">단가(원)</th>
-                                            <th className="p-2.5 text-right">금액(원)</th>
+                                            <th className="p-2.5 text-center">품목코드 (웹 주문관리 연동)</th>
+                                            <th className="p-2.5 text-center">가격 산출</th>
                                             <th className="p-2.5 text-center">삭제</th>
                                         </tr>
                                     </thead>
@@ -719,69 +840,75 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                                 </td>
                                             </tr>
                                         ) : (
-                                            editItems.map((item, idx) => (
-                                                <tr key={idx} className="hover:bg-gray-800/30">
-                                                    <td className="p-2">
-                                                        <input
-                                                            type="text"
-                                                            value={item.name || ''}
-                                                            onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
-                                                            className="w-24 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <input
-                                                            type="text"
-                                                            value={item.size || ''}
-                                                            onChange={(e) => handleItemChange(idx, 'size', e.target.value)}
-                                                            className="w-20 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <input
-                                                            type="text"
-                                                            value={item.thickness || ''}
-                                                            onChange={(e) => handleItemChange(idx, 'thickness', e.target.value)}
-                                                            className="w-20 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <input
-                                                            type="text"
-                                                            value={item.material || ''}
-                                                            onChange={(e) => handleItemChange(idx, 'material', e.target.value)}
-                                                            className="w-24 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2 text-right">
-                                                        <input
-                                                            type="number"
-                                                            value={item.quantity || 1}
-                                                            onChange={(e) => handleItemChange(idx, 'quantity', parseInt(e.target.value, 10) || 1)}
-                                                            className="w-16 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-right text-white"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2 text-right">
-                                                        <input
-                                                            type="number"
-                                                            value={item.unitPrice || 0}
-                                                            onChange={(e) => handleItemChange(idx, 'unitPrice', parseInt(e.target.value, 10) || 0)}
-                                                            className="w-24 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-right text-white"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2 text-right font-mono font-semibold text-emerald-400">
-                                                        {(item.amount || ((item.unitPrice || 0) * (item.quantity || 1))).toLocaleString()}원
-                                                    </td>
-                                                    <td className="p-2 text-center">
-                                                        <button
-                                                            onClick={() => handleRemoveItem(idx)}
-                                                            className="p-1 hover:bg-rose-900/40 rounded text-rose-400"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))
+                                            editItems.map((item, idx) => {
+                                                const itemCode = `${item.name || ''}-${item.thickness || ''}-${item.size || ''}-${item.material || ''}`;
+                                                return (
+                                                    <tr key={idx} className="hover:bg-gray-800/30">
+                                                        <td className="p-2">
+                                                            <input
+                                                                type="text"
+                                                                value={item.name || ''}
+                                                                onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
+                                                                className="w-24 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white font-bold"
+                                                                placeholder="예: CAP, 90E(L)"
+                                                            />
+                                                        </td>
+                                                        <td className="p-2">
+                                                            <input
+                                                                type="text"
+                                                                value={item.thickness || ''}
+                                                                onChange={(e) => handleItemChange(idx, 'thickness', e.target.value)}
+                                                                className="w-20 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white font-mono"
+                                                                placeholder="예: S40S"
+                                                            />
+                                                        </td>
+                                                        <td className="p-2">
+                                                            <input
+                                                                type="text"
+                                                                value={item.size || ''}
+                                                                onChange={(e) => handleItemChange(idx, 'size', e.target.value)}
+                                                                className="w-24 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white font-mono"
+                                                                placeholder={'예: 1-1/2", 4"'}
+                                                            />
+                                                        </td>
+                                                        <td className="p-2">
+                                                            <input
+                                                                type="text"
+                                                                value={item.material || ''}
+                                                                onChange={(e) => handleItemChange(idx, 'material', e.target.value)}
+                                                                className="w-28 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white font-mono"
+                                                                placeholder="예: WP304-S"
+                                                            />
+                                                        </td>
+                                                        <td className="p-2 text-right">
+                                                            <input
+                                                                type="number"
+                                                                value={item.quantity || 1}
+                                                                onChange={(e) => handleItemChange(idx, 'quantity', parseInt(e.target.value, 10) || 1)}
+                                                                className="w-16 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-right text-emerald-400 font-bold"
+                                                            />
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            <span className="font-mono text-[11px] text-cyan-300 bg-cyan-950/40 border border-cyan-800/40 px-2 py-1 rounded">
+                                                                {itemCode}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            <span className="text-[10px] text-gray-400 bg-gray-800/80 px-2 py-1 rounded">
+                                                                웹 주문관리 자동산정
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            <button
+                                                                onClick={() => handleRemoveItem(idx)}
+                                                                className="p-1 hover:bg-rose-900/40 rounded text-rose-400"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
                                         )}
                                     </tbody>
                                 </table>
@@ -822,16 +949,16 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
 
                         <div className="flex items-center gap-4">
                             <div className="text-right">
-                                <div className="text-[11px] text-gray-400">발주 합계 금액</div>
-                                <div className="text-base font-bold text-emerald-400 font-mono">
-                                    ₩{currentTotal.toLocaleString()}원 (VAT별도)
+                                <div className="text-[11px] text-gray-400">품목 {editItems.length}개 | 합계금액</div>
+                                <div className="text-xs font-bold text-cyan-300 font-mono">
+                                    {currentTotal > 0 ? `₩${currentTotal.toLocaleString('ko-KR')}` : `총 ${editItems.length}개 품목 완비`}
                                 </div>
                             </div>
 
                             {activeOrder.status === 'APPROVED' ? (
                                 <div className="px-4 py-2.5 rounded-xl bg-cyan-950/60 border border-cyan-700 text-cyan-300 text-xs font-bold flex items-center gap-2">
                                     <Check className="w-4 h-4 text-cyan-400" />
-                                    정식 발주 승인 완료 ({activeOrder.convertedOrderId})
+                                    정식 순차 발주번호: {activeOrder.orderNo || activeOrder.convertedOrderId}
                                 </div>
                             ) : (
                                 <button
@@ -839,13 +966,13 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                     disabled={saving || !canApprove}
                                     className={`flex items-center gap-2 px-6 py-2.5 text-xs font-bold rounded-xl shadow-lg transition-all transform active:scale-95 ${
                                         canApprove
-                                            ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-black shadow-emerald-500/20 cursor-pointer'
+                                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-emerald-500/20 cursor-pointer'
                                             : 'bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed opacity-60'
                                     }`}
-                                    title={!canApprove ? '도착지 정보와 운송비 조건이 필수 입력되어야 합니다.' : '정식 db.orders에 등록'}
+                                    title={!canApprove ? '도착지 정보와 운송비 조건이 필수 입력되어야 합니다.' : '정식 순차 발주번호 부여 후 구매부로 이첩'}
                                 >
                                     <Check className="w-4 h-4" />
-                                    {saving ? '승인 처리 중...' : '🚀 [정식 발주서 등록 승인 (db.orders)]'}
+                                    {saving ? '발주번호 채번 및 이첩 중...' : '🚀 [정식 발주 승인 및 순차 발주번호 발급 ➔ 구매부 이첩]'}
                                 </button>
                             )}
                         </div>
@@ -868,6 +995,157 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                         alt="Zoomed Attachment"
                         className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl"
                     />
+                </div>
+            )}
+
+            {/* 🧠 SLE-15 발주서 수정관찰 누적 학습 리포트 모달 */}
+            {showCorrectionModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+                    onClick={() => setShowCorrectionModal(false)}
+                >
+                    <div
+                        className="bg-[#12151f] border border-indigo-500/40 rounded-2xl w-full max-w-4xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="p-5 border-b border-gray-800 bg-gradient-to-r from-indigo-950/60 via-gray-900 to-indigo-950/40 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-400">
+                                    <BookOpen className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                        <span>발주서 수정관찰봇(SLE-15) 누적 학습 리포트</span>
+                                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-normal">
+                                            Self-Learning Active
+                                        </span>
+                                    </h3>
+                                    <p className="text-xs text-gray-400 mt-0.5">
+                                        관리자의 발주서 수기 보정 패턴을 실시간 학습하여 AI 비전/발주 추출 규칙에 반영합니다.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowCorrectionModal(false)}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Metrics Bar */}
+                        <div className="grid grid-cols-4 gap-3 p-4 bg-gray-900/60 border-b border-gray-800/80 text-xs">
+                            <div className="p-3 rounded-xl bg-gray-850/80 border border-gray-800">
+                                <div className="text-gray-400 text-[11px] mb-1">총 관찰 누적</div>
+                                <div className="text-lg font-bold text-white font-mono">
+                                    {correctionReport?.totalCorrections ?? 0} <span className="text-xs font-normal text-gray-400">건</span>
+                                </div>
+                            </div>
+                            <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/30">
+                                <div className="text-indigo-300 text-[11px] mb-1">재질(Material) 보정</div>
+                                <div className="text-lg font-bold text-indigo-400 font-mono">
+                                    {correctionReport?.materialCorrectionsCount ?? 0} <span className="text-xs font-normal text-gray-400">건</span>
+                                </div>
+                            </div>
+                            <div className="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/30">
+                                <div className="text-cyan-300 text-[11px] mb-1">두께(Thickness) 보정</div>
+                                <div className="text-lg font-bold text-cyan-400 font-mono">
+                                    {correctionReport?.thicknessCorrectionsCount ?? 0} <span className="text-xs font-normal text-gray-400">건</span>
+                                </div>
+                            </div>
+                            <div className="p-3 rounded-xl bg-teal-950/30 border border-teal-500/30">
+                                <div className="text-teal-300 text-[11px] mb-1">규격(Size) 보정</div>
+                                <div className="text-lg font-bold text-teal-400 font-mono">
+                                    {correctionReport?.sizeCorrectionsCount ?? 0} <span className="text-xs font-normal text-gray-400">건</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Recent Corrections List */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                            <div className="text-xs font-bold text-gray-300 flex items-center justify-between">
+                                <span>최근 감지 및 학습 이력 (최근 {correctionReport?.recentCorrections?.length || 0}건)</span>
+                                <span className="text-[11px] text-gray-500 font-mono">server/data/order_corrections.json</span>
+                            </div>
+
+                            {(!correctionReport?.recentCorrections || correctionReport.recentCorrections.length === 0) ? (
+                                <div className="p-8 text-center rounded-xl bg-gray-900/40 border border-gray-800 text-gray-400 text-xs">
+                                    <AlertCircle className="w-8 h-8 text-gray-500 mx-auto mb-2 opacity-50" />
+                                    아직 기록된 수정 학습 내역이 없습니다.
+                                    <p className="text-[11px] text-gray-500 mt-1">
+                                        카톡 발주서 검토 화면에서 품목 또는 도착지/운송 조건을 수정하여 저장하시면 자동으로 감지되어 누적 학습됩니다.
+                                    </p>
+                                </div>
+                            ) : (
+                                correctionReport.recentCorrections.map((rec) => (
+                                    <div key={rec.id} className="p-3.5 rounded-xl bg-gray-900/80 border border-gray-800 space-y-2.5">
+                                        <div className="flex items-center justify-between text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-indigo-300">{rec.customerName || '고객사'}</span>
+                                                <span className="text-[10px] text-gray-400 font-mono">#{rec.orderNo || rec.orderId}</span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">
+                                                    {rec.channelTag || '카카오톡'}
+                                                </span>
+                                            </div>
+                                            <span className="text-[10px] text-gray-400">
+                                                {new Date(rec.timestamp).toLocaleString('ko-KR')}
+                                            </span>
+                                        </div>
+
+                                        {/* Item Changes */}
+                                        {rec.itemChanges && rec.itemChanges.length > 0 && (
+                                            <div className="space-y-1.5 pl-2 border-l-2 border-indigo-500/40">
+                                                {rec.itemChanges.map((ic, idx) => (
+                                                    <div key={idx} className="text-xs space-y-1">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="font-semibold text-gray-300">{ic.itemName || `품목 #${ic.itemIndex + 1}`}</span>
+                                                            {ic.fieldDiffs?.map((fd, fIdx) => (
+                                                                <span key={fIdx} className="px-2 py-0.5 rounded bg-gray-800 text-[11px] font-mono text-gray-200">
+                                                                    <span className="text-gray-400">{fd.field}: </span>
+                                                                    <span className="text-rose-400 line-through mr-1">{String(fd.from)}</span>
+                                                                    <span className="text-emerald-400 font-bold">➔ {String(fd.to)}</span>
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                        {ic.ruleInferred && (
+                                                            <div className="text-[11px] text-indigo-300/90 bg-indigo-950/40 px-2 py-0.5 rounded inline-block">
+                                                                💡 추론 규칙: {ic.ruleInferred}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Condition Changes */}
+                                        {rec.conditionChanges && rec.conditionChanges.length > 0 && (
+                                            <div className="flex items-center gap-2 flex-wrap text-xs pl-2 border-l-2 border-amber-500/40">
+                                                <span className="text-[11px] text-amber-400 font-medium">조건 보정:</span>
+                                                {rec.conditionChanges.map((cc, cIdx) => (
+                                                    <span key={cIdx} className="px-2 py-0.5 rounded bg-gray-800 text-[11px] font-mono text-gray-200">
+                                                        <span className="text-gray-400">{cc.field}: </span>
+                                                        <span className="text-rose-400 line-through mr-1">{String(cc.from)}</span>
+                                                        <span className="text-emerald-400 font-bold">➔ {String(cc.to)}</span>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-3.5 border-t border-gray-800 bg-gray-900/60 flex justify-end">
+                            <button
+                                onClick={() => setShowCorrectionModal(false)}
+                                className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-semibold transition-colors"
+                            >
+                                닫기
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
