@@ -34,16 +34,19 @@ const INTAKES_FILE = path.join(DATA_DIR, 'kakao_intakes.json');
 const AGENTS_FILE = path.join(DATA_DIR, 'agents.json');
 const DRAFT_QUOTES_FILE = path.join(DATA_DIR, 'kakao_draft_quotations.json');
 const USERS_FILE = path.join(DATA_DIR, 'kakao_users.json');
+const KAKAO_ORDERS_FILE = path.join(DATA_DIR, 'kakao_orders.json');
 
 export class KakaoBotService {
     constructor() {
         this.intakes = [];
         this.draftQuotations = [];
+        this.orders = [];
         this.users = [];
         this.stats = {
             totalReceived: 0,
             textQuotes: 0,
             imageQuotes: 0,
+            totalOrders: 0,
             lastReceivedAt: null
         };
         // 🔥 중복 수신 및 무한 루프 격발 차단용 캐시 (60초 TTL)
@@ -97,6 +100,14 @@ export class KakaoBotService {
             } else {
                 this.users = [];
                 fs.writeFileSync(USERS_FILE, JSON.stringify([], null, 2), 'utf8');
+            }
+
+            if (fs.existsSync(KAKAO_ORDERS_FILE)) {
+                this.orders = JSON.parse(fs.readFileSync(KAKAO_ORDERS_FILE, 'utf8'));
+                this.stats.totalOrders = this.orders.length;
+            } else {
+                this.orders = [];
+                fs.writeFileSync(KAKAO_ORDERS_FILE, JSON.stringify([], null, 2), 'utf8');
             }
 
             // 🔥 [고도화] 기존 텍스트 인입 건 최신 피팅 정규화 엔진(다중 카테고리/수량)으로 자동 재스캔
@@ -165,6 +176,7 @@ export class KakaoBotService {
             safeAtomicWrite(INTAKES_FILE, this.intakes.slice(0, 500));
             safeAtomicWrite(DRAFT_QUOTES_FILE, this.draftQuotations.slice(0, 500));
             safeAtomicWrite(USERS_FILE, this.users);
+            safeAtomicWrite(KAKAO_ORDERS_FILE, this.orders.slice(0, 500));
         } catch (e) {
             console.error('[KakaoBotService] 데이터 저장 실패:', e.message);
         }
@@ -238,15 +250,33 @@ export class KakaoBotService {
 
         // 3. 사용자가 "확인", "견적", "결과", "얼마", "접수 현황" 등의 조회 메시지를 보낸 경우
         const isStatusQuery = !isImage && (
-            /^(확인|접수\s*현황|견적\s*확인|진행\s*상황|현황|조회|내역|견적|결과|얼마|답변|회신|언제|상황)$/i.test(utterance) ||
+            /^(확인|접수\s*현황|견적\s*확인|진행\s*상황|현황|조회|내역|결과|답변|회신|언제|상황)$/i.test(utterance) ||
             utterance.includes('접수 현황') ||
             utterance.includes('접수 결과') ||
-            utterance.includes('견적 확인') ||
-            utterance.includes('견적서') ||
-            utterance.includes('어떻게') ||
-            utterance.includes('나왔') ||
-            utterance.includes('얼마')
+            utterance.includes('진행 상황')
         );
+
+        // 3-1. 👑 [EXE-02 카카오톡 인바운드 분배봇: 발주(PO) vs 견적(Quote) 자동 분류]
+        const isOrderIntent = (
+            /^(발주|발주서|주문|주문서|발주합니다|출고\s*요청|납품\s*요청|진행\s*해주세요|발주\s*진행)$/i.test(utterance) ||
+            utterance.includes('발주서') ||
+            utterance.includes('발주합니다') ||
+            utterance.includes('발주 진행') ||
+            utterance.includes('출고 요청') ||
+            utterance.includes('주문합니다')
+        );
+
+        if (isOrderIntent) {
+            return await this.handleOrderSkillRequest({
+                utterance,
+                botUserKey,
+                matchedUser,
+                isImage,
+                finalImageUrl,
+                cleanImageUrl,
+                receivedAt
+            });
+        }
 
         // 🔥 [중복 요청 차단 (Deduplication)]: 카카오 오픈빌더 재시도 및 연타로 인한 무한루프 백엔드 격발 방지
         this.cleanupRecentRequests();
@@ -1047,6 +1077,175 @@ export class KakaoBotService {
     }
 
     /**
+     * 🛒 카카오톡 발주서(PO) 인바운드 접수 및 구매부(PUR-01/07) 연계 파이프라인 (EXE-02 전담)
+     */
+    async handleOrderSkillRequest({ utterance, botUserKey, matchedUser, isImage, finalImageUrl, cleanImageUrl, receivedAt }) {
+        console.log(`[KakaoBot] 🛒 [EXE-02] 카카오톡 발주서 인입 감지: "${utterance}" (User: ${matchedUser?.company || botUserKey})`);
+
+        // 1. 해당 고객의 최근 견적서 확인 (견적 기반 발주 전환인지 검사)
+        const recentQuote = this.draftQuotations.find(dq => 
+            !dq.isDeleted && (
+                dq.botUserKey === botUserKey || 
+                dq.kakaoBotUserKey === botUserKey || 
+                (matchedUser && dq.customerInfo?.phone && dq.customerInfo?.phone === matchedUser.phone)
+            )
+        );
+
+        const customerName = matchedUser?.company || recentQuote?.customerInfo?.company || matchedUser?.name || '카카오톡 고객사';
+        const phone = matchedUser?.phone || recentQuote?.customerInfo?.phone || '';
+        const orderNo = `PO-KKO-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        let orderItems = [];
+        let totalAmount = 0;
+
+        // A. 최근 견적서 기반 발주 진행 요청인 경우
+        if (recentQuote && recentQuote.items && recentQuote.items.length > 0) {
+            orderItems = recentQuote.items.map(it => ({
+                name: it.name || it.type || '배관 피팅',
+                spec: [it.thickness, it.material, it.size].filter(Boolean).join(' ') || it.spec || '대경 규격품',
+                quantity: it.quantity || it.qty || 1,
+                unitPrice: it.unitPrice || it.userUnitPrice || 0,
+                amount: it.amount || ((it.quantity || 1) * (it.unitPrice || 0))
+            }));
+            totalAmount = recentQuote.totalAmount || orderItems.reduce((sum, it) => sum + it.amount, 0);
+        } else if (!isImage) {
+            // B. 신규 텍스트 발주서 품목 추출
+            const normalized = fittingNormalizerService.normalize(utterance);
+            if (normalized.items && normalized.items.length > 0) {
+                orderItems = normalized.items.map(it => ({
+                    name: it.type || '배관 피팅',
+                    spec: [it.schedule, it.material, it.size].filter(Boolean).join(' ') || '대경 규격품',
+                    quantity: it.qty || 1,
+                    unitPrice: it.basePrice || 0,
+                    amount: (it.basePrice || 0) * (it.qty || 1)
+                }));
+                totalAmount = orderItems.reduce((sum, it) => sum + it.amount, 0);
+            }
+        }
+
+        const orderRecord = {
+            id: `ORD-KKO-${Date.now()}`,
+            orderNo,
+            type: isImage ? 'image' : 'text',
+            botUserKey,
+            customerName,
+            phone,
+            status: 'RECEIVED',
+            receivedAt,
+            channel: '카카오톡 채널 (@altf)',
+            assignedDept: 'purchase',
+            assignedAgents: ['EXE-02', 'PUR-01', 'PUR-07'],
+            utterance,
+            imageUrl: finalImageUrl || null,
+            items: orderItems,
+            itemCount: orderItems.length,
+            totalAmount,
+            relatedQuotationId: recentQuote?.id || null
+        };
+
+        this.orders.unshift(orderRecord);
+        this.stats.totalOrders = this.orders.length;
+        this.saveData();
+
+        // 전사 에이전트(EXE-02, PUR-01, PUR-07) 상태 및 로그 실시간 업데이트
+        this.dispatchOrderToAgents(orderRecord);
+
+        // 카카오톡 회신 메시지 템플릿
+        if (recentQuote) {
+            return {
+                version: '2.0',
+                template: {
+                    outputs: [
+                        {
+                            simpleText: {
+                                text: `🎉 [알트에프(AltF) 카카오 발주 접수 완료]\n${customerName} 귀하, 견적서(${recentQuote.id}) 기반 발주가 정상 접수되었습니다!\n━━━━━━━━━━━━━━━━━━━━\n• 접수발주번호: ${orderNo}\n• 의뢰품목: 총 ${orderItems.length}개 품목\n• 발주금액: ₩${totalAmount.toLocaleString()}원 (VAT별도)\n• 처리부서: 구매/주문관제팀 (PUR-01 / PUR-07)\n━━━━━━━━━━━━━━━━━━━━\n📦 시화 창고 출고 지시 및 납기 일정을 확정하여 즉시 안내드리겠습니다.\n📞 직통문의: 051-303-3751 (알트에프)`
+                            }
+                        }
+                    ],
+                    quickReplies: [
+                        { messageText: '진행상황 확인', action: 'message', label: '📊 주문 진행상황 확인' },
+                        { label: '📞 구매/출고팀 전화', action: 'phone', phoneNumber: '0513033751' }
+                    ]
+                }
+            };
+        }
+
+        return {
+            version: '2.0',
+            template: {
+                outputs: [
+                    {
+                        simpleText: {
+                            text: `📋 [알트에프(AltF) 카카오 발주서 접수 센터]\n고객님의 발주서(주문)가 정상 접수되었습니다!\n━━━━━━━━━━━━━━━━━━━━\n• 접수발주번호: ${orderNo}\n• 발주처: ${customerName} 귀하\n• 접수품목: ${orderItems.length > 0 ? `${orderItems.length}개 품목` : '발주서 사진/문서 분석 중'}\n• 담당부서: 구매/주문관제팀 (PUR-01 / PUR-07)\n━━━━━━━━━━━━━━━━━━━━\n⚡ 전사 실시간 재고 대조 및 출고 납기 일정을 확정하여 신속히 회신드리겠습니다.\n📞 직통문의: 051-303-3751 (알트에프)`
+                        }
+                    }
+                ],
+                quickReplies: [
+                    { messageText: '진행상황 확인', action: 'message', label: '📊 주문 진행상황 확인' },
+                    { label: '📞 구매/출고팀 전화', action: 'phone', phoneNumber: '0513033751' }
+                ]
+            }
+        };
+    }
+
+    /**
+     * 🛒 카카오 발주서 인입 시 구매부 에이전트(PUR-01, PUR-07, EXE-02) 상태 및 로그 업데이트
+     */
+    async dispatchOrderToAgents(orderRecord) {
+        try {
+            if (!fs.existsSync(AGENTS_FILE)) return;
+            const agents = JSON.parse(fs.readFileSync(AGENTS_FILE, 'utf8'));
+            const timeStr = new Date().toLocaleTimeString('ko-KR');
+
+            // 1. EXE-02 (카카오톡 인바운드 분배봇)
+            const exe02 = agents.find(a => a.code === 'EXE-02' || a.id === 'exe-02-kakao-classifier');
+            if (exe02) {
+                exe02.lastActive = '방금 전';
+                exe02.currentTask = `카카오 발주서 인입 감지 -> 구매부 이첩 (${orderRecord.orderNo})`;
+                if (!Array.isArray(exe02.logs)) exe02.logs = [];
+                exe02.logs.unshift(`[${timeStr}] 🟡 [EXE-02] 카카오 발주서 인입 [${orderRecord.orderNo}] -> 구매부(PUR-01/07) 주문 대장 이첩`);
+                exe02.logs = exe02.logs.slice(0, 10);
+                if (exe02.metrics) exe02.metrics.tasksToday = (exe02.metrics.tasksToday || 0) + 1;
+            }
+
+            // 2. PUR-07 (발주 분류 및 미결 통합 관제봇)
+            const pur07 = agents.find(a => a.code === 'PUR-07' || a.id === 'pur-07-order-router');
+            if (pur07) {
+                pur07.lastActive = '방금 전';
+                pur07.currentTask = `카카오 신규 발주서 접수 검토: ${orderRecord.orderNo}`;
+                if (!Array.isArray(pur07.logs)) pur07.logs = [];
+                pur07.logs.unshift(`[${timeStr}] 🛒 [PUR-07] 카카오 신규 발주서 접수 (${orderRecord.customerName}) -> 재고/생산 미결 검토 개시`);
+                pur07.logs = pur07.logs.slice(0, 10);
+                if (pur07.metrics) pur07.metrics.tasksToday = (pur07.metrics.tasksToday || 0) + 1;
+            }
+
+            // 3. PUR-01 (알트에프 재고 발주 동기화봇)
+            const pur01 = agents.find(a => a.code === 'PUR-01' || a.id === 'pur-01-order-collector');
+            if (pur01) {
+                pur01.lastActive = '방금 전';
+                if (!Array.isArray(pur01.logs)) pur01.logs = [];
+                pur01.logs.unshift(`[${timeStr}] 📦 [PUR-01] 카카오 발주서 품목 재고 대조 시작 (${orderRecord.orderNo})`);
+                pur01.logs = pur01.logs.slice(0, 10);
+            }
+
+            fs.writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2), 'utf8');
+        } catch (e) {
+            console.error('[KakaoBot] dispatchOrderToAgents 에러:', e.message);
+        }
+    }
+
+    /**
+     * 카카오 발주서 목록 조회
+     */
+    getOrders({ limit = 50, offset = 0 } = {}) {
+        const sorted = [...this.orders].sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
+        return {
+            total: sorted.length,
+            orders: sorted.slice(offset, offset + limit)
+        };
+    }
+
+    /**
      * 영업2팀 및 영업1팀 에이전트 자동 디스패치 및 통계 업데이트
      */
     async dispatchToAgents(intake, draftQuote = null) {
@@ -1064,6 +1263,19 @@ export class KakaoBotService {
                     ag.status = targetStatus;
                 }
             };
+
+            // EXE-02 (카카오톡 인바운드 분배봇)
+            const exe02 = agents.find(a => a.code === 'EXE-02' || a.id === 'exe-02-kakao-classifier');
+            if (exe02) {
+                safeSetAgentStatus(exe02, 'ACTIVE');
+                exe02.lastActive = '방금 전';
+                exe02.currentTask = `카카오 견적 인입 분류 -> 영업부(SLE) 이첩 [${intake.id}]`;
+                if (!Array.isArray(exe02.logs)) exe02.logs = [];
+                exe02.logs.unshift(`[${new Date().toLocaleTimeString('ko-KR')}] 🟡 [EXE-02] 카카오 견적 의뢰 인입 -> 영업부(SLE-01/02) 견적 파이프라인 이첩 완료`);
+                exe02.logs = exe02.logs.slice(0, 10);
+                if (exe02.metrics) exe02.metrics.tasksToday = (exe02.metrics.tasksToday || 0) + 1;
+                changed = true;
+            }
 
             // INT-02 (메신저/카톡 견적 인입 봇)
             const int02 = agents.find(a => a.code === 'INT-02' || a.id === 'int-02-messenger-intake' || a.id === 'INT-02');

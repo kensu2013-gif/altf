@@ -194,9 +194,9 @@ export const DEPARTMENTS: Department[] = [
         color: '#E040FB', // Neon Magenta
         bgGlow: 'rgba(224, 64, 251, 0.15)',
         icon: '👑',
-        description: '고객/매입처 단일 발송 게이트 통제, 승인 대기열 관리, 전사 업무 병목 감시',
-        headRole: '발송 게이트 & 운영 관제',
-        totalUnits: 2
+        description: '메신저(텔레그램/카톡) 인바운드 분배, 견적·발주 자동 분류, 전사 발송 게이트 통제 및 AI 자율 관제',
+        headRole: '인바운드 분배 & 자율 운영 관제',
+        totalUnits: 5
     }
 ];
 
@@ -825,6 +825,78 @@ const RAW_INITIAL_AGENTS: AgentUnit[] = [
         orderIndex: 0
     },
     {
+        id: 'exe-01-telegram-dispatcher',
+        code: 'EXE-01',
+        name: '텔레그램 인바운드 분배봇',
+        deptId: 'executive',
+        deptName: '관제·게이트부',
+        teamName: '인바운드게이트팀',
+        tier: 2,
+        position: '대리',
+        role: '텔레그램 수신 파일(거래명세표, 재고장, 성적서, 현장지시) 1차 정합성 검증 및 총무부/구매부/데이터관리팀 자동 분배',
+        status: 'ACTIVE',
+        isCreated: true,
+        approvalStatus: 'AUTO_RUNNING',
+        assignedHuman: '총괄 운영자',
+        requiresApproval: false,
+        metrics: { speed: 99, accuracy: 100, load: 15, uptime: '100%', tasksToday: 12 },
+        currentTask: '텔레그램 인바운드 스트림 실시간 라우팅 대기 중',
+        lastActive: '방금 전',
+        triggerEvents: ['EVENT_TELEGRAM_INBOUND'],
+        emittedEvents: ['EVENT_STATEMENT_DISPATCHED', 'EVENT_STOCK_EXCEL_DISPATCHED', 'EVENT_CERT_DISPATCHED'],
+        logs: ['[정상] 텔레그램 메신저 전용 인바운드 라우터 가동'],
+        connectedDeptIds: ['executive', 'general', 'purchase', 'dat'],
+        orderIndex: 1
+    },
+    {
+        id: 'exe-02-kakao-classifier',
+        code: 'EXE-02',
+        name: '카카오톡 인바운드 분배봇',
+        deptId: 'executive',
+        deptName: '관제·게이트부',
+        teamName: '인바운드게이트팀',
+        tier: 2,
+        position: '대리',
+        role: '카카오톡 수신 메시지/이미지 1차 접수 및 AI 의도 분류(견적 의뢰 vs 발주서 접수) -> 영업부 vs 구매부 실무 봇으로 자동 분배',
+        status: 'ACTIVE',
+        isCreated: true,
+        approvalStatus: 'AUTO_RUNNING',
+        assignedHuman: '카카오 채널 관리자',
+        requiresApproval: false,
+        metrics: { speed: 99, accuracy: 100, load: 20, uptime: '100%', tasksToday: 15 },
+        currentTask: '카카오톡 인바운드 메시지 지능형 분류 및 라우팅 대기 중',
+        lastActive: '방금 전',
+        triggerEvents: ['EVENT_KAKAO_INBOUND'],
+        emittedEvents: ['EVENT_QUOTE_DISPATCHED', 'EVENT_ORDER_DISPATCHED'],
+        logs: ['[정상] 카카오톡 견적/발주 지능형 라우팅 가동'],
+        connectedDeptIds: ['executive', 'sle', 'purchase'],
+        orderIndex: 2
+    },
+    {
+        id: 'exe-ai-assistant',
+        code: 'EXE-AI',
+        name: '텔레그램 자율 관제 AI 비서',
+        deptId: 'executive',
+        deptName: '관제·게이트부',
+        teamName: '운영관제팀',
+        tier: 3,
+        position: '과장',
+        role: '대표님 텔레그램 자연어 질문 실시간 분석, 전사 대시보드(Make.com, 미결 9단계, 거래명세표, 성적서) 상태 파악 및 즉각 브리핑',
+        status: 'ACTIVE',
+        isCreated: true,
+        approvalStatus: 'AUTO_RUNNING',
+        assignedHuman: '대표이사 직속',
+        requiresApproval: false,
+        metrics: { speed: 98, accuracy: 100, load: 10, uptime: '100%', tasksToday: 6 },
+        currentTask: '대표님 텔레그램 관제 질의응답 실시간 대기 중',
+        lastActive: '방금 전',
+        triggerEvents: ['EVENT_EXECUTIVE_QUESTION'],
+        emittedEvents: ['EVENT_EXECUTIVE_BRIEFING'],
+        logs: ['[정상] 실시간 대시보드 Q&A 인텔리전스 엔진 활성화'],
+        connectedDeptIds: ['executive', 'dat', 'purchase', 'quality'],
+        orderIndex: 3
+    },
+    {
         id: 'exe-11-monitor',
         code: 'EXE-11',
         name: '전사 업무 흐름 감시봇',
@@ -846,7 +918,7 @@ const RAW_INITIAL_AGENTS: AgentUnit[] = [
         emittedEvents: ['EVENT_BOTTLENECK_REPORTED'],
         logs: ['[정상] 전사 파이프라인 감시 중'],
         connectedDeptIds: ['executive'],
-        orderIndex: 1
+        orderIndex: 4
     }
 ];
 

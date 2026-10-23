@@ -1,5 +1,895 @@
 [
   {
+    "id": "ARC-2026-10-23-No_0001",
+    "date": "2026-10-23",
+    "invoiceNo": "No:0001",
+    "poNumbers": [
+      "ES261023-2974",
+      "9106602018"
+    ],
+    "customerName": "알트에프(ALT.F)",
+    "pricing": {
+      "totalSupplyPrice": 726600,
+      "freightPrice": 0,
+      "subtotal": 726600,
+      "vat": 72660,
+      "grandTotal": 799260
+    },
+    "invoiceFile": {
+      "fileName": "No_0001_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "path": "storage/archive/2026-10-23/invoices/No_0001_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "sizeBytes": 705471
+    },
+    "certificates": [
+      {
+        "certNo": "YR-26-09915",
+        "heatNo": "SD62415",
+        "lotNo": "KJA0879",
+        "fileName": "261014_알트에프.261014-2869 (10-14-31).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261014_알트에프.261014-2869 (10-14-31).pdf"
+      },
+      {
+        "certNo": "YR-26-09915",
+        "heatNo": "SD62415",
+        "lotNo": "KJA0879",
+        "fileName": "261014_알트에프.261014-2869 (10-14-31).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261014_알트에프.261014-2869 (10-14-31).pdf"
+      }
+    ],
+    "itemsCount": 2,
+    "matchResult": {
+      "matchStatus": "ALL_MATCHED",
+      "totalItems": 2,
+      "matchedCount": 2,
+      "matchedCerts": [
+        {
+          "itemNo": 1,
+          "itemName": "45E(S)",
+          "spec": "STS 304-W S/20S ERW 250A",
+          "qty": 4,
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879",
+          "pdfUrl": "261014_알트에프.261014-2869 (10-14-31).pdf"
+        },
+        {
+          "itemNo": 2,
+          "itemName": "운임",
+          "spec": "대경 규격품",
+          "qty": 1,
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879",
+          "pdfUrl": "261014_알트에프.261014-2869 (10-14-31).pdf"
+        }
+      ],
+      "itemVerification": [
+        {
+          "itemNo": 1,
+          "name": "45E(S)",
+          "status": "MATCHED",
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879"
+        },
+        {
+          "itemNo": 2,
+          "name": "운임",
+          "status": "MATCHED",
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879"
+        }
+      ],
+      "isConfirmed": true,
+      "summaryMessage": "✅ [3각 대조 완결] 발주 품목 2개 중 2개 성적서 1:1 완벽 일치 확정"
+    },
+    "archivedAt": "2026-10-23T13:58:15.259Z"
+  },
+  {
+    "id": "ARC-2026-10-23-No_0002",
+    "date": "2026-10-23",
+    "invoiceNo": "No:0002",
+    "poNumbers": [
+      "ES261023-2980"
+    ],
+    "customerName": "알트에프(ALT.F)",
+    "pricing": {
+      "totalSupplyPrice": 708390,
+      "freightPrice": 0,
+      "subtotal": 708390,
+      "vat": 70839,
+      "grandTotal": 779229
+    },
+    "invoiceFile": {
+      "fileName": "No_0002_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "path": "storage/archive/2026-10-23/invoices/No_0002_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "sizeBytes": 705471
+    },
+    "certificates": [
+      {
+        "certNo": "YR-26-09915",
+        "heatNo": "SD62415",
+        "lotNo": "KJA0879",
+        "fileName": "261014_알트에프.261014-2869 (10-14-31).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261014_알트에프.261014-2869 (10-14-31).pdf"
+      }
+    ],
+    "itemsCount": 1,
+    "matchResult": {
+      "matchStatus": "ALL_MATCHED",
+      "totalItems": 1,
+      "matchedCount": 1,
+      "matchedCerts": [
+        {
+          "itemNo": 1,
+          "itemName": "R(C)",
+          "spec": "STS 304-W S/10S ERW 350A * 200A",
+          "qty": 3,
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879",
+          "pdfUrl": "261014_알트에프.261014-2869 (10-14-31).pdf"
+        }
+      ],
+      "itemVerification": [
+        {
+          "itemNo": 1,
+          "name": "R(C)",
+          "status": "MATCHED",
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879"
+        }
+      ],
+      "isConfirmed": true,
+      "summaryMessage": "✅ [3각 대조 완결] 발주 품목 1개 중 1개 성적서 1:1 완벽 일치 확정"
+    },
+    "archivedAt": "2026-10-23T13:58:13.890Z"
+  },
+  {
+    "id": "ARC-2026-10-23-No_0005",
+    "date": "2026-10-23",
+    "invoiceNo": "No:0005",
+    "poNumbers": [
+      "ES261022-2959",
+      "9106602018"
+    ],
+    "customerName": "알트에프(ALT.F)",
+    "pricing": {
+      "totalSupplyPrice": 799720,
+      "freightPrice": 0,
+      "subtotal": 799720,
+      "vat": 79972,
+      "grandTotal": 879692
+    },
+    "invoiceFile": {
+      "fileName": "No_0005_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "path": "storage/archive/2026-10-23/invoices/No_0005_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "sizeBytes": 705471
+    },
+    "certificates": [
+      {
+        "certNo": "YR-26-10144",
+        "heatNo": "SD67103",
+        "lotNo": "KJA1458",
+        "fileName": "261023_알트에프.261022-2959 (10-22-18).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261023_알트에프.261022-2959 (10-22-18).pdf"
+      },
+      {
+        "certNo": "YR-26-10144",
+        "heatNo": "SD67103",
+        "lotNo": "KJA1458",
+        "fileName": "261023_알트에프.261022-2959 (10-22-18).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261023_알트에프.261022-2959 (10-22-18).pdf"
+      }
+    ],
+    "itemsCount": 2,
+    "matchResult": {
+      "matchStatus": "ALL_MATCHED",
+      "totalItems": 2,
+      "matchedCount": 2,
+      "matchedCerts": [
+        {
+          "itemNo": 1,
+          "itemName": "90E(S)",
+          "spec": "WP 316L-W S/10S ERW 6",
+          "qty": 8,
+          "certNo": "YR-26-10144",
+          "heatNo": "SD67103",
+          "lotNo": "KJA1458",
+          "pdfUrl": "261023_알트에프.261022-2959 (10-22-18).pdf"
+        },
+        {
+          "itemNo": 2,
+          "itemName": "운임",
+          "spec": "대경 규격품",
+          "qty": 1,
+          "certNo": "YR-26-10144",
+          "heatNo": "SD67103",
+          "lotNo": "KJA1458",
+          "pdfUrl": "261023_알트에프.261022-2959 (10-22-18).pdf"
+        }
+      ],
+      "itemVerification": [
+        {
+          "itemNo": 1,
+          "name": "90E(S)",
+          "status": "MATCHED",
+          "certNo": "YR-26-10144",
+          "heatNo": "SD67103",
+          "lotNo": "KJA1458"
+        },
+        {
+          "itemNo": 2,
+          "name": "운임",
+          "status": "MATCHED",
+          "certNo": "YR-26-10144",
+          "heatNo": "SD67103",
+          "lotNo": "KJA1458"
+        }
+      ],
+      "isConfirmed": true,
+      "summaryMessage": "✅ [3각 대조 완결] 발주 품목 2개 중 2개 성적서 1:1 완벽 일치 확정"
+    },
+    "archivedAt": "2026-10-23T13:58:12.762Z"
+  },
+  {
+    "id": "ARC-2026-10-23-No_0008",
+    "date": "2026-10-23",
+    "invoiceNo": "No:0008",
+    "poNumbers": [
+      "ES261023-2975"
+    ],
+    "customerName": "알트에프(ALT.F)",
+    "pricing": {
+      "totalSupplyPrice": 245660,
+      "freightPrice": 0,
+      "subtotal": 245660,
+      "vat": 24566,
+      "grandTotal": 270226
+    },
+    "invoiceFile": {
+      "fileName": "No_0008_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "path": "storage/archive/2026-10-23/invoices/No_0008_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "sizeBytes": 705471
+    },
+    "certificates": [
+      {
+        "certNo": "YR-26-09915",
+        "heatNo": "SD62415",
+        "lotNo": "KJA0879",
+        "fileName": "261014_알트에프.261014-2869 (10-14-31).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261014_알트에프.261014-2869 (10-14-31).pdf"
+      },
+      {
+        "certNo": "YR-26-09915",
+        "heatNo": "SD62415",
+        "lotNo": "KJA0879",
+        "fileName": "261014_알트에프.261014-2869 (10-14-31).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261014_알트에프.261014-2869 (10-14-31).pdf"
+      },
+      {
+        "certNo": "YR-26-09915",
+        "heatNo": "SD62415",
+        "lotNo": "KJA0879",
+        "fileName": "261014_알트에프.261014-2869 (10-14-31).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261014_알트에프.261014-2869 (10-14-31).pdf"
+      }
+    ],
+    "itemsCount": 3,
+    "matchResult": {
+      "matchStatus": "ALL_MATCHED",
+      "totalItems": 3,
+      "matchedCount": 3,
+      "matchedCerts": [
+        {
+          "itemNo": 1,
+          "itemName": "TEE",
+          "spec": "WP 316L-W S/10S ERW 6",
+          "qty": 1,
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879",
+          "pdfUrl": "261014_알트에프.261014-2869 (10-14-31).pdf"
+        },
+        {
+          "itemNo": 2,
+          "itemName": "TEE",
+          "spec": "WP 316L-W S/10S ERW",
+          "qty": 1,
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879",
+          "pdfUrl": "261014_알트에프.261014-2869 (10-14-31).pdf"
+        },
+        {
+          "itemNo": 3,
+          "itemName": "운임",
+          "spec": "대경 규격품",
+          "qty": 1,
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879",
+          "pdfUrl": "261014_알트에프.261014-2869 (10-14-31).pdf"
+        }
+      ],
+      "itemVerification": [
+        {
+          "itemNo": 1,
+          "name": "TEE",
+          "status": "MATCHED",
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879"
+        },
+        {
+          "itemNo": 2,
+          "name": "TEE",
+          "status": "MATCHED",
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879"
+        },
+        {
+          "itemNo": 3,
+          "name": "운임",
+          "status": "MATCHED",
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879"
+        }
+      ],
+      "isConfirmed": true,
+      "summaryMessage": "✅ [3각 대조 완결] 발주 품목 3개 중 3개 성적서 1:1 완벽 일치 확정"
+    },
+    "archivedAt": "2026-10-23T13:58:11.522Z"
+  },
+  {
+    "id": "ARC-2026-10-23-No_0010",
+    "date": "2026-10-23",
+    "invoiceNo": "No:0010",
+    "poNumbers": [
+      "ES261023-2979"
+    ],
+    "customerName": "알트에프(ALT.F)",
+    "pricing": {
+      "totalSupplyPrice": 960080,
+      "freightPrice": 0,
+      "subtotal": 960080,
+      "vat": 96008,
+      "grandTotal": 1056088
+    },
+    "invoiceFile": {
+      "fileName": "No_0010_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "path": "storage/archive/2026-10-23/invoices/No_0010_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "sizeBytes": 705471
+    },
+    "certificates": [
+      {
+        "certNo": "YR-26-09906",
+        "heatNo": "SD78489",
+        "lotNo": "KJA1020",
+        "fileName": "261015_알트에프.261015-2888 (10-15-42).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261015_알트에프.261015-2888 (10-15-42).pdf"
+      },
+      {
+        "certNo": "YR-26-09915",
+        "heatNo": "SD62415",
+        "lotNo": "KJA0879",
+        "fileName": "261014_알트에프.261014-2869 (10-14-31).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261014_알트에프.261014-2869 (10-14-31).pdf"
+      }
+    ],
+    "itemsCount": 2,
+    "matchResult": {
+      "matchStatus": "ALL_MATCHED",
+      "totalItems": 2,
+      "matchedCount": 2,
+      "matchedCerts": [
+        {
+          "itemNo": 1,
+          "itemName": "90E(L)",
+          "spec": "STS 304-W S/10S ERW 200A",
+          "qty": 9,
+          "certNo": "YR-26-09906",
+          "heatNo": "SD78489",
+          "lotNo": "KJA1020",
+          "pdfUrl": "261015_알트에프.261015-2888 (10-15-42).pdf"
+        },
+        {
+          "itemNo": 2,
+          "itemName": "운임",
+          "spec": "대경 규격품",
+          "qty": 1,
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879",
+          "pdfUrl": "261014_알트에프.261014-2869 (10-14-31).pdf"
+        }
+      ],
+      "itemVerification": [
+        {
+          "itemNo": 1,
+          "name": "90E(L)",
+          "status": "MATCHED",
+          "certNo": "YR-26-09906",
+          "heatNo": "SD78489",
+          "lotNo": "KJA1020"
+        },
+        {
+          "itemNo": 2,
+          "name": "운임",
+          "status": "MATCHED",
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879"
+        }
+      ],
+      "isConfirmed": true,
+      "summaryMessage": "✅ [3각 대조 완결] 발주 품목 2개 중 2개 성적서 1:1 완벽 일치 확정"
+    },
+    "archivedAt": "2026-10-23T13:58:10.048Z"
+  },
+  {
+    "id": "ARC-2026-10-23-No_0014",
+    "date": "2026-10-23",
+    "invoiceNo": "No:0014",
+    "poNumbers": [
+      "ES261023-2981"
+    ],
+    "customerName": "알트에프(ALT.F)",
+    "pricing": {
+      "totalSupplyPrice": 186680,
+      "freightPrice": 0,
+      "subtotal": 186680,
+      "vat": 18668,
+      "grandTotal": 205348
+    },
+    "invoiceFile": {
+      "fileName": "No_0014_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "path": "storage/archive/2026-10-23/invoices/No_0014_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "sizeBytes": 705471
+    },
+    "certificates": [
+      {
+        "certNo": "YR-26-09915",
+        "heatNo": "SD62415",
+        "lotNo": "KJA0879",
+        "fileName": "261014_알트에프.261014-2869 (10-14-31).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261014_알트에프.261014-2869 (10-14-31).pdf"
+      },
+      {
+        "certNo": "YR-26-09915",
+        "heatNo": "SD62415",
+        "lotNo": "KJA0879",
+        "fileName": "261014_알트에프.261014-2869 (10-14-31).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261014_알트에프.261014-2869 (10-14-31).pdf"
+      }
+    ],
+    "itemsCount": 2,
+    "matchResult": {
+      "matchStatus": "ALL_MATCHED",
+      "totalItems": 2,
+      "matchedCount": 2,
+      "matchedCerts": [
+        {
+          "itemNo": 1,
+          "itemName": "R(C)",
+          "spec": "STS 304-W S/40S ERW 200A * 150A",
+          "qty": 2,
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879",
+          "pdfUrl": "261014_알트에프.261014-2869 (10-14-31).pdf"
+        },
+        {
+          "itemNo": 2,
+          "itemName": "운임",
+          "spec": "대경 규격품",
+          "qty": 1,
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879",
+          "pdfUrl": "261014_알트에프.261014-2869 (10-14-31).pdf"
+        }
+      ],
+      "itemVerification": [
+        {
+          "itemNo": 1,
+          "name": "R(C)",
+          "status": "MATCHED",
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879"
+        },
+        {
+          "itemNo": 2,
+          "name": "운임",
+          "status": "MATCHED",
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879"
+        }
+      ],
+      "isConfirmed": true,
+      "summaryMessage": "✅ [3각 대조 완결] 발주 품목 2개 중 2개 성적서 1:1 완벽 일치 확정"
+    },
+    "archivedAt": "2026-10-23T13:58:08.952Z"
+  },
+  {
+    "id": "ARC-2026-10-23-No_0015",
+    "date": "2026-10-23",
+    "invoiceNo": "No:0015",
+    "poNumbers": [
+      "ES261023-2978"
+    ],
+    "customerName": "알트에프(ALT.F)",
+    "pricing": {
+      "totalSupplyPrice": 423640,
+      "freightPrice": 0,
+      "subtotal": 423640,
+      "vat": 42364,
+      "grandTotal": 466004
+    },
+    "invoiceFile": {
+      "fileName": "No_0015_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "path": "storage/archive/2026-10-23/invoices/No_0015_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "sizeBytes": 705471
+    },
+    "certificates": [
+      {
+        "certNo": "YR-26-09916",
+        "heatNo": "SE28856",
+        "lotNo": "KDC0011",
+        "fileName": "261014_알트에프.261014-2869 (10-14-31).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261014_알트에프.261014-2869 (10-14-31).pdf"
+      },
+      {
+        "certNo": "YR-26-09915",
+        "heatNo": "SD62415",
+        "lotNo": "KJA0879",
+        "fileName": "261014_알트에프.261014-2869 (10-14-31).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261014_알트에프.261014-2869 (10-14-31).pdf"
+      }
+    ],
+    "itemsCount": 2,
+    "matchResult": {
+      "matchStatus": "ALL_MATCHED",
+      "totalItems": 2,
+      "matchedCount": 2,
+      "matchedCerts": [
+        {
+          "itemNo": 1,
+          "itemName": "90E(L)",
+          "spec": "STS 304-W S/10S ERW 90 A",
+          "qty": 12,
+          "certNo": "YR-26-09916",
+          "heatNo": "SE28856",
+          "lotNo": "KDC0011",
+          "pdfUrl": "261014_알트에프.261014-2869 (10-14-31).pdf"
+        },
+        {
+          "itemNo": 2,
+          "itemName": "운임",
+          "spec": "대경 규격품",
+          "qty": 1,
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879",
+          "pdfUrl": "261014_알트에프.261014-2869 (10-14-31).pdf"
+        }
+      ],
+      "itemVerification": [
+        {
+          "itemNo": 1,
+          "name": "90E(L)",
+          "status": "MATCHED",
+          "certNo": "YR-26-09916",
+          "heatNo": "SE28856",
+          "lotNo": "KDC0011"
+        },
+        {
+          "itemNo": 2,
+          "name": "운임",
+          "status": "MATCHED",
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879"
+        }
+      ],
+      "isConfirmed": true,
+      "summaryMessage": "✅ [3각 대조 완결] 발주 품목 2개 중 2개 성적서 1:1 완벽 일치 확정"
+    },
+    "archivedAt": "2026-10-23T13:58:07.793Z"
+  },
+  {
+    "id": "ARC-2026-10-23-No_0020",
+    "date": "2026-10-23",
+    "invoiceNo": "No:0020",
+    "poNumbers": [
+      "ES261023-2987"
+    ],
+    "customerName": "알트에프(ALT.F)",
+    "pricing": {
+      "totalSupplyPrice": 183340,
+      "freightPrice": 0,
+      "subtotal": 183340,
+      "vat": 18334,
+      "grandTotal": 201674
+    },
+    "invoiceFile": {
+      "fileName": "No_0020_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "path": "storage/archive/2026-10-23/invoices/No_0020_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "sizeBytes": 705471
+    },
+    "certificates": [],
+    "itemsCount": 1,
+    "matchResult": {
+      "matchStatus": "ALL_MATCHED",
+      "totalItems": 1,
+      "matchedCount": 1,
+      "matchedCerts": [
+        {
+          "itemNo": 1,
+          "itemName": "CAP",
+          "spec": "STS 304-S S/10S SML'S 250A",
+          "qty": 2,
+          "certNo": "ALTF-25-06246",
+          "heatNo": "SD71304",
+          "lotNo": "JCQ3744",
+          "pdfUrl": ""
+        }
+      ],
+      "itemVerification": [
+        {
+          "itemNo": 1,
+          "name": "CAP",
+          "status": "MATCHED",
+          "certNo": "ALTF-25-06246",
+          "heatNo": "SD71304",
+          "lotNo": "JCQ3744"
+        }
+      ],
+      "isConfirmed": true,
+      "summaryMessage": "✅ [3각 대조 완결] 발주 품목 1개 중 1개 성적서 1:1 완벽 일치 확정"
+    },
+    "archivedAt": "2026-10-23T13:58:05.833Z"
+  },
+  {
+    "id": "ARC-2026-10-23-No_0021",
+    "date": "2026-10-23",
+    "invoiceNo": "No:0021",
+    "poNumbers": [
+      "ES261023-2985"
+    ],
+    "customerName": "알트에프(ALT.F)",
+    "pricing": {
+      "totalSupplyPrice": 580110,
+      "freightPrice": 0,
+      "subtotal": 580110,
+      "vat": 58011,
+      "grandTotal": 638121
+    },
+    "invoiceFile": {
+      "fileName": "No_0021_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "path": "storage/archive/2026-10-23/invoices/No_0021_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "sizeBytes": 705471
+    },
+    "certificates": [
+      {
+        "certNo": "YR-26-10030",
+        "heatNo": "A0601123",
+        "lotNo": "KJA1217",
+        "fileName": "261019_알트에프.261019-2917 (10-19-41).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261019_알트에프.261019-2917 (10-19-41).pdf"
+      },
+      {
+        "certNo": "YR-26-09907",
+        "heatNo": "SE51743",
+        "lotNo": "KJA1022",
+        "fileName": "261015_알트에프.261015-2886 (10-15-43).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261015_알트에프.261015-2886 (10-15-43).pdf"
+      }
+    ],
+    "itemsCount": 4,
+    "matchResult": {
+      "matchStatus": "ALL_MATCHED",
+      "totalItems": 4,
+      "matchedCount": 4,
+      "matchedCerts": [
+        {
+          "itemNo": 1,
+          "itemName": "CAP",
+          "spec": "STS 304-S S/40S SML'S 200A",
+          "qty": 6,
+          "certNo": "ALTF-25-06454",
+          "heatNo": "SD59916",
+          "lotNo": "JCQ4160",
+          "pdfUrl": ""
+        },
+        {
+          "itemNo": 2,
+          "itemName": "90E(L)",
+          "spec": "STS 304-W S/40S ERW 20A",
+          "qty": 3,
+          "certNo": "YR-26-10030",
+          "heatNo": "A0601123",
+          "lotNo": "KJA1217",
+          "pdfUrl": "261019_알트에프.261019-2917 (10-19-41).pdf"
+        },
+        {
+          "itemNo": 3,
+          "itemName": "90E(L)",
+          "spec": "STS 304-W S/40S ERW 25A",
+          "qty": 3,
+          "certNo": "ALTF-26-06977",
+          "heatNo": "SE26122",
+          "lotNo": "KGA0522",
+          "pdfUrl": ""
+        },
+        {
+          "itemNo": 4,
+          "itemName": "90E(L)",
+          "spec": "STS 304-W S/40S ERW 40A",
+          "qty": 3,
+          "certNo": "YR-26-09907",
+          "heatNo": "SE51743",
+          "lotNo": "KJA1022",
+          "pdfUrl": "261015_알트에프.261015-2886 (10-15-43).pdf"
+        }
+      ],
+      "itemVerification": [
+        {
+          "itemNo": 1,
+          "name": "CAP",
+          "status": "MATCHED",
+          "certNo": "ALTF-25-06454",
+          "heatNo": "SD59916",
+          "lotNo": "JCQ4160"
+        },
+        {
+          "itemNo": 2,
+          "name": "90E(L)",
+          "status": "MATCHED",
+          "certNo": "YR-26-10030",
+          "heatNo": "A0601123",
+          "lotNo": "KJA1217"
+        },
+        {
+          "itemNo": 3,
+          "name": "90E(L)",
+          "status": "MATCHED",
+          "certNo": "ALTF-26-06977",
+          "heatNo": "SE26122",
+          "lotNo": "KGA0522"
+        },
+        {
+          "itemNo": 4,
+          "name": "90E(L)",
+          "status": "MATCHED",
+          "certNo": "YR-26-09907",
+          "heatNo": "SE51743",
+          "lotNo": "KJA1022"
+        }
+      ],
+      "isConfirmed": true,
+      "summaryMessage": "✅ [3각 대조 완결] 발주 품목 4개 중 4개 성적서 1:1 완벽 일치 확정"
+    },
+    "archivedAt": "2026-10-23T13:58:03.162Z"
+  },
+  {
+    "id": "ARC-2026-10-23-No_0022",
+    "date": "2026-10-23",
+    "invoiceNo": "No:0022",
+    "poNumbers": [
+      "ES261023-2984"
+    ],
+    "customerName": "알트에프(ALT.F)",
+    "pricing": {
+      "totalSupplyPrice": 54520,
+      "freightPrice": 0,
+      "subtotal": 54520,
+      "vat": 5452,
+      "grandTotal": 59972
+    },
+    "invoiceFile": {
+      "fileName": "No_0022_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "path": "storage/archive/2026-10-23/invoices/No_0022_TalkFile_알트에프_거래명세표_1023_pdf.pdf",
+      "sizeBytes": 705471
+    },
+    "certificates": [
+      {
+        "certNo": "YR-26-09907",
+        "heatNo": "SE51743",
+        "lotNo": "KJA1022",
+        "fileName": "261015_알트에프.261015-2886 (10-15-43).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261015_알트에프.261015-2886 (10-15-43).pdf"
+      },
+      {
+        "certNo": "YR-26-09907",
+        "heatNo": "SE51743",
+        "lotNo": "KJA1022",
+        "fileName": "261015_알트에프.261015-2886 (10-15-43).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261015_알트에프.261015-2886 (10-15-43).pdf"
+      },
+      {
+        "certNo": "YR-26-09915",
+        "heatNo": "SD62415",
+        "lotNo": "KJA0879",
+        "fileName": "261014_알트에프.261014-2869 (10-14-31).pdf",
+        "localPath": "storage/archive/2026-10-23/certificates/261014_알트에프.261014-2869 (10-14-31).pdf"
+      }
+    ],
+    "itemsCount": 3,
+    "matchResult": {
+      "matchStatus": "ALL_MATCHED",
+      "totalItems": 3,
+      "matchedCount": 3,
+      "matchedCerts": [
+        {
+          "itemNo": 1,
+          "itemName": "CAP",
+          "spec": "WP 304-S S/40S 1-1/2\"",
+          "qty": 2,
+          "certNo": "YR-26-09907",
+          "heatNo": "SE51743",
+          "lotNo": "KJA1022",
+          "pdfUrl": "261015_알트에프.261015-2886 (10-15-43).pdf"
+        },
+        {
+          "itemNo": 2,
+          "itemName": "CAP",
+          "spec": "WP 304-S S/40S 4",
+          "qty": 2,
+          "certNo": "YR-26-09907",
+          "heatNo": "SE51743",
+          "lotNo": "KJA1022",
+          "pdfUrl": "261015_알트에프.261015-2886 (10-15-43).pdf"
+        },
+        {
+          "itemNo": 3,
+          "itemName": "운임",
+          "spec": "대경 규격품",
+          "qty": 1,
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879",
+          "pdfUrl": "261014_알트에프.261014-2869 (10-14-31).pdf"
+        }
+      ],
+      "itemVerification": [
+        {
+          "itemNo": 1,
+          "name": "CAP",
+          "status": "MATCHED",
+          "certNo": "YR-26-09907",
+          "heatNo": "SE51743",
+          "lotNo": "KJA1022"
+        },
+        {
+          "itemNo": 2,
+          "name": "CAP",
+          "status": "MATCHED",
+          "certNo": "YR-26-09907",
+          "heatNo": "SE51743",
+          "lotNo": "KJA1022"
+        },
+        {
+          "itemNo": 3,
+          "name": "운임",
+          "status": "MATCHED",
+          "certNo": "YR-26-09915",
+          "heatNo": "SD62415",
+          "lotNo": "KJA0879"
+        }
+      ],
+      "isConfirmed": true,
+      "summaryMessage": "✅ [3각 대조 완결] 발주 품목 3개 중 3개 성적서 1:1 완벽 일치 확정"
+    },
+    "archivedAt": "2026-10-23T13:58:02.393Z"
+  },
+  {
     "id": "ARC-2026-10-19-No_0015",
     "date": "2026-10-19",
     "invoiceNo": "No:0015",

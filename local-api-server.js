@@ -2622,6 +2622,16 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // 3-0. GET /api/kakao/orders : 수신된 카카오톡 발주서(PO) 목록
+        if (req.method === 'GET' && url.pathname === '/api/kakao/orders') {
+            const urlParams = new URLSearchParams(url.search);
+            const limit = parseInt(urlParams.get('limit') || '50', 10);
+            const offset = parseInt(urlParams.get('offset') || '0', 10);
+            const data = kakaoBotService.getOrders({ limit, offset });
+            sendJsonResponse(req, res, 200, { success: true, ...data });
+            return;
+        }
+
         // 3-1. DELETE /api/kakao/intakes/:id : 카카오톡 인입 기록 삭제
         if (req.method === 'DELETE' && url.pathname.startsWith('/api/kakao/intakes/')) {
             const intakeId = url.pathname.split('/').pop();

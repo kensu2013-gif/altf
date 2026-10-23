@@ -9,7 +9,7 @@
   "targetUrl": "https://altf.kr/api/orders (재고 발주 API 감지)",
   "status": "STANDBY",
   "statusLabel": "대기 중 (STANDBY)",
-  "lastSyncTime": "2026-10-23T13:51:16.164Z",
+  "lastSyncTime": "2026-10-23T13:55:25.184Z",
   "nextSyncTime": "2026-10-24T01:00:00.000Z",
   "nextSyncLabel": "내일 오전 10:00",
   "lastSyncType": "SCHEDULED_TRIGGER",

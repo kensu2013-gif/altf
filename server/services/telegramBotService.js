@@ -413,6 +413,19 @@ ${(targetInv.items?.length || 0) > 10 ? `... 외 ${targetInv.items.length - 10}�
                     return;
                 }
             }
+
+            // 👑 [관제·게이트부 EXE-AI 자율 총괄 AI 비서 직통 응답]
+            // 대표님의 자연어 질문(Make.com 인증, 미결 현황, 성적서, 재고 등)을 전사 대시보드 실시간 데이터를 바탕으로 즉각 브리핑
+            try {
+                const { executiveAiService } = await import('./executiveAiService.js');
+                const aiAnswer = await executiveAiService.askExecutiveAI(txt);
+                await this.sendMessage(chatId, aiAnswer);
+                return;
+            } catch (aiErr) {
+                console.error('[TelegramBot] EXE-AI 질의응답 실패:', aiErr);
+                await this.sendMessage(chatId, `❌ [EXE-AI] 질의 응답 중 오류가 발생했습니다: ${aiErr.message}`);
+                return;
+            }
         }
 
         // 사진으로 보냈을 때 친절한 안내
@@ -424,7 +437,7 @@ ${(targetInv.items?.length || 0) > 10 ? `... 외 ${targetInv.items.length - 10}�
             return;
         }
 
-        // 2. 문서(PDF 또는 XLSX 엑셀) 수신 처리
+        // 2. 문서(PDF 또는 XLSX 엑셀) 수신 처리 (EXE-01 텔레그램 인바운드 분배봇 1차 검증)
         if (msg.document) {
             const doc = msg.document;
             const fileName = doc.file_name || '문서';
@@ -446,6 +459,9 @@ ${(targetInv.items?.length || 0) > 10 ? `... 외 ${targetInv.items.length - 10}�
             const isPendingExcel = fileName.includes('미결') || (fileName.includes('알트에프') && (fileName.includes('리스트') || fileName.includes('미결')));
             if (isPendingExcel && (fileName.endsWith('.xlsx') || fileName.endsWith('.xls'))) {
                 try {
+                    const { executiveAiService } = await import('./executiveAiService.js');
+                    executiveAiService.updateAgentLog('EXE-01', `[미결 엑셀 접수] 구매부 미결관리팀(PUR-01~04/DAT-07) 전달 완료: ${fileName}`);
+
                     const fileInfo = await this.makeRequest('getFile', { file_id: doc.file_id });
                     if (!fileInfo || !fileInfo.ok || !fileInfo.result.file_path) {
                         throw new Error('텔레그램 파일 경로 획득 실패');
@@ -464,6 +480,9 @@ ${(targetInv.items?.length || 0) > 10 ? `... 외 ${targetInv.items.length - 10}�
             // A-2. 대경재고장 엑셀 파일(.xlsx, .xls) 감지 시 전자동 4단계 파이프라인 가동 및 과장 결재 보고
             if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.includes('재고')) {
                 try {
+                    const { executiveAiService } = await import('./executiveAiService.js');
+                    executiveAiService.updateAgentLog('EXE-01', `[대경 재고장 접수] 데이터관리팀(DAT-04~06) S3 파이프라인 전달 완료: ${fileName}`);
+
                     const fileInfo = await this.makeRequest('getFile', { file_id: doc.file_id });
                     if (!fileInfo || !fileInfo.ok || !fileInfo.result.file_path) {
                         throw new Error('텔레그램 파일 경로 획득 실패');
@@ -480,6 +499,10 @@ ${(targetInv.items?.length || 0) > 10 ? `... 외 ${targetInv.items.length - 10}�
             }
 
             // B. 거래명세서 PDF 문서 감지
+            try {
+                const { executiveAiService } = await import('./executiveAiService.js');
+                executiveAiService.updateAgentLog('EXE-01', `[거래명세표 PDF 접수] 총무부(GEN-01) 및 구매부(PUR-07) 전달 완료: ${fileName}`);
+            } catch {}
             await this.sendMessage(chatId, `⏳ <b>[${fileName}]</b> 거래명세서 문서를 감지했습니다. 전사 에이전트 연계 파이프라인을 가동합니다...`);
 
             try {
