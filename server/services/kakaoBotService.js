@@ -1242,14 +1242,15 @@ export class KakaoBotService {
     }
 
     /**
-     * 인입 목록 페이징 조회
+     * 인입 목록 페이징 조회 (삭제된 인입 제외)
      */
     getIntakes({ limit = 50, offset = 0 } = {}) {
+        const activeIntakes = (this.intakes || []).filter(i => !i.isDeleted);
         return {
-            total: this.intakes.length,
+            total: activeIntakes.length,
             limit,
             offset,
-            items: this.intakes.slice(offset, offset + limit)
+            items: activeIntakes.slice(offset, offset + limit)
         };
     }
 
@@ -1259,71 +1260,77 @@ export class KakaoBotService {
      * - AI 봇이 추출한 품목/단가/수량/할인율 대장
      * - 실시간 카카오톡 완결형 텍스트 프리뷰
      * - 담당자 검토 및 승인 상태
+     * - 삭제된 인입건 및 삭제된 견적서는 큐에서 완전 제외
      */
     getReviewQueue() {
-        return this.intakes.map(intake => {
-            const quote = this.draftQuotations.find(q => q.id === intake.quotationId) || null;
-            const items = quote?.items && quote.items.length > 0 ? quote.items : (intake.parsedItems || []);
-            const totalAmount = quote?.totalAmount !== undefined 
-                ? quote.totalAmount 
-                : items.reduce((sum, it) => sum + (it.amount || ((it.quantity !== undefined ? it.quantity : (it.qty || 1)) * (it.unitPrice || it.basePrice || 0))), 0);
-            const vatAmount = Math.round(totalAmount * 0.1);
-            const grandTotal = totalAmount + vatAmount;
+        return (this.intakes || [])
+            .filter(intake => !intake.isDeleted)
+            .map(intake => {
+                const quote = this.draftQuotations.find(q => q.id === intake.quotationId) || null;
+                if (quote && quote.isDeleted) return null;
 
-            const normalizedItems = items.map((it, idx) => ({
-                id: it.id || `item-${intake.id}-${idx}`,
-                name: it.name || it.type || '피팅',
-                thickness: it.thickness || it.schedule || 'S10S',
-                size: it.size || '',
-                material: it.material || 'STS304-W',
-                quantity: it.quantity !== undefined ? it.quantity : (it.qty || 1),
-                basePrice: it.base_price !== undefined ? it.base_price : (it.basePrice || 0),
-                discountRate: it.discountRate !== undefined ? it.discountRate : (intake.discountRate || quote?.discountRate || 50),
-                unitPrice: it.unitPrice !== undefined ? it.unitPrice : (it.userUnitPrice || Math.round((it.base_price || it.basePrice || 0) * (1 - (it.discountRate || 50) / 100))),
-                amount: it.amount !== undefined ? it.amount : ((it.quantity !== undefined ? it.quantity : (it.qty || 1)) * (it.unitPrice || 0)),
-                currentStock: it.currentStock !== undefined ? it.currentStock : 999,
-                location: it.location || '양산',
-                stockStatus: it.stockStatus || 'AVAILABLE'
-            }));
+                const items = quote?.items && quote.items.length > 0 ? quote.items : (intake.parsedItems || []);
+                const totalAmount = quote?.totalAmount !== undefined 
+                    ? quote.totalAmount 
+                    : items.reduce((sum, it) => sum + (it.amount || ((it.quantity !== undefined ? it.quantity : (it.qty || 1)) * (it.unitPrice || it.basePrice || 0))), 0);
+                const vatAmount = Math.round(totalAmount * 0.1);
+                const grandTotal = totalAmount + vatAmount;
 
-            const formattedText = quote 
-                ? this.formatKakaoQuoteMessage(quote, quote.reviewStatus === 'APPROVED') 
-                : this.formatKakaoQuoteMessage({
-                    id: intake.quotationId || 'DRAFT',
-                    customerName: intake.customer?.name || intake.matchedUser?.name || '카카오톡 고객',
-                    totalAmount,
+                const normalizedItems = items.map((it, idx) => ({
+                    id: it.id || `item-${intake.id}-${idx}`,
+                    name: it.name || it.type || '피팅',
+                    thickness: it.thickness || it.schedule || 'S10S',
+                    size: it.size || '',
+                    material: it.material || 'STS304-W',
+                    quantity: it.quantity !== undefined ? it.quantity : (it.qty || 1),
+                    basePrice: it.base_price !== undefined ? it.base_price : (it.basePrice || 0),
+                    discountRate: it.discountRate !== undefined ? it.discountRate : (intake.discountRate || quote?.discountRate || 50),
+                    unitPrice: it.unitPrice !== undefined ? it.unitPrice : (it.userUnitPrice || Math.round((it.base_price || it.basePrice || 0) * (1 - (it.discountRate || 50) / 100))),
+                    amount: it.amount !== undefined ? it.amount : ((it.quantity !== undefined ? it.quantity : (it.qty || 1)) * (it.unitPrice || 0)),
+                    currentStock: it.currentStock !== undefined ? it.currentStock : 999,
+                    location: it.location || '양산',
+                    stockStatus: it.stockStatus || 'AVAILABLE'
+                }));
+
+                const formattedText = quote 
+                    ? this.formatKakaoQuoteMessage(quote, quote.reviewStatus === 'APPROVED') 
+                    : this.formatKakaoQuoteMessage({
+                        id: intake.quotationId || 'DRAFT',
+                        customerName: intake.customer?.name || intake.matchedUser?.name || '카카오톡 고객',
+                        totalAmount,
+                        items: normalizedItems,
+                        memo: intake.remarks || '시화/양산 당일 즉시 출고 준비'
+                    }, false);
+
+                return {
+                    intakeId: intake.id,
+                    quotationId: intake.quotationId || quote?.id || null,
+                    receivedAt: intake.receivedAt,
+                    type: intake.type,
+                    botUserKey: intake.botUserKey,
+                    matchedUser: intake.matchedUser,
+                    customer: {
+                        name: intake.customer?.name || quote?.customerName || intake.matchedUser?.name || '카카오톡 고객',
+                        phone: intake.customer?.phone || quote?.customerInfo?.phone || intake.matchedUser?.phone || '',
+                        company: intake.customer?.name || quote?.customerInfo?.companyName || intake.matchedUser?.company || ''
+                    },
+                    rawUtterance: intake.utterance || '',
+                    imageUrl: intake.imageUrl || null,
+                    status: quote?.status || intake.status || 'PENDING_REVIEW',
+                    reviewStatus: quote?.reviewStatus || (quote?.status === 'APPROVED' ? 'APPROVED' : 'PENDING_REVIEW'),
+                    reviewedBy: quote?.reviewedBy || intake.reviewedBy || null,
+                    reviewedAt: quote?.reviewedAt || intake.reviewedAt || null,
+                    discountRate: quote?.items?.[0]?.discountRate || intake.discountRate || 50,
+                    memo: quote?.memo || intake.remarks || '',
                     items: normalizedItems,
-                    memo: intake.remarks || '시화/양산 당일 즉시 출고 준비'
-                }, false);
-
-            return {
-                intakeId: intake.id,
-                quotationId: intake.quotationId || quote?.id || null,
-                receivedAt: intake.receivedAt,
-                type: intake.type,
-                botUserKey: intake.botUserKey,
-                matchedUser: intake.matchedUser,
-                customer: {
-                    name: intake.customer?.name || quote?.customerName || intake.matchedUser?.name || '카카오톡 고객',
-                    phone: intake.customer?.phone || quote?.customerInfo?.phone || intake.matchedUser?.phone || '',
-                    company: intake.customer?.name || quote?.customerInfo?.companyName || intake.matchedUser?.company || ''
-                },
-                rawUtterance: intake.utterance || '',
-                imageUrl: intake.imageUrl || null,
-                status: quote?.status || intake.status || 'PENDING_REVIEW',
-                reviewStatus: quote?.reviewStatus || (quote?.status === 'APPROVED' ? 'APPROVED' : 'PENDING_REVIEW'),
-                reviewedBy: quote?.reviewedBy || intake.reviewedBy || null,
-                reviewedAt: quote?.reviewedAt || intake.reviewedAt || null,
-                discountRate: quote?.items?.[0]?.discountRate || intake.discountRate || 50,
-                memo: quote?.memo || intake.remarks || '',
-                items: normalizedItems,
-                totalAmount,
-                vatAmount,
-                grandTotal,
-                formattedKakaoText: formattedText,
-                dispatchStatus: quote?.dispatchStatus || 'PENDING'
-            };
-        });
+                    totalAmount,
+                    vatAmount,
+                    grandTotal,
+                    formattedKakaoText: formattedText,
+                    dispatchStatus: quote?.dispatchStatus || 'PENDING'
+                };
+            })
+            .filter(Boolean);
     }
 
     /**
@@ -1706,10 +1713,11 @@ export class KakaoBotService {
     }
 
     /**
-     * 카카오 견적서 소프트 삭제 (휴지통) 상태 동기화
+     * 카카오 견적서 소프트 삭제 (휴지통) 상태 동기화 (연결된 인입 intake도 동기화)
      */
     markQuotationDeleted(quotationId, isDeleted = true) {
         const quote = this.draftQuotations.find(q => q.id === quotationId);
+        let changed = false;
         if (quote) {
             quote.isDeleted = isDeleted;
             if (isDeleted) {
@@ -1718,28 +1726,72 @@ export class KakaoBotService {
                 delete quote.isDeleted;
                 delete quote.deletedAt;
             }
+            changed = true;
+        }
+
+        // 연결된 intake도 소프트 삭제 상태 동기화
+        this.intakes.forEach(i => {
+            if (i.quotationId === quotationId || (quote?.intakeId && i.id === quote.intakeId)) {
+                i.isDeleted = isDeleted;
+                if (isDeleted) {
+                    i.deletedAt = new Date().toISOString();
+                } else {
+                    delete i.isDeleted;
+                    delete i.deletedAt;
+                }
+                changed = true;
+            }
+        });
+
+        if (changed) {
             this.saveData();
-            console.log(`[KakaoBot] 🗑️ 견적서 [${quotationId}] isDeleted=${isDeleted} 상태 동기화 완료`);
+            console.log(`[KakaoBot] 🗑️ 견적서 [${quotationId}] 및 연관 인입건 isDeleted=${isDeleted} 상태 동기화 완료`);
             return true;
         }
         return false;
     }
 
     /**
-     * 카카오 견적서 영구 삭제 동기화
+     * 카카오 견적서 영구 삭제 동기화 (연결된 인입 intake도 함께 완전 파기)
      */
     deleteDraftQuotation(quotationId) {
         const initialCount = this.draftQuotations.length;
+        const targetQuote = this.draftQuotations.find(q => q.id === quotationId);
+        const targetIntakeId = targetQuote?.intakeId;
+
         this.draftQuotations = this.draftQuotations.filter(q => q.id !== quotationId);
-        this.intakes.forEach(i => {
-            if (i.quotationId === quotationId) {
-                delete i.quotationId;
-            }
-        });
-        if (this.draftQuotations.length !== initialCount) {
+        const prevIntakesCount = this.intakes.length;
+        this.intakes = this.intakes.filter(i => i.quotationId !== quotationId && (!targetIntakeId || i.id !== targetIntakeId));
+
+        if (this.draftQuotations.length !== initialCount || this.intakes.length !== prevIntakesCount) {
             this.saveData();
-            console.log(`[KakaoBot] ❌ 견적서 [${quotationId}] 영구 삭제 동기화 완료`);
+            console.log(`[KakaoBot] ❌ 견적서 [${quotationId}] 및 연관 인입건 영구 삭제 파기 완료`);
             return true;
+        }
+        return false;
+    }
+
+    /**
+     * 카카오톡 인입(intake) 건 단독 삭제
+     */
+    deleteIntake(intakeId, permanent = false) {
+        if (permanent) {
+            const initialCount = this.intakes.length;
+            this.intakes = this.intakes.filter(i => i.id !== intakeId);
+            if (this.intakes.length !== initialCount) {
+                this.saveData();
+                console.log(`[KakaoBot] ❌ 인입건 [${intakeId}] 영구 삭제 파기 완료`);
+                return true;
+            }
+        } else {
+            const intake = this.intakes.find(i => i.id === intakeId);
+            if (intake) {
+                intake.isDeleted = true;
+                intake.deletedAt = new Date().toISOString();
+                this.saveData();
+                console.log(`[KakaoBot] 🗑️ 인입건 [${intakeId}] 소프트 삭제 완료`);
+                return true;
+            }
         }
         return false;
     }

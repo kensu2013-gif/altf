@@ -59,6 +59,7 @@ let db = {
     aiReports: [],
     aiReportSchedule: DEFAULT_AI_REPORT_SCHEDULE(),
     agents: [],
+    deletedQuotationIds: [],
     lastSnapshotDate: null,
     lastSnapshot: null,
     currentSnapshot: null,
@@ -94,6 +95,7 @@ async function loadData() {
             db.aiReportSchedule = json.aiReportSchedule || DEFAULT_AI_REPORT_SCHEDULE();
             db.agents = json.agents || [];
             db.departments = json.departments || [];
+            db.deletedQuotationIds = json.deletedQuotationIds || [];
 
             // Local fallback seed for agents if empty
             if (db.agents.length === 0) {
@@ -505,14 +507,29 @@ async function saveData() {
                     }
                 }
 
-                // 2. 견적서(quotations) 유실 방지 가드
+                // 2. 견적서(quotations) 유실 방지 가드 (명시적 삭제 견적서 영구 부활 방지)
                 if (Array.isArray(remoteDb.quotations) && Array.isArray(db.quotations)) {
+                    // 삭제 묘비(tombstones) 목록 원격과 안전 병합
+                    const mergedDeletedIds = Array.from(new Set([
+                        ...(db.deletedQuotationIds || []),
+                        ...(remoteDb.deletedQuotationIds || [])
+                    ]));
+                    db.deletedQuotationIds = mergedDeletedIds;
+                    const deletedQuoteIds = new Set(mergedDeletedIds);
+
                     if (remoteDb.quotations.length > 50 && db.quotations.length < 10) {
                         console.error(`🚨 [CRITICAL GUARD] 로컬 견적서 수(${db.quotations.length})가 원격 수(${remoteDb.quotations.length}) 대비 비정상적으로 적습니다. 저장을 중단하고 원격 데이터를 보호 복구합니다.`);
-                        db.quotations = remoteDb.quotations;
+                        db.quotations = remoteDb.quotations.filter(rq => !deletedQuoteIds.has(rq.id) && !rq.isPermanentlyDeleted);
                     } else {
                         const localQuoteIds = new Set(db.quotations.map(q => q.id));
-                        const missingQuotes = remoteDb.quotations.filter(rq => !localQuoteIds.has(rq.id));
+                        
+                        // 원격에는 존재하지만 로컬에 없는 견적서 중, 삭제 묘비에 없으며 삭제 플래그가 없는 정상 건만 병합
+                        const missingQuotes = remoteDb.quotations.filter(rq => {
+                            if (localQuoteIds.has(rq.id)) return false;
+                            if (deletedQuoteIds.has(rq.id)) return false;
+                            if (rq.isDeleted || rq.isPermanentlyDeleted) return false;
+                            return true;
+                        });
 
                         if (missingQuotes.length > 0) {
                             console.log(`🛡️ [Safety Merge Guard] S3에 존재하는 최신 견적서 ${missingQuotes.length}건을 로컬 메모리에 자동 보존 병합합니다.`);
@@ -2373,6 +2390,15 @@ const server = http.createServer(async (req, res) => {
             const offset = parseInt(urlParams.get('offset') || '0', 10);
             const data = kakaoBotService.getIntakes({ limit, offset });
             sendJsonResponse(req, res, 200, { success: true, ...data });
+            return;
+        }
+
+        // 3-1. DELETE /api/kakao/intakes/:id : 카카오톡 인입 기록 삭제
+        if (req.method === 'DELETE' && url.pathname.startsWith('/api/kakao/intakes/')) {
+            const intakeId = url.pathname.split('/').pop();
+            const permanent = url.searchParams.get('permanent') === 'true';
+            const ok = kakaoBotService.deleteIntake(intakeId, permanent);
+            sendJsonResponse(req, res, ok ? 200 : 404, { success: ok, intakeId });
             return;
         }
 
@@ -5275,9 +5301,21 @@ const server = http.createServer(async (req, res) => {
         }
 
         let dbQuotesChanged = false;
+        const deletedIdsSet = new Set(db.deletedQuotationIds || []);
+
         for (const draft of (kakaoBotService.draftQuotations || [])) {
-            // 카카오 초안이 소프트 삭제된 경우 복원하지 않음
-            if (draft.isDeleted) continue;
+            const isDraftDeleted = draft.isDeleted || deletedIdsSet.has(draft.id);
+            const idx = db.quotations.findIndex(q => q.id === draft.id);
+
+            // 카카오 초안이 삭제되었거나 삭제 묘비에 등록된 경우
+            if (isDraftDeleted) {
+                if (idx !== -1 && !db.quotations[idx].isDeleted) {
+                    db.quotations[idx].isDeleted = true;
+                    db.quotations[idx].deletedAt = draft.deletedAt || new Date().toISOString();
+                    dbQuotesChanged = true;
+                }
+                continue;
+            }
 
             // 원문 텍스트(utterance) 동기화 - 특정 견적서 ID 또는 intakeId와 엄격 1:1 매칭 (이전/타 견적 데이터 오염 방지)
             const matchingIntake = (kakaoBotService.intakes || []).find(it => 
@@ -5289,8 +5327,8 @@ const server = http.createServer(async (req, res) => {
                 draft.utterance = matchingIntake.utterance;
             }
 
-            const idx = db.quotations.findIndex(q => q.id === draft.id);
             if (idx === -1) {
+                if (deletedIdsSet.has(draft.id)) continue;
                 db.quotations.unshift(draft);
                 dbQuotesChanged = true;
             } else {
@@ -5324,7 +5362,8 @@ const server = http.createServer(async (req, res) => {
         }
 
         const limitStr = url.searchParams.get('limit');
-        let quotesToSend = db.quotations.map(q => {
+        // 영구 삭제된 항목은 클라이언트에 전송하지 않음
+        let quotesToSend = db.quotations.filter(q => !q.isPermanentlyDeleted).map(q => {
             if (!q.rawText && (q.source === 'KAKAO' || q.id?.startsWith('Q-KAKAO') || q.botUserKey)) {
                 // 개별 견적 고유 ID로만 엄격 매칭하여 타 견적 문구 혼입 원천 차단
                 const intake = (kakaoBotService.intakes || []).find(it => 
@@ -5710,25 +5749,37 @@ const server = http.createServer(async (req, res) => {
                         return { error: 'Forbidden', status: 403 };
                     }
 
-                    // 사람이 실제로 삭제 버튼을 누른 경우에만 삭제 처리
-                    // 영구 삭제 요청이 오더라도 원본 증적 유실 방지를 위해 splice 완전 파기 대신 소프트 삭제 + 감사 기록 보존
-                    db.quotations[index] = {
-                        ...db.quotations[index],
-                        isDeleted: true,
-                        isPermanentlyDeleted: permanent ? true : false,
-                        deletedAt: new Date().toISOString(),
-                        deletedBy: {
-                            id: session.userId,
-                            email: session.email,
-                            role: session.role
-                        },
-                        deleteReason: permanent ? 'HUMAN_EXPLICIT_PERMANENT_DELETE' : 'HUMAN_EXPLICIT_DELETE'
-                    };
-
-                    if (typeof kakaoBotService.markQuotationDeleted === 'function') {
-                        kakaoBotService.markQuotationDeleted(id, true);
+                    if (!db.deletedQuotationIds) db.deletedQuotationIds = [];
+                    if (!db.deletedQuotationIds.includes(id)) {
+                        db.deletedQuotationIds.push(id);
                     }
-                    return { success: true, mode: permanent ? 'hard_protected' : 'soft' };
+
+                    if (permanent) {
+                        // 영구 삭제인 경우: db.quotations에서 splice로 완전 파기 & 카카오봇 초안 및 연관 인입도 완전 파기
+                        db.quotations.splice(index, 1);
+                        if (typeof kakaoBotService.deleteDraftQuotation === 'function') {
+                            kakaoBotService.deleteDraftQuotation(id);
+                        }
+                    } else {
+                        // 소프트 삭제인 경우: isDeleted: true 마킹 및 카카오봇 소프트 삭제 동기화
+                        db.quotations[index] = {
+                            ...db.quotations[index],
+                            isDeleted: true,
+                            isPermanentlyDeleted: false,
+                            deletedAt: new Date().toISOString(),
+                            deletedBy: {
+                                id: session.userId,
+                                email: session.email,
+                                role: session.role
+                            },
+                            deleteReason: 'HUMAN_EXPLICIT_DELETE'
+                        };
+
+                        if (typeof kakaoBotService.markQuotationDeleted === 'function') {
+                            kakaoBotService.markQuotationDeleted(id, true);
+                        }
+                    }
+                    return { success: true, mode: permanent ? 'permanent_purged' : 'soft' };
                 }
                 return { error: 'Not found', status: 404 };
             });
