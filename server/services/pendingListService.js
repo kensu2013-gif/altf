@@ -186,6 +186,45 @@ export class PendingListService {
     }
   }
 
+  _calculateRemainingDays(dateStr) {
+    if (!dateStr) return null;
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return null;
+      const today = new Date();
+      // Set to midnight comparison
+      today.setHours(0, 0, 0, 0);
+      d.setHours(0, 0, 0, 0);
+      const diffMs = d.getTime() - today.getTime();
+      return Math.round(diffMs / (1000 * 60 * 60 * 24));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  _estimateRemainingProductionDays(itemName, stage, progressPct) {
+    if (stage === '창고입고완료' || progressPct >= 100) return 0;
+    
+    // 카테고리별 실측 평균 리드타임
+    const cat = String(itemName || '').toUpperCase();
+    let totalLead = 22; // default
+    if (cat.includes('TEE')) totalLead = 27;
+    else if (cat.includes('45E')) totalLead = 32;
+    else if (cat.includes('90E')) totalLead = 21;
+    else if (cat.includes('R(') || cat.includes('REDUCER')) totalLead = 18;
+    else if (cat.includes('CAP')) totalLead = 20;
+
+    if (stage === '산세완결') return 2;
+    if (stage === '가공완료') return 4;
+    if (stage === '교정완료') return 7;
+    if (stage === '열처리완료') return 10;
+    if (stage === '성형완료') return 14;
+    if (stage === '절단완료') return 17;
+    if (stage === '재고/가공대기') return 10;
+    if (stage === '절단대기') return totalLead;
+    return totalLead; // 검토정체 등 0%
+  }
+
   /**
    * 2. 주문번호(Y열) ↔ 우리 발주번호 매칭 및 공정 진행도 판단 (PUR-03 대리봇)
    */
@@ -206,10 +245,15 @@ export class PendingListService {
     const poMap = new Map();
     orders.forEach(o => {
       if (o.poNumber) {
-        poMap.set(o.poNumber.trim(), o);
+        const trimmed = o.poNumber.trim();
+        poMap.set(trimmed, o);
+        poMap.set(trimmed.toUpperCase(), o);
+        const m = trimmed.match(/ES\d+-\d+/i);
+        if (m) poMap.set(m[0].toUpperCase(), o);
       }
       if (o.id) {
         poMap.set(o.id.trim(), o);
+        poMap.set(o.id.trim().toUpperCase(), o);
       }
     });
 
@@ -283,7 +327,11 @@ export class PendingListService {
       }
 
       // 2. 발주 매칭 및 Z열(납품처) ↔ Y열(주문번호) 연계
-      const matchedOrder = poMap.get(row.orderNo);
+      const rawOrderNo = (row.orderNo || '').trim();
+      const codeMatch = rawOrderNo.match(/ES\d+-\d+/i);
+      const matchedOrder = poMap.get(rawOrderNo)
+        || poMap.get(rawOrderNo.toUpperCase())
+        || (codeMatch ? poMap.get(codeMatch[0].toUpperCase()) : null);
       // Z열 납품처 우선, 없으면 ALTF DB의 customerName
       let customerName = row.deliveryTo || (matchedOrder?.customerName) || '자체/미지정';
       let poCreatedAt = null;
@@ -303,47 +351,85 @@ export class PendingListService {
       const poDate = this._extractPoDate(row.orderNo, row.workDate, poCreatedAt);
       const elapsedDays = this._calculateElapsedDays(poDate);
 
+      // 💡 [혁신적 고도화]: 고객 약속 납기일 ⟷ 대경 남은 제작 리드타임 대조 분석
+      const customerDueDate = matchedOrder?.adminResponse?.deliveryDate || (matchedOrder?.dueDate ? String(matchedOrder.dueDate).slice(0, 10) : null);
+      const remainingCustomerDays = this._calculateRemainingDays(customerDueDate);
+      const remainingProductionDays = this._estimateRemainingProductionDays(row.itemName, stage, progressPct);
+      const leadtimeDeficit = remainingCustomerDays !== null ? (remainingCustomerDays - remainingProductionDays) : null;
+
+      let dueDateStatus = 'NORMAL';
+      if (isCompleted) {
+        dueDateStatus = 'COMPLETED';
+      } else if (remainingCustomerDays !== null) {
+        if (remainingCustomerDays < 0) {
+          dueDateStatus = 'OVERDUE'; // 고객 약속 납기일 이미 초과
+        } else if (leadtimeDeficit < -3) {
+          dueDateStatus = 'IMPOSSIBLE_DELAY'; // 남은 납기일보다 제작 필요일수가 훨씬 큼 (납기 펑크 확정)
+        } else if (leadtimeDeficit <= 3) {
+          dueDateStatus = 'TIGHT_WARNING'; // 납기 임박/촉박
+        } else {
+          dueDateStatus = 'SAFE'; // 납기 안정
+        }
+      }
+
       // 3. 지연 및 병목 감지 (PUR-04 과장 연계 규칙)
       // 💡 [중요 규칙]: 창고입고(V열 storeDate) 완료된 품목은 출고 직전이므로 독촉 대상에서 100% 완전 제외!
       let alertReason = null;
       let alertSeverity = 'NORMAL'; // NORMAL | WARNING | CRITICAL
 
       if (!isCompleted) {
-        // A. 생산 확정인데 절단(P열) 미착수 -> 긴급 독촉!
-        if (row.workType.includes('생산') && !row.cutDate) {
+        // A. 고객 납기 초과 (이미 약속 납기가 지남) -> 최고 긴급 독촉!
+        if (dueDateStatus === 'OVERDUE') {
+          alertReason = `고객 약속 납기(${customerDueDate}) ${Math.abs(remainingCustomerDays)}일 초과 지연 중! (${stage})`;
+          alertSeverity = 'CRITICAL';
+        }
+        // B. 납기 불가 확정 (고객 납기일까지 남은 기간 < 제작 필요 기간) -> 긴급 경보!
+        else if (dueDateStatus === 'IMPOSSIBLE_DELAY') {
+          alertReason = remainingCustomerDays === 0
+            ? `고객 납기 오늘(D-Day) 도래했으나 미착수/정체 (제작 ${remainingProductionDays}일 추가 소요 예상)`
+            : `고객 납기까지 ${remainingCustomerDays}일 남았으나 제작 ${remainingProductionDays}일 소요 예상 (약 ${Math.abs(leadtimeDeficit)}일 납기 펑크 위험!)`;
+          alertSeverity = 'CRITICAL';
+        }
+        // C. 납기 임박 (촉박한 상태)
+        else if (dueDateStatus === 'TIGHT_WARNING') {
+          alertReason = `고객 납기 임박 (D-${remainingCustomerDays}일 / 제작 ${remainingProductionDays}일 예상, 오늘 즉시 후속 공정 필수)`;
+          alertSeverity = 'WARNING';
+        }
+        // D. 생산 확정인데 절단(P열) 미착수 -> 긴급 독촉!
+        else if (row.workType.includes('생산') && !row.cutDate) {
           alertReason = elapsedDays > 0 
             ? `생산 확정되었으나 절단(P열) 미착수 (발주 후 ${elapsedDays}일 경과)`
             : '생산 확정되었으나 절단(P열) 미착수 상태';
           alertSeverity = 'CRITICAL';
         }
-        // B. 1주일 이상 검토 정체인 경우 -> 검토 홀딩 독촉!
+        // E. 1주일 이상 검토 정체인 경우 -> 검토 홀딩 독촉!
         else if (row.workType.includes('검토') && !row.cutDate && !row.machDate) {
           alertReason = elapsedDays > 0
             ? `공정 미착수 (검토 상태 ${elapsedDays}일 장기 정체)`
             : '공정 미착수 (검토 상태 1주일 이상 장기 정체)';
           alertSeverity = 'WARNING';
         }
-        // C. 절단 완료 후 후속 성형/열처리 미진행
+        // F. 절단 완료 후 후속 성형/열처리 미진행
         else if (row.cutDate && !row.formDate && !row.machDate) {
           alertReason = `절단(${row.cutDate}) 완료 후 후속 성형/가공 미진행 정체`;
           alertSeverity = 'WARNING';
         }
-        // D. 성형 완료 후 열처리/가공 미진행
+        // G. 성형 완료 후 열처리/가공 미진행
         else if (row.formDate && !row.heatDate && !row.calibDate && !row.machDate) {
           alertReason = `성형(${row.formDate}) 완료 후 후속 열처리/가공 정체`;
           alertSeverity = 'WARNING';
         }
-        // E. 가공 완료 후 산세/창고입고 미진행
+        // H. 가공 완료 후 산세/창고입고 미진행
         else if (row.machDate && !row.acidDate && !row.storeDate) {
           alertReason = `가공(${row.machDate}) 완료 후 산세/창고입고 대기 정체`;
           alertSeverity = 'WARNING';
         }
-        // F. 수정/재고 배정 후 가공/입고 미진행
+        // I. 수정/재고 배정 후 가공/입고 미진행
         else if ((row.workType.includes('수정') || row.workType.includes('재고')) && !row.machDate && !row.storeDate) {
           alertReason = `${row.workType} 배정 후 가공/출고 미진행 정체`;
           alertSeverity = 'WARNING';
         }
-        // G. 외주 의뢰 후 미입고
+        // J. 외주 의뢰 후 미입고
         else if (row.workType.includes('외주') && !row.storeDate) {
           alertReason = '외주 가공 의뢰 후 창고 입고 대기';
           alertSeverity = 'WARNING';
@@ -360,6 +446,11 @@ export class PendingListService {
         poCreatedAt,
         poDate,
         elapsedDays,
+        customerDueDate,
+        remainingCustomerDays,
+        remainingProductionDays,
+        leadtimeDeficit,
+        dueDateStatus,
         isStockOrder,
         alertReason,
         alertSeverity
@@ -404,6 +495,12 @@ export class PendingListService {
         c.warningCount++;
       }
 
+      if (item.dueDateStatus === 'OVERDUE') {
+        c.overdueCount = (c.overdueCount || 0) + 1;
+      } else if (item.dueDateStatus === 'IMPOSSIBLE_DELAY') {
+        c.deficitRiskCount = (c.deficitRiskCount || 0) + 1;
+      }
+
       if (!item.isCompleted && item.progressPct <= 5) {
         c.unstartedCount++;
         if (item.workType.includes('생산') && !item.cutDate) c.cutPendingCount++;
@@ -425,7 +522,11 @@ export class PendingListService {
     // 각 거래처별 가장 주요한 문제 요약 문구 생성
     const clientDiagnoses = Object.values(clientMap).map(c => {
       let primaryIssue = '정상 진행 중';
-      if (c.criticalCount > 0) {
+      if ((c.overdueCount || 0) > 0) {
+        primaryIssue = `🚨 고객 약속 납기 초과 ${c.overdueCount}건 (최장 ${c.maxElapsedDays}일 정체)`;
+      } else if ((c.deficitRiskCount || 0) > 0) {
+        primaryIssue = `🚨 납기 펑크 위험 ${c.deficitRiskCount}건 (고객납기 < 제작필요일수)`;
+      } else if (c.criticalCount > 0) {
         primaryIssue = `절단 미착수 긴급 ${c.criticalCount}건 (최장 ${c.maxElapsedDays}일 정체)`;
       } else if (c.unstartedCount > 0) {
         primaryIssue = `공정 미착수 ${c.unstartedCount}건 (최장 ${c.maxElapsedDays}일 멈춤)`;
@@ -439,7 +540,9 @@ export class PendingListService {
         primaryIssue
       };
     }).sort((a, b) => {
-      // 정렬 우선순위: 긴급 많은 순 -> 정체 많은 순 -> 최장 경과일 많은 순 -> 총건수 많은 순
+      // 정렬 우선순위: 납기초과 많은 순 -> 납기위험 많은 순 -> 긴급 많은 순 -> 정체 많은 순 -> 최장 경과일 많은 순
+      if ((b.overdueCount || 0) !== (a.overdueCount || 0)) return (b.overdueCount || 0) - (a.overdueCount || 0);
+      if ((b.deficitRiskCount || 0) !== (a.deficitRiskCount || 0)) return (b.deficitRiskCount || 0) - (a.deficitRiskCount || 0);
       if (b.criticalCount !== a.criticalCount) return b.criticalCount - a.criticalCount;
       if (b.alertCount !== a.alertCount) return b.alertCount - a.alertCount;
       if (b.maxElapsedDays !== a.maxElapsedDays) return b.maxElapsedDays - a.maxElapsedDays;
@@ -453,7 +556,20 @@ export class PendingListService {
       .sort((a, b) => (b.elapsedDays || 0) - (a.elapsedDays || 0))
       .slice(0, 50);
 
-    this._updateAgentStatus('PUR-03', `발주 매칭 ${matchedCount}건, 공정 단계 및 거래처별 병목 분석 완료`, `매칭 ${matchedCount}건 / 거래처 ${clientDiagnoses.length}개 진단 / 최장 정체 ${longestStagnantItems[0]?.elapsedDays || 0}일`, 'ACTIVE');
+    // 6. 고객 납기 대비 지연 위험 품목 TOP 리스트 (Critical Due Date Risk Items)
+    // 고객 납기일까지 남은 기간보다 대경 제작 소요 예상일이 더 길어 펑크가 확실하거나 이미 지난 품목들
+    const criticalDueRiskItems = analyzedRows
+      .filter(r => !r.isCompleted && r.dueDateStatus && r.dueDateStatus !== 'COMPLETED' && r.dueDateStatus !== 'SAFE')
+      .sort((a, b) => {
+        if (a.dueDateStatus === 'OVERDUE' && b.dueDateStatus !== 'OVERDUE') return -1;
+        if (b.dueDateStatus === 'OVERDUE' && a.dueDateStatus !== 'OVERDUE') return 1;
+        const defA = a.leadtimeDeficit !== null ? a.leadtimeDeficit : 999;
+        const defB = b.leadtimeDeficit !== null ? b.leadtimeDeficit : 999;
+        return defA - defB;
+      })
+      .slice(0, 50);
+
+    this._updateAgentStatus('PUR-03', `발주 매칭 ${matchedCount}건, 고객 납기 위험 ${criticalDueRiskItems.length}건 분석 완료`, `매칭 ${matchedCount}건 / 거래처 ${clientDiagnoses.length}개 진단 / 납기 위험 ${criticalDueRiskItems.length}건`, 'ACTIVE');
 
     return {
       totalRows: analyzedRows.length,
@@ -465,6 +581,7 @@ export class PendingListService {
       alertItems,
       clientDiagnoses,
       longestStagnantItems,
+      criticalDueRiskItems,
       rows: analyzedRows
     };
   }
@@ -750,12 +867,21 @@ export class PendingListService {
 
     // 0. 파일 아카이빙 (PUR-01 수신봇)
     this._updateAgentStatus('PUR-01', `신규 미결 엑셀 수신: ${originalFilename}`, `미결 파일 접수 및 아카이빙`, 'ACTIVE');
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const archivePath = path.join(STORAGE_DIR, `pending_${timestamp}_${originalFilename}`);
-    if (typeof bufferOrPath === 'string') {
-      fs.copyFileSync(bufferOrPath, archivePath);
+    
+    // Clean originalFilename to prevent stacking prefixes
+    const cleanFilename = path.basename(originalFilename).replace(/^(pending_[0-9T\-_.]+Z_)+/, '');
+    let archivePath;
+    if (typeof bufferOrPath === 'string' && path.resolve(bufferOrPath).startsWith(path.resolve(STORAGE_DIR))) {
+      // 이미 storage 디렉토리에 보관된 파일이면 중복 복사 방지
+      archivePath = bufferOrPath;
     } else {
-      fs.writeFileSync(archivePath, bufferOrPath);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      archivePath = path.join(STORAGE_DIR, `pending_${timestamp}_${cleanFilename}`);
+      if (typeof bufferOrPath === 'string') {
+        fs.copyFileSync(bufferOrPath, archivePath);
+      } else {
+        fs.writeFileSync(archivePath, bufferOrPath);
+      }
     }
 
     // 1. 파싱 (PUR-02 사원)
@@ -774,6 +900,9 @@ export class PendingListService {
     this._updateAgentStatus('SAL-03', `고객사별 미결 공정 상태 ${analyzed.matchedCount}건 동기화 완료`, `고객 납기 안내 준비 완료`, 'ACTIVE');
 
     // 6. 결과 전체 저장
+    const overdueCount = (analyzed.rows || []).filter(r => r.dueDateStatus === 'OVERDUE').length;
+    const deficitRiskCount = (analyzed.rows || []).filter(r => r.dueDateStatus === 'IMPOSSIBLE_DELAY').length;
+
     const finalResult = {
       timestamp: new Date().toISOString(),
       filename: originalFilename,
@@ -784,11 +913,15 @@ export class PendingListService {
         unmatchedCount: analyzed.unmatchedCount,
         stockOrderCount: analyzed.stockOrderCount,
         alertCount: analyzed.alertCount,
+        overdueCount,
+        deficitRiskCount,
+        dueRiskCount: (analyzed.criticalDueRiskItems || []).length,
         excludedNonProductCount: parsed.excludedNonProductCount || 0
       },
       stageCounts: analyzed.stageCounts,
       clientDiagnoses: analyzed.clientDiagnoses,
       longestStagnantItems: analyzed.longestStagnantItems,
+      criticalDueRiskItems: analyzed.criticalDueRiskItems || [],
       chaserReport,
       leadtimeStats,
       rows: analyzed.rows

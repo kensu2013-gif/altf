@@ -63,6 +63,11 @@ export interface PendingOrderItem {
     poCreatedAt?: string | null;
     poDate?: string;
     elapsedDays?: number;
+    customerDueDate?: string | null;
+    remainingCustomerDays?: number | null;
+    remainingProductionDays?: number;
+    leadtimeDeficit?: number | null;
+    dueDateStatus?: 'NORMAL' | 'OVERDUE' | 'IMPOSSIBLE_DELAY' | 'TIGHT_WARNING' | 'SAFE' | 'COMPLETED';
     isStockOrder: boolean;
     alertReason?: string | null;
     alertSeverity?: 'NORMAL' | 'WARNING' | 'CRITICAL';
@@ -76,6 +81,8 @@ export interface ClientDiagnosis {
     warningCount: number;
     unstartedCount: number;
     completedCount: number;
+    overdueCount?: number;
+    deficitRiskCount?: number;
     maxElapsedDays: number;
     oldestOrderNo: string;
     oldestPoDate: string;
@@ -90,6 +97,9 @@ export interface PendingAnalysisSummary {
     unmatchedCount: number;
     stockOrderCount: number;
     alertCount: number;
+    overdueCount?: number;
+    deficitRiskCount?: number;
+    dueRiskCount?: number;
     excludedNonProductCount?: number;
 }
 
@@ -130,6 +140,7 @@ export interface PendingAnalysisData {
     stageCounts: Record<string, number>;
     clientDiagnoses?: ClientDiagnosis[];
     longestStagnantItems?: PendingOrderItem[];
+    criticalDueRiskItems?: PendingOrderItem[];
     chaserReport?: {
         reportId: string;
         createdAt: string;
@@ -178,10 +189,11 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
     const [loading, setLoading] = useState(false);
     const [searchKeyword, setSearchKeyword] = useState('');
     const [stageFilter, setStageFilter] = useState<string>('ALL');
-    const [severityFilter, setSeverityFilter] = useState<'ALL' | 'ALERT_ONLY' | 'CRITICAL' | 'WARNING'>('ALL');
+    const [severityFilter, setSeverityFilter] = useState<'ALL' | 'ALERT_ONLY' | 'CRITICAL' | 'WARNING' | 'DUE_RISK'>('ALL');
     const [clientFilter, setClientFilter] = useState<string>('ALL');
     const [copiedReport, setCopiedReport] = useState(false);
     const [activeTab, setActiveTab] = useState<'TABLE' | 'CLIENTS' | 'STAGNANT' | 'CHASER_REPORT' | 'LEADTIME'>('TABLE');
+    const [stagnantSubTab, setStagnantSubTab] = useState<'DUE_DEFICIT' | 'ELAPSED_DAYS'>('DUE_DEFICIT');
     const [uploading, setUploading] = useState(false);
     const [showExpandedMetrics, setShowExpandedMetrics] = useState(false);
 
@@ -306,6 +318,7 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
             if (severityFilter === 'ALERT_ONLY' && !item.alertReason) return false;
             if (severityFilter === 'CRITICAL' && item.alertSeverity !== 'CRITICAL') return false;
             if (severityFilter === 'WARNING' && item.alertSeverity !== 'WARNING') return false;
+            if (severityFilter === 'DUE_RISK' && item.dueDateStatus !== 'OVERDUE' && item.dueDateStatus !== 'IMPOSSIBLE_DELAY') return false;
 
             // Search keyword
             if (searchKeyword.trim()) {
@@ -385,6 +398,7 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
     const leadtimeStats = data?.leadtimeStats;
     const clientDiagnoses = data?.clientDiagnoses || [];
     const longestStagnantItems = data?.longestStagnantItems || [];
+    const criticalDueRiskItems = data?.criticalDueRiskItems || [];
 
     // Jump to client filter in Table tab
     const handleSelectClient = (clientName: string) => {
@@ -457,10 +471,10 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                                     : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
                             }`}
                         >
-                            <Hourglass className="w-3.5 h-3.5 text-rose-300 animate-pulse" />
-                            <span>최장 미착수 정체 TOP</span>
+                            <AlertTriangle className="w-3.5 h-3.5 text-rose-300 animate-pulse" />
+                            <span>납기 위험 & 정체 진단</span>
                             <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-rose-950/60 text-rose-200 border border-rose-400/30 font-bold">
-                                {longestStagnantItems.length}건
+                                {criticalDueRiskItems.length > 0 ? `${criticalDueRiskItems.length}건 위험` : `${longestStagnantItems.length}건`}
                             </span>
                         </button>
 
@@ -730,6 +744,20 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                                 >
                                     ⚠️ 공정 정체
                                 </button>
+                                <button
+                                    onClick={() => setSeverityFilter('DUE_RISK')}
+                                    className={`px-2.5 py-1 rounded text-xs transition-colors flex items-center gap-1 ${
+                                        severityFilter === 'DUE_RISK' ? 'bg-rose-600 text-white font-bold' : 'text-rose-400 hover:text-white'
+                                    }`}
+                                >
+                                    <AlertTriangle className="w-3 h-3 text-rose-300" />
+                                    🚨 납기 위험
+                                    {(summary?.dueRiskCount || 0) > 0 && (
+                                        <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-rose-950 text-rose-200">
+                                            {summary?.dueRiskCount}
+                                        </span>
+                                    )}
+                                </button>
                             </div>
                         </div>
 
@@ -739,9 +767,10 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                                 <thead className="sticky top-0 bg-slate-950 text-slate-300 border-b border-slate-800 z-10 shadow-sm font-semibold">
                                     <tr>
                                         <th className="py-2.5 px-3 w-12 text-center text-slate-400">#</th>
-                                        <th className="py-2.5 px-3 min-w-[130px]">발주일 / 경과일</th>
-                                        <th className="py-2.5 px-3 min-w-[130px]">납품처 (Z열)</th>
-                                        <th className="py-2.5 px-3 min-w-[120px]">주문번호 (Y열)</th>
+                                        <th className="py-2.5 px-3 min-w-[125px]">발주일 / 경과일</th>
+                                        <th className="py-2.5 px-3 min-w-[125px]">납품처 (Z열)</th>
+                                        <th className="py-2.5 px-3 min-w-[115px]">주문번호 (Y열)</th>
+                                        <th className="py-2.5 px-3 min-w-[145px] text-amber-300">고객납기 / 제작마진</th>
                                         <th className="py-2.5 px-3 min-w-[90px]">품 명</th>
                                         <th className="py-2.5 px-3 min-w-[120px]">규격 / 두께</th>
                                         <th className="py-2.5 px-3 min-w-[90px]">재질</th>
@@ -751,13 +780,13 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                                         <th className="py-2.5 px-3 text-center min-w-[90px]">진행률</th>
                                         <th className="py-2.5 px-3 min-w-[80px]">절단일</th>
                                         <th className="py-2.5 px-3 min-w-[80px]">입고일</th>
-                                        <th className="py-2.5 px-3 min-w-[220px]">병목 진단 / 납기 독촉 사유</th>
+                                        <th className="py-2.5 px-3 min-w-[200px]">병목 진단 / 납기 독촉 사유</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/60 font-mono">
                                     {filteredRows.length === 0 ? (
                                         <tr>
-                                            <td colSpan={14} className="py-16 text-center text-slate-400 font-sans">
+                                            <td colSpan={15} className="py-16 text-center text-slate-400 font-sans">
                                                 <div className="flex flex-col items-center justify-center gap-2">
                                                     <Filter className="w-8 h-8 text-slate-600" />
                                                     <p className="text-sm">조건에 일치하는 미결 제품이 없습니다.</p>
@@ -827,6 +856,54 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                                                         }`}>
                                                             {row.orderNo || '-'}
                                                         </span>
+                                                    </td>
+
+                                                    {/* 고객납기 / 제작마진 */}
+                                                    <td className="py-2 px-3">
+                                                        {row.customerDueDate ? (
+                                                            <div className="flex flex-col">
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-xs text-slate-200 font-semibold">{row.customerDueDate}</span>
+                                                                    {typeof row.remainingCustomerDays === 'number' && (
+                                                                        <span className={`text-[10px] font-bold ${
+                                                                            row.remainingCustomerDays < 0 ? 'text-rose-400' :
+                                                                            row.remainingCustomerDays <= 7 ? 'text-amber-400' : 'text-emerald-400'
+                                                                        }`}>
+                                                                            ({row.remainingCustomerDays < 0 ? `+${Math.abs(row.remainingCustomerDays)}일 초과` : `D-${row.remainingCustomerDays}일`})
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {!row.isCompleted && (
+                                                                    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                                                        {row.dueDateStatus === 'OVERDUE' && (
+                                                                            <span className="px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                                                                                🚨 납기초과
+                                                                            </span>
+                                                                        )}
+                                                                        {row.dueDateStatus === 'IMPOSSIBLE_DELAY' && (
+                                                                            <span className="px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-red-600/30 text-red-200 border border-red-500/50" title={`고객잔여 ${row.remainingCustomerDays}일 vs 필요제작 ${row.remainingProductionDays}일`}>
+                                                                                🚨 {Math.abs(row.leadtimeDeficit || 0)}일 펑크위험
+                                                                            </span>
+                                                                        )}
+                                                                        {row.dueDateStatus === 'TIGHT_WARNING' && (
+                                                                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                                                                ⚠️ 납기촉박
+                                                                            </span>
+                                                                        )}
+                                                                        {row.dueDateStatus === 'SAFE' && (
+                                                                            <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-400">
+                                                                                ✅ 안전
+                                                                            </span>
+                                                                        )}
+                                                                        <span className="text-[10px] text-slate-400 font-sans">
+                                                                            (잔여제작 {row.remainingProductionDays}일)
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-slate-500 text-[11px]">-</span>
+                                                        )}
                                                     </td>
 
                                                     {/* 품 명 */}
@@ -987,6 +1064,18 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
 
                                                 {/* Status badges */}
                                                 <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                                                    {(client.overdueCount || 0) > 0 && (
+                                                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/25 text-rose-300 border border-rose-500/40 flex items-center gap-1 animate-pulse">
+                                                            <AlertTriangle className="w-3 h-3 text-rose-400" />
+                                                            납기초과 {client.overdueCount}건
+                                                        </span>
+                                                    )}
+                                                    {(client.deficitRiskCount || 0) > 0 && (
+                                                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-600/30 text-red-200 border border-red-500/50 flex items-center gap-1">
+                                                            <Flame className="w-3 h-3 text-red-400" />
+                                                            제작지연 펑크위험 {client.deficitRiskCount}건
+                                                        </span>
+                                                    )}
                                                     {client.criticalCount > 0 && (
                                                         <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-1">
                                                             <Flame className="w-3 h-3 text-red-400 animate-pulse" />
@@ -1065,149 +1154,395 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                     </div>
                 )}
 
-                {/* 5. TAB 3: 발주일 기준 최장 미착수 정체 TOP ("발주 한날짜로 부터 아무것도 제일 진행안된게 뭔지") */}
+                {/* 5. TAB 3: 고객 납기 지연 예측 & 최장 미착수 정체 진단 */}
                 {activeTab === 'STAGNANT' && (
                     <div className="flex-1 flex flex-col min-h-0 bg-slate-900/60 p-4 md:p-6 overflow-auto">
                         <div className="max-w-6xl mx-auto w-full space-y-4">
-                            {/* Header description */}
-                            <div className="bg-gradient-to-r from-rose-950/50 via-slate-950 to-amber-950/40 border border-rose-500/40 p-5 rounded-xl shadow-xl">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                                            <Hourglass className="w-5 h-5 text-rose-400 animate-spin" />
-                                            발주일 기준 최장 미착수 정체 순위 (0% 진행 품목 TOP)
-                                            <span className="px-2 py-0.5 rounded text-xs bg-rose-500/20 text-rose-300 font-mono font-bold">
-                                                발주 후 방치 품목 집중 관제
-                                            </span>
-                                        </h3>
-                                        <p className="text-xs text-slate-400 mt-1">
-                                            발주(PO)를 넣은 지 수개월이 지나도록 <b>대경벤드에서 절단(P열) 착수조차 안 되고 검토/홀딩 상태로 멈춰 있는</b> 피팅 자재들을 경과일수 순으로 정렬했습니다.
-                                            <span className="text-amber-400 font-medium ml-1">
-                                                (💡 NEGO, 시편TEST비 등 비제품성 정산 행은 자동 제외되어 순수 배관 피팅 자재만 표시됩니다)
-                                            </span>
-                                        </p>
-                                    </div>
-                                    <div className="text-right font-mono">
-                                        <div className="text-xs text-slate-400">최장 정체 일수</div>
-                                        <div className="text-2xl font-black text-rose-400">
-                                            {longestStagnantItems[0]?.elapsedDays || 0} <span className="text-sm font-normal text-slate-400">일</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Top 3 Worst Highlight Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                {longestStagnantItems.slice(0, 3).map((item, idx) => (
-                                    <div 
-                                        key={item.rowIdx}
-                                        className="p-4 rounded-xl bg-slate-950 border border-rose-500/40 shadow-lg relative overflow-hidden"
+                            {/* Mode Segmented Controls */}
+                            <div className="flex items-center justify-between bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+                                <div className="flex items-center gap-1.5">
+                                    <button
+                                        onClick={() => setStagnantSubTab('DUE_DEFICIT')}
+                                        className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                            stagnantSubTab === 'DUE_DEFICIT'
+                                                ? 'bg-rose-600 text-white shadow-md'
+                                                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                                        }`}
                                     >
-                                        <div className="absolute top-2 right-2 px-2 py-0.5 rounded text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 font-mono">
-                                            #{idx + 1} 최장 멈춤
+                                        <AlertTriangle className="w-3.5 h-3.5 text-rose-300 animate-pulse" />
+                                        <span>🚨 고객 납기 위험 진단 (남은납기 ⟷ 예상제작소요 대조)</span>
+                                        <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-950 text-rose-200 border border-rose-400/40">
+                                            {criticalDueRiskItems.length}건
+                                        </span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => setStagnantSubTab('ELAPSED_DAYS')}
+                                        className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                            stagnantSubTab === 'ELAPSED_DAYS'
+                                                ? 'bg-slate-700 text-white shadow-md'
+                                                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                                        }`}
+                                    >
+                                        <Hourglass className="w-3.5 h-3.5 text-amber-300" />
+                                        <span>⏳ 발주 후 장기 미착수 정체 (0% 미착수 경과순)</span>
+                                        <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-300 border border-slate-700">
+                                            {longestStagnantItems.length}건
+                                        </span>
+                                    </button>
+                                </div>
+
+                                <div className="text-[11px] text-slate-400 font-sans hidden md:block pr-2">
+                                    {stagnantSubTab === 'DUE_DEFICIT' ? (
+                                        <span className="text-rose-300 font-medium">💡 고객 약속납기 잔여일수보다 대경 제작 소요가 길어 펑크가 확정된 순위</span>
+                                    ) : (
+                                        <span className="text-amber-300 font-medium">💡 발주 후 수개월간 절단 착수조차 안 된 미착수 순위</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* MODE A: 고객 납기 대비 지연 예측 (Leadtime Deficit) */}
+                            {stagnantSubTab === 'DUE_DEFICIT' && (
+                                <div className="space-y-4">
+                                    {/* Header description */}
+                                    <div className="bg-gradient-to-r from-rose-950/60 via-slate-950 to-amber-950/40 border border-rose-500/40 p-5 rounded-xl shadow-xl">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                                                    <AlertTriangle className="w-5 h-5 text-rose-400 animate-pulse" />
+                                                    고객 약속납기 ⟷ 대경 남은 공정 리드타임 정밀 대조 진단
+                                                    <span className="px-2 py-0.5 rounded text-xs bg-rose-500/20 text-rose-300 font-mono font-bold">
+                                                        선제적 납기 펑크 예측
+                                                    </span>
+                                                </h3>
+                                                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                                                    단순히 '발주 후 며칠 경과'만 보는 과거 기준을 넘어, <b>'고객 납기일까지 남은 기간(D-day)'</b>과 <b>'대경벤드의 현재 공정 단계에서 완성까지 소요되는 예상 제작일수'</b>를 대조하여 <b>납기 펑크 및 지연 결손(Deficit)</b>을 사전에 판정합니다.
+                                                    <span className="text-amber-300 font-medium ml-1">
+                                                        (예: 고객 납기가 7일 남았으나 티(TEE) 공정이 아직 절단대기 상태(27일 소요)라면 20일 펑크 확정)
+                                                    </span>
+                                                </p>
+                                            </div>
+                                            <div className="text-right font-mono shrink-0 pl-4">
+                                                <div className="text-xs text-slate-400">납기 위험 감지</div>
+                                                <div className="text-2xl font-black text-rose-400">
+                                                    {criticalDueRiskItems.length} <span className="text-sm font-normal text-slate-400">건</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-slate-400 font-semibold">
-                                            {item.deliveryTo || item.customerName}
-                                        </div>
-                                        <div className="text-xl font-black text-rose-400 mt-1 font-mono">
-                                            D+{item.elapsedDays}일째 멈춤
-                                        </div>
-                                        <div className="text-xs text-white font-bold mt-2">
-                                            {item.itemName} {item.size} ({item.thickness})
-                                        </div>
-                                        <div className="text-[11px] text-slate-400 mt-1">
-                                            발주: <span className="text-slate-300 font-mono">{item.orderNo}</span> ({item.poDate})
-                                        </div>
-                                        <div className="text-[11px] text-amber-300 mt-0.5">
-                                            수량: <span className="font-bold">{item.orderQty}개</span> | 작업구분: {item.workType} ({item.stage})
-                                        </div>
-                                        <button
-                                            onClick={() => {
-                                                setSearchKeyword(item.orderNo);
-                                                setActiveTab('TABLE');
-                                            }}
-                                            className="mt-3 w-full py-1 text-center rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 hover:text-white transition-colors"
-                                        >
-                                            공정 대장에서 확인 →
-                                        </button>
                                     </div>
-                                ))}
-                            </div>
 
-                            {/* Full Table of Stagnant Items */}
-                            <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-                                <div className="p-3 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
-                                    <span className="font-semibold text-slate-300">
-                                        공정 미착수 정체 상위 50개 품목 대장
-                                    </span>
-                                    <span>정렬: 발주 후 경과일수 많은 순 (내림차순)</span>
-                                </div>
+                                    {/* Top 3 Worst Highlight Cards */}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        {criticalDueRiskItems.slice(0, 3).map((item, idx) => (
+                                            <div 
+                                                key={item.rowIdx}
+                                                className="p-4 rounded-xl bg-slate-950 border border-rose-500/50 shadow-lg relative overflow-hidden flex flex-col justify-between"
+                                            >
+                                                <div>
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="text-xs text-slate-400 font-semibold truncate max-w-[170px]" title={item.deliveryTo || item.customerName}>
+                                                            {item.deliveryTo || item.customerName}
+                                                        </div>
+                                                        <div className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 font-mono">
+                                                            #{idx + 1} {item.dueDateStatus === 'OVERDUE' ? '납기 초과' : '펑크 위험'}
+                                                        </div>
+                                                    </div>
 
-                                <div className="overflow-x-auto max-h-[500px]">
-                                    <table className="w-full text-left text-xs border-collapse font-mono">
-                                        <thead className="sticky top-0 bg-slate-900 text-slate-400 border-b border-slate-800 font-semibold">
-                                            <tr>
-                                                <th className="py-2.5 px-3 text-center">순위</th>
-                                                <th className="py-2.5 px-3">정체 일수</th>
-                                                <th className="py-2.5 px-3">발주일자</th>
-                                                <th className="py-2.5 px-3">주문번호 (Y열)</th>
-                                                <th className="py-2.5 px-3 font-sans">납품처 (Z열)</th>
-                                                <th className="py-2.5 px-3">품명</th>
-                                                <th className="py-2.5 px-3">규격 / 두께</th>
-                                                <th className="py-2.5 px-3 text-right">수량</th>
-                                                <th className="py-2.5 px-3 text-center font-sans">작업구분</th>
-                                                <th className="py-2.5 px-3 text-center font-sans">현재 상태</th>
-                                                <th className="py-2.5 px-3 text-center">액션</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-800/60">
-                                            {longestStagnantItems.map((item, idx) => (
-                                                <tr key={item.rowIdx} className="hover:bg-slate-900/60 transition-colors">
-                                                    <td className="py-2 px-3 text-center text-slate-500 font-bold">
-                                                        #{idx + 1}
-                                                    </td>
-                                                    <td className="py-2 px-3 font-bold">
-                                                        <span className={`px-2 py-0.5 rounded text-[11px] ${
-                                                            (item.elapsedDays || 0) >= 100 
-                                                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' 
-                                                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                                                        }`}>
-                                                            D+{item.elapsedDays}일
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-2 px-3 text-slate-300">{item.poDate || '-'}</td>
-                                                    <td className="py-2 px-3 font-bold text-emerald-400">{item.orderNo}</td>
-                                                    <td className="py-2 px-3 font-sans font-bold text-amber-300">
-                                                        {item.deliveryTo || item.customerName}
-                                                    </td>
-                                                    <td className="py-2 px-3 font-extrabold text-white">{item.itemName}</td>
-                                                    <td className="py-2 px-3 text-slate-300">{item.size} ({item.thickness})</td>
-                                                    <td className="py-2 px-3 text-right font-bold text-white">{item.orderQty}</td>
-                                                    <td className="py-2 px-3 text-center font-sans">
-                                                        <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 border border-slate-700">
-                                                            {item.workType}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-2 px-3 text-center font-sans text-red-300 text-[11px]">
-                                                        {item.stage}
-                                                    </td>
-                                                    <td className="py-2 px-3 text-center">
-                                                        <button
-                                                            onClick={() => {
-                                                                setSearchKeyword(item.orderNo);
-                                                                setActiveTab('TABLE');
-                                                            }}
-                                                            className="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-amber-600 hover:text-white text-slate-300 transition-colors"
-                                                        >
-                                                            대장 보기
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                                    <div className="text-lg font-black text-rose-400 mt-2 font-mono">
+                                                        {item.dueDateStatus === 'OVERDUE' ? (
+                                                            <span>🚨 고객납기 {Math.abs(item.remainingCustomerDays || 0)}일 초과</span>
+                                                        ) : (
+                                                            <span>🚨 {Math.abs(item.leadtimeDeficit || 0)}일 펑크 위험!</span>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="text-xs text-white font-bold mt-2 truncate" title={`${item.itemName} ${item.size} (${item.thickness})`}>
+                                                        {item.itemName} {item.size} ({item.thickness})
+                                                    </div>
+
+                                                    <div className="mt-2.5 p-2 rounded bg-slate-900 border border-slate-800 text-[11px] space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-slate-400">고객 납기:</span>
+                                                            <span className="font-bold text-amber-300 font-mono">
+                                                                {item.customerDueDate || '-'} ({typeof item.remainingCustomerDays === 'number' ? (item.remainingCustomerDays < 0 ? `+${Math.abs(item.remainingCustomerDays)}일 초과` : `D-${item.remainingCustomerDays}일`) : 'N/A'})
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-slate-400">대경 현재 공정:</span>
+                                                            <span className="font-bold text-slate-200">
+                                                                {item.stage} ({item.progressPct}%)
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-slate-400">잔여 제작 필요:</span>
+                                                            <span className="font-bold text-rose-300 font-mono">
+                                                                약 {item.remainingProductionDays}일 소요 예상
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="text-[11px] text-slate-400 mt-2 font-mono flex items-center justify-between">
+                                                        <span>발주: {item.orderNo}</span>
+                                                        <span className="text-white font-bold">{item.orderQty}개</span>
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setSearchKeyword(item.orderNo);
+                                                        setActiveTab('TABLE');
+                                                    }}
+                                                    className="mt-3 w-full py-1 text-center rounded bg-slate-800 hover:bg-rose-600 hover:text-white text-[11px] text-slate-300 transition-colors"
+                                                >
+                                                    공정 대장에서 확인 →
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Full Table of Due Date Risk Items */}
+                                    <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                                        <div className="p-3 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                                            <span className="font-semibold text-slate-300">
+                                                고객 납기 지연 및 펑크 위험 상위 50개 품목 대장
+                                            </span>
+                                            <span>정렬: 납기 결손 마진 큰 순 (내림차순)</span>
+                                        </div>
+
+                                        <div className="overflow-x-auto max-h-[500px]">
+                                            <table className="w-full text-left text-xs border-collapse font-mono">
+                                                <thead className="sticky top-0 bg-slate-900 text-slate-400 border-b border-slate-800 font-semibold">
+                                                    <tr>
+                                                        <th className="py-2.5 px-3 text-center">순위</th>
+                                                        <th className="py-2.5 px-3 text-center">납기 판정</th>
+                                                        <th className="py-2.5 px-3">고객 약속납기 (D-day)</th>
+                                                        <th className="py-2.5 px-3">대경 공정 & 잔여소요</th>
+                                                        <th className="py-2.5 px-3 text-center">납기 결손 마진</th>
+                                                        <th className="py-2.5 px-3">주문번호 (Y열)</th>
+                                                        <th className="py-2.5 px-3 font-sans">납품처 (Z열)</th>
+                                                        <th className="py-2.5 px-3">품명</th>
+                                                        <th className="py-2.5 px-3">규격 / 두께</th>
+                                                        <th className="py-2.5 px-3 text-right">수량</th>
+                                                        <th className="py-2.5 px-3 text-center">액션</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-800/60">
+                                                    {criticalDueRiskItems.map((item, idx) => (
+                                                        <tr key={item.rowIdx} className="hover:bg-slate-900/60 transition-colors">
+                                                            <td className="py-2 px-3 text-center text-slate-500 font-bold">
+                                                                #{idx + 1}
+                                                            </td>
+                                                            <td className="py-2 px-3 text-center">
+                                                                {item.dueDateStatus === 'OVERDUE' ? (
+                                                                    <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                                                                        🚨 납기초과
+                                                                    </span>
+                                                                ) : item.dueDateStatus === 'IMPOSSIBLE_DELAY' ? (
+                                                                    <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-600/30 text-red-200 border border-red-500/50">
+                                                                        🚨 펑크위험
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                                                        ⚠️ 촉박
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className="py-2 px-3">
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-slate-200 font-semibold">{item.customerDueDate || '-'}</span>
+                                                                    {typeof item.remainingCustomerDays === 'number' && (
+                                                                        <span className={`text-[10px] font-bold ${
+                                                                            item.remainingCustomerDays < 0 ? 'text-rose-400' : 'text-amber-400'
+                                                                        }`}>
+                                                                            {item.remainingCustomerDays < 0 ? `+${Math.abs(item.remainingCustomerDays)}일 경과` : `D-${item.remainingCustomerDays}일 남음`}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-2 px-3">
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-slate-300 font-sans">{item.stage} ({item.progressPct}%)</span>
+                                                                    <span className="text-[10px] text-rose-300 font-semibold">
+                                                                        잔여제작: 약 {item.remainingProductionDays}일 필요
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-2 px-3 text-center font-bold">
+                                                                <span className="px-2 py-0.5 rounded text-[11px] bg-red-950 text-red-200 border border-red-500/40">
+                                                                    {item.leadtimeDeficit !== null ? `${item.leadtimeDeficit}일` : '-'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-2 px-3 font-bold text-emerald-400">{item.orderNo}</td>
+                                                            <td className="py-2 px-3 font-sans font-bold text-amber-300">
+                                                                {item.deliveryTo || item.customerName}
+                                                            </td>
+                                                            <td className="py-2 px-3 font-extrabold text-white">{item.itemName}</td>
+                                                            <td className="py-2 px-3 text-slate-300">{item.size} ({item.thickness})</td>
+                                                            <td className="py-2 px-3 text-right font-bold text-white">{item.orderQty}</td>
+                                                            <td className="py-2 px-3 text-center">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSearchKeyword(item.orderNo);
+                                                                        setActiveTab('TABLE');
+                                                                    }}
+                                                                    className="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-amber-600 hover:text-white text-slate-300 transition-colors"
+                                                                >
+                                                                    대장 보기
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+
+                            {/* MODE B: 발주일 기준 장기 미착수 정체 (0% 진행 품목 TOP) */}
+                            {stagnantSubTab === 'ELAPSED_DAYS' && (
+                                <div className="space-y-4">
+                                    {/* Header description */}
+                                    <div className="bg-gradient-to-r from-amber-950/50 via-slate-950 to-slate-900 border border-amber-500/40 p-5 rounded-xl shadow-xl">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                                                    <Hourglass className="w-5 h-5 text-amber-400 animate-spin" />
+                                                    발주일 기준 최장 미착수 정체 순위 (0% 진행 품목 TOP)
+                                                    <span className="px-2 py-0.5 rounded text-xs bg-amber-500/20 text-amber-300 font-mono font-bold">
+                                                        발주 후 방치 품목 집중 관제
+                                                    </span>
+                                                </h3>
+                                                <p className="text-xs text-slate-400 mt-1">
+                                                    발주(PO)를 넣은 지 수개월이 지나도록 <b>대경벤드에서 절단(P열) 착수조차 안 되고 검토/홀딩 상태로 멈춰 있는</b> 피팅 자재들을 경과일수 순으로 정렬했습니다.
+                                                    <span className="text-amber-400 font-medium ml-1">
+                                                        (💡 NEGO, 시편TEST비 등 비제품성 정산 행은 자동 제외되어 순수 배관 피팅 자재만 표시됩니다)
+                                                    </span>
+                                                </p>
+                                            </div>
+                                            <div className="text-right font-mono shrink-0 pl-4">
+                                                <div className="text-xs text-slate-400">최장 정체 일수</div>
+                                                <div className="text-2xl font-black text-amber-400">
+                                                    {longestStagnantItems[0]?.elapsedDays || 0} <span className="text-sm font-normal text-slate-400">일</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Top 3 Worst Highlight Cards */}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        {longestStagnantItems.slice(0, 3).map((item, idx) => (
+                                            <div 
+                                                key={item.rowIdx}
+                                                className="p-4 rounded-xl bg-slate-950 border border-amber-500/40 shadow-lg relative overflow-hidden"
+                                            >
+                                                <div className="absolute top-2 right-2 px-2 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono">
+                                                    #{idx + 1} 최장 멈춤
+                                                </div>
+                                                <div className="text-xs text-slate-400 font-semibold truncate max-w-[170px]">
+                                                    {item.deliveryTo || item.customerName}
+                                                </div>
+                                                <div className="text-xl font-black text-amber-400 mt-1 font-mono">
+                                                    D+{item.elapsedDays}일째 멈춤
+                                                </div>
+                                                <div className="text-xs text-white font-bold mt-2">
+                                                    {item.itemName} {item.size} ({item.thickness})
+                                                </div>
+                                                <div className="text-[11px] text-slate-400 mt-1">
+                                                    발주: <span className="text-slate-300 font-mono">{item.orderNo}</span> ({item.poDate})
+                                                </div>
+                                                <div className="text-[11px] text-amber-300 mt-0.5">
+                                                    수량: <span className="font-bold">{item.orderQty}개</span> | 작업구분: {item.workType} ({item.stage})
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        setSearchKeyword(item.orderNo);
+                                                        setActiveTab('TABLE');
+                                                    }}
+                                                    className="mt-3 w-full py-1 text-center rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 hover:text-white transition-colors"
+                                                >
+                                                    공정 대장에서 확인 →
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Full Table of Stagnant Items */}
+                                    <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                                        <div className="p-3 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                                            <span className="font-semibold text-slate-300">
+                                                공정 미착수 정체 상위 50개 품목 대장
+                                            </span>
+                                            <span>정렬: 발주 후 경과일수 많은 순 (내림차순)</span>
+                                        </div>
+
+                                        <div className="overflow-x-auto max-h-[500px]">
+                                            <table className="w-full text-left text-xs border-collapse font-mono">
+                                                <thead className="sticky top-0 bg-slate-900 text-slate-400 border-b border-slate-800 font-semibold">
+                                                    <tr>
+                                                        <th className="py-2.5 px-3 text-center">순위</th>
+                                                        <th className="py-2.5 px-3">정체 일수</th>
+                                                        <th className="py-2.5 px-3">발주일자</th>
+                                                        <th className="py-2.5 px-3">주문번호 (Y열)</th>
+                                                        <th className="py-2.5 px-3 font-sans">납품처 (Z열)</th>
+                                                        <th className="py-2.5 px-3">품명</th>
+                                                        <th className="py-2.5 px-3">규격 / 두께</th>
+                                                        <th className="py-2.5 px-3 text-right">수량</th>
+                                                        <th className="py-2.5 px-3 text-center font-sans">작업구분</th>
+                                                        <th className="py-2.5 px-3 text-center font-sans">현재 상태</th>
+                                                        <th className="py-2.5 px-3 text-center">액션</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-800/60">
+                                                    {longestStagnantItems.map((item, idx) => (
+                                                        <tr key={item.rowIdx} className="hover:bg-slate-900/60 transition-colors">
+                                                            <td className="py-2 px-3 text-center text-slate-500 font-bold">
+                                                                #{idx + 1}
+                                                            </td>
+                                                            <td className="py-2 px-3 font-bold">
+                                                                <span className={`px-2 py-0.5 rounded text-[11px] ${
+                                                                    (item.elapsedDays || 0) >= 100 
+                                                                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' 
+                                                                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                                                }`}>
+                                                                    D+{item.elapsedDays}일
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-2 px-3 text-slate-300">{item.poDate || '-'}</td>
+                                                            <td className="py-2 px-3 font-bold text-emerald-400">{item.orderNo}</td>
+                                                            <td className="py-2 px-3 font-sans font-bold text-amber-300">
+                                                                {item.deliveryTo || item.customerName}
+                                                            </td>
+                                                            <td className="py-2 px-3 font-extrabold text-white">{item.itemName}</td>
+                                                            <td className="py-2 px-3 text-slate-300">{item.size} ({item.thickness})</td>
+                                                            <td className="py-2 px-3 text-right font-bold text-white">{item.orderQty}</td>
+                                                            <td className="py-2 px-3 text-center font-sans">
+                                                                <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 border border-slate-700">
+                                                                    {item.workType}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-2 px-3 text-center font-sans text-red-300 text-[11px]">
+                                                                {item.stage}
+                                                            </td>
+                                                            <td className="py-2 px-3 text-center">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSearchKeyword(item.orderNo);
+                                                                        setActiveTab('TABLE');
+                                                                    }}
+                                                                    className="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-amber-600 hover:text-white text-slate-300 transition-colors"
+                                                                >
+                                                                    대장 보기
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
