@@ -2,6 +2,7 @@
   "taeilAppsScriptUrl": "https://script.google.com/macros/s/AKfycbzMy1QO9YAlTvoiwrsy__P1SE0reXuqEZ3_i2il1jyCUpDSTHXt0W8rRgmDbKzv6SxV/exec",
   "daekyungAppsScriptUrl": "https://script.google.com/macros/s/AKfycbzajFL2l0CfRhMzBwGcXwKaMbURxmk98TOBli_oVPFOG6mdukduRWOJWsDi1VUXbXOm5g/exec",
   "altfDbAppsScriptUrl": "https://script.google.com/macros/s/AKfycbyQHiIy20cjxbUtDI9BSriZBePczKz4C1X74p2s504Bm2a63QH0TJ7CTCfXydlV7p7aGQ/exec",
+  "googleDriveFileId": "1_ZAnMjzbZyw8UQRgybVhaOYpWHpGe9U0",
   "bufferWaitMinutes": 3.5,
   "retryWaitMinutes": 3.5,
   "maxRetries": 5,

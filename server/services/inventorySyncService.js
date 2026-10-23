@@ -147,6 +147,7 @@ export class InventorySyncService {
       taeilAppsScriptUrl: '',
       daekyungAppsScriptUrl: '',
       altfDbAppsScriptUrl: '',
+      googleDriveFileId: '1_ZAnMjzbZyw8UQRgybVhaOYpWHpGe9U0',
       bufferWaitMinutes: 3.5, // 3.5분 (210초) 기본
       retryWaitMinutes: 3.5,  // 실패 시 3~5분 후 재시도
       maxRetries: 5,          // 최대 재시도 횟수
@@ -769,6 +770,58 @@ export class InventorySyncService {
     }
   }
 
+  /**
+   * 🤖 [DAT-06 과장 자동 직수신] 구글 드라이브에서 최신 inventory.json을 백그라운드로 자동 다이렉트 다운로드
+   */
+  async downloadLatestInventoryFromGoogleDrive() {
+    const fileId = this.config.googleDriveFileId || '1_ZAnMjzbZyw8UQRgybVhaOYpWHpGe9U0';
+    if (!fileId) return null;
+
+    try {
+      this._updateAgentStatus('DAT-06', '[자동 수신] 구글 드라이브에서 최신 inventory.json 직접 다운로드 중...', '구글 드라이브 직수신 착수', 'ACTIVE');
+      console.log(`[DAT-06 과장] 구글 드라이브에서 최신 inventory.json 직접 다운로드 시도 (File ID: ${fileId})...`);
+
+      const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000); // 60초 타임아웃
+
+      const res = await fetch(downloadUrl, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      }
+
+      const text = await res.text();
+      // 유효한 JSON인지 파싱 검증
+      const parsed = JSON.parse(text);
+      const items = Array.isArray(parsed) ? parsed : (parsed.items || []);
+      if (!items || items.length < 5000) {
+        throw new Error(`다운로드된 데이터 품목수(${items.length}건)가 부족합니다.`);
+      }
+
+      const homedir = os.homedir();
+      const downloadsDir = path.join(homedir, 'Downloads');
+      if (!fs.existsSync(downloadsDir)) {
+        fs.mkdirSync(downloadsDir, { recursive: true });
+      }
+
+      const targetPath = path.join(downloadsDir, 'inventory.json');
+      fs.writeFileSync(targetPath, text, 'utf8');
+
+      // 로컬 스토리지 캐시에도 백업 저장
+      const storageDir = path.resolve(process.cwd(), './storage/inventory');
+      if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
+      fs.writeFileSync(path.join(storageDir, 'inventory.json'), text, 'utf8');
+
+      console.log(`[DAT-06 과장] ✅ 구글 드라이브로부터 최신 inventory.json (${items.length.toLocaleString()}건) 직수신 완료: ${targetPath}`);
+      return { path: targetPath, count: items.length };
+    } catch (err) {
+      console.warn(`[DAT-06 과장] 구글 드라이브 자동 다운로드 경고 (기존 파일 탐색으로 대체):`, err.message);
+      return null;
+    }
+  }
+
   // ==========================================
   // [과장] DAT-06: 중복 방지 파일 정리, S3 배포, 재고 갱신, 시화 변동량 분석
   // ==========================================
@@ -791,6 +844,12 @@ export class InventorySyncService {
     this._updateAgentStatus('DAT-06', '[검수] 직전 대리 SUCCESS 확인됨 ➔ 최신 inventory.json 실물 타임스탬프 및 품목수 검증 중...', '최신 결과물 실물 검수 착수', 'ACTIVE');
 
     try {
+      // 0. 구글 드라이브로부터 최신 inventory.json 전자동 다이렉트 다운로드 (수동 개입 0% 실현)
+      const fileId = this.config.googleDriveFileId || '1_ZAnMjzbZyw8UQRgybVhaOYpWHpGe9U0';
+      if (fileId && !options.skipGoogleDriveDownload) {
+        await this.downloadLatestInventoryFromGoogleDrive();
+      }
+
       const homedir = os.homedir();
       const downloadsDir = path.join(homedir, 'Downloads');
       const cleanedFiles = [];
