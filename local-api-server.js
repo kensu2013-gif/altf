@@ -678,6 +678,34 @@ kakaoBotService.onOrderApproved = async (approvedKakaoOrder) => {
     }
 };
 
+// 🗑️ 카카오톡 발주서 삭제 시 db.orders 및 S3(altf.kr) 영구 동기화 삭제 훅
+kakaoBotService.onOrderDeleted = async (deletedKakaoOrder) => {
+    try {
+        if (!db.orders || !Array.isArray(db.orders)) return;
+        const targetId = deletedKakaoOrder.convertedOrderId;
+        const targetPoNo = deletedKakaoOrder.orderNo;
+        const targetKkoId = deletedKakaoOrder.id;
+        const beforeCount = db.orders.length;
+
+        // db.orders에서 정식 발주서 완전 제거 (altf.kr 영구 제외)
+        db.orders = db.orders.filter(o => {
+            if (targetId && o.id === targetId) return false;
+            if (targetPoNo && (o.poNumber === targetPoNo || o.id === targetPoNo)) return false;
+            if (targetKkoId && (o.id === targetKkoId || o.poNumber === targetKkoId)) return false;
+            if (targetPoNo && typeof o.memo === 'string' && o.memo.includes(targetPoNo)) return false;
+            if (targetKkoId && typeof o.memo === 'string' && o.memo.includes(targetKkoId)) return false;
+            return true;
+        });
+
+        if (db.orders.length < beforeCount) {
+            console.log(`[API] 🗑️ [카카오 발주 삭제] db.orders에서 발주서(${targetId || targetPoNo || targetKkoId}) 영구 제거 완료 (S3/altf.kr 동기화)`);
+            queueSave();
+        }
+    } catch (err) {
+        console.error('[API] 카카오 발주서 삭제 동기화 오류:', err.message);
+    }
+};
+
 async function updateDb(updater) {
     try {
         const result = await updater();

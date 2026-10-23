@@ -1476,14 +1476,25 @@ export class KakaoBotService {
     }
 
     /**
-     * 카카오 발주서 삭제
+     * 카카오 발주서 영구 삭제 (대시보드 및 db.orders/altf.kr 영구 제외)
      */
     deleteOrder(orderId) {
         const idx = this.orders.findIndex(o => o.id === orderId || o.orderNo === orderId);
         if (idx === -1) return false;
+        const deleted = this.orders[idx];
+        deleted.isDeleted = true;
         this.orders.splice(idx, 1);
         this.stats.totalOrders = this.orders.length;
         this.saveData();
+
+        // 🗑️ 정식 원장(db.orders) 및 S3(altf.kr)에서도 영구 삭제하도록 콜백 격발
+        if (typeof this.onOrderDeleted === 'function') {
+            try {
+                this.onOrderDeleted(deleted);
+            } catch (err) {
+                console.error('[KakaoBot] onOrderDeleted 콜백 실패:', err.message);
+            }
+        }
         return true;
     }
 

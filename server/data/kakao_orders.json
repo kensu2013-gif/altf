@@ -1,58 +1,12 @@
 [
   {
-    "id": "ORD-KKO-1792765955799",
-    "orderNo": "PO-KKO-261023-6278",
-    "channel": "카카오톡",
-    "source": "카카오톡",
-    "orderChannel": "카카오톡",
-    "type": "text",
-    "botUserKey": "test_buyer_sy",
-    "customerName": "에스와이금속",
-    "destination": "동시화 화물터미널",
-    "freightTerms": "현불화물 후 화물비청구",
-    "recipient": "",
-    "phone": "",
-    "quoteAdj": {},
-    "status": "APPROVED",
-    "validationStatus": "VALID",
-    "missingFields": [],
-    "reviewStatus": "APPROVED",
-    "receivedAt": "2026-10-23T14:32:35.797Z",
-    "assignedDept": "purchase",
-    "assignedAgents": [
-      "EXE-02",
-      "PUR-01",
-      "PUR-07"
-    ],
-    "utterance": "에스와이금속 50\n현불화물 후 화물비청구",
-    "imageUrl": null,
-    "items": [
-      {
-        "name": "90E(L)",
-        "size": "50A",
-        "thickness": "S10S",
-        "material": "STS304-W",
-        "quantity": 10,
-        "unitPrice": 12000,
-        "amount": 120000
-      }
-    ],
-    "itemCount": 1,
-    "totalAmount": 120000,
-    "relatedQuotationId": null,
-    "updatedAt": "2026-10-23T14:32:50.553Z",
-    "approvedBy": "조현진 대표",
-    "approvedAt": "2026-10-23T14:32:58.640Z",
-    "convertedOrderId": "PO-20261023-KKO-9078"
-  },
-  {
-    "id": "ORD-KKO-1792765950763",
+    "id": "ORD-KKO-WONJIN-20261023",
     "orderNo": "PO-KKO-261023-7381",
     "channel": "카카오톡",
     "source": "카카오톡",
     "orderChannel": "카카오톡",
     "type": "text",
-    "botUserKey": "test_buyer_wonjin",
+    "botUserKey": "kakao_buyer_wonjin_01",
     "customerName": "원진철강",
     "destination": "대신화물/평택고덕 지점",
     "freightTerms": "선불 화물 발송",
@@ -63,7 +17,7 @@
     "validationStatus": "VALID",
     "missingFields": [],
     "reviewStatus": "PENDING",
-    "receivedAt": "2026-10-23T14:32:30.762Z",
+    "receivedAt": "2026-10-23T14:40:00.000Z",
     "assignedDept": "purchase",
     "assignedAgents": [
       "EXE-02",
@@ -74,88 +28,28 @@
     "imageUrl": null,
     "items": [
       {
+        "id": "ORD-ITEM-0-WONJIN",
         "name": "CAP",
         "material": "A403WP304",
         "size": "1-1/2\"",
         "thickness": "S40S",
         "quantity": 2,
-        "unitPrice": 0,
-        "amount": 0
+        "unitPrice": 14500,
+        "amount": 29000
       },
       {
+        "id": "ORD-ITEM-1-WONJIN",
         "name": "CAP",
         "material": "A403WP304",
         "size": "4\"",
         "thickness": "S40S",
         "quantity": 2,
-        "unitPrice": 0,
-        "amount": 0
+        "unitPrice": 38000,
+        "amount": 76000
       }
     ],
     "itemCount": 2,
-    "totalAmount": 0,
-    "relatedQuotationId": null
-  },
-  {
-    "id": "ORD-KKO-1792765053519",
-    "orderNo": "PO-KKO-261023-5853",
-    "type": "text",
-    "botUserKey": "kakao_order_test_user_01",
-    "customerName": "카카오톡 고객사",
-    "phone": "",
-    "status": "RECEIVED",
-    "receivedAt": "2026-10-23T14:17:33.518Z",
-    "channel": "카카오톡 채널 (@altf)",
-    "assignedDept": "purchase",
-    "assignedAgents": [
-      "EXE-02",
-      "PUR-01",
-      "PUR-07"
-    ],
-    "utterance": "발주서 접수합니다. 40A 엘보 10개, 50A 티 5개 발주 부탁드립니다.",
-    "imageUrl": null,
-    "items": [
-      {
-        "name": "90E(L)",
-        "spec": "S10S STS304-W 40A",
-        "quantity": 40,
-        "unitPrice": 10920,
-        "amount": 436800
-      }
-    ],
-    "itemCount": 1,
-    "totalAmount": 436800,
-    "relatedQuotationId": null
-  },
-  {
-    "id": "ORD-KKO-1792765008499",
-    "orderNo": "PO-KKO-261023-7542",
-    "type": "text",
-    "botUserKey": "test_kakao_buyer_99",
-    "customerName": "카카오톡 고객사",
-    "phone": "",
-    "status": "RECEIVED",
-    "receivedAt": "2026-10-23T14:16:48.497Z",
-    "channel": "카카오톡 채널 (@altf)",
-    "assignedDept": "purchase",
-    "assignedAgents": [
-      "EXE-02",
-      "PUR-01",
-      "PUR-07"
-    ],
-    "utterance": "발주합니다. 40A 엘보 20개, 50A 티 10개 주문 부탁드립니다.",
-    "imageUrl": null,
-    "items": [
-      {
-        "name": "90E(L)",
-        "spec": "S10S STS304-W 40A",
-        "quantity": 40,
-        "unitPrice": 10920,
-        "amount": 436800
-      }
-    ],
-    "itemCount": 1,
-    "totalAmount": 436800,
+    "totalAmount": 105000,
     "relatedQuotationId": null
   }
 ]

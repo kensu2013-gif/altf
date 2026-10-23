@@ -286,6 +286,32 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
         }
     };
 
+    // 🗑️ Permanent deletion from dashboard and altf.kr
+    const handleDeleteOrder = async () => {
+        if (!activeOrder) return;
+        if (!confirm(`[카카오톡 발주서 영구 삭제]\n\n• 발주번호: ${activeOrder.orderNo}\n• 발송업체: ${activeOrder.customerName}\n\n정말로 이 발주서를 영구 삭제하시겠습니까?\n\n* 삭제 시 대시보드 및 altf.kr 정식 주문 대장에서 완전히 제거되어 다시는 표시되지 않습니다.`)) {
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/kakao/orders/${activeOrder.id}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                alert(`🗑️ [삭제 완료] ${activeOrder.orderNo} 건이 영구 삭제되었습니다.\n(대시보드 및 altf.kr에서 완전히 제거되었습니다.)`);
+                setSelectedOrderId(null);
+                await fetchOrders();
+            } else {
+                alert('삭제 실패');
+            }
+        } catch (e: any) {
+            alert('삭제 오류: ' + e.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const pendingCount = orders.filter(o => o.status !== 'APPROVED').length;
     const currentTotal = editItems.reduce((s, it) => s + (it.amount || ((it.unitPrice || 0) * (it.quantity || 1))), 0);
 
@@ -388,7 +414,24 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
 
                                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-800/50 text-[11px] text-gray-500">
                                         <span>{item.orderNo}</span>
-                                        <span className="text-gray-400">{item.type === 'image_and_text' ? '📷 사진+텍스트' : item.type === 'image' ? '📷 사진 인입' : '💬 텍스트'}</span>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-gray-400">{item.type === 'image_and_text' ? '📷 사진+텍스트' : item.type === 'image' ? '📷 사진' : '💬 텍스트'}</span>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (confirm(`[카카오톡 발주서 영구 삭제]\n\n${item.orderNo} (${item.customerName}) 건을 영구 삭제하시겠습니까?\n대시보드 및 altf.kr 정식 주문 대장에서 완전히 제거됩니다.`)) {
+                                                        fetch(`/api/kakao/orders/${item.id}`, { method: 'DELETE' }).then(() => {
+                                                            if (selectedOrderId === item.id) setSelectedOrderId(null);
+                                                            fetchOrders();
+                                                        });
+                                                    }
+                                                }}
+                                                className="p-1 hover:bg-rose-950/60 rounded text-gray-500 hover:text-rose-400 transition-colors"
+                                                title="영구 삭제"
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -749,13 +792,22 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                     {/* Bottom Action Footer */}
                     <div className="px-6 py-4 border-t border-gray-800 bg-[#161922] flex items-center justify-between flex-shrink-0">
                         <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleDeleteOrder}
+                                disabled={saving}
+                                className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-gray-800/90 hover:bg-rose-950/80 text-rose-400 border border-rose-900/60 transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+                                title="대시보드 및 altf.kr 정식 원장에서 영구 삭제"
+                            >
+                                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                                <span>발주서 영구 삭제</span>
+                            </button>
                             {activeOrder.status !== 'APPROVED' && (
                                 <button
                                     onClick={handleReject}
                                     disabled={saving}
-                                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-gray-800 hover:bg-rose-950/60 text-rose-300 border border-rose-900/40 transition-colors disabled:opacity-50"
+                                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-gray-800 hover:bg-rose-950/40 text-rose-300 border border-gray-700 transition-colors disabled:opacity-50"
                                 >
-                                    ❌ 발주 반려
+                                    ❌ 반려
                                 </button>
                             )}
                             <button
