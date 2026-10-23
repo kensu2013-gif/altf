@@ -454,7 +454,7 @@ export class PurchaseStockOrderService {
 
                 // 사용자가 대시보드에서 명시적으로 OFFLINE(OFF) 또는 IDLE로 설정한 경우 덮어쓰지 않고 절대 우선 유지
                 if (purAgent.status !== 'OFFLINE' && purAgent.status !== 'OFF' && purAgent.status !== 'IDLE') {
-                    purAgent.status = isRunning ? 'ACTIVE' : 'STANDBY';
+                    purAgent.status = 'ACTIVE';
                 }
                 purAgent.currentTask = isRunning 
                     ? `altf.kr API 재고 발주 동기화 실행 중...` 

@@ -1030,6 +1030,122 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // 🚀 전사 봇 41기 전체 일괄 활성화 API
+    if (url.pathname === '/api/agents/activate-all' && req.method === 'POST') {
+        try {
+            const result = agentControlManager.activateAllAgents();
+            db.agents = agentControlManager.agentsCache;
+            queueSave();
+
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({
+                success: true,
+                count: result.count,
+                message: '전사 41기 봇 전체 활성화(ACTIVE) 완료',
+                agents: db.agents
+            }));
+            return;
+        } catch (e) {
+            console.error('[API] Activate all agents failed:', e);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: e.message }));
+            return;
+        }
+    }
+
+    // ⚡ 전사 봇 41기 전체 즉시 실행 파이프라인 가동 API (RUN ALL)
+    if (url.pathname === '/api/agents/run-all' && req.method === 'POST') {
+        try {
+            // 1. 전사 봇 상태를 ACTIVE로 일괄 전환 & 보존
+            const result = agentControlManager.activateAllAgents();
+            db.agents = agentControlManager.agentsCache;
+            queueSave();
+
+            const executionReport = {
+                timestamp: new Date().toISOString(),
+                totalBots: db.agents.length,
+                activatedBots: result.count,
+                triggeredPipelines: []
+            };
+
+            // 2. 주요 부서별 실행 파이프라인 비동기 즉각 트리거
+            // (1) 구매부 PUR-01: 알트에프 재고 발주 동기화
+            try {
+                if (typeof purchaseStockOrderService.syncFromAltfApi === 'function') {
+                    purchaseStockOrderService.syncFromAltfApi(false).catch(err => console.warn('[RUN-ALL] PUR-01 sync error:', err.message));
+                    executionReport.triggeredPipelines.push({ dept: '구매부', code: 'PUR-01', name: '알트에프 재고 발주 동기화' });
+                }
+            } catch (p1Err) {
+                console.warn('[RUN-ALL] PUR-01 trigger warning:', p1Err.message);
+            }
+
+            // (2) 구매부 PUR-02~04 / DAT-07: 대경 생산 미결 원장 파싱 및 공정 납기 분석
+            try {
+                if (typeof pendingListService.syncLatest === 'function') {
+                    pendingListService.syncLatest().catch(err => console.warn('[RUN-ALL] PUR-02~04 sync error:', err.message));
+                    executionReport.triggeredPipelines.push({ dept: '구매부/데이터관리팀', code: 'PUR-02~04, DAT-07', name: '대경 생산미결 파싱 & 공정납기 정밀진단' });
+                }
+            } catch (p2Err) {
+                console.warn('[RUN-ALL] PUR-02~04 trigger warning:', p2Err.message);
+            }
+
+            // (3) 구매부 PUR-07: 주문 분류 및 미결 통합 동기화
+            try {
+                if (typeof purchaseBacklogBotService.classifyAndSyncBacklog === 'function') {
+                    purchaseBacklogBotService.classifyAndSyncBacklog(db.orders || []);
+                    executionReport.triggeredPipelines.push({ dept: '구매부', code: 'PUR-07', name: '발주 분류 및 미결 통합 관제' });
+                }
+            } catch (p7Err) {
+                console.warn('[RUN-ALL] PUR-07 trigger warning:', p7Err.message);
+            }
+
+            // (4) 품질부 QC-01/02: 메일플러그 외주 성적서 수집
+            try {
+                if (typeof mailplugService.syncNow === 'function') {
+                    mailplugService.syncNow().catch(err => console.warn('[RUN-ALL] QC-01 sync error:', err.message));
+                    executionReport.triggeredPipelines.push({ dept: '품질부', code: 'QC-01/02', name: '메일플러그 성적서 IMAP 수집 & 파싱' });
+                }
+            } catch (qcErr) {
+                console.warn('[RUN-ALL] QC-01 trigger warning:', qcErr.message);
+            }
+
+            // (5) 데이터관리팀 DAT-03~06: 재고 상태 갱신
+            try {
+                if (typeof inventorySyncService.loadConfig === 'function') {
+                    inventorySyncService.loadConfig();
+                    executionReport.triggeredPipelines.push({ dept: '데이터관리팀', code: 'DAT-03~06', name: 'ALTF 재고 DB 및 S3 동기화 체인' });
+                }
+            } catch (datErr) {
+                console.warn('[RUN-ALL] DAT-03 trigger warning:', datErr.message);
+            }
+
+            // (6) 영업부 SLE-07: 견적 요율 점검
+            try {
+                if (typeof sleQuoteReviewService.reviewAllQuotes === 'function') {
+                    sleQuoteReviewService.reviewAllQuotes(db.quotations || []);
+                    executionReport.triggeredPipelines.push({ dept: '영업부', code: 'SLE-07', name: '견적 요율 자동 점검' });
+                }
+            } catch (sleErr) {
+                console.warn('[RUN-ALL] SLE-07 trigger warning:', sleErr.message);
+            }
+
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({
+                success: true,
+                message: '⚡ 전사 봇 41기 전체 활성화 및 실시간 파이프라인 가동이 성공적으로 개시되었습니다.',
+                executionReport,
+                agents: db.agents
+            }));
+            return;
+        } catch (e) {
+            console.error('[API] Run all agents failed:', e);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: e.message }));
+            return;
+        }
+    }
+
+
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 🏛️ B2B AGENT LEDGER API (단일 원장 API: 0-B 규격)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

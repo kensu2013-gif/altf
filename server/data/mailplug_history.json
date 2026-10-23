@@ -1,5 +1,23 @@
 [
   {
+    "id": "mail_1792735860173",
+    "timestamp": "2026-10-23T06:11:00.173Z",
+    "type": "REAL_IMAP_COLLECTED",
+    "uid": 22923,
+    "subject": "[대경벤드] 10/22일 출고분 성적서 전달드 립니다(추가)",
+    "extractedPdfCount": 1,
+    "files": [
+      {
+        "filename": "[대경벤드] 10_22일 출고분 성적서 전달드 립니다(추가).pdf",
+        "path": "/Volumes/Extreme SSD/altf-kr-web-skeleton/storage/certificates/[대경벤드] 10_22일 출고분 성적서 전달드 립니다(추가).pdf",
+        "sizeBytes": 3813961,
+        "sourceZip": null,
+        "emailSubject": "[대경벤드] 10/22일 출고분 성적서 전달드 립니다(추가)",
+        "date": "Fri, 23 Oct 2026 14:24:31 +0900"
+      }
+    ]
+  },
+  {
     "id": "mail_1792728450440",
     "timestamp": "2026-10-23T04:07:30.440Z",
     "type": "REAL_IMAP_COLLECTED",

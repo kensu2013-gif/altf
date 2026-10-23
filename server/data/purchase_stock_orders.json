@@ -1,5 +1,38 @@
 [
   {
+    "id": "PO-20261023-TAEIL-006_item_0",
+    "orderId": "PO-20261023-TAEIL-006",
+    "orderDate": "2026-10-23",
+    "receivedDate": "-",
+    "customer": "주식회사 한도금속",
+    "supplier": "대경벤드",
+    "poNo": "ES261023-2981",
+    "certNo": "-",
+    "specMaterial": "STS304-W",
+    "specInspection": "S40S",
+    "heatNo": "-",
+    "lotNo": "-",
+    "itemNo": 1,
+    "description": "R(C)-S40S-200A X 150A-STS304-W",
+    "orderQty": 2,
+    "receivedQty": 0,
+    "pendingQty": 2,
+    "status": "미결",
+    "chem": {
+      "C": "",
+      "Si": "",
+      "Mn": "",
+      "P": "",
+      "S": "",
+      "Ni": "",
+      "Cr": "",
+      "Mo": ""
+    },
+    "mech": "-",
+    "pdfUrls": [],
+    "memo": "배송:화물 - 동시화 지점\n담당자: 한도금속 (031-499-3800)\n요청사항: 현불화물\n[재고장 확인의 건]"
+  },
+  {
     "id": "PO-20261022-TAEIL-005_item_0",
     "orderId": "PO-20261022-TAEIL-005",
     "orderDate": "2026-10-22",

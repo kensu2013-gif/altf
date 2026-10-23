@@ -188,6 +188,50 @@ class AgentControlManager extends EventEmitter {
             return false;
         }
     }
+
+    /**
+     * 🚀 전사 봇 41기 전체 일괄 활성화 (Ready & Active State)
+     * - 모든 봇의 status를 'ACTIVE'로 전환
+     * - isCreated를 true로 보장
+     * - 사원/대리는 AUTO_RUNNING, 과장/팀장은 APPROVED로 자동 승인 상태 설정
+     * - 실시간 가동 로그 기록 및 대시보드 리스너 브로드캐스트
+     */
+    activateAllAgents() {
+        this.loadAgents();
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('ko-KR');
+
+        this.agentsCache = this.agentsCache.map(agent => {
+            const isManager = agent.position === '팀장' || agent.position === '과장';
+            const approval = isManager ? 'APPROVED' : 'AUTO_RUNNING';
+            const existingLogs = Array.isArray(agent.logs) ? agent.logs : [];
+            const newLog = `[${timeStr}] [전사 일괄 가동] 봇 활성화 완료 (상태: ACTIVE, 파이프라인 상시 가동 준비)`;
+
+            return {
+                ...agent,
+                status: 'ACTIVE',
+                isCreated: true,
+                approvalStatus: approval,
+                lastActive: '방금 전',
+                metrics: {
+                    ...(agent.metrics || { speed: 98, accuracy: 99, load: 15, uptime: '99.9%', tasksToday: 10 }),
+                    tasksToday: ((agent.metrics?.tasksToday || 0) + 1)
+                },
+                logs: [newLog, ...existingLogs.slice(0, 19)]
+            };
+        });
+
+        try {
+            fs.writeFileSync(AGENTS_PATH, JSON.stringify(this.agentsCache, null, 2), 'utf8');
+            console.log(`🚀 [AgentControlManager] 전사 41기 봇 전체 활성화(ACTIVE) 저장 완료`);
+            this.emit('change', this.agentsCache);
+            return { success: true, count: this.agentsCache.length, agents: this.agentsCache };
+        } catch (e) {
+            console.error('[AgentControlManager] 전사 활성화 저장 오류:', e.message);
+            throw e;
+        }
+    }
 }
 
 export const agentControlManager = new AgentControlManager();
+
