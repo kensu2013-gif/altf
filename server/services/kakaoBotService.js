@@ -256,6 +256,8 @@ export class KakaoBotService {
             utterance.includes('진행 상황')
         );
 
+        const cleanImageUrl = finalImageUrl ? finalImageUrl.split('?')[0] : '';
+
         // 3-1. 👑 [EXE-02 카카오톡 인바운드 분배봇: 발주(PO) vs 견적(Quote) 자동 분류]
         const isOrderIntent = (
             /^(발주|발주서|주문|주문서|발주합니다|출고\s*요청|납품\s*요청|진행\s*해주세요|발주\s*진행)$/i.test(utterance) ||
@@ -280,7 +282,6 @@ export class KakaoBotService {
 
         // 🔥 [중복 요청 차단 (Deduplication)]: 카카오 오픈빌더 재시도 및 연타로 인한 무한루프 백엔드 격발 방지
         this.cleanupRecentRequests();
-        const cleanImageUrl = finalImageUrl ? finalImageUrl.split('?')[0] : '';
         const dedupKey = isImage
             ? `IMG:${botUserKey}:${cleanImageUrl}`
             : (isStatusQuery ? null : `TXT:${botUserKey}:${utterance.toLowerCase()}`);

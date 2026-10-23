@@ -1,1 +1,64 @@
-[]
+[
+  {
+    "id": "ORD-KKO-1792765053519",
+    "orderNo": "PO-KKO-261023-5853",
+    "type": "text",
+    "botUserKey": "kakao_order_test_user_01",
+    "customerName": "카카오톡 고객사",
+    "phone": "",
+    "status": "RECEIVED",
+    "receivedAt": "2026-10-23T14:17:33.518Z",
+    "channel": "카카오톡 채널 (@altf)",
+    "assignedDept": "purchase",
+    "assignedAgents": [
+      "EXE-02",
+      "PUR-01",
+      "PUR-07"
+    ],
+    "utterance": "발주서 접수합니다. 40A 엘보 10개, 50A 티 5개 발주 부탁드립니다.",
+    "imageUrl": null,
+    "items": [
+      {
+        "name": "90E(L)",
+        "spec": "S10S STS304-W 40A",
+        "quantity": 40,
+        "unitPrice": 10920,
+        "amount": 436800
+      }
+    ],
+    "itemCount": 1,
+    "totalAmount": 436800,
+    "relatedQuotationId": null
+  },
+  {
+    "id": "ORD-KKO-1792765008499",
+    "orderNo": "PO-KKO-261023-7542",
+    "type": "text",
+    "botUserKey": "test_kakao_buyer_99",
+    "customerName": "카카오톡 고객사",
+    "phone": "",
+    "status": "RECEIVED",
+    "receivedAt": "2026-10-23T14:16:48.497Z",
+    "channel": "카카오톡 채널 (@altf)",
+    "assignedDept": "purchase",
+    "assignedAgents": [
+      "EXE-02",
+      "PUR-01",
+      "PUR-07"
+    ],
+    "utterance": "발주합니다. 40A 엘보 20개, 50A 티 10개 주문 부탁드립니다.",
+    "imageUrl": null,
+    "items": [
+      {
+        "name": "90E(L)",
+        "spec": "S10S STS304-W 40A",
+        "quantity": 40,
+        "unitPrice": 10920,
+        "amount": 436800
+      }
+    ],
+    "itemCount": 1,
+    "totalAmount": 436800,
+    "relatedQuotationId": null
+  }
+]
