@@ -6,6 +6,7 @@ const STORAGE_DIR = path.resolve(process.cwd(), './storage/pending_lists');
 const DB_PATH = path.resolve(process.cwd(), './data/db.json');
 const ANALYSIS_RESULT_PATH = path.resolve(process.cwd(), './server/data/pending_orders_analysis.json');
 const LEADTIME_STATS_PATH = path.resolve(process.cwd(), './server/data/leadtime_stats.json');
+const LEADTIME_HISTORY_PATH = path.resolve(process.cwd(), './server/data/leadtime_history.json');
 const AGENTS_JSON_PATH = path.resolve(process.cwd(), './server/data/agents.json');
 
 export class PendingListService {
@@ -217,38 +218,62 @@ export class PendingListService {
         }
       }
 
-      // 2. 발주 매칭
+      // 2. 발주 매칭 및 Z열(납품처) ↔ Y열(주문번호) 연계
       const matchedOrder = poMap.get(row.orderNo);
-      let customerName = '자체/미지정';
+      // Z열 납품처 우선, 없으면 ALTF DB의 customerName
+      let customerName = row.deliveryTo || (matchedOrder?.customerName) || '자체/미지정';
       let poCreatedAt = null;
-      let isStockOrder = row.orderNo.includes('재고') || row.project.includes('재고');
+      let isStockOrder = row.orderNo.includes('재고') || row.project.includes('재고') || (row.deliveryTo && row.deliveryTo.includes('재고'));
 
       if (matchedOrder) {
         matchedCount++;
-        customerName = matchedOrder.customerName || '고객사 매칭';
+        if (!row.deliveryTo && matchedOrder.customerName) {
+          customerName = matchedOrder.customerName;
+        }
         poCreatedAt = matchedOrder.createdAt;
         if (matchedOrder.isStockOrder) isStockOrder = true;
       }
       if (isStockOrder) stockOrderCount++;
 
       // 3. 지연 및 병목 감지 (PUR-04 과장 연계 규칙)
+      // 💡 [중요 규칙]: 창고입고(V열 storeDate) 완료된 품목은 출고 직전이므로 독촉 대상에서 100% 완전 제외!
       let alertReason = null;
       let alertSeverity = 'NORMAL'; // NORMAL | WARNING | CRITICAL
 
       if (!isCompleted) {
-        // A. 생산으로 넘겼으나 절단일자가 없는 경우
+        // A. 생산 확정인데 절단(P열) 미착수 -> 긴급 독촉!
         if (row.workType.includes('생산') && !row.cutDate) {
-          alertReason = '생산 확정되었으나 절단 미착수 상태';
+          alertReason = '생산 확정되었으나 절단(P열) 미착수 상태';
           alertSeverity = 'CRITICAL';
         }
-        // B. 1주일 이상 검토 정체인 경우
+        // B. 1주일 이상 검토 정체인 경우 -> 검토 홀딩 독촉!
         else if (row.workType.includes('검토') && !row.cutDate && !row.machDate) {
-          alertReason = '1주일 이상 공정 미착수 (검토 상태 정체)';
+          alertReason = '공정 미착수 (검토 상태 1주일 이상 장기 정체)';
           alertSeverity = 'WARNING';
         }
-        // C. 이전 공정 완료 후 장기 멈춤
-        else if (row.formDate && !row.heatDate && !row.machDate) {
-          alertReason = '성형 완료 후 열처리/가공 10일 이상 정체';
+        // C. 절단 완료 후 후속 성형/열처리 미진행
+        else if (row.cutDate && !row.formDate && !row.machDate) {
+          alertReason = `절단(${row.cutDate}) 완료 후 후속 성형/가공 미진행 정체`;
+          alertSeverity = 'WARNING';
+        }
+        // D. 성형 완료 후 열처리/가공 미진행
+        else if (row.formDate && !row.heatDate && !row.calibDate && !row.machDate) {
+          alertReason = `성형(${row.formDate}) 완료 후 후속 열처리/가공 정체`;
+          alertSeverity = 'WARNING';
+        }
+        // E. 가공 완료 후 산세/창고입고 미진행
+        else if (row.machDate && !row.acidDate && !row.storeDate) {
+          alertReason = `가공(${row.machDate}) 완료 후 산세/창고입고 대기 정체`;
+          alertSeverity = 'WARNING';
+        }
+        // F. 수정/재고 배정 후 가공/입고 미진행
+        else if ((row.workType.includes('수정') || row.workType.includes('재고')) && !row.machDate && !row.storeDate) {
+          alertReason = `${row.workType} 배정 후 가공/출고 미진행 정체`;
+          alertSeverity = 'WARNING';
+        }
+        // G. 외주 의뢰 후 미입고
+        else if (row.workType.includes('외주') && !row.storeDate) {
+          alertReason = '외주 가공 의뢰 후 창고 입고 대기';
           alertSeverity = 'WARNING';
         }
       }
@@ -272,7 +297,7 @@ export class PendingListService {
       }
     });
 
-    this._updateAgentStatus('PUR-03', `발주 매칭 ${matchedCount}건, 공정 단계 분류 완료`, `매칭 ${matchedCount}건 / 지연 경보 ${alertItems.length}건 산출`, 'ACTIVE');
+    this._updateAgentStatus('PUR-03', `발주 매칭 ${matchedCount}건, 공정 단계 분류 완료`, `매칭 ${matchedCount}건 / 지연 경보 ${alertItems.length}건 산출 (입고완료 제외)`, 'ACTIVE');
 
     return {
       totalRows: analyzedRows.length,
@@ -288,126 +313,260 @@ export class PendingListService {
 
   /**
    * 3. 대경벤드 납기 독촉 보고서 생성 (PUR-04 과장봇)
+   * 💡 [핵심 원칙]: 창고 입고(V열 storeDate) 완료 건은 출고 직전 상태이므로 독촉 보고서에서 100% 완전 제외!
+   * 💡 Z열(납품처)과 Y열(주문번호) 기준으로 그룹핑하여 대경벤드에 직통 전달 가능한 형식으로 작성
    */
   generateChaserReport(analyzedData) {
     this._updateAgentStatus('PUR-04', '공정 진행도 종합 분석 및 대경벤드 납기 독촉 보고서 작성 중...', '납기 독촉 리포트 작성 착수', 'ACTIVE');
 
-    const criticalItems = analyzedData.alertItems.filter(i => i.alertSeverity === 'CRITICAL');
-    const warningItems = analyzedData.alertItems.filter(i => i.alertSeverity === 'WARNING');
+    // 🚨 창고입고 완료 품목은 출고 직전이므로 독촉 대상에서 완전히 배제
+    const pendingAlertItems = analyzedData.alertItems.filter(i => !i.isCompleted && !i.storeDate);
 
-    // Group critical items by orderNo
+    const criticalItems = pendingAlertItems.filter(i => i.alertSeverity === 'CRITICAL');
+    const warningItems = pendingAlertItems.filter(i => i.alertSeverity === 'WARNING');
+
+    // Grouping by [주문번호(Y열) + 납품처(Z열)]
     const groupByOrder = {};
-    analyzedData.alertItems.forEach(item => {
-      const key = item.orderNo || '주문번호미상';
-      if (!groupByOrder[key]) {
-        groupByOrder[key] = {
-          orderNo: key,
-          customerName: item.customerName,
+    pendingAlertItems.forEach(item => {
+      const orderKey = item.orderNo || '주문번호미상';
+      const destKey = item.deliveryTo || item.customerName || '자체/미지정';
+      const compositeKey = `${orderKey}__${destKey}`;
+
+      if (!groupByOrder[compositeKey]) {
+        groupByOrder[compositeKey] = {
+          orderNo: orderKey,
+          deliveryTo: destKey,
+          customerName: item.customerName || destKey,
           items: []
         };
       }
-      groupByOrder[key].items.push(item);
+      groupByOrder[compositeKey].items.push(item);
     });
 
     const todayStr = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
     let markdown = `# 🚨 [알트에프 구매부] 대경벤드 생산 미결 및 긴급 납기 독촉 보고서\n`;
     markdown += `**작성 일시**: ${todayStr} | **주관**: 구매부 미결관리팀 (PUR-04 과장)\n`;
-    markdown += `**총 미결 항목**: ${analyzedData.totalRows.toLocaleString()}건 | **납기 지연/정체 경보**: 총 ${analyzedData.alertCount}건 (긴급: ${criticalItems.length}건, 경고: ${warningItems.length}건)\n\n`;
+    markdown += `**총 미결 항목**: ${analyzedData.totalRows.toLocaleString()}건 | **창고입고 완료(독촉 제외)**: ${(analyzedData.stageCounts?.창고입고완료 || 0).toLocaleString()}건\n`;
+    markdown += `**실제 독촉 대상(공정 멈춤/지연)**: 총 **${pendingAlertItems.length}건** (긴급: ${criticalItems.length}건, 경고: ${warningItems.length}건)\n\n`;
 
-    markdown += `## 📊 1. 공정 단계별 미결 현황\n`;
-    markdown += `| 공정 단계 | 품목 수 | 진행 상태 |\n`;
-    markdown += `| :--- | :---: | :--- |\n`;
-    for (const [st, cnt] of Object.entries(analyzedData.stageCounts)) {
-      markdown += `| **${st}** | ${cnt}건 | ${st.includes('완료') ? '✅ 정상/완료' : '⚠️ 공정 진행 대기'} |\n`;
-    }
-    markdown += `\n`;
+    markdown += `> 💡 **안내**: 창고 입고(V열)가 완료된 품목은 출고 직전/완료 상태이므로 본 독촉 보고서에서 전면 제외되었으며, 현재 제조 공정이 착수되지 않았거나 중간에 멈춰 있는 품목들만 수록되었습니다.\n\n`;
 
-    markdown += `## ⚡ 2. 대경벤드 긴급 조치 및 납기 독촉 요청 리스트 (Top 발주건)\n`;
-    let count = 0;
-    for (const [ordNo, group] of Object.entries(groupByOrder)) {
-      count++;
-      if (count > 15) break; // 상위 15개 발주건 표출
-      markdown += `### 📌 발주번호: ${ordNo} (고객사: ${group.customerName}) - 지연 ${group.items.length}건\n`;
-      markdown += `| LOT | 품명 | 규격 | 재질 | 작업상태 | 잔량 | 정체 사유 |\n`;
-      markdown += `| :--- | :--- | :--- | :--- | :--- | :---: | :--- |\n`;
-      group.items.slice(0, 5).forEach(it => {
-        markdown += `| ${it.lotNo} | ${it.itemName} | ${it.size} (${it.thickness}) | ${it.material} | ${it.workType} | **${it.remainQty}개** | 🚨 ${it.alertReason} |\n`;
+    markdown += `## ⚡ [납품처 / 주문번호별] 긴급 조치 및 납기 독촉 요청 리스트\n`;
+    for (const [_, group] of Object.entries(groupByOrder)) {
+      markdown += `### 📌 [주문번호: ${group.orderNo}] 납품처: ${group.deliveryTo} (지연: ${group.items.length}건)\n`;
+      markdown += `| LOT | 품명 | 규격(두께) | 재질 | 작업(L열) | 잔량 | 정체 단계 및 독촉 사유 |\n`;
+      markdown += `| :--- | :--- | :--- | :--- | :---: | :---: | :--- |\n`;
+      group.items.slice(0, 8).forEach(it => {
+        const icon = it.alertSeverity === 'CRITICAL' ? '🚨' : '⚠️';
+        markdown += `| ${it.lotNo} | ${it.itemName} | ${it.size} (${it.thickness}) | ${it.material} | ${it.workType} | **${it.remainQty}개** | ${icon} ${it.alertReason} |\n`;
       });
-      if (group.items.length > 5) {
-        markdown += `| ... | 외 ${group.items.length - 5}개 품목 추가 지연 중 | | | | | |\n`;
+      if (group.items.length > 8) {
+        markdown += `| ... | 외 ${group.items.length - 8}개 품목 추가 지연 중 | | | | | |\n`;
       }
       markdown += `\n`;
     }
 
-    markdown += `## 💬 3. 영업부 및 고객 대응 가이드라인 (SAL-03 연계)\n`;
-    markdown += `- 고객사 긴급 주문건 중 '생산' 상태이나 절단일자가 없는 품목은 대경 공장장 직통 유선 독촉 요망.\n`;
-    markdown += `- '재고' 상태 품목(${analyzedData.stageCounts.창고입고완료 || 0}건 창고입고 확인)은 즉시 출고물류부(LOG)와 연계하여 고객사 출고 일정 조율 가능.\n`;
+    markdown += `## 💬 영업부 및 출고물류부 연계 가이드라인 (SAL-03 연계)\n`;
+    markdown += `- '생산' 확정 상태이나 절단일자가 없는 ${criticalItems.length}건은 대경 공장장 직통 유선 독촉 요망.\n`;
+    markdown += `- '검토' 상태에서 1주일 이상 멈춰 있는 품목은 즉각 기술 사양 확정 및 생산 라인 투입 요구.\n`;
+    markdown += `- 창고입고 완료된 ${(analyzedData.stageCounts?.창고입고완료 || 0)}건은 출고물류부(LOG-01)와 즉시 연계하여 고객사 상차/배송 일정 조율.\n`;
 
     const report = {
       reportId: `CHASER-${Date.now()}`,
       createdAt: new Date().toISOString(),
       summary: {
         totalRows: analyzedData.totalRows,
-        alertCount: analyzedData.alertCount,
+        alertCount: pendingAlertItems.length,
         criticalCount: criticalItems.length,
-        warningCount: warningItems.length
+        warningCount: warningItems.length,
+        excludedCompletedCount: analyzedData.stageCounts?.창고입고완료 || 0
       },
       markdown,
       groupByOrder
     };
 
-    this._updateAgentStatus('PUR-04', `대경 독촉 보고서 생성 완료 (지연 ${analyzedData.alertCount}건)`, `대경벤드 납기 독촉 리포트 작성 완료`, 'ACTIVE');
+    this._updateAgentStatus('PUR-04', `대경 독촉 보고서 생성 완료 (지연 ${pendingAlertItems.length}건)`, `대경벤드 납기 독촉 리포트 작성 완료 (입고완료 제외)`, 'ACTIVE');
     return report;
   }
 
   /**
    * 4. 제조공정 리드타임 누적 통계 산출 (DAT-07 분석팀 봇)
+   * 💡 [누적 데이터베이스]: 업로드되는 모든 엑셀 파일의 완료 데이터를 영구 누적 관리
+   * 💡 [세부 분석]: 품목 카테고리뿐만 아니라 사이즈(소경/중경/대경/초대경) 및 두께(Schedule)별 세분화 통계 산출
    */
-  calculateLeadtimeStats(analyzedRows) {
-    this._updateAgentStatus('DAT-07', '공정별 실제 제조 리드타임(소요 일수) 통계 산출 중...', '리드타임 분석 착수', 'ACTIVE');
+  calculateLeadtimeStats(analyzedRows, originalFilename = '알트에프 미결 리스트.xlsx') {
+    this._updateAgentStatus('DAT-07', '품목·사이즈·두께별 실제 제조 리드타임 누적 통계 산출 중...', '리드타임 분석 착수', 'ACTIVE');
 
-    const completedItems = analyzedRows.filter(r => r.storeDate && r.cutDate);
-    const itemTypeStats = {};
+    // 1. 기존 영구 누적 히스토리 로드 (server/data/leadtime_history.json)
+    const historyMap = new Map();
+    if (fs.existsSync(LEADTIME_HISTORY_PATH)) {
+      try {
+        const rawHistory = JSON.parse(fs.readFileSync(LEADTIME_HISTORY_PATH, 'utf8'));
+        if (Array.isArray(rawHistory)) {
+          rawHistory.forEach(item => {
+            if (item.key) historyMap.set(item.key, item);
+          });
+        }
+      } catch (e) {
+        console.warn('[PendingListService] leadtime_history.json 읽기 경고:', e.message);
+      }
+    }
 
-    completedItems.forEach(r => {
+    // 2. 현재 파일에서 절단일자(P)와 창고입고(V)가 존재하는 완료 품목 추출 및 누적 병합
+    let newSamplesAdded = 0;
+    analyzedRows.forEach(r => {
+      if (!r.cutDate || !r.storeDate) return;
       const cut = this._parseDateString(r.cutDate);
       const store = this._parseDateString(r.storeDate);
       if (!cut || !store || store < cut) return;
 
       const diffDays = Math.round((store - cut) / (1000 * 60 * 60 * 24));
-      if (diffDays <= 0 || diffDays > 120) return; // 이상치 제거
+      if (diffDays <= 0 || diffDays > 180) return; // 이상치 제외
 
-      const itemCategory = r.itemName.toUpperCase().split('(')[0].trim() || '기타';
-      if (!itemTypeStats[itemCategory]) {
-        itemTypeStats[itemCategory] = {
-          category: itemCategory,
-          count: 0,
-          totalDays: 0,
-          minDays: 999,
-          maxDays: 0,
-          avgDays: 0
-        };
+      const category = r.itemName.toUpperCase().split('(')[0].trim() || '기타';
+      const size = r.size || '미분류';
+      const sizeGroup = this._normalizeSizeGroup(size);
+      const thickness = r.thickness || '기본두께';
+
+      const key = `${r.lotNo}_${r.orderNo}_${category}_${size}_${thickness}`;
+
+      const sample = {
+        key,
+        lotNo: r.lotNo,
+        orderNo: r.orderNo,
+        deliveryTo: r.deliveryTo || r.customerName || '자체',
+        itemName: r.itemName,
+        category,
+        size,
+        sizeGroup,
+        thickness,
+        material: r.material,
+        cutDate: r.cutDate,
+        storeDate: r.storeDate,
+        diffDays,
+        sourceFile: originalFilename,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (!historyMap.has(key)) {
+        newSamplesAdded++;
       }
+      historyMap.set(key, sample);
+    });
 
-      const stat = itemTypeStats[itemCategory];
-      stat.count++;
-      stat.totalDays += diffDays;
-      if (diffDays < stat.minDays) stat.minDays = diffDays;
-      if (diffDays > stat.maxDays) stat.maxDays = diffDays;
-      stat.avgDays = Math.round((stat.totalDays / stat.count) * 10) / 10;
+    const allSamples = Array.from(historyMap.values());
+
+    // 3. 누적 히스토리 영구 저장
+    fs.writeFileSync(LEADTIME_HISTORY_PATH, JSON.stringify(allSamples, null, 2), 'utf8');
+
+    // 4. 다차원 통계 산출
+    const categoryStatsMap = {};
+    const sizeGroupStatsMap = {};
+    const thicknessStatsMap = {};
+    const detailedMatrixMap = {};
+
+    allSamples.forEach(s => {
+      // A. 카테고리 종합 통계
+      if (!categoryStatsMap[s.category]) {
+        categoryStatsMap[s.category] = { category: s.category, count: 0, totalDays: 0, minDays: 999, maxDays: 0, avgDays: 0 };
+      }
+      this._accumulateStat(categoryStatsMap[s.category], s.diffDays);
+
+      // B. 카테고리 x 사이즈그룹 세그먼트
+      const sgKey = `${s.category} / ${s.sizeGroup}`;
+      if (!sizeGroupStatsMap[sgKey]) {
+        sizeGroupStatsMap[sgKey] = { category: s.category, sizeGroup: s.sizeGroup, count: 0, totalDays: 0, minDays: 999, maxDays: 0, avgDays: 0 };
+      }
+      this._accumulateStat(sizeGroupStatsMap[sgKey], s.diffDays);
+
+      // C. 카테고리 x 두께
+      const thkKey = `${s.category} / ${s.thickness}`;
+      if (!thicknessStatsMap[thkKey]) {
+        thicknessStatsMap[thkKey] = { category: s.category, thickness: s.thickness, count: 0, totalDays: 0, minDays: 999, maxDays: 0, avgDays: 0 };
+      }
+      this._accumulateStat(thicknessStatsMap[thkKey], s.diffDays);
+
+      // D. 상세 복합 매트릭스 (Category x Size x Thickness)
+      const detKey = `${s.category}__${s.size}__${s.thickness}`;
+      if (!detailedMatrixMap[detKey]) {
+        detailedMatrixMap[detKey] = { category: s.category, size: s.size, thickness: s.thickness, count: 0, totalDays: 0, minDays: 999, maxDays: 0, avgDays: 0 };
+      }
+      this._accumulateStat(detailedMatrixMap[detKey], s.diffDays);
     });
 
     const statsResult = {
       lastUpdated: new Date().toISOString(),
-      sampleCount: completedItems.length,
-      categoryStats: Object.values(itemTypeStats)
+      sampleCount: allSamples.length,
+      newSamplesAdded,
+      categoryStats: Object.values(categoryStatsMap),
+      sizeGroupStats: Object.values(sizeGroupStatsMap),
+      thicknessStats: Object.values(thicknessStatsMap),
+      detailedMatrix: Object.values(detailedMatrixMap)
     };
 
     fs.writeFileSync(LEADTIME_STATS_PATH, JSON.stringify(statsResult, null, 2), 'utf8');
-    this._updateAgentStatus('DAT-07', `품목별 제조 리드타임 ${Object.keys(itemTypeStats).length}개 카테고리 통계 산출 완료`, `견적팀 공급용 리드타임 통계 DB 저장 완료`, 'ACTIVE');
+    this._updateAgentStatus('DAT-07', `누적 ${allSamples.length}건 표본 기반 리드타임 벤치마크(사이즈·두께별) 갱신 완료`, `견적팀 공급용 리드타임 누적 통계 DB 저장 완료`, 'ACTIVE');
 
     return statsResult;
+  }
+
+  _accumulateStat(target, days) {
+    target.count++;
+    target.totalDays += days;
+    if (days < target.minDays) target.minDays = days;
+    if (days > target.maxDays) target.maxDays = days;
+    target.avgDays = Math.round((target.totalDays / target.count) * 10) / 10;
+  }
+
+  _normalizeSizeGroup(sizeStr) {
+    if (!sizeStr) return '미분류';
+    const numMatch = String(sizeStr).match(/(\d+)/);
+    if (!numMatch) return '기타 규격';
+    const val = parseInt(numMatch[1], 10);
+    if (val <= 50) return '소경 (50A 이하 / 2" 이하)';
+    if (val <= 150) return '중경 (65A~150A / 2-1/2"~6")';
+    if (val <= 350) return '대경 (200A~350A / 8"~14")';
+    return '초대경 (400A 이상 / 16" 이상)';
+  }
+
+  /**
+   * 💡 견적팀(SLE) 연계: 품목/사이즈/두께 입력 시 최적 예상 제조 리드타임 조회
+   */
+  estimateLeadtime(category, size, thickness) {
+    const stats = this.getLeadtimeStats();
+    if (!stats) return { avgDays: 25, confidence: 'DEFAULT' };
+
+    const catUpper = String(category || '').toUpperCase().split('(')[0].trim();
+    const sizeStr = String(size || '').trim();
+    const thkStr = String(thickness || '').trim();
+
+    // 1. 상세 매트릭스 정확 일치
+    if (stats.detailedMatrix) {
+      const match = stats.detailedMatrix.find(m => m.category === catUpper && m.size === sizeStr && m.thickness === thkStr);
+      if (match) return { avgDays: match.avgDays, minDays: match.minDays, maxDays: match.maxDays, count: match.count, confidence: 'EXACT_SPEC' };
+    }
+
+    // 2. 사이즈그룹 일치
+    const sizeGroup = this._normalizeSizeGroup(sizeStr);
+    if (stats.sizeGroupStats) {
+      const sgMatch = stats.sizeGroupStats.find(s => s.category === catUpper && s.sizeGroup === sizeGroup);
+      if (sgMatch) return { avgDays: sgMatch.avgDays, minDays: sgMatch.minDays, maxDays: sgMatch.maxDays, count: sgMatch.count, confidence: 'SIZE_GROUP' };
+    }
+
+    // 3. 두께 일치
+    if (stats.thicknessStats) {
+      const thkMatch = stats.thicknessStats.find(t => t.category === catUpper && t.thickness === thkStr);
+      if (thkMatch) return { avgDays: thkMatch.avgDays, minDays: thkMatch.minDays, maxDays: thkMatch.maxDays, count: thkMatch.count, confidence: 'THICKNESS' };
+    }
+
+    // 4. 카테고리 종합 평균
+    if (stats.categoryStats) {
+      const catMatch = stats.categoryStats.find(c => c.category === catUpper);
+      if (catMatch) return { avgDays: catMatch.avgDays, minDays: catMatch.minDays, maxDays: catMatch.maxDays, count: catMatch.count, confidence: 'CATEGORY_AVG' };
+    }
+
+    return { avgDays: 25, confidence: 'DEFAULT' };
   }
 
   _parseDateString(dateStr) {
@@ -450,8 +609,8 @@ export class PendingListService {
     // 3. 독촉 보고서 생성 (PUR-04 과장)
     const chaserReport = this.generateChaserReport(analyzed);
 
-    // 4. 리드타임 누적 통계 산출 (DAT-07 분석팀 과장)
-    const leadtimeStats = this.calculateLeadtimeStats(analyzed.rows);
+    // 4. 누적 리드타임 통계 산출 (DAT-07 분석팀 과장)
+    const leadtimeStats = this.calculateLeadtimeStats(analyzed.rows, originalFilename);
 
     // 5. 영업부 연계 브리핑 생성 (SAL-03 대리)
     this._updateAgentStatus('SAL-03', `고객사별 미결 공정 상태 ${analyzed.matchedCount}건 동기화 완료`, `고객 납기 안내 준비 완료`, 'ACTIVE');

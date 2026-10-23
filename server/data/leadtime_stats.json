@@ -1,6 +1,7 @@
 {
-  "lastUpdated": "2026-10-23T04:19:37.142Z",
+  "lastUpdated": "2026-10-23T05:09:07.953Z",
   "sampleCount": 57,
+  "newSamplesAdded": 57,
   "categoryStats": [
     {
       "category": "90E",
@@ -33,6 +34,749 @@
       "minDays": 8,
       "maxDays": 35,
       "avgDays": 18
+    }
+  ],
+  "sizeGroupStats": [
+    {
+      "category": "90E",
+      "sizeGroup": "소경 (50A 이하 / 2\" 이하)",
+      "count": 7,
+      "totalDays": 125,
+      "minDays": 7,
+      "maxDays": 32,
+      "avgDays": 17.9
+    },
+    {
+      "category": "90E",
+      "sizeGroup": "대경 (200A~350A / 8\"~14\")",
+      "count": 6,
+      "totalDays": 155,
+      "minDays": 15,
+      "maxDays": 39,
+      "avgDays": 25.8
+    },
+    {
+      "category": "90E",
+      "sizeGroup": "초대경 (400A 이상 / 16\" 이상)",
+      "count": 2,
+      "totalDays": 32,
+      "minDays": 12,
+      "maxDays": 20,
+      "avgDays": 16
+    },
+    {
+      "category": "45E",
+      "sizeGroup": "대경 (200A~350A / 8\"~14\")",
+      "count": 3,
+      "totalDays": 81,
+      "minDays": 13,
+      "maxDays": 35,
+      "avgDays": 27
+    },
+    {
+      "category": "45E",
+      "sizeGroup": "초대경 (400A 이상 / 16\" 이상)",
+      "count": 2,
+      "totalDays": 56,
+      "minDays": 26,
+      "maxDays": 30,
+      "avgDays": 28
+    },
+    {
+      "category": "45E",
+      "sizeGroup": "중경 (65A~150A / 2-1/2\"~6\")",
+      "count": 1,
+      "totalDays": 56,
+      "minDays": 56,
+      "maxDays": 56,
+      "avgDays": 56
+    },
+    {
+      "category": "TEE",
+      "sizeGroup": "대경 (200A~350A / 8\"~14\")",
+      "count": 10,
+      "totalDays": 264,
+      "minDays": 19,
+      "maxDays": 41,
+      "avgDays": 26.4
+    },
+    {
+      "category": "TEE",
+      "sizeGroup": "초대경 (400A 이상 / 16\" 이상)",
+      "count": 4,
+      "totalDays": 106,
+      "minDays": 23,
+      "maxDays": 34,
+      "avgDays": 26.5
+    },
+    {
+      "category": "R",
+      "sizeGroup": "대경 (200A~350A / 8\"~14\")",
+      "count": 8,
+      "totalDays": 135,
+      "minDays": 8,
+      "maxDays": 25,
+      "avgDays": 16.9
+    },
+    {
+      "category": "R",
+      "sizeGroup": "초대경 (400A 이상 / 16\" 이상)",
+      "count": 4,
+      "totalDays": 109,
+      "minDays": 24,
+      "maxDays": 35,
+      "avgDays": 27.3
+    },
+    {
+      "category": "R",
+      "sizeGroup": "소경 (50A 이하 / 2\" 이하)",
+      "count": 8,
+      "totalDays": 115,
+      "minDays": 8,
+      "maxDays": 21,
+      "avgDays": 14.4
+    },
+    {
+      "category": "TEE",
+      "sizeGroup": "중경 (65A~150A / 2-1/2\"~6\")",
+      "count": 2,
+      "totalDays": 59,
+      "minDays": 29,
+      "maxDays": 30,
+      "avgDays": 29.5
+    }
+  ],
+  "thicknessStats": [
+    {
+      "category": "90E",
+      "thickness": "S/20S",
+      "count": 6,
+      "totalDays": 141,
+      "minDays": 15,
+      "maxDays": 35,
+      "avgDays": 23.5
+    },
+    {
+      "category": "45E",
+      "thickness": "S/20S",
+      "count": 6,
+      "totalDays": 193,
+      "minDays": 13,
+      "maxDays": 56,
+      "avgDays": 32.2
+    },
+    {
+      "category": "TEE",
+      "thickness": "S/20S",
+      "count": 10,
+      "totalDays": 248,
+      "minDays": 19,
+      "maxDays": 34,
+      "avgDays": 24.8
+    },
+    {
+      "category": "90E",
+      "thickness": "S/40S",
+      "count": 3,
+      "totalDays": 74,
+      "minDays": 17,
+      "maxDays": 39,
+      "avgDays": 24.7
+    },
+    {
+      "category": "TEE",
+      "thickness": "S/40S",
+      "count": 2,
+      "totalDays": 75,
+      "minDays": 34,
+      "maxDays": 41,
+      "avgDays": 37.5
+    },
+    {
+      "category": "R",
+      "thickness": "S/20S",
+      "count": 11,
+      "totalDays": 222,
+      "minDays": 8,
+      "maxDays": 35,
+      "avgDays": 20.2
+    },
+    {
+      "category": "R",
+      "thickness": "6.35T",
+      "count": 1,
+      "totalDays": 8,
+      "minDays": 8,
+      "maxDays": 8,
+      "avgDays": 8
+    },
+    {
+      "category": "TEE",
+      "thickness": "S/10S",
+      "count": 4,
+      "totalDays": 106,
+      "minDays": 23,
+      "maxDays": 30,
+      "avgDays": 26.5
+    },
+    {
+      "category": "R",
+      "thickness": "S/10S",
+      "count": 5,
+      "totalDays": 72,
+      "minDays": 8,
+      "maxDays": 22,
+      "avgDays": 14.4
+    },
+    {
+      "category": "90E",
+      "thickness": "S/10S",
+      "count": 6,
+      "totalDays": 97,
+      "minDays": 7,
+      "maxDays": 27,
+      "avgDays": 16.2
+    },
+    {
+      "category": "R",
+      "thickness": "S/40S",
+      "count": 3,
+      "totalDays": 57,
+      "minDays": 18,
+      "maxDays": 21,
+      "avgDays": 19
+    }
+  ],
+  "detailedMatrix": [
+    {
+      "category": "90E",
+      "size": "50A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 32,
+      "minDays": 32,
+      "maxDays": 32,
+      "avgDays": 32
+    },
+    {
+      "category": "90E",
+      "size": "200A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 20,
+      "minDays": 20,
+      "maxDays": 20,
+      "avgDays": 20
+    },
+    {
+      "category": "90E",
+      "size": "250A",
+      "thickness": "S/20S",
+      "count": 2,
+      "totalDays": 34,
+      "minDays": 15,
+      "maxDays": 19,
+      "avgDays": 17
+    },
+    {
+      "category": "90E",
+      "size": "350A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 35,
+      "minDays": 35,
+      "maxDays": 35,
+      "avgDays": 35
+    },
+    {
+      "category": "90E",
+      "size": "400A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 20,
+      "minDays": 20,
+      "maxDays": 20,
+      "avgDays": 20
+    },
+    {
+      "category": "45E",
+      "size": "200A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 13,
+      "minDays": 13,
+      "maxDays": 13,
+      "avgDays": 13
+    },
+    {
+      "category": "45E",
+      "size": "250A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 33,
+      "minDays": 33,
+      "maxDays": 33,
+      "avgDays": 33
+    },
+    {
+      "category": "45E",
+      "size": "350A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 35,
+      "minDays": 35,
+      "maxDays": 35,
+      "avgDays": 35
+    },
+    {
+      "category": "45E",
+      "size": "400A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 26,
+      "minDays": 26,
+      "maxDays": 26,
+      "avgDays": 26
+    },
+    {
+      "category": "45E",
+      "size": "500A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 30,
+      "minDays": 30,
+      "maxDays": 30,
+      "avgDays": 30
+    },
+    {
+      "category": "45E",
+      "size": "100A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 56,
+      "minDays": 56,
+      "maxDays": 56,
+      "avgDays": 56
+    },
+    {
+      "category": "TEE",
+      "size": "200A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 27,
+      "minDays": 27,
+      "maxDays": 27,
+      "avgDays": 27
+    },
+    {
+      "category": "TEE",
+      "size": "250A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 33,
+      "minDays": 33,
+      "maxDays": 33,
+      "avgDays": 33
+    },
+    {
+      "category": "TEE",
+      "size": "300A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 19,
+      "minDays": 19,
+      "maxDays": 19,
+      "avgDays": 19
+    },
+    {
+      "category": "TEE",
+      "size": "350A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 25,
+      "minDays": 25,
+      "maxDays": 25,
+      "avgDays": 25
+    },
+    {
+      "category": "TEE",
+      "size": "400A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 25,
+      "minDays": 25,
+      "maxDays": 25,
+      "avgDays": 25
+    },
+    {
+      "category": "TEE",
+      "size": "300A * 250A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 19,
+      "minDays": 19,
+      "maxDays": 19,
+      "avgDays": 19
+    },
+    {
+      "category": "TEE",
+      "size": "300A * 200A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 19,
+      "minDays": 19,
+      "maxDays": 19,
+      "avgDays": 19
+    },
+    {
+      "category": "TEE",
+      "size": "300A * 150A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 22,
+      "minDays": 22,
+      "maxDays": 22,
+      "avgDays": 22
+    },
+    {
+      "category": "TEE",
+      "size": "350A * 150A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 25,
+      "minDays": 25,
+      "maxDays": 25,
+      "avgDays": 25
+    },
+    {
+      "category": "TEE",
+      "size": "450A * 400A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 34,
+      "minDays": 34,
+      "maxDays": 34,
+      "avgDays": 34
+    },
+    {
+      "category": "90E",
+      "size": "250A",
+      "thickness": "S/40S",
+      "count": 1,
+      "totalDays": 39,
+      "minDays": 39,
+      "maxDays": 39,
+      "avgDays": 39
+    },
+    {
+      "category": "TEE",
+      "size": "200A",
+      "thickness": "S/40S",
+      "count": 1,
+      "totalDays": 34,
+      "minDays": 34,
+      "maxDays": 34,
+      "avgDays": 34
+    },
+    {
+      "category": "TEE",
+      "size": "250A",
+      "thickness": "S/40S",
+      "count": 1,
+      "totalDays": 41,
+      "minDays": 41,
+      "maxDays": 41,
+      "avgDays": 41
+    },
+    {
+      "category": "R",
+      "size": "300A * 250A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 20,
+      "minDays": 20,
+      "maxDays": 20,
+      "avgDays": 20
+    },
+    {
+      "category": "R",
+      "size": "300A * 200A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 24,
+      "minDays": 24,
+      "maxDays": 24,
+      "avgDays": 24
+    },
+    {
+      "category": "R",
+      "size": "300A * 150A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 20,
+      "minDays": 20,
+      "maxDays": 20,
+      "avgDays": 20
+    },
+    {
+      "category": "R",
+      "size": "350A * 150A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 25,
+      "minDays": 25,
+      "maxDays": 25,
+      "avgDays": 25
+    },
+    {
+      "category": "R",
+      "size": "400A * 200A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 24,
+      "minDays": 24,
+      "maxDays": 24,
+      "avgDays": 24
+    },
+    {
+      "category": "R",
+      "size": "400A * 250A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 25,
+      "minDays": 25,
+      "maxDays": 25,
+      "avgDays": 25
+    },
+    {
+      "category": "R",
+      "size": "400A * 300A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 25,
+      "minDays": 25,
+      "maxDays": 25,
+      "avgDays": 25
+    },
+    {
+      "category": "R",
+      "size": "450A * 400A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 35,
+      "minDays": 35,
+      "maxDays": 35,
+      "avgDays": 35
+    },
+    {
+      "category": "R",
+      "size": "16\" * 12\"",
+      "thickness": "6.35T",
+      "count": 1,
+      "totalDays": 8,
+      "minDays": 8,
+      "maxDays": 8,
+      "avgDays": 8
+    },
+    {
+      "category": "TEE",
+      "size": "65A * 15A",
+      "thickness": "S/10S",
+      "count": 1,
+      "totalDays": 30,
+      "minDays": 30,
+      "maxDays": 30,
+      "avgDays": 30
+    },
+    {
+      "category": "TEE",
+      "size": "65A * 20A",
+      "thickness": "S/10S",
+      "count": 1,
+      "totalDays": 29,
+      "minDays": 29,
+      "maxDays": 29,
+      "avgDays": 29
+    },
+    {
+      "category": "R",
+      "size": "200A * 100A",
+      "thickness": "S/10S",
+      "count": 1,
+      "totalDays": 22,
+      "minDays": 22,
+      "maxDays": 22,
+      "avgDays": 22
+    },
+    {
+      "category": "90E",
+      "size": "2\"",
+      "thickness": "S/40S",
+      "count": 1,
+      "totalDays": 18,
+      "minDays": 18,
+      "maxDays": 18,
+      "avgDays": 18
+    },
+    {
+      "category": "R",
+      "size": "10\" * 4\"",
+      "thickness": "S/10S",
+      "count": 1,
+      "totalDays": 20,
+      "minDays": 20,
+      "maxDays": 20,
+      "avgDays": 20
+    },
+    {
+      "category": "90E",
+      "size": "2\"",
+      "thickness": "S/10S",
+      "count": 2,
+      "totalDays": 30,
+      "minDays": 15,
+      "maxDays": 15,
+      "avgDays": 15
+    },
+    {
+      "category": "90E",
+      "size": "6\"",
+      "thickness": "S/40S",
+      "count": 1,
+      "totalDays": 17,
+      "minDays": 17,
+      "maxDays": 17,
+      "avgDays": 17
+    },
+    {
+      "category": "R",
+      "size": "3\" * 2\"",
+      "thickness": "S/10S",
+      "count": 2,
+      "totalDays": 22,
+      "minDays": 10,
+      "maxDays": 12,
+      "avgDays": 11
+    },
+    {
+      "category": "R",
+      "size": "2-1/2\" * 1-1/2\"",
+      "thickness": "S/40S",
+      "count": 1,
+      "totalDays": 18,
+      "minDays": 18,
+      "maxDays": 18,
+      "avgDays": 18
+    },
+    {
+      "category": "R",
+      "size": "2\" * 1\"",
+      "thickness": "S/40S",
+      "count": 1,
+      "totalDays": 21,
+      "minDays": 21,
+      "maxDays": 21,
+      "avgDays": 21
+    },
+    {
+      "category": "90E",
+      "size": "3\"",
+      "thickness": "S/10S",
+      "count": 1,
+      "totalDays": 21,
+      "minDays": 21,
+      "maxDays": 21,
+      "avgDays": 21
+    },
+    {
+      "category": "R",
+      "size": "4\" * 3\"",
+      "thickness": "S/10S",
+      "count": 1,
+      "totalDays": 8,
+      "minDays": 8,
+      "maxDays": 8,
+      "avgDays": 8
+    },
+    {
+      "category": "R",
+      "size": "3\" * 1-1/2\"",
+      "thickness": "S/40S",
+      "count": 1,
+      "totalDays": 18,
+      "minDays": 18,
+      "maxDays": 18,
+      "avgDays": 18
+    },
+    {
+      "category": "90E",
+      "size": "300A",
+      "thickness": "S/10S",
+      "count": 1,
+      "totalDays": 27,
+      "minDays": 27,
+      "maxDays": 27,
+      "avgDays": 27
+    },
+    {
+      "category": "TEE",
+      "size": "450A * 32A",
+      "thickness": "S/10S",
+      "count": 1,
+      "totalDays": 24,
+      "minDays": 24,
+      "maxDays": 24,
+      "avgDays": 24
+    },
+    {
+      "category": "TEE",
+      "size": "450A * 200A",
+      "thickness": "S/10S",
+      "count": 1,
+      "totalDays": 23,
+      "minDays": 23,
+      "maxDays": 23,
+      "avgDays": 23
+    },
+    {
+      "category": "R",
+      "size": "200A * 125A",
+      "thickness": "S/20S",
+      "count": 1,
+      "totalDays": 8,
+      "minDays": 8,
+      "maxDays": 8,
+      "avgDays": 8
+    },
+    {
+      "category": "R",
+      "size": "200A * 150A",
+      "thickness": "S/20S",
+      "count": 2,
+      "totalDays": 16,
+      "minDays": 8,
+      "maxDays": 8,
+      "avgDays": 8
+    },
+    {
+      "category": "90E",
+      "size": "600A",
+      "thickness": "S/10S",
+      "count": 1,
+      "totalDays": 12,
+      "minDays": 12,
+      "maxDays": 12,
+      "avgDays": 12
+    },
+    {
+      "category": "90E",
+      "size": "4\"",
+      "thickness": "S/10S",
+      "count": 1,
+      "totalDays": 7,
+      "minDays": 7,
+      "maxDays": 7,
+      "avgDays": 7
     }
   ]
 }

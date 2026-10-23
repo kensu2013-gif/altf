@@ -21,7 +21,7 @@
       "uptime": "99.9%",
       "tasksToday": 12
     },
-    "currentTask": "텔레그램/웹 대경 미결 엑셀 파일 수신 대기 중",
+    "currentTask": "신규 미결 엑셀 수신: pending_2026-10-23T04-19-36-969Z_알트에프 미결 리스트 (10.20).xlsx",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_PENDING_EXCEL_RECEIVED"
@@ -30,6 +30,7 @@
       "EVENT_PENDING_EXCEL_STORED"
     ],
     "logs": [
+      "[오후 2:09:07] 미결 파일 접수 및 아카이빙",
       "[정상] 대경 미결 리스트 수신 채널 대기"
     ],
     "connectedDeptIds": [
@@ -60,7 +61,7 @@
       "uptime": "99.9%",
       "tasksToday": 12
     },
-    "currentTask": "대경 미결 엑셀 전 행/열 데이터 정밀 추출 완료",
+    "currentTask": "대경 미결 리스트 619행 파싱 완료",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_PENDING_EXCEL_STORED"
@@ -69,6 +70,8 @@
       "EVENT_PENDING_ROWS_PARSED"
     ],
     "logs": [
+      "[오후 2:09:07] 619개 유효 품목 행 파싱 성공",
+      "[오후 2:09:07] 미결 엑셀 파싱 착수",
       "[정상] 미결 엑셀 619건 유효 데이터 행 파싱 완료"
     ],
     "connectedDeptIds": [
@@ -98,7 +101,7 @@
       "uptime": "99.9%",
       "tasksToday": 18
     },
-    "currentTask": "발주 매칭 577건 및 공정 9단계 추적 완료",
+    "currentTask": "발주 매칭 577건, 공정 단계 분류 완료",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_PENDING_ROWS_PARSED"
@@ -107,6 +110,8 @@
       "EVENT_PROCESS_MATCHED"
     ],
     "logs": [
+      "[오후 2:09:07] 매칭 577건 / 지연 경보 517건 산출 (입고완료 제외)",
+      "[오후 2:09:07] 발주번호 및 공정 매칭 착수",
       "[정상] 발주번호 매칭 및 공정 진행도 실시간 연동 완료"
     ],
     "connectedDeptIds": [
@@ -137,7 +142,7 @@
       "uptime": "99.9%",
       "tasksToday": 10
     },
-    "currentTask": "대경 독촉 보고서 생성 완료 (지연 84건 감지)",
+    "currentTask": "대경 독촉 보고서 생성 완료 (지연 517건)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_PROCESS_MATCHED"
@@ -146,6 +151,8 @@
       "EVENT_CHASER_REPORT_GENERATED"
     ],
     "logs": [
+      "[오후 2:09:07] 대경벤드 납기 독촉 리포트 작성 완료 (입고완료 제외)",
+      "[오후 2:09:07] 납기 독촉 리포트 작성 착수",
       "[정상] 대경벤드 생산 독촉장 및 구매부 경보 리포트 확정"
     ],
     "connectedDeptIds": [
@@ -177,7 +184,7 @@
       "uptime": "99.9%",
       "tasksToday": 8
     },
-    "currentTask": "고객사별 미결 공정 진행도 동기화 완료",
+    "currentTask": "고객사별 미결 공정 상태 577건 동기화 완료",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_PROCESS_MATCHED"
@@ -186,6 +193,7 @@
       "EVENT_CUSTOMER_LEADTIME_BRIEFED"
     ],
     "logs": [
+      "[오후 2:09:07] 고객 납기 안내 준비 완료",
       "[정상] 고객사 발주 공정 실시간 안내 대기"
     ],
     "connectedDeptIds": [
@@ -216,7 +224,7 @@
       "uptime": "99.9%",
       "tasksToday": 15
     },
-    "currentTask": "품목별 제조 리드타임 4개 카테고리 통계 산출 완료",
+    "currentTask": "누적 57건 표본 기반 리드타임 벤치마크(사이즈·두께별) 갱신 완료",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_PROCESS_MATCHED"
@@ -225,6 +233,8 @@
       "EVENT_LEADTIME_STATS_UPDATED"
     ],
     "logs": [
+      "[오후 2:09:07] 견적팀 공급용 리드타임 누적 통계 DB 저장 완료",
+      "[오후 2:09:07] 리드타임 분석 착수",
       "[정상] 견적팀 공급용 리드타임 통계 DB 저장 완료"
     ],
     "connectedDeptIds": [
@@ -885,7 +895,7 @@
       "uptime": "99.9%",
       "tasksToday": 2483
     },
-    "currentTask": "[영업시간 1시간 주기] 발주 2483건 분류 관리 | 미결 488건 | 고객발송준비 468건 (다음: 오늘 14:00)",
+    "currentTask": "[영업시간 1시간 주기] 발주 2483건 분류 관리 | 미결 488건 | 고객발송준비 582건 (다음: 오늘 15:00)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_ORDER_CREATED",
@@ -895,10 +905,10 @@
       "EVENT_BACKLOG_SYNCED"
     ],
     "logs": [
-      "[13:00] [PUR-07] altf.kr 발주 2483건 업체/날짜별 분류 완료",
-      "[13:00] 미결(Pending) 488건 추적 중 (매입발주서 자동 매핑)",
-      "[13:00] QC-01 성적서 교차 대조: 482건 접수 확인",
-      "[13:00] 출고 완료 패키징: 거래명세표+성적서 번들 468건 발송 대기"
+      "[14:00] [PUR-07] altf.kr 발주 2483건 업체/날짜별 분류 완료",
+      "[14:00] 미결(Pending) 488건 추적 중 (매입발주서 자동 매핑)",
+      "[14:00] QC-01 성적서 교차 대조: 602건 접수 확인",
+      "[14:00] 출고 완료 패키징: 거래명세표+성적서 번들 582건 발송 대기"
     ],
     "connectedDeptIds": [
       "quality",
