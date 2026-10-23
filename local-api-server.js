@@ -33,6 +33,7 @@ import { agentControlManager } from './server/services/agentControlManager.js';
 import { dispatchGate } from './server/services/dispatchGate.js';
 import { ruleCorrectionAgent } from './server/services/ruleCorrectionAgent.js';
 import { dailyBackupService } from './server/services/dailyBackupService.js';
+import { pendingListService } from './server/services/pendingListService.js';
 
 import multer from 'multer';
 
@@ -1983,6 +1984,117 @@ const server = http.createServer(async (req, res) => {
                 sendJsonResponse(req, res, 500, { success: false, error: err.message });
                 return;
             }
+        }
+    }
+
+    // ==========================================
+    // 🏭 구매부 미결관리팀 (PUR-01~04, SAL-03, DAT-07) : 대경벤드 생산 미결 및 공정 추적 관제 API
+    // ==========================================
+    if (url.pathname.startsWith('/api/pending-orders') || url.pathname.startsWith('/api/pur/pending-orders')) {
+        // 1. GET /api/pending-orders/latest : 최신 미결 분석 결과 및 공정별 현황 조회
+        if (req.method === 'GET' && (url.pathname === '/api/pending-orders/latest' || url.pathname === '/api/pur/pending-orders/latest')) {
+            try {
+                let latest = pendingListService.getLatestAnalysis();
+                if (!latest) {
+                    latest = await pendingListService.syncLatest();
+                }
+                sendJsonResponse(req, res, 200, { success: true, data: latest });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 2. POST /api/pending-orders/sync : 최신 엑셀 파일 즉시 재분석 & 동기화
+        if (req.method === 'POST' && (url.pathname === '/api/pending-orders/sync' || url.pathname === '/api/pur/pending-orders/sync')) {
+            try {
+                const result = await pendingListService.syncLatest();
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    message: `미결 리스트 ${result.summary.totalRows}행 분석 완료 (발주 매칭 ${result.summary.matchedCount}건, 경보 ${result.summary.alertCount}건)`,
+                    data: result
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 3. GET /api/pending-orders/chaser-report : 대경벤드 긴급 납기 독촉 보고서 조회
+        if (req.method === 'GET' && (url.pathname === '/api/pending-orders/chaser-report' || url.pathname === '/api/pur/pending-orders/chaser-report')) {
+            try {
+                const latest = pendingListService.getLatestAnalysis();
+                if (!latest || !latest.chaserReport) {
+                    sendJsonResponse(req, res, 404, { success: false, error: '독촉 보고서가 생성되지 않았습니다.' });
+                    return;
+                }
+                sendJsonResponse(req, res, 200, { success: true, report: latest.chaserReport });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 4. GET /api/pending-orders/leadtime-stats : 품목별 실제 제조 리드타임 누적 통계
+        if (req.method === 'GET' && (url.pathname === '/api/pending-orders/leadtime-stats' || url.pathname === '/api/pur/pending-orders/leadtime-stats')) {
+            try {
+                const stats = pendingListService.getLeadtimeStats();
+                sendJsonResponse(req, res, 200, { success: true, stats });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 5. POST /api/pending-orders/open-folder : 미결 엑셀 보관함 폴더 열기 (storage/pending_lists)
+        if (req.method === 'POST' && (url.pathname === '/api/pending-orders/open-folder' || url.pathname === '/api/pur/pending-orders/open-folder')) {
+            try {
+                const targetDir = path.resolve('./storage/pending_lists');
+                if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+                const isWin = process.platform === 'win32';
+                const isMac = process.platform === 'darwin';
+
+                let cmd = isWin ? `explorer "${targetDir}"` : (isMac ? `open "${targetDir}"` : `xdg-open "${targetDir}"`);
+                exec(cmd, (err) => {
+                    if (err) console.error('[PUR-Pending] 폴더 열기 오류:', err.message);
+                });
+
+                sendJsonResponse(req, res, 200, {
+                    success: true,
+                    message: `미결 리스트 보관 폴더 열기 완료: ${targetDir}`,
+                    folderPath: targetDir
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // 6. POST /api/pending-orders/upload : 웹에서 신규 미결 엑셀 직접 업로드 파싱
+        if (req.method === 'POST' && (url.pathname === '/api/pending-orders/upload' || url.pathname === '/api/pur/pending-orders/upload')) {
+            uploadMiddleware(req, res, async (err) => {
+                if (err) {
+                    sendJsonResponse(req, res, 400, { success: false, error: '파일 업로드 오류: ' + err.message });
+                    return;
+                }
+                if (!req.file || !req.file.buffer) {
+                    sendJsonResponse(req, res, 400, { success: false, error: '업로드된 파일이 없습니다.' });
+                    return;
+                }
+
+                try {
+                    const originalName = req.file.originalname || '알트에프 미결 리스트.xlsx';
+                    const result = await pendingListService.processPendingListPipeline(req.file.buffer, originalName);
+                    sendJsonResponse(req, res, 200, {
+                        success: true,
+                        message: `[${originalName}] 파싱 및 분석 완료! (${result.summary.totalRows}행, 경보 ${result.summary.alertCount}건)`,
+                        data: result
+                    });
+                } catch (pipeErr) {
+                    sendJsonResponse(req, res, 500, { success: false, error: pipeErr.message });
+                }
+            });
+            return;
         }
     }
 

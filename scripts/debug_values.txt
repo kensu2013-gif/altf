@@ -13,6 +13,7 @@
   "location1": "",
   "maker1": "",
   "shQty": 0,
+  "bsQty": 0,
   "marking_wait_qty": 0,
   "odEqKey": "45E(L)-S10S-300A-STS304L-S",
   "base_price": 1759590,

@@ -20,6 +20,7 @@ import https from 'https';
 import { daekyungInvoiceService } from './daekyungInvoiceService.js';
 import { invoiceArchiveService } from './invoiceArchiveService.js';
 import { agentControlManager } from './agentControlManager.js';
+import { pendingListService } from './pendingListService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -302,6 +303,12 @@ export class TelegramBotService {
                 return;
             }
 
+            // 📋 [구매부 미결 관리 질의] "미결 현황", "독촉장", "공정 현황", "대경 미결" 등 질의 시 즉각 보고
+            if (this.isPendingQuery(txt)) {
+                await this.handlePendingQuery(chatId, txt);
+                return;
+            }
+
             if (txt.length >= 2) {
                 // 1. 날짜별 아카이브 검색 ("2026-10-22 거래명세표 찾아줘", "2824 성적서 찾아줘" 등)
                 const archiveMatches = invoiceArchiveService.searchArchive(txt);
@@ -435,7 +442,26 @@ ${(targetInv.items?.length || 0) > 10 ? `... 외 ${targetInv.items.length - 10}�
                 }, 120000);
             }
 
-            // A. 대경재고장 엑셀 파일(.xlsx, .xls) 감지 시 전자동 4단계 파이프라인 가동 및 과장 결재 보고
+            // A-1. 대경 미결 리스트 엑셀(.xlsx, .xls) 감지 시 구매부 미결관리팀(PUR-01~04, SAL-03, DAT-07) 파이프라인 가동
+            const isPendingExcel = fileName.includes('미결') || (fileName.includes('알트에프') && (fileName.includes('리스트') || fileName.includes('미결')));
+            if (isPendingExcel && (fileName.endsWith('.xlsx') || fileName.endsWith('.xls'))) {
+                try {
+                    const fileInfo = await this.makeRequest('getFile', { file_id: doc.file_id });
+                    if (!fileInfo || !fileInfo.ok || !fileInfo.result.file_path) {
+                        throw new Error('텔레그램 파일 경로 획득 실패');
+                    }
+                    const buffer = await this.downloadFile(fileInfo.result.file_path);
+
+                    // 비동기로 미결관리팀 전사 협업 파이프라인 즉시 가동
+                    this.executePendingOrdersPipeline(chatId, fileName, buffer);
+                    return;
+                } catch (e) {
+                    await this.sendMessage(chatId, `❌ 대경 미결 리스트 엑셀 다운로드 오류: ${e.message}`);
+                    return;
+                }
+            }
+
+            // A-2. 대경재고장 엑셀 파일(.xlsx, .xls) 감지 시 전자동 4단계 파이프라인 가동 및 과장 결재 보고
             if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.includes('재고')) {
                 try {
                     const fileInfo = await this.makeRequest('getFile', { file_id: doc.file_id });
@@ -829,13 +855,23 @@ ${listText.trim()}
             getAgentSummary('PUR-07'), // 발주/미결 통합 관제
             getAgentSummary('PUR-08'), // 재고발주 사전 품의
             '',
-            '⚡ <b>[데이터관리팀 - Make.com 인프라 & 재고 4단계 자동화]</b>',
+            '🏭 <b>[구매부 - 대경 생산 미결 & 납기 독촉팀]</b>',
+            getAgentSummary('PUR-01'), // 미결 리스트 수신 봇
+            getAgentSummary('PUR-02'), // 미결 엑셀 분석 봇
+            getAgentSummary('PUR-03'), // 진행공정 확인 봇
+            getAgentSummary('PUR-04'), // 독촉 보고서 생성 봇
+            '',
+            '💼 <b>[영업부 - 고객 납기 브리핑]</b>',
+            getAgentSummary('SAL-03'), // 고객 납기 예상 브리핑 봇
+            '',
+            '⚡ <b>[데이터관리팀 - 인프라 & 공정 리드타임 분석]</b>',
             getAgentSummary('DAT-01'), // Make.com 크리덴셜 자동 인증
             getAgentSummary('DAT-02'), // Make.com 시나리오 유지 감시
             getAgentSummary('DAT-03'), // 태일/시화
             getAgentSummary('DAT-04'), // 대경 변환
             getAgentSummary('DAT-05'), // ALTF DB
-            getAgentSummary('DAT-06')  // S3 배포 & 변동량
+            getAgentSummary('DAT-06'), // S3 배포 & 변동량
+            getAgentSummary('DAT-07')  // 공정 리드타임 누적 분석
         ].filter(line => line !== null).join('\n');
 
         const overallReport = `
@@ -856,6 +892,149 @@ ${keyHighlights}
         `.trim();
 
         await this.sendMessage(chatId, overallReport);
+    }
+
+    /**
+     * 📋 대경 미결 리스트 엑셀 수신 시 구매부 미결관리팀(PUR-01~04, SAL-03, DAT-07) 자율 협업 파이프라인
+     */
+    async executePendingOrdersPipeline(chatId, fileName, buffer) {
+        try {
+            await this.sendMessage(chatId, `
+<b>📋 [대경벤드 생산 미결 리스트 접수 & 구매부 미결관리팀 가동]</b>
+📄 <b>파일명</b>: <code>${fileName}</code>
+
+조현진 대표님, 대경벤드 생산 미결 엑셀이 접수되어 구매부 미결관리팀 및 전사 연계 봇을 긴급 가동합니다:
+1️⃣ 📥 <b>[PUR-01 사원]</b> 미결 원장 수신 및 안전 아카이빙
+2️⃣ 🔍 <b>[PUR-02 사원]</b> 전 행/열 정밀 파싱 (L열 작업유형 및 공정일자 검증)
+3️⃣ 🔗 <b>[PUR-03 대리]</b> Y열 주문번호 ↔ 우리 발주번호 매칭 & 9단계 공정 진행도 추적
+4️⃣ 🚨 <b>[PUR-04 과장]</b> 1주일 이상 검토 정체 / 절단 누락 품목 독촉 보고서 자동 생성
+5️⃣ 🏢 <b>[SAL-03 대리 & DAT-07 과장]</b> 고객사 납기 알림 동기화 & 품목별 제조 리드타임 통계 산출
+            `.trim());
+
+            const result = await pendingListService.processPendingListPipeline(buffer, fileName);
+            const { summary, stageCounts, chaserReport, leadtimeStats } = result;
+
+            const stageReport = [
+                `• 검토정체: <b>${stageCounts.검토정체 || 0}건</b> ⚠️`,
+                `• 절단대기: <b>${stageCounts.절단대기 || 0}건</b> ⚠️`,
+                `• 절단완료: <b>${stageCounts.절단완료 || 0}건</b>`,
+                `• 성형완료: <b>${stageCounts.성형완료 || 0}건</b>`,
+                `• 열처리완료: <b>${stageCounts.열처리완료 || 0}건</b>`,
+                `• 교정완료: <b>${stageCounts.교정완료 || 0}건</b>`,
+                `• 가공완료: <b>${stageCounts.가공완료 || 0}건</b>`,
+                `• 산세완료: <b>${stageCounts.산세완료 || 0}건</b>`,
+                `• 창고입고완료: <b>${stageCounts.창고입고완료 || 0}건</b> ✅`
+            ].join('\n');
+
+            const alertItemsText = (result.rows.filter(r => r.alertSeverity === 'CRITICAL').slice(0, 5).map(r => 
+                `• <code>${r.orderNo}</code> (${r.customerName}): <b>${r.itemName}</b> ${r.size} - 🚨 ${r.alertReason}`
+            ).join('\n') || '긴급 독촉 항목 없음');
+
+            const leadtimeText = (leadtimeStats?.categoryStats || []).map(c => 
+                `• <b>${c.category}</b>: 평균 <b>${c.avgDays}일</b> 소요 (${c.minDays}~${c.maxDays}일)`
+            ).join('\n') || '데이터 산출 중';
+
+            const replyMsg = `
+<b>✅ [구매부 미결관리팀 분석 완료 보고 - PUR-04 과장]</b>
+📊 <b>총 미결 품목</b>: <b>${summary.totalRows.toLocaleString()}건</b>
+🔗 <b>발주 매칭</b>: <b>${summary.matchedCount.toLocaleString()}건</b> (재고 발주: ${summary.stockOrderCount}건)
+🚨 <b>독촉 경보 대상</b>: 총 <b>${summary.alertCount}건</b> (긴급: ${chaserReport.summary?.criticalCount || 0}건, 경고: ${chaserReport.summary?.warningCount || 0}건)
+
+🏭 <b>공정 단계별 현황</b>:
+${stageReport}
+
+⚡ <b>주요 긴급 독촉 발주건 (절단 미착수/정체)</b>:
+${alertItemsText}
+
+⏱️ <b>DAT-07 분석팀 품목별 실제 제조 리드타임 (견적팀 제공)</b>:
+${leadtimeText}
+
+💼 <b>영업부(SAL-03) 연계</b>: 고객사별 납기 예상일 동기화 완료!
+웹 에이전트 오피스(<code>/agent-office</code>)에서 상세 독촉 리포트 및 발주별 추적 화면을 확인하실 수 있습니다.
+            `.trim();
+
+            await this.sendMessage(chatId, replyMsg);
+        } catch (e) {
+            console.error('[TelegramBot] Pending pipeline failed:', e);
+            await this.sendMessage(chatId, `❌ 미결 리스트 처리 중 오류: ${e.message}`);
+        }
+    }
+
+    /**
+     * 구매부 미결 관리 질의 여부 판별
+     */
+    isPendingQuery(text = '') {
+        const t = text.trim();
+        if (/미결.*(현황|상태|보고|리포트|리스트|목록|내역|조회|알려줘|어때)/i.test(t)) return true;
+        if (/독촉.*(장|보고|리포트|목록|대상|알려줘)/i.test(t)) return true;
+        if (/대경.*(미결|공정|생산|진행|일지)/i.test(t)) return true;
+        if (/공정.*(현황|진행|상태|추적|단계)/i.test(t)) return true;
+        if (/^(\/pending|\/chaser|미결|미결현황|독촉장|공정현황)$/i.test(t)) return true;
+        return false;
+    }
+
+    /**
+     * 텔레그램 메신저 미결 현황 및 독촉 리포트 회신
+     */
+    async handlePendingQuery(chatId, queryText = '') {
+        let latest = pendingListService.getLatestAnalysis();
+        if (!latest) {
+            try {
+                latest = await pendingListService.syncLatest();
+            } catch (e) {
+                await this.sendMessage(chatId, `ℹ️ 현재 분석된 대경 미결 리스트가 없습니다. 텔레그램이나 웹에 <b>알트에프 미결 리스트(날짜).xlsx</b> 파일을 전송해 주시면 구매부 미결관리팀이 즉시 분석을 시작합니다.`);
+                return;
+            }
+        }
+
+        const q = queryText.trim();
+        const wantsChaserReport = /독촉|보고서|리포트|리스트/.test(q);
+
+        if (wantsChaserReport && latest.chaserReport?.markdown) {
+            // 독촉장 상세 리포트 회신
+            const reportMsg = `
+<b>🚨 [대경벤드 긴급 납기 독촉 보고서 - PUR-04 과장]</b>
+기준 일시: <code>${latest.chaserReport.createdAt?.slice(0, 10) || '오늘'}</code>
+총 경보: <b>${latest.summary.alertCount}건</b> (긴급: ${latest.chaserReport.summary?.criticalCount || 0}건)
+
+<b>주요 독촉 요청 발주건 TOP 5:</b>
+${Object.entries(latest.chaserReport.groupByOrder || {}).slice(0, 5).map(([ordNo, g]) => 
+    `• <b>${ordNo}</b> (${g.customerName}) : 지연 ${g.items.length}건\n  ${g.items.slice(0, 2).map(it => `  ↳ [${it.lotNo}] ${it.itemName} ${it.size} (${it.remainQty}개) - ${it.alertReason}`).join('\n')}`
+).join('\n\n')}
+
+💡 <i>전체 독촉장 및 고객사별 상세 현황은 웹 에이전트 오피스(/agent-office)에서 엑셀 및 텍스트로 바로 복사하실 수 있습니다.</i>
+            `.trim();
+
+            await this.sendMessage(chatId, reportMsg);
+            return;
+        }
+
+        // 일반 미결 공정 현황 요약 회신
+        const st = latest.stageCounts || {};
+        const reply = `
+<b>📊 [구매부 대경벤드 생산 미결 및 공정 진행 현황]</b>
+📁 파일: <code>${latest.filename || '알트에프 미결 리스트.xlsx'}</code>
+⏱️ 분석 시각: <code>${latest.timestamp ? new Date(latest.timestamp).toLocaleString('ko-KR') : '최근'}</code>
+
+• 총 미결 품목: <b>${latest.summary.totalRows.toLocaleString()}건</b>
+• 발주 매칭: <b>${latest.summary.matchedCount.toLocaleString()}건</b>
+• 🚨 지연/정체 경보: <b>${latest.summary.alertCount}건</b>
+
+🏭 <b>공정 단계별 현황</b>:
+• 검토 정체: <b>${st.검토정체 || 0}건</b>
+• 절단 대기: <b>${st.절단대기 || 0}건</b>
+• 절단 완료: <b>${st.절단완료 || 0}건</b>
+• 성형 완료: <b>${st.성형완료 || 0}건</b>
+• 열처리 완료: <b>${st.열처리완료 || 0}건</b>
+• 교정 완료: <b>${st.교정완료 || 0}건</b>
+• 가공 완료: <b>${st.가공완료 || 0}건</b>
+• 산세 완료: <b>${st.산세완료 || 0}건</b>
+• 창고 입고 완료: <b>${st.창고입고완료 || 0}건</b> ✅
+
+💡 <i>"독촉장 보여줘" 라고 입력하시면 대경벤드 전송용 긴급 납기 독촉 보고서를 바로 확인하실 수 있습니다.</i>
+        `.trim();
+
+        await this.sendMessage(chatId, reply);
     }
 }
 

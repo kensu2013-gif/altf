@@ -13,6 +13,7 @@
   "location1",
   "maker1",
   "shQty",
+  "bsQty",
   "marking_wait_qty",
   "odEqKey",
   "base_price",

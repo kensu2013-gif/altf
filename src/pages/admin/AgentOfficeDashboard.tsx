@@ -50,13 +50,15 @@ import {
     UploadCloud,
     Timer,
     Settings,
-    MessageSquare
+    MessageSquare,
+    Factory
 } from 'lucide-react';
 import { CertificateLedgerModal } from '../../components/admin/CertificateLedgerModal';
 import { PurchaseLedgerModal } from '../../components/admin/PurchaseLedgerModal';
 import { CertificateIssuerModal } from '../../components/admin/CertificateIssuerModal';
 import { DaekyungInvoiceModal } from '../../components/admin/DaekyungInvoiceModal';
 import { KakaoMessengerQuoteModal } from '../../components/admin/KakaoMessengerQuoteModal';
+import { PendingOrdersModal } from '../../components/admin/PendingOrdersModal';
 
 const STORAGE_KEY = 'altf_agent_swarm_core18_v1';
 const STORAGE_DEPT_KEY = 'altf_departments_core6_v1';
@@ -707,6 +709,7 @@ export default function AgentOfficeDashboard() {
     const [showAllFilesModal, setShowAllFilesModal] = useState<boolean>(false);
     const [showLedgerModal, setShowLedgerModal] = useState<boolean>(false);
     const [showPurchaseLedgerModal, setShowPurchaseLedgerModal] = useState<boolean>(false);
+    const [showPendingOrdersModal, setShowPendingOrdersModal] = useState<boolean>(false);
     const [showCertIssuerModal, setShowCertIssuerModal] = useState<boolean>(false);
     const [showDaekyungInvoiceModal, setShowDaekyungInvoiceModal] = useState<boolean>(false);
     const [showKakaoQuoteModal, setShowKakaoQuoteModal] = useState<boolean>(false);
@@ -2986,6 +2989,21 @@ export default function AgentOfficeDashboard() {
                                     <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded font-mono">정기</span>
                                 </button>
 
+                                {/* 2-2. 대경 생산 미결 & 공정 관제 */}
+                                <button
+                                    onClick={() => { setShowPendingOrdersModal(true); setShowToolsDropdown(false); }}
+                                    className="w-full text-left p-2 rounded-lg hover:bg-amber-950/40 border border-transparent hover:border-amber-500/30 flex items-center justify-between transition-colors group cursor-pointer"
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <Factory className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                                        <div>
+                                            <div className="text-xs font-bold text-slate-200 group-hover:text-amber-300">🏭 대경 생산 미결 & 공정 관제</div>
+                                            <div className="text-[10px] text-slate-400">PUR-01~04 9단계 추적 & 독촉장 생성</div>
+                                        </div>
+                                    </div>
+                                    <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded font-mono">실시간</span>
+                                </button>
+
                                 {/* 3. 성적서 발행기 */}
                                 <button
                                     onClick={() => { setShowCertIssuerModal(true); setShowToolsDropdown(false); }}
@@ -5067,7 +5085,15 @@ export default function AgentOfficeDashboard() {
                                             className="flex-1 py-2 px-3 rounded-lg bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer transition-all"
                                         >
                                             <Boxes className="w-3.5 h-3.5" />
-                                            <span>📊 재고 발주 & 성적서 대장 열기</span>
+                                            <span>📊 재고 발주 & 성적서 대장</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPendingOrdersModal(true)}
+                                            className="py-2 px-3 rounded-lg bg-linear-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.3)] cursor-pointer transition-all"
+                                        >
+                                            <Factory className="w-3.5 h-3.5" />
+                                            <span>🏭 대경 미결 & 공정 관제</span>
                                         </button>
                                         <a
                                             href="/api/pur/download-excel"
@@ -6622,6 +6648,12 @@ export default function AgentOfficeDashboard() {
             <PurchaseLedgerModal
                 isOpen={showPurchaseLedgerModal}
                 onClose={() => setShowPurchaseLedgerModal(false)}
+            />
+
+            {/* 🏭 4-2. 구매부 (PUR) 대경벤드 생산 미결 리스트 9단계 공정 추적 & 납기 독촉 모달 */}
+            <PendingOrdersModal
+                isOpen={showPendingOrdersModal}
+                onClose={() => setShowPendingOrdersModal(false)}
             />
 
             {/* 📜 5. 품질부 (QC-06) 성적서 발행봇 & DAT-10 아카이빙 모달 */}

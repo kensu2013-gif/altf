@@ -1,0 +1,38 @@
+{
+  "lastUpdated": "2026-10-23T04:19:37.142Z",
+  "sampleCount": 57,
+  "categoryStats": [
+    {
+      "category": "90E",
+      "count": 15,
+      "totalDays": 312,
+      "minDays": 7,
+      "maxDays": 39,
+      "avgDays": 20.8
+    },
+    {
+      "category": "45E",
+      "count": 6,
+      "totalDays": 193,
+      "minDays": 13,
+      "maxDays": 56,
+      "avgDays": 32.2
+    },
+    {
+      "category": "TEE",
+      "count": 16,
+      "totalDays": 429,
+      "minDays": 19,
+      "maxDays": 41,
+      "avgDays": 26.8
+    },
+    {
+      "category": "R",
+      "count": 20,
+      "totalDays": 359,
+      "minDays": 8,
+      "maxDays": 35,
+      "avgDays": 18
+    }
+  ]
+}

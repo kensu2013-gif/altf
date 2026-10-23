@@ -1,5 +1,239 @@
 [
   {
+    "id": "pur-01-pending-intake",
+    "code": "PUR-01",
+    "name": "미결 리스트 수신 봇",
+    "deptId": "purchase",
+    "deptName": "구매부",
+    "teamName": "미결관리팀",
+    "tier": 1,
+    "position": "사원",
+    "role": "텔레그램 및 웹으로 전달되는 대경벤드 생산 미결 엑셀 원장 파일 실시간 감시 및 수신 아카이빙",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "AUTO_RUNNING",
+    "assignedHuman": "구매부 미결담당",
+    "requiresApproval": false,
+    "metrics": {
+      "speed": 99,
+      "accuracy": 100,
+      "load": 15,
+      "uptime": "99.9%",
+      "tasksToday": 12
+    },
+    "currentTask": "텔레그램/웹 대경 미결 엑셀 파일 수신 대기 중",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_PENDING_EXCEL_RECEIVED"
+    ],
+    "emittedEvents": [
+      "EVENT_PENDING_EXCEL_STORED"
+    ],
+    "logs": [
+      "[정상] 대경 미결 리스트 수신 채널 대기"
+    ],
+    "connectedDeptIds": [
+      "purchase",
+      "dat"
+    ],
+    "orderIndex": 1
+  },
+  {
+    "id": "pur-02-pending-parser",
+    "code": "PUR-02",
+    "name": "미결 엑셀 분석 봇",
+    "deptId": "purchase",
+    "deptName": "구매부",
+    "teamName": "미결관리팀",
+    "tier": 1,
+    "position": "사원",
+    "role": "수신된 대경 미결 엑셀 658행 전 행/열 정밀 파싱, L열(작업유형) 및 공정 일자 유효성 검증",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "AUTO_RUNNING",
+    "assignedHuman": "구매부 미결담당",
+    "requiresApproval": false,
+    "metrics": {
+      "speed": 98,
+      "accuracy": 99,
+      "load": 20,
+      "uptime": "99.9%",
+      "tasksToday": 12
+    },
+    "currentTask": "대경 미결 엑셀 전 행/열 데이터 정밀 추출 완료",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_PENDING_EXCEL_STORED"
+    ],
+    "emittedEvents": [
+      "EVENT_PENDING_ROWS_PARSED"
+    ],
+    "logs": [
+      "[정상] 미결 엑셀 619건 유효 데이터 행 파싱 완료"
+    ],
+    "connectedDeptIds": [
+      "purchase"
+    ],
+    "orderIndex": 2
+  },
+  {
+    "id": "pur-03-process-matcher",
+    "code": "PUR-03",
+    "name": "진행공정 확인 봇",
+    "deptId": "purchase",
+    "deptName": "구매부",
+    "teamName": "미결관리팀",
+    "tier": 2,
+    "position": "대리",
+    "role": "Y열 주문번호 ↔ 우리 발주번호(poNumber) 및 품목 매칭, 절단~성형~열처리~교정~가공~산세~창고입고 단계 추적",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "AUTO_RUNNING",
+    "assignedHuman": "구매부 대리",
+    "requiresApproval": false,
+    "metrics": {
+      "speed": 97,
+      "accuracy": 99,
+      "load": 30,
+      "uptime": "99.9%",
+      "tasksToday": 18
+    },
+    "currentTask": "발주 매칭 577건 및 공정 9단계 추적 완료",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_PENDING_ROWS_PARSED"
+    ],
+    "emittedEvents": [
+      "EVENT_PROCESS_MATCHED"
+    ],
+    "logs": [
+      "[정상] 발주번호 매칭 및 공정 진행도 실시간 연동 완료"
+    ],
+    "connectedDeptIds": [
+      "purchase",
+      "sle"
+    ],
+    "orderIndex": 3
+  },
+  {
+    "id": "pur-04-leadtime-alert",
+    "code": "PUR-04",
+    "name": "공정 진행도 파악 & 독촉 보고서 생성 봇",
+    "deptId": "purchase",
+    "deptName": "구매부",
+    "teamName": "미결관리팀",
+    "tier": 3,
+    "position": "과장",
+    "role": "공정 지연(1주일 이상 검토 정체, 절단 누락 등) 감지 및 대경벤드 납기 독촉 보고서 자동 생성",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "AUTO_RUNNING",
+    "assignedHuman": "구매부 과장",
+    "requiresApproval": false,
+    "metrics": {
+      "speed": 95,
+      "accuracy": 99,
+      "load": 25,
+      "uptime": "99.9%",
+      "tasksToday": 10
+    },
+    "currentTask": "대경 독촉 보고서 생성 완료 (지연 84건 감지)",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_PROCESS_MATCHED"
+    ],
+    "emittedEvents": [
+      "EVENT_CHASER_REPORT_GENERATED"
+    ],
+    "logs": [
+      "[정상] 대경벤드 생산 독촉장 및 구매부 경보 리포트 확정"
+    ],
+    "connectedDeptIds": [
+      "purchase",
+      "executive",
+      "sle"
+    ],
+    "orderIndex": 4
+  },
+  {
+    "id": "sal-03-customer-leadtime",
+    "code": "SAL-03",
+    "name": "고객 납기 예상 브리핑 봇",
+    "deptId": "sle",
+    "deptName": "영업부",
+    "teamName": "영업관리팀",
+    "tier": 2,
+    "position": "대리",
+    "role": "구매부 미결 공정 상태 연계하여 고객사(customerName) 및 담당자에게 공정 진행(빠름/지연) 실시간 브리핑",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "AUTO_RUNNING",
+    "assignedHuman": "영업부 대리",
+    "requiresApproval": false,
+    "metrics": {
+      "speed": 96,
+      "accuracy": 98,
+      "load": 15,
+      "uptime": "99.9%",
+      "tasksToday": 8
+    },
+    "currentTask": "고객사별 미결 공정 진행도 동기화 완료",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_PROCESS_MATCHED"
+    ],
+    "emittedEvents": [
+      "EVENT_CUSTOMER_LEADTIME_BRIEFED"
+    ],
+    "logs": [
+      "[정상] 고객사 발주 공정 실시간 안내 대기"
+    ],
+    "connectedDeptIds": [
+      "sle",
+      "purchase"
+    ],
+    "orderIndex": 5
+  },
+  {
+    "id": "dat-07-leadtime-analytics",
+    "code": "DAT-07",
+    "name": "공정 리드타임 누적 분석 봇",
+    "deptId": "dat",
+    "deptName": "데이터관리팀",
+    "teamName": "공정데이터분석팀",
+    "tier": 3,
+    "position": "과장",
+    "role": "미결 이력 아카이빙, 거래명세표와 연계하여 품목군별 실제 제조 리드타임(소요 일수) 통계 산출 및 견적팀 제공",
+    "status": "ACTIVE",
+    "isCreated": true,
+    "approvalStatus": "AUTO_RUNNING",
+    "assignedHuman": "데이터팀 과장",
+    "requiresApproval": false,
+    "metrics": {
+      "speed": 97,
+      "accuracy": 99,
+      "load": 20,
+      "uptime": "99.9%",
+      "tasksToday": 15
+    },
+    "currentTask": "품목별 제조 리드타임 4개 카테고리 통계 산출 완료",
+    "lastActive": "방금 전",
+    "triggerEvents": [
+      "EVENT_PROCESS_MATCHED"
+    ],
+    "emittedEvents": [
+      "EVENT_LEADTIME_STATS_UPDATED"
+    ],
+    "logs": [
+      "[정상] 견적팀 공급용 리드타임 통계 DB 저장 완료"
+    ],
+    "connectedDeptIds": [
+      "dat",
+      "sle"
+    ],
+    "orderIndex": 6
+  },
+  {
     "id": "int-01-mail-intake",
     "code": "INT-01",
     "name": "메일 견적접수봇",
@@ -649,9 +883,9 @@
       "accuracy": 99,
       "load": 100,
       "uptime": "99.9%",
-      "tasksToday": 2480
+      "tasksToday": 2483
     },
-    "currentTask": "[영업시간 1시간 주기] 발주 2480건 분류 관리 | 미결 483건 | 고객발송준비 468건 (다음: 오늘 12:00)",
+    "currentTask": "[영업시간 1시간 주기] 발주 2483건 분류 관리 | 미결 488건 | 고객발송준비 468건 (다음: 오늘 14:00)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_ORDER_CREATED",
@@ -661,10 +895,10 @@
       "EVENT_BACKLOG_SYNCED"
     ],
     "logs": [
-      "[11:00] [PUR-07] altf.kr 발주 2480건 업체/날짜별 분류 완료",
-      "[11:00] 미결(Pending) 483건 추적 중 (매입발주서 자동 매핑)",
-      "[11:00] QC-01 성적서 교차 대조: 482건 접수 확인",
-      "[11:00] 출고 완료 패키징: 거래명세표+성적서 번들 468건 발송 대기"
+      "[13:00] [PUR-07] altf.kr 발주 2483건 업체/날짜별 분류 완료",
+      "[13:00] 미결(Pending) 488건 추적 중 (매입발주서 자동 매핑)",
+      "[13:00] QC-01 성적서 교차 대조: 482건 접수 확인",
+      "[13:00] 출고 완료 패키징: 거래명세표+성적서 번들 468건 발송 대기"
     ],
     "connectedDeptIds": [
       "quality",
@@ -780,9 +1014,9 @@
       "accuracy": 99,
       "load": 45,
       "uptime": "99.9%",
-      "tasksToday": 1652
+      "tasksToday": 1729
     },
-    "currentTask": "성적서 76개 파일 판독 완료 (대장 누적 1652개 행 보관 중)",
+    "currentTask": "성적서 97개 파일 판독 완료 (대장 누적 1729개 행 보관 중)",
     "lastActive": "방금 전",
     "triggerEvents": [
       "EVENT_CERT_DOWNLOADED"
@@ -791,11 +1025,11 @@
       "EVENT_CERT_PARSED"
     ],
     "logs": [
-      "[오후 1:57:00] ✅ QC-02 판독 및 엑셀 누적 완료! (총 80개 파일, 누적 1652개 품목, 소요시간 1.0초)",
-      "[오후 1:57:00] 📄 [80/80] 261021_알트에프.261021-2953 (10-21-31).pdf 판독 완료 (2p 중 1개 품목 추출)",
-      "[오후 1:57:00] 📄 [79/80] 261021_알트에프.261021-2952 (10-21-32).pdf 판독 완료 (5p 중 3개 품목 추출)",
-      "[오후 1:57:00] 📄 [78/80] 261021_알트에프.261021-2950 (10-21-29).pdf 판독 완료 (6p 중 4개 품목 추출)",
-      "[오후 1:57:00] 📄 [77/80] 261021_알트에프.261021-2949 (10-21-28).pdf 판독 완료 (3p 중 1개 품목 추출)"
+      "[오후 1:07:31] ✅ QC-02 판독 및 엑셀 누적 완료! (총 101개 파일, 누적 1729개 품목, 소요시간 1.3초)",
+      "[오후 1:07:31] 📄 [101/101] 261023_알트에프.261022-2959 (10-22-18).pdf 판독 완료 (3p 중 1개 품목 추출)",
+      "[오후 1:07:31] 📄 [100/101] 261022_알트에프.261022-2991 (10-22-44).pdf 판독 완료 (3p 중 1개 품목 추출)",
+      "[오후 1:07:31] 📄 [99/101] 261022_알트에프.261022-2971-1 (10-22-46).pdf 판독 완료 (3p 중 1개 품목 추출)",
+      "[오후 1:07:31] 📄 [98/101] 261022_알트에프.261022-2970 (10-22-42).pdf 판독 완료 (5p 중 2개 품목 추출)"
     ],
     "connectedDeptIds": [
       "quality"
@@ -1363,6 +1597,8 @@
       "SIGNAL_DAT03_SUCCESS"
     ],
     "logs": [
+      "[오후 1:00:09] 태일/시화재고 구글시트 동기화 완료 (SUCCESS)",
+      "[오후 1:00:00] 태일/시화재고 Apps Script 및 원격 API 호출 시작",
       "[오전 9:00:26] 태일/시화재고 구글시트 동기화 완료 (SUCCESS)",
       "[오전 9:00:17] 태일/시화재고 Apps Script 및 원격 API 호출 시작",
       "[오후 5:30:12] 태일/시화재고 구글시트 동기화 완료 (SUCCESS)",
@@ -1413,6 +1649,9 @@
       "SIGNAL_DAT04_SUCCESS"
     ],
     "logs": [
+      "[오후 1:00:10] 대경재고 0건 구글시트 변환 완료 (SUCCESS)",
+      "[오후 1:00:09] 대경재고 원장 처리 시작",
+      "[오후 1:00:09] 직전 봇 DAT-03의 SUCCESS 신호 감지됨",
       "[오전 9:00:27] 대경재고 0건 구글시트 변환 완료 (SUCCESS)",
       "[오전 9:00:26] 대경재고 원장 처리 시작",
       "[오전 9:00:26] 직전 봇 DAT-03의 SUCCESS 신호 감지됨",
@@ -1468,6 +1707,10 @@
       "SIGNAL_DAT05_SUCCESS"
     ],
     "logs": [
+      "[오후 1:03:49] ALTF DB 연산 완료 (SUCCESS)",
+      "[오후 1:03:40] ALTF DB Apps Script 실행 시작",
+      "[오후 1:00:10] 구글시트 대용량 수식 연산 안정화 버퍼링 가동",
+      "[오후 1:00:10] 직전 사원 봇들(DAT-03, DAT-04)의 SUCCESS 신호 모두 감지됨",
       "[오전 9:04:04] ALTF DB 연산 완료 (SUCCESS)",
       "[오전 9:03:57] ALTF DB Apps Script 실행 시작",
       "[오전 9:00:27] 구글시트 대용량 수식 연산 안정화 버퍼링 가동",
@@ -1478,11 +1721,7 @@
       "[오후 5:30:13] 직전 사원 봇들(DAT-03, DAT-04)의 SUCCESS 신호 모두 감지됨",
       "[오후 1:04:14] ALTF DB 연산 완료 (SUCCESS)",
       "[오후 1:04:04] ALTF DB Apps Script 실행 시작",
-      "[오후 1:00:27] 구글시트 대용량 수식 연산 안정화 버퍼링 가동",
-      "[오후 1:00:27] 직전 사원 봇들(DAT-03, DAT-04)의 SUCCESS 신호 모두 감지됨",
-      "[AM 9:49:21] [DAT-05 대리 거부] 직전 사원 봇들의 SUCCESS 신호가 모두 확인되지 않았습니다. (DAT-03: IDLE, DAT-04: WAITING_PREVIOUS) 사원 작업이 100% 완료된 후에만 버퍼링을 시작할 수 있습니다.",
-      "[감시] 사원(DAT-03, DAT-04) 완료 신호 전수 확인 대기",
-      "[대기] 구글시트 연산 안정화 타이머 (기본 3분 30초 카운트다운) 준비 완료"
+      "[오후 1:00:27] 구글시트 대용량 수식 연산 안정화 버퍼링 가동"
     ],
     "connectedDeptIds": [
       "dat"
@@ -1526,21 +1765,21 @@
       "SIHWA_DAILY_DIFF_CONFIRMED"
     ],
     "logs": [
+      "[오후 1:04:09] S3 배포 및 시화 변동량(5160건: 입고+0/출고-5160) 확정 (SUCCESS)",
+      "[오후 1:04:02] S3 배포 및 시화 변동량(5160건: 입고+0/출고-5160) 확정 (SUCCESS)",
+      "[오후 1:03:56] 결과물 실물 검증 통과",
+      "[오후 1:03:52] 결과물 실물 검증 통과",
+      "[오후 1:03:49] 구글 드라이브 직수신 착수",
+      "[오후 1:03:49] 최신 결과물 실물 검수 착수",
+      "[오후 1:03:49] 구글 드라이브 직수신 착수",
+      "[오후 1:03:49] 최신 결과물 실물 검수 착수",
+      "[오후 1:03:49] 직전 대리 DAT-05의 SUCCESS 신호 감지됨",
       "[오전 9:25:55] S3 배포 및 시화 변동량(5160건: 입고+0/출고-5160) 확정 (SUCCESS)",
       "[오전 9:25:52] 결과물 실물 검증 통과",
       "[오전 9:25:49] 구글 드라이브 직수신 착수",
       "[오전 9:25:49] 최신 결과물 실물 검수 착수",
       "[오전 9:11:08] 결과물 실물 검증 통과",
-      "[오전 9:11:08] 최신 결과물 실물 검수 착수",
-      "[오전 9:07:42] 배포/변동량 분석 실패: [DAT-06 과장 검수 실패] 구글 드라이브에서 다운로드된 inventory.json 파일을 찾을 수 없습니다. 구글 드라이브에서 최신 파일을 다운로드해 주세요.",
-      "[오전 9:07:42] [DAT-06 과장 검수 실패] 구글 드라이브에서 다운로드된 inventory.json 파일을 찾을 수 없습니다. 구글 드라이브에서 최신 파일을 다운로드해 주세요.",
-      "[오전 9:07:42] 최신 결과물 실물 검수 착수",
-      "[오전 9:04:04] 배포/변동량 분석 실패: [DAT-06 과장 검수 실패] 구글 드라이브에서 다운로드된 inventory.json 파일을 찾을 수 없습니다. 구글 드라이브에서 최신 파일을 다운로드해 주세요.",
-      "[오전 9:04:04] [DAT-06 과장 검수 실패] 구글 드라이브에서 다운로드된 inventory.json 파일을 찾을 수 없습니다. 구글 드라이브에서 최신 파일을 다운로드해 주세요.",
-      "[오전 9:04:04] 최신 결과물 실물 검수 착수",
-      "[오전 9:04:04] 배포/변동량 분석 실패: [DAT-06 과장 검수 실패] 구글 드라이브에서 다운로드된 inventory.json 파일을 찾을 수 없습니다. 구글 드라이브에서 최신 파일을 다운로드해 주세요.",
-      "[오전 9:04:04] [DAT-06 과장 검수 실패] 구글 드라이브에서 다운로드된 inventory.json 파일을 찾을 수 없습니다. 구글 드라이브에서 최신 파일을 다운로드해 주세요.",
-      "[오전 9:04:04] 최신 결과물 실물 검수 착수"
+      "[오전 9:11:08] 최신 결과물 실물 검수 착수"
     ],
     "connectedDeptIds": [
       "dat",

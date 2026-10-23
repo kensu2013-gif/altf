@@ -21,9 +21,13 @@
     "color": "#00E676",
     "bgGlow": "rgba(0, 230, 118, 0.15)",
     "icon": "🛒",
-    "description": "고객 발주서 등록, 견적 대조, S/D/M 경로 판별, 대경 매입발주 및 미결 관제",
+    "description": "고객 발주서 등록, 견적 대조, S/D/M 경로 판별, 대경 매입발주 및 생산 미결 공정 관제",
     "headRole": "구매/SCM 총괄",
-    "totalUnits": 5
+    "totalUnits": 9,
+    "teams": [
+      "구매SCM팀",
+      "미결관리팀"
+    ]
   },
   {
     "id": "quality",
@@ -78,10 +82,11 @@
     "icon": "⚡",
     "headRole": "데이터 인프라 & Make.com 크리덴셜 총괄",
     "description": "Make.com OAuth 감시, 구글드라이브 3대 재고시트 통합, 3~5분 버퍼링 관제 및 AWS S3 실시간 연동 총괄",
-    "totalUnits": 6,
+    "totalUnits": 7,
     "teams": [
       "자동화인프라팀",
-      "재고동기화자동화팀"
+      "재고동기화자동화팀",
+      "공정데이터분석팀"
     ]
   }
 ]
