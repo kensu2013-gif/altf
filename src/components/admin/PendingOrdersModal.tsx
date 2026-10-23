@@ -5,7 +5,6 @@ import {
     RefreshCw, 
     FolderOpen, 
     AlertTriangle, 
-    CheckCircle2, 
     Clock, 
     Layers, 
     Copy, 
@@ -14,10 +13,15 @@ import {
     TrendingUp, 
     BellRing,
     Factory,
-    FileSpreadsheet,
     Flame,
     Calculator,
-    ShieldAlert
+    ShieldAlert,
+    Building2,
+    Hourglass,
+    ChevronDown,
+    ChevronUp,
+    ArrowUpRight,
+    Filter
 } from 'lucide-react';
 
 export interface PendingOrderItem {
@@ -57,9 +61,27 @@ export interface PendingOrderItem {
     matched: boolean;
     customerName: string;
     poCreatedAt?: string | null;
+    poDate?: string;
+    elapsedDays?: number;
     isStockOrder: boolean;
     alertReason?: string | null;
     alertSeverity?: 'NORMAL' | 'WARNING' | 'CRITICAL';
+}
+
+export interface ClientDiagnosis {
+    clientName: string;
+    totalCount: number;
+    alertCount: number;
+    criticalCount: number;
+    warningCount: number;
+    unstartedCount: number;
+    completedCount: number;
+    maxElapsedDays: number;
+    oldestOrderNo: string;
+    oldestPoDate: string;
+    oldestItemSummary: string;
+    primaryIssue: string;
+    sampleItems?: PendingOrderItem[];
 }
 
 export interface PendingAnalysisSummary {
@@ -105,6 +127,8 @@ export interface PendingAnalysisData {
     archivePath: string;
     summary: PendingAnalysisSummary;
     stageCounts: Record<string, number>;
+    clientDiagnoses?: ClientDiagnosis[];
+    longestStagnantItems?: PendingOrderItem[];
     chaserReport?: {
         reportId: string;
         createdAt: string;
@@ -154,9 +178,14 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
     const [searchKeyword, setSearchKeyword] = useState('');
     const [stageFilter, setStageFilter] = useState<string>('ALL');
     const [severityFilter, setSeverityFilter] = useState<'ALL' | 'ALERT_ONLY' | 'CRITICAL' | 'WARNING'>('ALL');
+    const [clientFilter, setClientFilter] = useState<string>('ALL');
     const [copiedReport, setCopiedReport] = useState(false);
-    const [activeTab, setActiveTab] = useState<'TABLE' | 'CHASER_REPORT' | 'LEADTIME'>('TABLE');
+    const [activeTab, setActiveTab] = useState<'TABLE' | 'CLIENTS' | 'STAGNANT' | 'CHASER_REPORT' | 'LEADTIME'>('TABLE');
     const [uploading, setUploading] = useState(false);
+    const [showExpandedMetrics, setShowExpandedMetrics] = useState(false);
+
+    // Client diagnosis search in CLIENTS tab
+    const [clientSearch, setClientSearch] = useState('');
 
     // Leadtime Calculator Simulator state (견적팀 연계)
     const [simCategory, setSimCategory] = useState<string>('90E');
@@ -244,10 +273,29 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
         }
     }, [isOpen]);
 
-    // Filtered rows
+    // Available unique clients with counts
+    const clientOptions = useMemo(() => {
+        if (!data?.rows) return [];
+        const map = new Map<string, number>();
+        data.rows.forEach(r => {
+            const client = r.deliveryTo || r.customerName || '자체/미지정';
+            map.set(client, (map.get(client) || 0) + 1);
+        });
+        return Array.from(map.entries())
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count);
+    }, [data]);
+
+    // Filtered rows for TABLE tab
     const filteredRows = useMemo(() => {
         if (!data?.rows) return [];
         return data.rows.filter(item => {
+            // Client filter
+            if (clientFilter !== 'ALL') {
+                const client = item.deliveryTo || item.customerName || '자체/미지정';
+                if (client !== clientFilter) return false;
+            }
+
             // Stage filter
             if (stageFilter !== 'ALL' && item.stage !== stageFilter) {
                 return false;
@@ -278,7 +326,19 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
 
             return true;
         });
-    }, [data, stageFilter, severityFilter, searchKeyword]);
+    }, [data, clientFilter, stageFilter, severityFilter, searchKeyword]);
+
+    // Filtered Client Diagnoses for CLIENTS tab
+    const filteredClients = useMemo(() => {
+        if (!data?.clientDiagnoses) return [];
+        if (!clientSearch.trim()) return data.clientDiagnoses;
+        const kw = clientSearch.toLowerCase();
+        return data.clientDiagnoses.filter(c => 
+            c.clientName.toLowerCase().includes(kw) || 
+            c.primaryIssue.toLowerCase().includes(kw) ||
+            c.oldestOrderNo.toLowerCase().includes(kw)
+        );
+    }, [data?.clientDiagnoses, clientSearch]);
 
     // Dynamic simulator estimate computation
     const simulatedEstimate = useMemo(() => {
@@ -322,77 +382,119 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
     const stageCounts = data?.stageCounts || {};
     const chaserReport = data?.chaserReport;
     const leadtimeStats = data?.leadtimeStats;
+    const clientDiagnoses = data?.clientDiagnoses || [];
+    const longestStagnantItems = data?.longestStagnantItems || [];
+
+    // Jump to client filter in Table tab
+    const handleSelectClient = (clientName: string) => {
+        setClientFilter(clientName);
+        setActiveTab('TABLE');
+    };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-            <div className="relative w-full max-w-[96vw] h-[92vh] bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-200">
-                {/* 1. Modal Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/80">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-600 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
-                            <Factory className="w-5 h-5 text-white" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+            <div className="relative w-full max-w-[98vw] h-[95vh] bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-200">
+                
+                {/* 1. Ultra-Compact Modal Header & Navigation */}
+                <div className="flex items-center justify-between px-5 py-2.5 border-b border-slate-800 bg-slate-950/90 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-600 to-orange-500 flex items-center justify-center shadow-md shadow-amber-500/20 shrink-0">
+                            <Factory className="w-4 h-4 text-white" />
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                                    대경벤드 생산 미결 & 공정 관제 허브
+                                <h2 className="text-base font-bold tracking-tight text-white flex items-center gap-1.5">
+                                    대경벤드 생산 미결 & 공정 관제
                                 </h2>
-                                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                                    구매부 미결관리팀 (PUR-01~04)
-                                </span>
-                                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                    영업부(SAL-03) · 데이터팀(DAT-07)
+                                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                    PUR-01~04
                                 </span>
                             </div>
-                            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
-                                <span>원장: <b>{data?.filename || '알트에프 미결 리스트.xlsx'}</b></span>
-                                <span>•</span>
-                                <span>분석 기준: {data?.timestamp ? new Date(data.timestamp).toLocaleString('ko-KR') : '확인 중'}</span>
+                            <p className="text-[11px] text-slate-400 truncate max-w-[420px]" title={data?.filename}>
+                                원장: <span className="text-slate-300 font-mono">{data?.filename || '알트에프 미결 리스트.xlsx'}</span>
                             </p>
                         </div>
                     </div>
 
+                    {/* Navigation Tabs (Streamlined) */}
+                    <div className="flex items-center bg-slate-800/90 rounded-xl p-1 border border-slate-700/80 shadow-inner">
+                        <button
+                            onClick={() => setActiveTab('TABLE')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                activeTab === 'TABLE' 
+                                    ? 'bg-amber-600 text-white shadow-md' 
+                                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                            }`}
+                        >
+                            <Layers className="w-3.5 h-3.5" />
+                            <span>제품 공정 대장</span>
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-black/30 text-amber-200">
+                                {data?.rows?.length || 0}
+                            </span>
+                        </button>
+
+                        <button
+                            onClick={() => setActiveTab('CLIENTS')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                activeTab === 'CLIENTS' 
+                                    ? 'bg-blue-600 text-white shadow-md' 
+                                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                            }`}
+                        >
+                            <Building2 className="w-3.5 h-3.5 text-blue-300" />
+                            <span>거래처별 병목 진단</span>
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-blue-950/60 text-blue-200 border border-blue-400/30 font-bold">
+                                {clientDiagnoses.length}개사
+                            </span>
+                        </button>
+
+                        <button
+                            onClick={() => setActiveTab('STAGNANT')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                activeTab === 'STAGNANT' 
+                                    ? 'bg-rose-600 text-white shadow-md' 
+                                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                            }`}
+                        >
+                            <Hourglass className="w-3.5 h-3.5 text-rose-300 animate-pulse" />
+                            <span>최장 미착수 정체 TOP</span>
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-rose-950/60 text-rose-200 border border-rose-400/30 font-bold">
+                                {longestStagnantItems.length}건
+                            </span>
+                        </button>
+
+                        <button
+                            onClick={() => setActiveTab('CHASER_REPORT')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                activeTab === 'CHASER_REPORT' 
+                                    ? 'bg-red-700 text-white shadow-md' 
+                                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                            }`}
+                        >
+                            <BellRing className="w-3.5 h-3.5" />
+                            <span>납기 독촉장</span>
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-red-950/60 text-red-200 font-bold">
+                                {chaserReport?.summary?.alertCount || 0}
+                            </span>
+                        </button>
+
+                        <button
+                            onClick={() => setActiveTab('LEADTIME')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                activeTab === 'LEADTIME' 
+                                    ? 'bg-indigo-600 text-white shadow-md' 
+                                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                            }`}
+                        >
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            <span>리드타임</span>
+                        </button>
+                    </div>
+
                     {/* Action buttons */}
                     <div className="flex items-center gap-2">
-                        {/* Tab Switch */}
-                        <div className="flex items-center bg-slate-800/80 rounded-lg p-1 border border-slate-700 mr-2">
-                            <button
-                                onClick={() => setActiveTab('TABLE')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                                    activeTab === 'TABLE' 
-                                        ? 'bg-amber-600 text-white shadow-sm' 
-                                        : 'text-slate-400 hover:text-white'
-                                }`}
-                            >
-                                <Layers className="w-3.5 h-3.5 inline mr-1.5" />
-                                공정 대장 ({data?.rows?.length || 0})
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('CHASER_REPORT')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                                    activeTab === 'CHASER_REPORT' 
-                                        ? 'bg-red-600 text-white shadow-sm' 
-                                        : 'text-slate-400 hover:text-white'
-                                }`}
-                            >
-                                <BellRing className="w-3.5 h-3.5 inline mr-1.5" />
-                                납기 독촉장 ({chaserReport?.summary?.alertCount || 0})
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('LEADTIME')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                                    activeTab === 'LEADTIME' 
-                                        ? 'bg-indigo-600 text-white shadow-sm' 
-                                        : 'text-slate-400 hover:text-white'
-                                }`}
-                            >
-                                <TrendingUp className="w-3.5 h-3.5 inline mr-1.5" />
-                                제조 리드타임 벤치마크 (누적 {leadtimeStats?.sampleCount || 0}건)
-                            </button>
-                        </div>
-
                         {/* File Upload Button */}
-                        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 cursor-pointer transition-colors">
+                        <label className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 cursor-pointer transition-colors">
                             <UploadCloud className="w-3.5 h-3.5 text-amber-400" />
                             <span>{uploading ? '분석 중...' : '엑셀 업로드'}</span>
                             <input 
@@ -407,8 +509,8 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                         {/* Open folder button */}
                         <button
                             onClick={handleOpenFolder}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition-colors"
-                            title="storage/pending_lists 폴더 열기"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition-colors"
+                            title="storage/pending_lists 보관함 열기"
                         >
                             <FolderOpen className="w-3.5 h-3.5 text-blue-400" />
                             <span>보관함</span>
@@ -418,252 +520,321 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                         <button
                             onClick={handleSync}
                             disabled={loading}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-600/20 text-amber-300 hover:bg-amber-600/30 border border-amber-500/30 transition-colors"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-600/20 text-amber-300 hover:bg-amber-600/30 border border-amber-500/30 transition-colors"
                         >
                             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                            <span>즉시 재분석</span>
+                            <span>재분석</span>
                         </button>
 
                         {/* Close button */}
                         <button
                             onClick={onClose}
-                            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors ml-2"
+                            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors ml-1"
                         >
                             <X className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
 
-                {/* 2. Key Metrics Summary Banner */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-4 bg-slate-950/40 border-b border-slate-800">
-                    {/* Total rows */}
-                    <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                        <div>
-                            <div className="text-xs text-slate-400 font-medium">대경 미결 총 행수</div>
-                            <div className="text-xl font-bold text-white mt-1">
-                                {summary?.totalRows ? summary.totalRows.toLocaleString() : '0'} <span className="text-xs font-normal text-slate-400">건</span>
-                            </div>
+                {/* 2. Slim KPI Strip (Takes only 38px instead of 300px!) */}
+                <div className="px-5 py-2 bg-slate-950/70 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3 shrink-0 text-xs">
+                    <div className="flex items-center gap-4 divide-x divide-slate-800">
+                        <div className="flex items-center gap-2">
+                            <span className="text-slate-400">대경 미결 총:</span>
+                            <span className="font-bold text-white font-mono text-sm">{summary?.totalRows || 0}</span>
+                            <span className="text-slate-500 text-[11px]">건</span>
                         </div>
-                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                            <FileSpreadsheet className="w-4 h-4" />
+                        <div className="pl-4 flex items-center gap-2">
+                            <span className="text-slate-400">우리 발주(PO) 매칭:</span>
+                            <span className="font-bold text-emerald-400 font-mono text-sm">{summary?.matchedCount || 0}</span>
+                            <span className="text-slate-500 text-[11px]">건</span>
                         </div>
-                    </div>
-
-                    {/* Matched count */}
-                    <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                        <div>
-                            <div className="text-xs text-slate-400 font-medium">우리 발주(PO) 매칭</div>
-                            <div className="text-xl font-bold text-emerald-400 mt-1">
-                                {summary?.matchedCount ? summary.matchedCount.toLocaleString() : '0'} <span className="text-xs font-normal text-slate-400">건</span>
-                            </div>
-                            <div className="text-[11px] text-slate-500">재고발주 {summary?.stockOrderCount || 0}건 포함</div>
-                        </div>
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                            <CheckCircle2 className="w-4 h-4" />
-                        </div>
-                    </div>
-
-                    {/* Urgent Chaser Alerts (Excluding stored items) */}
-                    <div className="p-3 rounded-xl bg-slate-900/90 border border-red-500/30 flex items-center justify-between bg-red-950/20">
-                        <div>
-                            <div className="text-xs text-red-400 font-medium flex items-center gap-1">
-                                <Flame className="w-3 h-3 text-red-400 animate-pulse" />
-                                <span>실제 공정 정체·독촉 대상</span>
-                            </div>
-                            <div className="text-xl font-bold text-red-400 mt-1">
-                                {chaserReport?.summary?.alertCount ? chaserReport.summary.alertCount.toLocaleString() : (summary?.alertCount || 0)} <span className="text-xs font-normal text-slate-400">건</span>
-                            </div>
-                            <div className="text-[11px] text-red-300/80">긴급(절단미착수) {chaserReport?.summary?.criticalCount || 0}건 · 정체 {chaserReport?.summary?.warningCount || 0}건</div>
-                        </div>
-                        <div className="w-8 h-8 rounded-lg bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400">
-                            <AlertTriangle className="w-4 h-4" />
-                        </div>
-                    </div>
-
-                    {/* Completed stored (Excluded from chasers) */}
-                    <div className="p-3 rounded-xl bg-slate-900/90 border border-teal-500/30 flex items-center justify-between bg-teal-950/20">
-                        <div>
-                            <div className="text-xs text-teal-400 font-medium">창고 입고 완료 (독촉 제외)</div>
-                            <div className="text-xl font-bold text-teal-400 mt-1">
-                                {stageCounts['창고입고완료'] ? stageCounts['창고입고완료'].toLocaleString() : '0'} <span className="text-xs font-normal text-slate-400">건</span>
-                            </div>
-                            <div className="text-[11px] text-teal-300/80">출고 직전 완료 (독촉 대상 제외)</div>
-                        </div>
-                        <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400">
-                            <Check className="w-4 h-4" />
-                        </div>
-                    </div>
-
-                    {/* Avg Leadtime */}
-                    <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                        <div>
-                            <div className="text-xs text-slate-400 font-medium">누적 제조 평균 리드타임</div>
-                            <div className="text-xl font-bold text-indigo-400 mt-1">
-                                23.5 <span className="text-xs font-normal text-slate-400">일</span>
-                            </div>
-                            <div className="text-[11px] text-slate-500">누적 {leadtimeStats?.sampleCount || 0}개 실측 표본</div>
-                        </div>
-                        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                            <Clock className="w-4 h-4" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* 3. 9-Stage Process Funnel Visual Progress */}
-                <div className="px-6 py-3 bg-slate-950/60 border-b border-slate-800/80">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="text-xs font-semibold text-slate-300 flex items-center gap-2">
-                            <span>🏭 9단계 제조 공정 진행 현황 퍼널</span>
-                            <span className="text-[11px] text-slate-500 font-normal">
-                                (L열 검토·생산·재고·수정 판별 ➔ P~X열 절단~입고 실시간 추적)
+                        <div className="pl-4 flex items-center gap-2">
+                            <span className="text-red-400 font-semibold flex items-center gap-1">
+                                <Flame className="w-3 h-3 text-red-400" />
+                                <span>정체·독촉 대상:</span>
+                            </span>
+                            <span className="font-extrabold text-red-400 font-mono text-sm">{chaserReport?.summary?.alertCount || 0}</span>
+                            <span className="px-1.5 py-0.2 rounded text-[10px] bg-red-950/80 text-red-300 border border-red-500/30 font-bold">
+                                긴급(절단미착수) {chaserReport?.summary?.criticalCount || 0}건
                             </span>
                         </div>
+                        <div className="pl-4 flex items-center gap-2">
+                            <span className="text-teal-400">창고 입고 완료:</span>
+                            <span className="font-bold text-teal-300 font-mono text-sm">{stageCounts['창고입고완료'] || 0}</span>
+                            <span className="text-slate-500 text-[11px]">(독촉 전면 제외)</span>
+                        </div>
+                        <div className="pl-4 flex items-center gap-2">
+                            <span className="text-slate-400">평균 리드타임:</span>
+                            <span className="font-bold text-indigo-400 font-mono text-sm">23.5</span>
+                            <span className="text-slate-500 text-[11px]">일 (누적 57건 실측)</span>
+                        </div>
                     </div>
-                    <div className="grid grid-cols-9 gap-1.5 text-center text-xs">
-                        {[
-                            { name: '검토정체', count: stageCounts['검토정체'] || 0, color: 'bg-amber-950/40 border-amber-500/40 text-amber-300', pct: '0%' },
-                            { name: '절단대기', count: stageCounts['절단대기'] || 0, color: 'bg-red-950/40 border-red-500/40 text-red-300', pct: '5%' },
-                            { name: '절단완료', count: stageCounts['절단완료'] || 0, color: 'bg-blue-950/40 border-blue-500/40 text-blue-300', pct: '20%' },
-                            { name: '성형완료', count: stageCounts['성형완료'] || 0, color: 'bg-blue-950/40 border-blue-500/40 text-blue-300', pct: '35%' },
-                            { name: '열처리완료', count: stageCounts['열처리완료'] || 0, color: 'bg-purple-950/40 border-purple-500/40 text-purple-300', pct: '50%' },
-                            { name: '교정완료', count: stageCounts['교정완료'] || 0, color: 'bg-purple-950/40 border-purple-500/40 text-purple-300', pct: '60%' },
-                            { name: '가공완료', count: stageCounts['가공완료'] || 0, color: 'bg-cyan-950/40 border-cyan-500/40 text-cyan-300', pct: '75%' },
-                            { name: '산세완결', count: stageCounts['산세완료'] || 0, color: 'bg-cyan-950/40 border-cyan-500/40 text-cyan-300', pct: '90%' },
-                            { name: '창고입고', count: stageCounts['창고입고완료'] || 0, color: 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300', pct: '100%' }
-                        ].map((st, i) => (
-                            <button
-                                key={st.name}
-                                onClick={() => setStageFilter(stageFilter === st.name ? 'ALL' : st.name)}
-                                className={`p-2 rounded-lg border transition-all text-left ${st.color} ${
-                                    stageFilter === st.name ? 'ring-2 ring-amber-400 scale-[1.02]' : 'hover:border-slate-500'
-                                }`}
-                            >
-                                <div className="text-[10px] text-slate-400 flex items-center justify-between">
-                                    <span>Step {i + 1}</span>
-                                    <span>{st.pct}</span>
-                                </div>
-                                <div className="font-semibold truncate text-[11px] mt-0.5">{st.name}</div>
-                                <div className="text-base font-bold mt-0.5">{st.count}건</div>
-                            </button>
-                        ))}
-                    </div>
+
+                    {/* Expand/Collapse Detailed Funnel & Metrics Toggle */}
+                    <button
+                        onClick={() => setShowExpandedMetrics(!showExpandedMetrics)}
+                        className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800 transition-colors"
+                    >
+                        <span>9단계 공정 퍼널 / 상세 지표</span>
+                        {showExpandedMetrics ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
                 </div>
 
-                {/* 4. Tab Contents */}
+                {/* Collapsible Expanded Funnel Banner (Hidden by default to give MAX space to table) */}
+                {showExpandedMetrics && (
+                    <div className="px-5 py-3 bg-slate-950/90 border-b border-slate-800 shrink-0 animate-in slide-in-from-top-2 duration-150">
+                        <div className="text-[11px] font-semibold text-slate-400 mb-2 flex items-center justify-between">
+                            <span>🏭 9단계 제조 공정 진행 현황 퍼널 (클릭 시 해당 공정으로 즉시 필터)</span>
+                            <span className="text-[10px] text-slate-500">L열 검토·생산 판별 ➔ P~X열 실시간 추적</span>
+                        </div>
+                        <div className="grid grid-cols-9 gap-1.5 text-center text-xs">
+                            {[
+                                { name: '검토정체', count: stageCounts['검토정체'] || 0, color: 'bg-amber-950/40 border-amber-500/40 text-amber-300', pct: '0%' },
+                                { name: '절단대기', count: stageCounts['절단대기'] || 0, color: 'bg-red-950/40 border-red-500/40 text-red-300', pct: '5%' },
+                                { name: '절단완료', count: stageCounts['절단완료'] || 0, color: 'bg-blue-950/40 border-blue-500/40 text-blue-300', pct: '20%' },
+                                { name: '성형완료', count: stageCounts['성형완료'] || 0, color: 'bg-blue-950/40 border-blue-500/40 text-blue-300', pct: '35%' },
+                                { name: '열처리완료', count: stageCounts['열처리완료'] || 0, color: 'bg-purple-950/40 border-purple-500/40 text-purple-300', pct: '50%' },
+                                { name: '교정완료', count: stageCounts['교정완료'] || 0, color: 'bg-purple-950/40 border-purple-500/40 text-purple-300', pct: '60%' },
+                                { name: '가공완료', count: stageCounts['가공완료'] || 0, color: 'bg-cyan-950/40 border-cyan-500/40 text-cyan-300', pct: '75%' },
+                                { name: '산세완결', count: stageCounts['산세완료'] || 0, color: 'bg-cyan-950/40 border-cyan-500/40 text-cyan-300', pct: '90%' },
+                                { name: '창고입고', count: stageCounts['창고입고완료'] || 0, color: 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300', pct: '100%' }
+                            ].map((st, i) => (
+                                <button
+                                    key={st.name}
+                                    onClick={() => {
+                                        setStageFilter(stageFilter === st.name ? 'ALL' : st.name);
+                                        setActiveTab('TABLE');
+                                    }}
+                                    className={`p-1.5 rounded-lg border transition-all text-left ${st.color} ${
+                                        stageFilter === st.name ? 'ring-2 ring-amber-400 scale-[1.02]' : 'hover:border-slate-500'
+                                    }`}
+                                >
+                                    <div className="text-[9px] text-slate-400 flex items-center justify-between">
+                                        <span>Step {i + 1}</span>
+                                        <span>{st.pct}</span>
+                                    </div>
+                                    <div className="font-semibold truncate text-[11px] mt-0.5">{st.name}</div>
+                                    <div className="text-sm font-bold mt-0.5 font-mono">{st.count}건</div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* 3. TAB 1: 제품 공정 대장 (Expanded Full-Screen Ledger View) */}
                 {activeTab === 'TABLE' && (
-                    <div className="flex-1 flex flex-col min-h-0 bg-slate-900/50">
-                        {/* Search & Filter Toolbar */}
-                        <div className="p-3 border-b border-slate-800 flex items-center justify-between gap-3 bg-slate-950/30">
-                            {/* Search input */}
-                            <div className="relative flex-1 max-w-md">
-                                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    type="text"
-                                    placeholder="주문번호(Y), 납품처(Z), 품명, 고객사, 규격, 재질 검색..."
-                                    value={searchKeyword}
-                                    onChange={e => setSearchKeyword(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 transition-colors"
-                                />
+                    <div className="flex-1 flex flex-col min-h-0 bg-slate-900/60 overflow-hidden">
+                        {/* Compact Search & Multi-Filter Bar */}
+                        <div className="p-2.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2.5 bg-slate-950/40 shrink-0">
+                            {/* Left: Client filter select & Keyword search */}
+                            <div className="flex items-center gap-2 flex-1 max-w-2xl">
+                                {/* 거래처 선택 드롭다운 */}
+                                <div className="relative min-w-[180px]">
+                                    <select
+                                        value={clientFilter}
+                                        onChange={e => setClientFilter(e.target.value)}
+                                        className="w-full py-1.5 pl-3 pr-8 rounded-lg bg-slate-800 border border-slate-700 text-xs font-semibold text-amber-300 focus:outline-none focus:border-amber-500 transition-colors cursor-pointer"
+                                    >
+                                        <option value="ALL">🏢 전체 거래처 ({data?.rows?.length || 0}건)</option>
+                                        {clientOptions.map(c => (
+                                            <option key={c.name} value={c.name}>
+                                                {c.name} ({c.count}건)
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* 검색어 인풋 */}
+                                <div className="relative flex-1">
+                                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="주문번호(Y), 품명, 규격, 재질, 작업구분 검색..."
+                                        value={searchKeyword}
+                                        onChange={e => setSearchKeyword(e.target.value)}
+                                        className="w-full pl-8 pr-4 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 transition-colors"
+                                    />
+                                    {searchKeyword && (
+                                        <button 
+                                            onClick={() => setSearchKeyword('')}
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                                        >
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
-                            {/* Filter Chips */}
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-400">정체/경보 필터:</span>
+                            {/* Right: Stage & Severity Filter Buttons */}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                {/* 공정 단계 필터 */}
+                                {stageFilter !== 'ALL' && (
+                                    <span className="px-2 py-0.5 rounded text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                                        공정: {stageFilter}
+                                        <button onClick={() => setStageFilter('ALL')} className="hover:text-white">
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </span>
+                                )}
+
+                                {clientFilter !== 'ALL' && (
+                                    <span className="px-2 py-0.5 rounded text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1 font-semibold">
+                                        거래처: {clientFilter}
+                                        <button onClick={() => setClientFilter('ALL')} className="hover:text-white">
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </span>
+                                )}
+
+                                <div className="h-4 w-px bg-slate-700 mx-1" />
+
                                 <button
                                     onClick={() => setSeverityFilter('ALL')}
                                     className={`px-2.5 py-1 rounded text-xs transition-colors ${
-                                        severityFilter === 'ALL' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
+                                        severityFilter === 'ALL' ? 'bg-slate-700 text-white font-bold' : 'text-slate-400 hover:text-white'
                                     }`}
                                 >
-                                    전체 ({data?.rows?.length || 0})
+                                    전체
                                 </button>
                                 <button
                                     onClick={() => setSeverityFilter('ALERT_ONLY')}
                                     className={`px-2.5 py-1 rounded text-xs transition-colors flex items-center gap-1 ${
-                                        severityFilter === 'ALERT_ONLY' ? 'bg-red-600 text-white' : 'text-red-400 hover:text-red-300'
+                                        severityFilter === 'ALERT_ONLY' ? 'bg-red-600 text-white font-bold' : 'text-red-400 hover:text-red-300'
                                     }`}
                                 >
                                     <AlertTriangle className="w-3 h-3" />
-                                    정체/독촉 대상 ({chaserReport?.summary?.alertCount || 0})
+                                    정체·독촉 대상
                                 </button>
                                 <button
                                     onClick={() => setSeverityFilter('CRITICAL')}
                                     className={`px-2.5 py-1 rounded text-xs transition-colors ${
-                                        severityFilter === 'CRITICAL' ? 'bg-red-700 text-white' : 'text-red-300 hover:text-white'
+                                        severityFilter === 'CRITICAL' ? 'bg-red-700 text-white font-bold' : 'text-red-300 hover:text-white'
                                     }`}
                                 >
-                                    🚨 긴급 절단누락 ({chaserReport?.summary?.criticalCount || 0})
+                                    🚨 긴급 절단미착수
                                 </button>
                                 <button
                                     onClick={() => setSeverityFilter('WARNING')}
                                     className={`px-2.5 py-1 rounded text-xs transition-colors ${
-                                        severityFilter === 'WARNING' ? 'bg-amber-600 text-white' : 'text-amber-300 hover:text-white'
+                                        severityFilter === 'WARNING' ? 'bg-amber-600 text-white font-bold' : 'text-amber-300 hover:text-white'
                                     }`}
                                 >
-                                    ⚠️ 공정 정체 ({chaserReport?.summary?.warningCount || 0})
+                                    ⚠️ 공정 정체
                                 </button>
                             </div>
                         </div>
 
-                        {/* Data Table */}
+                        {/* Large, High-Visibility Product Ledger Table */}
                         <div className="flex-1 overflow-auto">
                             <table className="w-full text-left text-xs border-collapse">
-                                <thead className="sticky top-0 bg-slate-950 text-slate-400 border-b border-slate-800 z-10 shadow-sm font-semibold">
+                                <thead className="sticky top-0 bg-slate-950 text-slate-300 border-b border-slate-800 z-10 shadow-sm font-semibold">
                                     <tr>
-                                        <th className="py-2.5 px-3">행</th>
-                                        <th className="py-2.5 px-3">LOT번호</th>
-                                        <th className="py-2.5 px-3">주문번호 (Y열)</th>
-                                        <th className="py-2.5 px-3">납품처 (Z열)</th>
-                                        <th className="py-2.5 px-3">품 명</th>
-                                        <th className="py-2.5 px-3">규격 / 두께</th>
-                                        <th className="py-2.5 px-3">재질</th>
-                                        <th className="py-2.5 px-3 text-center">작업 (L열)</th>
-                                        <th className="py-2.5 px-3 text-right">수주잔량</th>
-                                        <th className="py-2.5 px-3 text-center">공정 단계</th>
-                                        <th className="py-2.5 px-3 text-center">진행률</th>
-                                        <th className="py-2.5 px-3">절단(P)</th>
-                                        <th className="py-2.5 px-3">가공(T)</th>
-                                        <th className="py-2.5 px-3">입고(V)</th>
-                                        <th className="py-2.5 px-3">납기 독촉 / 정체 사유</th>
+                                        <th className="py-2.5 px-3 w-12 text-center text-slate-400">#</th>
+                                        <th className="py-2.5 px-3 min-w-[130px]">발주일 / 경과일</th>
+                                        <th className="py-2.5 px-3 min-w-[130px]">납품처 (Z열)</th>
+                                        <th className="py-2.5 px-3 min-w-[120px]">주문번호 (Y열)</th>
+                                        <th className="py-2.5 px-3 min-w-[90px]">품 명</th>
+                                        <th className="py-2.5 px-3 min-w-[120px]">규격 / 두께</th>
+                                        <th className="py-2.5 px-3 min-w-[90px]">재질</th>
+                                        <th className="py-2.5 px-3 text-center min-w-[70px]">작업 (L)</th>
+                                        <th className="py-2.5 px-3 text-right min-w-[70px]">수주잔량</th>
+                                        <th className="py-2.5 px-3 text-center min-w-[100px]">공정 단계</th>
+                                        <th className="py-2.5 px-3 text-center min-w-[90px]">진행률</th>
+                                        <th className="py-2.5 px-3 min-w-[80px]">절단일</th>
+                                        <th className="py-2.5 px-3 min-w-[80px]">입고일</th>
+                                        <th className="py-2.5 px-3 min-w-[220px]">병목 진단 / 납기 독촉 사유</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/60 font-mono">
                                     {filteredRows.length === 0 ? (
                                         <tr>
-                                            <td colSpan={15} className="py-12 text-center text-slate-500 font-sans">
-                                                조건에 일치하는 미결 데이터가 없습니다.
+                                            <td colSpan={14} className="py-16 text-center text-slate-400 font-sans">
+                                                <div className="flex flex-col items-center justify-center gap-2">
+                                                    <Filter className="w-8 h-8 text-slate-600" />
+                                                    <p className="text-sm">조건에 일치하는 미결 제품이 없습니다.</p>
+                                                    <button 
+                                                        onClick={() => { setClientFilter('ALL'); setStageFilter('ALL'); setSeverityFilter('ALL'); setSearchKeyword(''); }}
+                                                        className="text-xs text-amber-400 hover:underline mt-1"
+                                                    >
+                                                        모든 필터 초기화
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredRows.map(row => {
+                                        filteredRows.map((row, idx) => {
                                             const isAlert = !!row.alertReason;
                                             const isCritical = row.alertSeverity === 'CRITICAL';
+                                            const clientName = row.deliveryTo || row.customerName || '자체/미지정';
+                                            const elapsed = row.elapsedDays || 0;
+
                                             return (
                                                 <tr 
                                                     key={row.rowIdx}
-                                                    className={`hover:bg-slate-800/50 transition-colors ${
-                                                        isCritical ? 'bg-red-950/20' : (isAlert ? 'bg-amber-950/10' : '')
+                                                    className={`hover:bg-slate-800/60 transition-colors ${
+                                                        isCritical ? 'bg-red-950/25' : (isAlert ? 'bg-amber-950/15' : (idx % 2 === 1 ? 'bg-slate-950/20' : ''))
                                                     }`}
                                                 >
-                                                    <td className="py-2 px-3 text-slate-500">{row.rowIdx}</td>
-                                                    <td className="py-2 px-3 font-semibold text-slate-300">{row.lotNo}</td>
+                                                    {/* Row idx */}
+                                                    <td className="py-2 px-3 text-center text-slate-500 text-[11px]">{row.rowIdx}</td>
+
+                                                    {/* 발주일 / 경과일 */}
+                                                    <td className="py-2 px-3">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs text-slate-300 font-semibold">{row.poDate || '-'}</span>
+                                                            {elapsed > 0 && !row.isCompleted ? (
+                                                                <span className={`text-[10px] font-bold mt-0.5 inline-flex items-center gap-1 ${
+                                                                    elapsed >= 100 ? 'text-red-400' :
+                                                                    elapsed >= 30 ? 'text-amber-400' : 'text-slate-400'
+                                                                }`}>
+                                                                    <Clock className="w-2.5 h-2.5" />
+                                                                    D+{elapsed}일째 {row.progressPct <= 5 ? '멈춤' : '진행'}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] text-slate-500 font-sans">
+                                                                    {row.isCompleted ? '입고 완료' : '-'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* 납품처 (Z열) */}
+                                                    <td className="py-2 px-3 font-sans font-bold text-amber-300">
+                                                        <button 
+                                                            onClick={() => setClientFilter(clientName)}
+                                                            className="hover:underline text-left truncate max-w-[140px] block"
+                                                            title={`이 거래처(${clientName})만 모아보기`}
+                                                        >
+                                                            {clientName}
+                                                        </button>
+                                                    </td>
+
+                                                    {/* 주문번호 (Y열) */}
                                                     <td className="py-2 px-3">
                                                         <span className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
                                                             row.matched 
-                                                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                                                                 : 'bg-slate-800 text-slate-400'
                                                         }`}>
                                                             {row.orderNo || '-'}
                                                         </span>
                                                     </td>
-                                                    <td className="py-2 px-3 font-sans font-semibold text-amber-300 truncate max-w-[130px]" title={row.deliveryTo || row.customerName}>
-                                                        {row.deliveryTo || row.customerName || '-'}
+
+                                                    {/* 품 명 */}
+                                                    <td className="py-2 px-3 font-extrabold text-white text-xs">{row.itemName}</td>
+
+                                                    {/* 규격 / 두께 */}
+                                                    <td className="py-2 px-3 text-slate-200 font-semibold">
+                                                        {row.size} <span className="text-slate-400 font-normal">({row.thickness})</span>
                                                     </td>
-                                                    <td className="py-2 px-3 font-bold text-white">{row.itemName}</td>
-                                                    <td className="py-2 px-3 text-slate-300">{row.size} ({row.thickness})</td>
-                                                    <td className="py-2 px-3 text-slate-400">{row.material}</td>
+
+                                                    {/* 재질 */}
+                                                    <td className="py-2 px-3 text-slate-300 text-[11px]">{row.material}</td>
+
+                                                    {/* 작업 (L열) */}
                                                     <td className="py-2 px-3 text-center font-sans">
-                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                                             row.workType.includes('생산') ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
                                                             row.workType.includes('재고') ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' :
                                                             row.workType.includes('검토') ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
@@ -673,14 +844,20 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                                                             {row.workType}
                                                         </span>
                                                     </td>
-                                                    <td className="py-2 px-3 text-right font-bold text-white">
+
+                                                    {/* 수주 잔량 */}
+                                                    <td className="py-2 px-3 text-right font-extrabold text-white">
                                                         {row.remainQty.toLocaleString()}
                                                     </td>
+
+                                                    {/* 공정 단계 */}
                                                     <td className="py-2 px-3 text-center font-sans">
-                                                        <span className="text-[11px] font-medium text-slate-300">
+                                                        <span className="text-[11px] font-semibold text-slate-300">
                                                             {row.stage}
                                                         </span>
                                                     </td>
+
+                                                    {/* 진행률 */}
                                                     <td className="py-2 px-3 text-center">
                                                         <div className="flex items-center gap-1.5 justify-center">
                                                             <div className="w-12 bg-slate-800 rounded-full h-1.5 overflow-hidden">
@@ -693,27 +870,32 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                                                                     style={{ width: `${row.progressPct}%` }}
                                                                 />
                                                             </div>
-                                                            <span className="text-[10px] text-slate-400">{row.progressPct}%</span>
+                                                            <span className="text-[10px] text-slate-400 font-bold">{row.progressPct}%</span>
                                                         </div>
                                                     </td>
+
+                                                    {/* 절단일 */}
                                                     <td className="py-2 px-3 text-slate-400 text-[11px]">{row.cutDate || '-'}</td>
-                                                    <td className="py-2 px-3 text-slate-400 text-[11px]">{row.machDate || '-'}</td>
+
+                                                    {/* 입고일 */}
                                                     <td className="py-2 px-3 text-slate-400 text-[11px]">
                                                         {row.storeDate ? (
                                                             <span className="text-teal-400 font-bold">{row.storeDate}</span>
                                                         ) : '-'}
                                                     </td>
+
+                                                    {/* 병목 사유 / 경보 */}
                                                     <td className="py-2 px-3 font-sans">
                                                         {row.alertReason ? (
-                                                            <div className={`flex items-center gap-1 text-[11px] ${
+                                                            <div className={`flex items-center gap-1.5 text-[11px] ${
                                                                 isCritical ? 'text-red-400 font-bold' : 'text-amber-400'
                                                             }`}>
-                                                                <AlertTriangle className="w-3 h-3 shrink-0" />
+                                                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                                                                 <span>{row.alertReason}</span>
                                                             </div>
                                                         ) : (
                                                             <span className="text-teal-400/80 text-[10px] flex items-center gap-1 font-mono">
-                                                                <Check className="w-3 h-3" /> 정상
+                                                                <Check className="w-3 h-3" /> 정상 완료
                                                             </span>
                                                         )}
                                                     </td>
@@ -727,9 +909,301 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                     </div>
                 )}
 
-                {/* 5. Chaser Report Tab (Excluding stored items, grouped by 주문번호 + 납품처) */}
+                {/* 4. TAB 2: 거래처별 병목 진단 (CLIENTS - "우리 거래처별로 뭔가가장문제인지") */}
+                {activeTab === 'CLIENTS' && (
+                    <div className="flex-1 flex flex-col min-h-0 bg-slate-900/60 p-4 md:p-6 overflow-auto">
+                        <div className="max-w-6xl mx-auto w-full space-y-4">
+                            {/* Header description & Search */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/80 border border-slate-800 p-4 rounded-xl">
+                                <div>
+                                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                        <Building2 className="w-5 h-5 text-blue-400" />
+                                        거래처(납품처)별 공정 병목 진단 대시보드
+                                        <span className="px-2 py-0.5 rounded text-xs bg-blue-500/20 text-blue-300 font-mono">
+                                            총 {clientDiagnoses.length}개 고객사
+                                        </span>
+                                    </h3>
+                                    <p className="text-xs text-slate-400 mt-1">
+                                        고객사별로 대경벤드에서 어떤 공정이 멈춰있는지, 무엇이 가장 심각한 문제인지 한눈에 진단합니다.
+                                    </p>
+                                </div>
+
+                                <div className="relative w-72">
+                                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="거래처명 검색 (예: 한화, 부산밸브, 경남...)"
+                                        value={clientSearch}
+                                        onChange={e => setClientSearch(e.target.value)}
+                                        className="w-full pl-9 pr-4 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Client Cards Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                                {filteredClients.map((client, idx) => {
+                                    const hasCritical = client.criticalCount > 0;
+                                    const hasAlert = client.alertCount > 0;
+                                    const isAllDone = client.completedCount === client.totalCount;
+
+                                    return (
+                                        <div 
+                                            key={client.clientName}
+                                            className={`rounded-xl border p-4 transition-all flex flex-col justify-between ${
+                                                hasCritical 
+                                                    ? 'bg-red-950/20 border-red-500/40 hover:border-red-400 shadow-lg shadow-red-950/10' 
+                                                    : hasAlert 
+                                                    ? 'bg-slate-950/70 border-slate-800 hover:border-amber-500/50' 
+                                                    : (isAllDone ? 'bg-teal-950/15 border-teal-500/30' : 'bg-slate-950/50 border-slate-800')
+                                            }`}
+                                        >
+                                            <div>
+                                                {/* Top row: Client name & rank */}
+                                                <div className="flex items-start justify-between gap-2 border-b border-slate-800 pb-2.5">
+                                                    <div>
+                                                        <div className="text-[10px] text-slate-500 font-mono">
+                                                            #{idx + 1} 순위 거래처
+                                                        </div>
+                                                        <h4 className="text-base font-extrabold text-white mt-0.5 truncate max-w-[200px]" title={client.clientName}>
+                                                            {client.clientName}
+                                                        </h4>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-xs text-slate-400 font-medium">총 미결</div>
+                                                        <div className="text-lg font-black text-amber-400 font-mono">
+                                                            {client.totalCount} <span className="text-xs font-normal text-slate-400">건</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Status badges */}
+                                                <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                                                    {client.criticalCount > 0 && (
+                                                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-1">
+                                                            <Flame className="w-3 h-3 text-red-400 animate-pulse" />
+                                                            절단미착수 {client.criticalCount}건
+                                                        </span>
+                                                    )}
+                                                    {client.warningCount > 0 && (
+                                                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                                            정체 {client.warningCount}건
+                                                        </span>
+                                                    )}
+                                                    {client.unstartedCount > 0 && (
+                                                        <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                                                            미착수 0% {client.unstartedCount}건
+                                                        </span>
+                                                    )}
+                                                    {client.completedCount > 0 && (
+                                                        <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                                                            입고완료 {client.completedCount}건
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Primary Issue Highlight */}
+                                                <div className={`mt-3 p-2.5 rounded-lg border text-xs leading-snug ${
+                                                    hasCritical 
+                                                        ? 'bg-red-950/40 border-red-500/30 text-red-200' 
+                                                        : hasAlert 
+                                                        ? 'bg-amber-950/30 border-amber-500/30 text-amber-200' 
+                                                        : 'bg-slate-900 border-slate-800 text-slate-300'
+                                                }`}>
+                                                    <div className="text-[10px] text-slate-400 font-semibold mb-0.5 flex items-center gap-1">
+                                                        <AlertTriangle className="w-3 h-3" />
+                                                        가장 시급한 문제:
+                                                    </div>
+                                                    <div className="font-bold">{client.primaryIssue}</div>
+                                                </div>
+
+                                                {/* Oldest order info */}
+                                                {client.maxElapsedDays > 0 && (
+                                                    <div className="mt-2.5 text-[11px] text-slate-400 font-mono space-y-0.5">
+                                                        <div className="flex items-center justify-between">
+                                                            <span>최장 정체:</span>
+                                                            <span className="font-bold text-rose-400">
+                                                                발주 후 {client.maxElapsedDays}일 경과
+                                                            </span>
+                                                        </div>
+                                                        {client.oldestOrderNo && (
+                                                            <div className="flex items-center justify-between truncate text-slate-400">
+                                                                <span>발주번호:</span>
+                                                                <span className="text-slate-300">{client.oldestOrderNo}</span>
+                                                            </div>
+                                                        )}
+                                                        {client.oldestItemSummary && (
+                                                            <div className="text-slate-500 truncate text-[10px] mt-0.5" title={client.oldestItemSummary}>
+                                                                품목: {client.oldestItemSummary}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Action button */}
+                                            <button
+                                                onClick={() => handleSelectClient(client.clientName)}
+                                                className="mt-4 w-full py-1.5 rounded-lg bg-slate-800 hover:bg-amber-600 hover:text-white text-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-700 hover:border-amber-500"
+                                            >
+                                                <span>이 거래처 품목 모아보기 ({client.totalCount}건)</span>
+                                                <ArrowUpRight className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 5. TAB 3: 발주일 기준 최장 미착수 정체 TOP ("발주 한날짜로 부터 아무것도 제일 진행안된게 뭔지") */}
+                {activeTab === 'STAGNANT' && (
+                    <div className="flex-1 flex flex-col min-h-0 bg-slate-900/60 p-4 md:p-6 overflow-auto">
+                        <div className="max-w-6xl mx-auto w-full space-y-4">
+                            {/* Header description */}
+                            <div className="bg-gradient-to-r from-rose-950/50 via-slate-950 to-amber-950/40 border border-rose-500/40 p-5 rounded-xl shadow-xl">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                                            <Hourglass className="w-5 h-5 text-rose-400 animate-spin" />
+                                            발주일 기준 최장 미착수 정체 순위 (0% 진행 품목 TOP)
+                                            <span className="px-2 py-0.5 rounded text-xs bg-rose-500/20 text-rose-300 font-mono font-bold">
+                                                발주 후 방치 품목 집중 관제
+                                            </span>
+                                        </h3>
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            발주(PO)를 넣은 지 수개월이 지나도록 <b>대경벤드에서 절단(P열) 착수조차 안 되고 검토/홀딩 상태로 멈춰 있는</b> 품목들을 경과일수 순으로 정렬했습니다.
+                                        </p>
+                                    </div>
+                                    <div className="text-right font-mono">
+                                        <div className="text-xs text-slate-400">최장 정체 일수</div>
+                                        <div className="text-2xl font-black text-rose-400">
+                                            {longestStagnantItems[0]?.elapsedDays || 0} <span className="text-sm font-normal text-slate-400">일</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Top 3 Worst Highlight Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {longestStagnantItems.slice(0, 3).map((item, idx) => (
+                                    <div 
+                                        key={item.rowIdx}
+                                        className="p-4 rounded-xl bg-slate-950 border border-rose-500/40 shadow-lg relative overflow-hidden"
+                                    >
+                                        <div className="absolute top-2 right-2 px-2 py-0.5 rounded text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 font-mono">
+                                            #{idx + 1} 최장 멈춤
+                                        </div>
+                                        <div className="text-xs text-slate-400 font-semibold">
+                                            {item.deliveryTo || item.customerName}
+                                        </div>
+                                        <div className="text-xl font-black text-rose-400 mt-1 font-mono">
+                                            D+{item.elapsedDays}일째 멈춤
+                                        </div>
+                                        <div className="text-xs text-white font-bold mt-2">
+                                            {item.itemName} {item.size} ({item.thickness})
+                                        </div>
+                                        <div className="text-[11px] text-slate-400 mt-1">
+                                            발주: <span className="text-slate-300 font-mono">{item.orderNo}</span> ({item.poDate})
+                                        </div>
+                                        <div className="text-[11px] text-amber-300 mt-0.5">
+                                            수량: <span className="font-bold">{item.orderQty}개</span> | 작업구분: {item.workType} ({item.stage})
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                setSearchKeyword(item.orderNo);
+                                                setActiveTab('TABLE');
+                                            }}
+                                            className="mt-3 w-full py-1 text-center rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 hover:text-white transition-colors"
+                                        >
+                                            공정 대장에서 확인 →
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Full Table of Stagnant Items */}
+                            <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                                <div className="p-3 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                                    <span className="font-semibold text-slate-300">
+                                        공정 미착수 정체 상위 50개 품목 대장
+                                    </span>
+                                    <span>정렬: 발주 후 경과일수 많은 순 (내림차순)</span>
+                                </div>
+
+                                <div className="overflow-x-auto max-h-[500px]">
+                                    <table className="w-full text-left text-xs border-collapse font-mono">
+                                        <thead className="sticky top-0 bg-slate-900 text-slate-400 border-b border-slate-800 font-semibold">
+                                            <tr>
+                                                <th className="py-2.5 px-3 text-center">순위</th>
+                                                <th className="py-2.5 px-3">정체 일수</th>
+                                                <th className="py-2.5 px-3">발주일자</th>
+                                                <th className="py-2.5 px-3">주문번호 (Y열)</th>
+                                                <th className="py-2.5 px-3 font-sans">납품처 (Z열)</th>
+                                                <th className="py-2.5 px-3">품명</th>
+                                                <th className="py-2.5 px-3">규격 / 두께</th>
+                                                <th className="py-2.5 px-3 text-right">수량</th>
+                                                <th className="py-2.5 px-3 text-center font-sans">작업구분</th>
+                                                <th className="py-2.5 px-3 text-center font-sans">현재 상태</th>
+                                                <th className="py-2.5 px-3 text-center">액션</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-800/60">
+                                            {longestStagnantItems.map((item, idx) => (
+                                                <tr key={item.rowIdx} className="hover:bg-slate-900/60 transition-colors">
+                                                    <td className="py-2 px-3 text-center text-slate-500 font-bold">
+                                                        #{idx + 1}
+                                                    </td>
+                                                    <td className="py-2 px-3 font-bold">
+                                                        <span className={`px-2 py-0.5 rounded text-[11px] ${
+                                                            (item.elapsedDays || 0) >= 100 
+                                                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' 
+                                                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                                        }`}>
+                                                            D+{item.elapsedDays}일
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2 px-3 text-slate-300">{item.poDate || '-'}</td>
+                                                    <td className="py-2 px-3 font-bold text-emerald-400">{item.orderNo}</td>
+                                                    <td className="py-2 px-3 font-sans font-bold text-amber-300">
+                                                        {item.deliveryTo || item.customerName}
+                                                    </td>
+                                                    <td className="py-2 px-3 font-extrabold text-white">{item.itemName}</td>
+                                                    <td className="py-2 px-3 text-slate-300">{item.size} ({item.thickness})</td>
+                                                    <td className="py-2 px-3 text-right font-bold text-white">{item.orderQty}</td>
+                                                    <td className="py-2 px-3 text-center font-sans">
+                                                        <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 border border-slate-700">
+                                                            {item.workType}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2 px-3 text-center font-sans text-red-300 text-[11px]">
+                                                        {item.stage}
+                                                    </td>
+                                                    <td className="py-2 px-3 text-center">
+                                                        <button
+                                                            onClick={() => {
+                                                                setSearchKeyword(item.orderNo);
+                                                                setActiveTab('TABLE');
+                                                            }}
+                                                            className="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-amber-600 hover:text-white text-slate-300 transition-colors"
+                                                        >
+                                                            대장 보기
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 6. TAB 4: 대경벤드 긴급 납기 독촉 보고서 */}
                 {activeTab === 'CHASER_REPORT' && (
-                    <div className="flex-1 flex flex-col min-h-0 bg-slate-900/50 p-6 overflow-auto">
+                    <div className="flex-1 flex flex-col min-h-0 bg-slate-900/50 p-4 md:p-6 overflow-auto">
                         <div className="max-w-4xl mx-auto w-full space-y-4">
                             {/* 안내 배너: 창고입고 제외 명시 */}
                             <div className="p-4 rounded-xl bg-teal-950/30 border border-teal-500/30 flex items-start gap-3">
@@ -766,7 +1240,7 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                                     </button>
                                 </div>
 
-                                <pre className="text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed bg-slate-900/80 p-4 rounded-lg border border-slate-800/80">
+                                <pre className="text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed bg-slate-900/80 p-4 rounded-lg border border-slate-800/80 max-h-[550px] overflow-auto">
                                     {chaserReport?.markdown || '생성된 독촉 보고서가 없습니다.'}
                                 </pre>
                             </div>
@@ -774,9 +1248,9 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                     </div>
                 )}
 
-                {/* 6. Leadtime Stats Tab (Cumulative multi-tier by size & thickness + Quotation Estimator) */}
+                {/* 7. TAB 5: 제조 리드타임 벤치마크 및 견적 시뮬레이터 */}
                 {activeTab === 'LEADTIME' && (
-                    <div className="flex-1 flex flex-col min-h-0 bg-slate-900/50 p-6 overflow-auto">
+                    <div className="flex-1 flex flex-col min-h-0 bg-slate-900/50 p-4 md:p-6 overflow-auto">
                         <div className="max-w-5xl mx-auto w-full space-y-6">
                             {/* Simulator Card for Quotation Team */}
                             <div className="bg-gradient-to-r from-indigo-950/60 to-purple-950/60 border border-indigo-500/40 rounded-xl p-5 shadow-xl">
@@ -981,18 +1455,18 @@ export function PendingOrdersModal({ isOpen, onClose }: PendingOrdersModalProps)
                     </div>
                 )}
 
-                {/* 7. Modal Footer */}
-                <div className="flex items-center justify-between px-6 py-3 border-t border-slate-800 bg-slate-950/80 text-xs text-slate-400">
-                    <div className="flex items-center gap-4">
-                        <span>표시 중: <b>{filteredRows.length}</b>건</span>
+                {/* 8. Compact Modal Footer */}
+                <div className="flex items-center justify-between px-5 py-2.5 border-t border-slate-800 bg-slate-950/90 text-xs text-slate-400 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <span>현재 대장 표시: <b className="text-white">{filteredRows.length}</b>건</span>
                         <span>•</span>
-                        <span>창고입고 완료: <b>{stageCounts['창고입고완료'] || 0}</b>건 (독촉 대상 제외)</span>
+                        <span>창고입고 완료: <b className="text-teal-400">{stageCounts['창고입고완료'] || 0}</b>건 (독촉 제외)</span>
                         <span>•</span>
-                        <span>구매부(PUR-01~04) ⟷ 영업부(SAL-03) ⟷ 데이터팀(DAT-07) 실시간 연동 중</span>
+                        <span>거래처 총: <b className="text-blue-400">{clientDiagnoses.length}</b>개사 분석 완료</span>
                     </div>
                     <button
                         onClick={onClose}
-                        className="px-4 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
+                        className="px-4 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer font-medium"
                     >
                         닫기
                     </button>

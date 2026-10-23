@@ -122,6 +122,54 @@ export class PendingListService {
     return String(val).trim();
   }
 
+  _extractPoDate(orderNo, workDate, poCreatedAt) {
+    if (poCreatedAt) {
+      try {
+        const d = new Date(poCreatedAt);
+        if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+      } catch (e) {}
+    }
+    if (orderNo) {
+      // 1. ES260326-711 형태 (ES + YYMMDD)
+      const m1 = String(orderNo).match(/ES(\d{2})(\d{2})(\d{2})/i);
+      if (m1) {
+        return `20${m1[1]}-${m1[2]}-${m1[3]}`;
+      }
+      // 2. 2026-03-26 or 2026.03.26
+      const m2 = String(orderNo).match(/(20\d{2})[-./](\d{1,2})[-./](\d{1,2})/);
+      if (m2) {
+        return `${m2[1]}-${m2[2].padStart(2, '0')}-${m2[3].padStart(2, '0')}`;
+      }
+      // 3. 20260326
+      const m3 = String(orderNo).match(/(20\d{2})(\d{2})(\d{2})/);
+      if (m3) {
+        return `${m3[1]}-${m3[2]}-${m3[3]}`;
+      }
+    }
+    if (workDate) {
+      const s = String(workDate).trim();
+      const m = s.match(/(20\d{2})[-./]?(\d{2})[-./]?(\d{2})/);
+      if (m) {
+        return `${m[1]}-${m[2]}-${m[3]}`;
+      }
+    }
+    return '';
+  }
+
+  _calculateElapsedDays(dateStr) {
+    if (!dateStr) return 0;
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return 0;
+      const today = new Date();
+      const diffMs = today.getTime() - d.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      return diffDays > 0 ? diffDays : 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
   /**
    * 2. 주문번호(Y열) ↔ 우리 발주번호 매칭 및 공정 진행도 판단 (PUR-03 대리봇)
    */
@@ -235,6 +283,10 @@ export class PendingListService {
       }
       if (isStockOrder) stockOrderCount++;
 
+      // 발주일자 추출 및 발주일 기준 경과 일수 산출
+      const poDate = this._extractPoDate(row.orderNo, row.workDate, poCreatedAt);
+      const elapsedDays = this._calculateElapsedDays(poDate);
+
       // 3. 지연 및 병목 감지 (PUR-04 과장 연계 규칙)
       // 💡 [중요 규칙]: 창고입고(V열 storeDate) 완료된 품목은 출고 직전이므로 독촉 대상에서 100% 완전 제외!
       let alertReason = null;
@@ -243,12 +295,16 @@ export class PendingListService {
       if (!isCompleted) {
         // A. 생산 확정인데 절단(P열) 미착수 -> 긴급 독촉!
         if (row.workType.includes('생산') && !row.cutDate) {
-          alertReason = '생산 확정되었으나 절단(P열) 미착수 상태';
+          alertReason = elapsedDays > 0 
+            ? `생산 확정되었으나 절단(P열) 미착수 (발주 후 ${elapsedDays}일 경과)`
+            : '생산 확정되었으나 절단(P열) 미착수 상태';
           alertSeverity = 'CRITICAL';
         }
         // B. 1주일 이상 검토 정체인 경우 -> 검토 홀딩 독촉!
         else if (row.workType.includes('검토') && !row.cutDate && !row.machDate) {
-          alertReason = '공정 미착수 (검토 상태 1주일 이상 장기 정체)';
+          alertReason = elapsedDays > 0
+            ? `공정 미착수 (검토 상태 ${elapsedDays}일 장기 정체)`
+            : '공정 미착수 (검토 상태 1주일 이상 장기 정체)';
           alertSeverity = 'WARNING';
         }
         // C. 절단 완료 후 후속 성형/열처리 미진행
@@ -286,6 +342,8 @@ export class PendingListService {
         matched: !!matchedOrder,
         customerName,
         poCreatedAt,
+        poDate,
+        elapsedDays,
         isStockOrder,
         alertReason,
         alertSeverity
@@ -297,7 +355,89 @@ export class PendingListService {
       }
     });
 
-    this._updateAgentStatus('PUR-03', `발주 매칭 ${matchedCount}건, 공정 단계 분류 완료`, `매칭 ${matchedCount}건 / 지연 경보 ${alertItems.length}건 산출 (입고완료 제외)`, 'ACTIVE');
+    // 4. 거래처별(납품처별) 병목 진단 집계 (Client Diagnoses)
+    const clientMap = {};
+    analyzedRows.forEach(item => {
+      const client = item.deliveryTo || item.customerName || '자체/미지정';
+      if (!clientMap[client]) {
+        clientMap[client] = {
+          clientName: client,
+          totalCount: 0,
+          alertCount: 0,
+          criticalCount: 0,
+          warningCount: 0,
+          unstartedCount: 0, // 아무것도 진행 안 됨 (진행률 <= 5%)
+          completedCount: 0,
+          maxElapsedDays: 0,
+          oldestOrderNo: '',
+          oldestPoDate: '',
+          oldestItemSummary: '',
+          cutPendingCount: 0,
+          reviewPendingCount: 0,
+          sampleItems: []
+        };
+      }
+      const c = clientMap[client];
+      c.totalCount++;
+      if (item.isCompleted) c.completedCount++;
+      if (item.alertSeverity === 'CRITICAL') {
+        c.alertCount++;
+        c.criticalCount++;
+      } else if (item.alertSeverity === 'WARNING') {
+        c.alertCount++;
+        c.warningCount++;
+      }
+
+      if (!item.isCompleted && item.progressPct <= 5) {
+        c.unstartedCount++;
+        if (item.workType.includes('생산') && !item.cutDate) c.cutPendingCount++;
+        if (item.workType.includes('검토') && !item.cutDate) c.reviewPendingCount++;
+      }
+
+      if (item.elapsedDays > c.maxElapsedDays) {
+        c.maxElapsedDays = item.elapsedDays;
+        c.oldestOrderNo = item.orderNo || '';
+        c.oldestPoDate = item.poDate || '';
+        c.oldestItemSummary = `${item.itemName} ${item.size} (${item.thickness})`;
+      }
+
+      if (c.sampleItems.length < 5) {
+        c.sampleItems.push(item);
+      }
+    });
+
+    // 각 거래처별 가장 주요한 문제 요약 문구 생성
+    const clientDiagnoses = Object.values(clientMap).map(c => {
+      let primaryIssue = '정상 진행 중';
+      if (c.criticalCount > 0) {
+        primaryIssue = `절단 미착수 긴급 ${c.criticalCount}건 (최장 ${c.maxElapsedDays}일 정체)`;
+      } else if (c.unstartedCount > 0) {
+        primaryIssue = `공정 미착수 ${c.unstartedCount}건 (최장 ${c.maxElapsedDays}일 멈춤)`;
+      } else if (c.warningCount > 0) {
+        primaryIssue = `중간 공정 정체 ${c.warningCount}건`;
+      } else if (c.completedCount === c.totalCount) {
+        primaryIssue = '전량 창고입고 완료 (출고 대기)';
+      }
+      return {
+        ...c,
+        primaryIssue
+      };
+    }).sort((a, b) => {
+      // 정렬 우선순위: 긴급 많은 순 -> 정체 많은 순 -> 최장 경과일 많은 순 -> 총건수 많은 순
+      if (b.criticalCount !== a.criticalCount) return b.criticalCount - a.criticalCount;
+      if (b.alertCount !== a.alertCount) return b.alertCount - a.alertCount;
+      if (b.maxElapsedDays !== a.maxElapsedDays) return b.maxElapsedDays - a.maxElapsedDays;
+      return b.totalCount - a.totalCount;
+    });
+
+    // 5. 발주일 기준 최장 미착수 정체 TOP 리스트 (Longest Stagnant Items)
+    // 조건: 완료되지 않았고 진행률 <= 5% (검토정체 or 절단대기)
+    const longestStagnantItems = analyzedRows
+      .filter(r => !r.isCompleted && r.progressPct <= 5)
+      .sort((a, b) => (b.elapsedDays || 0) - (a.elapsedDays || 0))
+      .slice(0, 50);
+
+    this._updateAgentStatus('PUR-03', `발주 매칭 ${matchedCount}건, 공정 단계 및 거래처별 병목 분석 완료`, `매칭 ${matchedCount}건 / 거래처 ${clientDiagnoses.length}개 진단 / 최장 정체 ${longestStagnantItems[0]?.elapsedDays || 0}일`, 'ACTIVE');
 
     return {
       totalRows: analyzedRows.length,
@@ -307,6 +447,8 @@ export class PendingListService {
       stageCounts,
       alertCount: alertItems.length,
       alertItems,
+      clientDiagnoses,
+      longestStagnantItems,
       rows: analyzedRows
     };
   }
@@ -628,6 +770,8 @@ export class PendingListService {
         alertCount: analyzed.alertCount
       },
       stageCounts: analyzed.stageCounts,
+      clientDiagnoses: analyzed.clientDiagnoses,
+      longestStagnantItems: analyzed.longestStagnantItems,
       chaserReport,
       leadtimeStats,
       rows: analyzed.rows
