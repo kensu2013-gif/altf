@@ -1579,11 +1579,11 @@ export class KakaoBotService {
             order.items = updateData.items.map(it => ({
                 ...it,
                 itemCode: `${it.name || ''}-${it.thickness || ''}-${it.size || ''}-${it.material || ''}`,
-                unitPrice: it.unitPrice || 0,
-                amount: it.amount || 0
+                unitPrice: 0,
+                amount: 0
             }));
             order.itemCount = updateData.items.length;
-            order.totalAmount = order.items.reduce((s, it) => s + (it.amount || 0), 0);
+            order.totalAmount = 0;
         }
         if (updateData.memo) order.memo = updateData.memo;
         if (updateData.remarks !== undefined) order.remarks = updateData.remarks;

@@ -39,8 +39,8 @@
         "size": "200A",
         "thickness": "S40S",
         "quantity": 6,
-        "unitPrice": 198410,
-        "amount": 1190460
+        "unitPrice": 0,
+        "amount": 0
       },
       {
         "id": "ORD-ITEM-1-1792851725131",
@@ -49,8 +49,8 @@
         "size": "40A",
         "thickness": "S40S",
         "quantity": 3,
-        "unitPrice": 16120,
-        "amount": 48360
+        "unitPrice": 0,
+        "amount": 0
       },
       {
         "id": "ORD-ITEM-2-1792851725131",
@@ -59,8 +59,8 @@
         "size": "25A",
         "thickness": "S40S",
         "quantity": 3,
-        "unitPrice": 9600,
-        "amount": 28800
+        "unitPrice": 0,
+        "amount": 0
       },
       {
         "id": "ORD-ITEM-3-1792851725131",
@@ -69,13 +69,14 @@
         "size": "20A",
         "thickness": "S40S",
         "quantity": 3,
-        "unitPrice": 7210,
-        "amount": 21630
+        "unitPrice": 0,
+        "amount": 0
       }
     ],
     "itemCount": 4,
     "totalAmount": 0,
     "relatedQuotationId": null,
-    "remarks": "금성밴드 본사로 납품요망, 부득이 화물 처리 시: 경동: 구로608A, 대신: 신도림지점"
+    "remarks": "금성밴드 본사로 납품요망, 부득이 화물 처리 시: 경동: 구로608A, 대신: 신도림지점",
+    "updatedAt": "2026-10-24T15:00:10.566Z"
   }
 ]

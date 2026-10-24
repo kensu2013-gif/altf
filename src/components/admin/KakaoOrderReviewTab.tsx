@@ -355,18 +355,15 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
         return [];
     }, [activeOrder]);
 
-    // Item handlers
+    // Item handlers (Kakao reception does NOT calculate prices - strictly 5 dimensions + quantity)
     const handleItemChange = (index: number, field: keyof KakaoOrderProductItem, value: string | number) => {
         const updated = [...editItems];
         updated[index] = {
             ...updated[index],
-            [field]: value
+            [field]: value,
+            unitPrice: 0,
+            amount: 0
         };
-        if (field === 'quantity' || field === 'unitPrice') {
-            const qty = Number(updated[index].quantity) || 0;
-            const price = Number(updated[index].unitPrice) || 0;
-            updated[index].amount = qty * price;
-        }
         setEditItems(updated);
     };
 
@@ -582,7 +579,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
     };
 
     const pendingCount = orders.filter(o => o.status !== 'APPROVED').length;
-    const currentTotal = editItems.reduce((s, it) => s + (it.amount || ((it.unitPrice || 0) * (it.quantity || 1))), 0);
+    const totalQuantity = editItems.reduce((s, it) => s + (Number(it.quantity) || 1), 0);
 
     return (
         <div className="flex-1 flex overflow-hidden relative font-pretendard">
@@ -1197,15 +1194,18 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                             </div>
                         </div>
 
-                        {/* 5. Items Table (품목이 3~4개 이상일 때도 한눈에 쉽게 확인) */}
+                        {/* 5. Items Table (품목이 3~4개 이상일 때도 한눈에 쉽게 확인 - 단가 산정 제외) */}
                         <div className="bg-[#141722] border border-gray-800 rounded-xl p-4 space-y-3">
                             <div className="flex items-center justify-between border-b border-gray-800 pb-2.5">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
                                         2. 발주 품목 및 규격 대장
                                     </h4>
-                                    <span className="text-xs font-bold text-amber-300 bg-amber-950/60 border border-amber-800/60 px-2 py-0.5 rounded-full font-mono">
-                                        총 {editItems.length}개 품목
+                                    <span className="text-xs font-bold text-amber-300 bg-amber-950/60 border border-amber-800/60 px-2.5 py-0.5 rounded-full font-mono">
+                                        총 {editItems.length}개 품목 (총 {totalQuantity}개)
+                                    </span>
+                                    <span className="text-[11px] text-gray-400 bg-gray-900 border border-gray-800 px-2.5 py-0.5 rounded font-medium">
+                                        🔒 단가/금액 산정 제외 ➔ 웹 주문관리(db.orders) 공식 요율로 자동 연동
                                     </span>
                                 </div>
                                 <button
@@ -1220,32 +1220,29 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                 <table className="w-full text-left text-xs">
                                     <thead className="bg-[#191d29] text-gray-400 font-semibold">
                                         <tr>
-                                            <th className="p-2.5 text-center w-10">No</th>
+                                            <th className="p-2.5 text-center w-12">No</th>
                                             <th className="p-2.5">품명</th>
                                             <th className="p-2.5">두께(Sch)</th>
                                             <th className="p-2.5">규격(Size)</th>
                                             <th className="p-2.5">재질</th>
                                             <th className="p-2.5 text-right w-24">수량</th>
-                                            <th className="p-2.5 text-center">품목코드 (자동 연동)</th>
-                                            <th className="p-2.5 text-right w-28">단가(원)</th>
-                                            <th className="p-2.5 text-right w-32">합계(원)</th>
-                                            <th className="p-2.5 text-center w-12">삭제</th>
+                                            <th className="p-2.5 text-center">품목코드 (웹 주문 연동 규격)</th>
+                                            <th className="p-2.5 text-center w-14">삭제</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-800/60 text-gray-200">
                                         {editItems.length === 0 ? (
                                             <tr>
-                                                <td colSpan={10} className="p-6 text-center text-gray-500">
+                                                <td colSpan={8} className="p-6 text-center text-gray-500">
                                                     등록된 품목이 없습니다. [+ 품목 추가]를 눌러 입력해주세요.
                                                 </td>
                                             </tr>
                                         ) : (
                                             editItems.map((item, idx) => {
                                                 const itemCode = `${item.name || ''}-${item.thickness || ''}-${item.size || ''}-${item.material || ''}`;
-                                                const lineTotal = (item.amount || (item.unitPrice || 0) * (item.quantity || 1));
                                                 return (
                                                     <tr key={idx} className="hover:bg-gray-800/30 transition-colors">
-                                                        <td className="p-2 text-center text-gray-500 font-mono text-[11px]">
+                                                        <td className="p-2.5 text-center text-gray-500 font-mono text-xs">
                                                             {idx + 1}
                                                         </td>
                                                         <td className="p-2">
@@ -1253,7 +1250,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                                                 type="text"
                                                                 value={item.name || ''}
                                                                 onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
-                                                                className="w-24 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white font-bold text-xs"
+                                                                className="w-28 bg-gray-900 border border-gray-700 rounded px-2.5 py-1.5 text-white font-bold text-xs focus:outline-none focus:border-emerald-500"
                                                                 placeholder="예: CAP, 90E(L)"
                                                             />
                                                         </td>
@@ -1262,7 +1259,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                                                 type="text"
                                                                 value={item.thickness || ''}
                                                                 onChange={(e) => handleItemChange(idx, 'thickness', e.target.value)}
-                                                                className="w-20 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white font-mono text-xs"
+                                                                className="w-24 bg-gray-900 border border-gray-700 rounded px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
                                                                 placeholder="예: S40S"
                                                             />
                                                         </td>
@@ -1271,7 +1268,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                                                 type="text"
                                                                 value={item.size || ''}
                                                                 onChange={(e) => handleItemChange(idx, 'size', e.target.value)}
-                                                                className="w-24 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white font-mono text-xs"
+                                                                className="w-28 bg-gray-900 border border-gray-700 rounded px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
                                                                 placeholder={'예: 1-1/2", 4"'}
                                                             />
                                                         </td>
@@ -1280,7 +1277,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                                                 type="text"
                                                                 value={item.material || ''}
                                                                 onChange={(e) => handleItemChange(idx, 'material', e.target.value)}
-                                                                className="w-28 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white font-mono text-xs"
+                                                                className="w-32 bg-gray-900 border border-gray-700 rounded px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
                                                                 placeholder="예: STS304-S"
                                                             />
                                                         </td>
@@ -1289,27 +1286,21 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                                                 type="number"
                                                                 value={item.quantity || 1}
                                                                 onChange={(e) => handleItemChange(idx, 'quantity', parseInt(e.target.value, 10) || 1)}
-                                                                className="w-16 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-right text-emerald-400 font-bold text-xs"
+                                                                className="w-20 bg-gray-900 border border-gray-700 rounded px-2.5 py-1.5 text-right text-emerald-400 font-bold text-xs focus:outline-none focus:border-emerald-500"
                                                             />
                                                         </td>
                                                         <td className="p-2 text-center">
-                                                            <span className="font-mono text-[11px] text-cyan-300 bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded">
+                                                            <span className="font-mono text-xs text-cyan-300 bg-cyan-950/40 border border-cyan-800/40 px-2.5 py-1 rounded">
                                                                 {itemCode}
                                                             </span>
-                                                        </td>
-                                                        <td className="p-2 text-right font-mono text-xs text-gray-300">
-                                                            {item.unitPrice ? `₩${item.unitPrice.toLocaleString('ko-KR')}` : '-'}
-                                                        </td>
-                                                        <td className="p-2 text-right font-mono text-xs font-bold text-emerald-300">
-                                                            {lineTotal > 0 ? `₩${lineTotal.toLocaleString('ko-KR')}` : '-'}
                                                         </td>
                                                         <td className="p-2 text-center">
                                                             <button
                                                                 onClick={() => handleRemoveItem(idx)}
-                                                                className="p-1 hover:bg-rose-900/40 rounded text-rose-400 transition-colors"
+                                                                className="p-1.5 hover:bg-rose-900/40 rounded text-rose-400 transition-colors"
                                                                 title="품목 삭제"
                                                             >
-                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                                <Trash2 className="w-4 h-4" />
                                                             </button>
                                                         </td>
                                                     </tr>
@@ -1346,11 +1337,11 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                         </div>
 
                         <div className="flex items-center gap-4">
-                            {/* Summary Counter */}
+                            {/* Summary Counter (No price calculation) */}
                             <div className="text-right">
-                                <div className="text-[11px] text-gray-400">총 {editItems.length}개 품목</div>
-                                <div className="text-xs font-bold text-cyan-300 font-mono">
-                                    {currentTotal > 0 ? `₩${currentTotal.toLocaleString('ko-KR')}` : '금액 웹 주문관리 자동산정'}
+                                <div className="text-[11px] text-gray-400">총 {editItems.length}개 품목 (총 {totalQuantity}개)</div>
+                                <div className="text-xs font-semibold text-emerald-400/90 font-mono">
+                                    단가 산정 제외 (웹 정식 승인 시 공식 가격 자동 산정)
                                 </div>
                             </div>
 
