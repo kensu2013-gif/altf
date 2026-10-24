@@ -1,25 +1,25 @@
 [
   {
-    "id": "ORD-KKO-1792804658815",
+    "id": "ORD-KKO-1792851725131",
     "orderNo": null,
-    "clientOrderRef": "2531",
     "channel": "카카오톡",
     "source": "카카오톡",
     "orderChannel": "카카오톡",
     "channelTag": "카카오톡",
-    "type": "image",
+    "type": "image_and_text",
     "botUserKey": "ae13f2fcaf674c9ced76087384cca24ae64e590c9e8eb31a25ee2c80f84ff89884",
-    "customerName": "(주)원주스텐레스",
-    "businessNumber": "224-81-48652",
-    "destination": "평택고덕 대신화물",
-    "freightTerms": "선불(무운임)",
-    "recipient": "원주스텐 (010-2985-8112)",
-    "phone": "01062223751",
+    "customerName": "이지스텍",
+    "destination": "금성밴드 본사 (화물 지점: 경동 구로608A / 대신 신도림지점)",
+    "freightTerms": "",
+    "recipient": "조현진",
+    "clientOrderRef": null,
     "status": "PENDING_REVIEW",
-    "validationStatus": "VALID",
-    "missingFields": [],
+    "validationStatus": "INCOMPLETE",
+    "missingFields": [
+      "운송비 조건(선불/착불/현불청구)"
+    ],
     "reviewStatus": "PENDING",
-    "receivedAt": "2026-10-24T01:17:38.814Z",
+    "receivedAt": "2026-10-24T14:16:21.599Z",
     "assignedDept": "sle",
     "assignedTeam": "영업3팀",
     "assignedAgents": [
@@ -29,26 +29,53 @@
       "SLE-14",
       "SLE-15"
     ],
-    "utterance": "https://talk.kakaocdn.net/dna/03ZrR/dJMcblfVald/ybIfk8q7jUh2mVEoJ96EmC/i_e033b9ee9f27.jpeg?credential=zf3biCPbmWRjbqf40YGePFLewdou7TIK&expires=1887412658&signature=qqWZmp3A87XJ85SvoCLVq3Ds9s8%3D",
-    "imageUrl": "https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/documents/quotes/1792804659000_kakao_1792804659000.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIARFEQZVQJBH5GSZM3%2F20261024%2Fap-northeast-2%2Fs3%2Faws4_request&X-Amz-Date=20261024T011739Z&X-Amz-Expires=604800&X-Amz-Signature=3d0e3f42bf105059fc8c6b023c12a75ddbe4579c9adb1d0a999ee117a942e8a4&X-Amz-SignedHeaders=host&response-content-disposition=inline%3B%20filename%2A%3DUTF-8%27%27kakao_1792804659000.jpg&response-content-type=image%2Fjpeg&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+    "utterance": "발주서 사진 인입",
+    "imageUrl": "https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/documents/quotes/1792851382040_kakao_1792851382039.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIARFEQZVQJBH5GSZM3%2F20261024%2Fap-northeast-2%2Fs3%2Faws4_request&X-Amz-Date=20261024T141622Z&X-Amz-Expires=604800&X-Amz-Signature=bd2570e16b9f620968d66b91bc559e1b127e6bf43265d0def21ac68fbf77e370&X-Amz-SignedHeaders=host&response-content-disposition=inline%3B%20filename%2A%3DUTF-8%27%27kakao_1792851382039.jpg&response-content-type=image%2Fjpeg&x-amz-checksum-mode=ENABLED&x-id=GetObject",
     "items": [
       {
-        "id": "ORD-ITEM-0-1792804658815",
-        "name": "90E(S)",
+        "id": "ORD-ITEM-0-1792851725131",
+        "name": "CAP",
+        "material": "STS304-S",
+        "size": "200A",
+        "thickness": "S40S",
+        "quantity": 6,
+        "unitPrice": 198410,
+        "amount": 1190460
+      },
+      {
+        "id": "ORD-ITEM-1-1792851725131",
+        "name": "90E(L)",
         "material": "STS304-W",
-        "size": "500A",
-        "thickness": "S20S",
-        "quantity": 2,
-        "unitPrice": 1300520,
-        "amount": 2601040,
-        "currentStock": 1,
-        "location": "양산",
-        "maker": "대경"
+        "size": "40A",
+        "thickness": "S40S",
+        "quantity": 3,
+        "unitPrice": 16120,
+        "amount": 48360
+      },
+      {
+        "id": "ORD-ITEM-2-1792851725131",
+        "name": "90E(L)",
+        "material": "STS304-W",
+        "size": "25A",
+        "thickness": "S40S",
+        "quantity": 3,
+        "unitPrice": 9600,
+        "amount": 28800
+      },
+      {
+        "id": "ORD-ITEM-3-1792851725131",
+        "name": "90E(L)",
+        "material": "STS304-W",
+        "size": "20A",
+        "thickness": "S40S",
+        "quantity": 3,
+        "unitPrice": 7210,
+        "amount": 21630
       }
     ],
-    "itemCount": 1,
-    "totalAmount": 2601040,
+    "itemCount": 4,
+    "totalAmount": 0,
     "relatedQuotationId": null,
-    "remarks": "보내는곳-원주스텐(기재요망), 받는곳-평택고덕 대신화물, 대신 010-2985-8112, 화요일 화물처리 목요일도착"
+    "remarks": "금성밴드 본사로 납품요망, 부득이 화물 처리 시: 경동: 구로608A, 대신: 신도림지점"
   }
 ]

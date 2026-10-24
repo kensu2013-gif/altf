@@ -791,16 +791,32 @@ export class KakaoBotService {
                     this.saveData();
 
                     const cleanKakaoUrl = typeof finalImageUrl === 'string' ? finalImageUrl.split('?')[0] : '';
-                    return await this.handleOrderSkillRequest({
+                    const orderResponse = await this.handleOrderSkillRequest({
                         utterance: utterance && !utterance.startsWith('http') ? utterance : (normalized.documentTitle || '발주서 사진 인입'),
                         botUserKey,
                         matchedUser,
                         isImage: true,
                         finalImageUrl: uploadedS3Url || finalImageUrl,
                         cleanImageUrl: cleanKakaoUrl,
-                        receivedAt,
+                        receivedAt: intakeRecord.receivedAt || new Date().toISOString(),
                         preParsedOcr: normalized
                     });
+
+                    if (callbackUrl && orderResponse) {
+                        try {
+                            const fetch = (await import('node-fetch')).default;
+                            await fetch(callbackUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(orderResponse)
+                            });
+                            console.log(`[KakaoBot] 🚀 [영업3팀 발주 접수 완료 콜백 전송 성공]: ${callbackUrl}`);
+                        } catch (cbErr) {
+                            console.warn('[KakaoBot] 발주 콜백 전송 오류:', cbErr.message);
+                        }
+                    }
+                    this.saveData();
+                    return orderResponse;
                 }
 
                 // SLE-02 발화 내 추가 지시 반영 (요율, 납기)
@@ -1327,13 +1343,19 @@ export class KakaoBotService {
             if (ocrResult.remarks) {
                 if (!parsed.destination) {
                     const destMatch = ocrResult.remarks.match(/(?:받는곳|도착지|배송지)[\s:-]*([^\n,]+)/i) || 
+                                      ocrResult.remarks.match(/([^\n,]*(?:납품요망|본사로\s*납품|본사납품|납품처)[^\n,]*)/i) ||
+                                      ocrResult.remarks.match(/(?:경동|대신)[\s:-]*([^\n,]+)/i) ||
                                       ocrResult.remarks.match(/([^\n,]*대신화물[^\n,]*)/i) || 
                                       ocrResult.remarks.match(/([^\n,]*경동화물[^\n,]*)/i);
                     if (destMatch) parsed.destination = destMatch[1].trim();
+                    else if (/금성밴드/i.test(ocrResult.remarks)) {
+                        parsed.destination = '금성밴드 본사 (화물: 경동 구로608A / 대신 신도림지점)';
+                    }
                 }
                 if (!parsed.freightTerms) {
                     if (/무운임|선불/i.test(ocrResult.remarks)) parsed.freightTerms = '선불(무운임)';
                     else if (/착불/i.test(ocrResult.remarks)) parsed.freightTerms = '착불';
+                    else if (/화물/i.test(ocrResult.remarks)) parsed.freightTerms = '화물(운송비 협의)';
                 }
                 if (!parsed.phone) {
                     const phoneMatch = ocrResult.remarks.match(/01[016789][-\s]?\d{3,4}[-\s]?\d{4}/);
@@ -1816,6 +1838,13 @@ export class KakaoBotService {
      * 카카오 발주서 목록 조회
      */
     getOrders({ limit = 50, offset = 0 } = {}) {
+        if (fs.existsSync(KAKAO_ORDERS_FILE)) {
+            try {
+                this.orders = JSON.parse(fs.readFileSync(KAKAO_ORDERS_FILE, 'utf8'));
+            } catch (e) {
+                console.error('[KakaoBot] KAKAO_ORDERS_FILE 로드 오류:', e.message);
+            }
+        }
         const sorted = [...this.orders].sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
         return {
             total: sorted.length,
@@ -2035,6 +2064,11 @@ export class KakaoBotService {
      * 인입 목록 페이징 조회 (삭제된 인입 제외)
      */
     getIntakes({ limit = 50, offset = 0 } = {}) {
+        if (fs.existsSync(INTAKES_FILE)) {
+            try {
+                this.intakes = JSON.parse(fs.readFileSync(INTAKES_FILE, 'utf8'));
+            } catch (e) {}
+        }
         const activeIntakes = (this.intakes || []).filter(i => !i.isDeleted);
         return {
             total: activeIntakes.length,
@@ -2053,6 +2087,16 @@ export class KakaoBotService {
      * - 삭제된 인입건 및 삭제된 견적서는 큐에서 완전 제외
      */
     getReviewQueue() {
+        if (fs.existsSync(INTAKES_FILE)) {
+            try {
+                this.intakes = JSON.parse(fs.readFileSync(INTAKES_FILE, 'utf8'));
+            } catch (e) {}
+        }
+        if (fs.existsSync(DRAFT_QUOTES_FILE)) {
+            try {
+                this.draftQuotations = JSON.parse(fs.readFileSync(DRAFT_QUOTES_FILE, 'utf8'));
+            } catch (e) {}
+        }
         return (this.intakes || [])
             .filter(intake => !intake.isDeleted && intake.documentType !== 'ORDER' && !String(intake.status || '').startsWith('ORDER_'))
             .map(intake => {
