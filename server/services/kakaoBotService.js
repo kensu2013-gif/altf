@@ -773,6 +773,36 @@ export class KakaoBotService {
                 // 비전 OCR 및 규격 표준화 엔진 가동 (Gemini 3.1 Flash-Lite + Gemini 3.8 Flash Fallback)
                 const normalized = await fittingVisionOcrService.recognizeAndNormalize(imgBuf, contentType);
 
+                // 👑 [EXE-02 / INT-03 비전 문서 판별: 발주서(ORDER) vs 견적의뢰서(QUOTATION)]
+                const isDocOrder = normalized.documentType === 'ORDER' ||
+                                   /발주|주문|ORDER|P\.?O/i.test(normalized.documentTitle || '') ||
+                                   /발주|주문|받는곳|화물|대신화물|경동화물|선불|착불/i.test(normalized.remarks || '') ||
+                                   Boolean(normalized.orderNumber);
+
+                if (isDocOrder) {
+                    console.log(`[KakaoBot] 🎯 [인바운드 라우팅] 이미지 비전 OCR 판독 결과 '발주서(ORDER)' 판정! (제목: ${normalized.documentTitle || '발주서'}, 고객사: ${normalized.customer?.name || '미상'}) ➔ 영업3팀(SLE-11~15) 발주 파이프라인으로 전환`);
+                    intakeRecord.documentType = 'ORDER';
+                    intakeRecord.assignedTeam = '영업3팀 (발주접수/조건검증)';
+                    intakeRecord.assignedAgents = ['SLE-11', 'SLE-12', 'SLE-13', 'SLE-14', 'SLE-15'];
+                    intakeRecord.status = 'ORDER_PENDING_REVIEW';
+                    intakeRecord.customer = normalized.customer;
+                    intakeRecord.remarks = normalized.remarks;
+                    intakeRecord.parsedItems = normalized.items;
+                    this.saveData();
+
+                    const cleanKakaoUrl = typeof finalImageUrl === 'string' ? finalImageUrl.split('?')[0] : '';
+                    return await this.handleOrderSkillRequest({
+                        utterance: utterance && !utterance.startsWith('http') ? utterance : (normalized.documentTitle || '발주서 사진 인입'),
+                        botUserKey,
+                        matchedUser,
+                        isImage: true,
+                        finalImageUrl: uploadedS3Url || finalImageUrl,
+                        cleanImageUrl: cleanKakaoUrl,
+                        receivedAt,
+                        preParsedOcr: normalized
+                    });
+                }
+
                 // SLE-02 발화 내 추가 지시 반영 (요율, 납기)
                 const overrides = sleQuoteReviewService.parseUtteranceOverrides(utterance);
                 if (overrides) {
@@ -1221,7 +1251,7 @@ export class KakaoBotService {
      * 🛒 카카오톡 발주서(PO) 인바운드 접수 및 구매부(PUR-01/07) 연계 파이프라인 (EXE-02 전담)
      * 🛡️ 원장 보호 정책: 뒷단(db.orders)을 직접 오염시키지 않고, 접수대기(PENDING_REVIEW) 상태로 안전 격리 저장
      */
-    async handleOrderSkillRequest({ utterance, botUserKey, matchedUser, isImage, finalImageUrl, cleanImageUrl, receivedAt }) {
+    async handleOrderSkillRequest({ utterance, botUserKey, matchedUser, isImage, finalImageUrl, cleanImageUrl, receivedAt, preParsedOcr = null }) {
         console.log(`[KakaoBot] 🛒 [EXE-02] 카카오톡 발주서 인입 감지: "${utterance}" (User: ${matchedUser?.company || botUserKey})`);
 
         // 1. 해당 고객의 최근 견적서 확인 (견적 기반 발주 전환인지 검사)
@@ -1245,7 +1275,8 @@ export class KakaoBotService {
         const parsed = this.parseKakaoOrderUtterance(utterance, recentQuote);
 
         // 📸 3-1. 발주서 사진 첨부 시 Gemini / GPT Vision OCR 정밀 판독 (영업3팀 SLE-11 가동)
-        if (effectiveImageUrl) {
+        let ocrResult = preParsedOcr;
+        if (!ocrResult && effectiveImageUrl) {
             try {
                 console.log(`[KakaoBot] 📸 [영업3팀 SLE-11] 발주서 이미지 Gemini/GPT Vision OCR 판독 착수: ${effectiveImageUrl}`);
                 let imgBuf = null;
@@ -1266,33 +1297,61 @@ export class KakaoBotService {
                 }
 
                 if (imgBuf) {
-                    const ocrResult = await fittingVisionOcrService.recognizeAndNormalize(imgBuf, contentType);
-                    if (ocrResult && Array.isArray(ocrResult.items) && ocrResult.items.length > 0) {
-                        console.log(`[KakaoBot] ✅ [영업3팀 SLE-11/12] 발주서 이미지에서 ${ocrResult.items.length}개 품목 Vision OCR 추출 성공!`);
-                        if (!parsed.items || parsed.items.length === 0) {
-                            parsed.items = ocrResult.items.map((it, idx) => ({
-                                id: `ORD-ITEM-${idx}-${Date.now()}`,
-                                name: it.type || it.name || '배관 피팅',
-                                material: it.material || 'STS304-W',
-                                size: it.size || '',
-                                thickness: it.schedule || it.thickness || 'S10S',
-                                quantity: it.qty || it.quantity || 1,
-                                unitPrice: it.basePrice || it.unitPrice || 0,
-                                amount: (it.basePrice || it.unitPrice || 0) * (it.qty || it.quantity || 1)
-                            }));
-                        }
-                        if ((!parsed.customerName || parsed.customerName === '카카오톡 고객사') && ocrResult.customer?.name) {
-                            parsed.customerName = ocrResult.customer.name;
-                        }
-                    }
+                    ocrResult = await fittingVisionOcrService.recognizeAndNormalize(imgBuf, contentType);
                 }
             } catch (ocrErr) {
                 console.warn('[KakaoBot] 영업3팀 발주서 비전 OCR 오류 (로컬 파서 폴백):', ocrErr.message);
             }
         }
 
+        if (ocrResult) {
+            console.log(`[KakaoBot] ✅ [영업3팀 SLE-11/12] 발주서 이미지에서 ${ocrResult.items?.length || 0}개 품목 Vision OCR 매칭 완료!`);
+            if (Array.isArray(ocrResult.items) && ocrResult.items.length > 0 && (!parsed.items || parsed.items.length === 0)) {
+                parsed.items = ocrResult.items.map((it, idx) => ({
+                    id: `ORD-ITEM-${idx}-${Date.now()}`,
+                    name: it.type || it.name || '배관 피팅',
+                    material: it.material || 'STS304-W',
+                    size: it.size || '',
+                    thickness: it.schedule || it.thickness || 'S10S',
+                    quantity: it.qty || it.quantity || 1,
+                    unitPrice: it.basePrice || it.unitPrice || 0,
+                    amount: (it.basePrice || it.unitPrice || 0) * (it.qty || it.quantity || 1)
+                }));
+            }
+            if ((!parsed.customerName || parsed.customerName === '카카오톡 고객사') && ocrResult.customer?.name) {
+                parsed.customerName = ocrResult.customer.name;
+            }
+            if (ocrResult.orderNumber) {
+                parsed.clientOrderRef = ocrResult.orderNumber;
+            }
+            if (ocrResult.remarks) {
+                if (!parsed.destination) {
+                    const destMatch = ocrResult.remarks.match(/(?:받는곳|도착지|배송지)[\s:-]*([^\n,]+)/i) || 
+                                      ocrResult.remarks.match(/([^\n,]*대신화물[^\n,]*)/i) || 
+                                      ocrResult.remarks.match(/([^\n,]*경동화물[^\n,]*)/i);
+                    if (destMatch) parsed.destination = destMatch[1].trim();
+                }
+                if (!parsed.freightTerms) {
+                    if (/무운임|선불/i.test(ocrResult.remarks)) parsed.freightTerms = '선불(무운임)';
+                    else if (/착불/i.test(ocrResult.remarks)) parsed.freightTerms = '착불';
+                }
+                if (!parsed.phone) {
+                    const phoneMatch = ocrResult.remarks.match(/01[016789][-\s]?\d{3,4}[-\s]?\d{4}/);
+                    if (phoneMatch) parsed.phone = phoneMatch[0];
+                }
+            }
+        }
+
         const customerName = parsed.customerName || matchedUser?.company || recentQuote?.customerInfo?.company || matchedUser?.name || '카카오톡 고객사';
         const phone = parsed.phone || matchedUser?.phone || recentQuote?.customerInfo?.phone || '';
+
+        // 🛡️ 필수 4대 항목 재검증 (발송업체명, 도착지, 운송비, 품목규격)
+        const missingFields = [];
+        if (!customerName || customerName === '카카오톡 고객사') missingFields.push('발송업체명(상호)');
+        if (!parsed.destination) missingFields.push('도착지 정보(지점/배송지)');
+        if (!parsed.freightTerms) missingFields.push('운송비 조건(선불/착불/현불청구)');
+        if (!parsed.items || parsed.items.length === 0) missingFields.push('발주 품목/규격');
+        const validationStatus = missingFields.length === 0 ? 'VALID' : 'INCOMPLETE';
 
         // 🛡️ 발주번호 임의 생성 절대 금지: 접수 대기 단계에서는 번호를 부여하지 않고 null 유지
         // 담당자가 웹 화면에서 확인 및 저장/승인을 누르는 순간 정식 순차 발주번호(예: ES261023-2901 등) 채번!
@@ -1323,11 +1382,10 @@ export class KakaoBotService {
             destination: parsed.destination || '',
             freightTerms: parsed.freightTerms || '',
             recipient: parsed.recipient || matchedUser?.name || '',
-            phone,
-            quoteAdj: parsed.quoteAdj || {},
+            clientOrderRef: parsed.clientOrderRef || ocrResult?.orderNumber || null,
             status: 'PENDING_REVIEW', // 🔥 주문접수에 '대기' 형태로 두고 확인 작업
-            validationStatus: parsed.validationStatus, // 'VALID' or 'INCOMPLETE'
-            missingFields: parsed.missingFields,
+            validationStatus, // 'VALID' or 'INCOMPLETE'
+            missingFields,
             reviewStatus: 'PENDING',
             receivedAt,
             assignedDept: 'sle',
@@ -1338,7 +1396,8 @@ export class KakaoBotService {
             items: parsed.items, // 품목명-두께-사이즈-재질-수량만 정확히 파악
             itemCount: parsed.items.length,
             totalAmount: 0, // 봇이 가격 임의 계산 절대 금지 (웹 주문관리 자동산정)
-            relatedQuotationId: recentQuote?.id || null
+            relatedQuotationId: recentQuote?.id || null,
+            remarks: ocrResult?.remarks || ''
         };
 
         this.orders.unshift(orderRecord);
@@ -1350,7 +1409,7 @@ export class KakaoBotService {
 
         // 7. 카카오톡 회신 메시지 (사무실 확인 필수 안내)
         const statusNotice = orderRecord.validationStatus === 'VALID' 
-            ? '✅ [필수항목 완비] 사무실 담당 직원이 검토 후 즉시 정식 발주 승인 및 순차 발주번호가 부여됩니다.'
+            ? '✅ [필수항목 완비] 영업3팀(발주팀) 담당 직원이 검토 후 즉시 정식 발주 승인 및 구매부(대경/태일)로 안전하게 인계됩니다.'
             : `⚠️ [확인 필요] 도착지 또는 운송비 조건 보완 후 정식 승인됩니다. (누락: ${orderRecord.missingFields.join(', ')})`;
 
         return {
@@ -1984,7 +2043,7 @@ export class KakaoBotService {
      */
     getReviewQueue() {
         return (this.intakes || [])
-            .filter(intake => !intake.isDeleted)
+            .filter(intake => !intake.isDeleted && intake.documentType !== 'ORDER' && !String(intake.status || '').startsWith('ORDER_'))
             .map(intake => {
                 const quote = this.draftQuotations.find(q => q.id === intake.quotationId) || null;
                 if (quote && quote.isDeleted) return null;

@@ -271,13 +271,16 @@ export const FITTING_OCR_BASE_PROMPT = `당신은 스테인리스 배관·피팅
 [반환 형식]
 반드시 다음 JSON 포맷만 순수하게 출력하십시오:
 {
+  "documentType": "ORDER" 또는 "QUOTATION" (문서 상단 제목이나 서식이 발주서/Order Sheet/P.O/주문서/발주번호가 있으면 반드시 ORDER, 견적의뢰서/견적서/단가문의면 QUOTATION),
+  "documentTitle": "문서 상단에 적힌 제목 (예: 발주서, Order Sheet, 견적의뢰서 등)",
+  "orderNumber": "발주번호가 기재되어 있다면 문자열 추출 (예: 2531, 없으면 null)",
   "customer": {
     "name": "발신 고객사 상호명 (알트에프 귀하는 수신자이므로 발신자를 기재)",
     "businessNumber": "000-00-00000 포맷 (미발견 시 null)",
     "phone": "전화번호",
     "fax": "팩스번호"
   },
-  "remarks": "비고",
+  "remarks": "비고 (받는곳, 배송지, 화물지점, 연락처, 운송조건, 납기일 등 모든 특이사항 보존)",
   "items": [
     {
       "original_description": "원문 라인 텍스트 그대로 복사",
@@ -714,8 +717,15 @@ export class FittingVisionOcrService {
             };
         });
 
+        let documentType = parsedResult.documentType;
+        if (!documentType || documentType === 'UNKNOWN') {
+            const isOrder = /발주|주문|ORDER\s*SHEET|PURCHASE\s*ORDER|\bP\.?O\.?\b|발주서|주문서|발주번호/i.test(docText);
+            documentType = isOrder ? 'ORDER' : 'QUOTATION';
+        }
+
         return {
             ...parsedResult,
+            documentType,
             items: validatedItems
         };
     }

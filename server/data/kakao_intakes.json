@@ -1,5 +1,67 @@
 [
   {
+    "id": "KAKAO-1792804658815-TF4E",
+    "type": "image",
+    "botUserKey": "ae13f2fcaf674c9ced76087384cca24ae64e590c9e8eb31a25ee2c80f84ff89884",
+    "isRegisteredUser": true,
+    "matchedUser": {
+      "botUserKey": "ae13f2fcaf674c9ced76087384cca24ae64e590c9e8eb31a25ee2c80f84ff89884",
+      "name": "조현진",
+      "phone": "01062223751",
+      "company": "ATLF",
+      "email": "",
+      "registeredAt": "2026-10-21T09:00:00Z",
+      "notes": "알트에프 대표"
+    },
+    "utterance": "https://talk.kakaocdn.net/dna/03ZrR/dJMcblfVald/ybIfk8q7jUh2mVEoJ96EmC/i_e033b9ee9f27.jpeg?credential=zf3biCPbmWRjbqf40YGePFLewdou7TIK&expires=1887412658&signature=qqWZmp3A87XJ85SvoCLVq3Ds9s8%3D",
+    "imageUrl": "https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/documents/quotes/1792804659000_kakao_1792804659000.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIARFEQZVQJBH5GSZM3%2F20261024%2Fap-northeast-2%2Fs3%2Faws4_request&X-Amz-Date=20261024T011739Z&X-Amz-Expires=604800&X-Amz-Signature=3d0e3f42bf105059fc8c6b023c12a75ddbe4579c9adb1d0a999ee117a942e8a4&X-Amz-SignedHeaders=host&response-content-disposition=inline%3B%20filename%2A%3DUTF-8%27%27kakao_1792804659000.jpg&response-content-type=image%2Fjpeg&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+    "originalKakaoUrl": "https://talk.kakaocdn.net/dna/03ZrR/dJMcblfVald/ybIfk8q7jUh2mVEoJ96EmC/i_e033b9ee9f27.jpeg",
+    "status": "ORDER_PENDING_REVIEW",
+    "receivedAt": "2026-10-24T01:17:38.814Z",
+    "channel": "카카오톡 채널 (@altf)",
+    "assignedTeam": "영업3팀 (발주접수/조건검증)",
+    "assignedAgents": [
+      "SLE-11",
+      "SLE-12",
+      "SLE-13",
+      "SLE-14",
+      "SLE-15"
+    ],
+    "parsedItems": [
+      {
+        "original_description": "용접엘보-90°(S/20S)500A-(short)",
+        "originalText": "용접엘보-90°(S/20S)500A-(short)",
+        "itemId": "90E(S)-S20S-500A-STS304-W",
+        "type": "90E(S)",
+        "schedule": "S20S",
+        "size": "500A",
+        "material": "STS304-W",
+        "qty": 2,
+        "basePrice": 1300520,
+        "currentStock": 1,
+        "stockStatus": "PARTIAL",
+        "location": "양산",
+        "matchedInDb": true,
+        "confidence": "HIGH"
+      }
+    ],
+    "s3UploadedUrl": "https://altf-web-data-prod.s3.ap-northeast-2.amazonaws.com/documents/quotes/1792804659000_kakao_1792804659000.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIARFEQZVQJBH5GSZM3%2F20261024%2Fap-northeast-2%2Fs3%2Faws4_request&X-Amz-Date=20261024T011739Z&X-Amz-Expires=604800&X-Amz-Signature=3d0e3f42bf105059fc8c6b023c12a75ddbe4579c9adb1d0a999ee117a942e8a4&X-Amz-SignedHeaders=host&response-content-disposition=inline%3B%20filename%2A%3DUTF-8%27%27kakao_1792804659000.jpg&response-content-type=image%2Fjpeg&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+    "customer": {
+      "name": "(주)원주스텐레스",
+      "businessNumber": "224-81-48652",
+      "phone": "01062223751",
+      "fax": "033-731-7403",
+      "mobile": "01062223751",
+      "contact": "조현진",
+      "landline": "033-731-7401",
+      "email": ""
+    },
+    "discountRate": 50,
+    "remarks": "보내는곳-원주스텐(기재요망), 받는곳-평택고덕 대신화물, 태신 010-2985-8112, 하요일 화물처리 무운임도착",
+    "documentType": "ORDER",
+    "orderId": "ORD-KKO-1792804658815"
+  },
+  {
     "id": "KAKAO-1792595135537-F7VH",
     "type": "image",
     "botUserKey": "ae13f2fcaf674c9ced76087384cca24ae64e590c9e8eb31a25ee2c80f84ff89884",
