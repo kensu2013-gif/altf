@@ -39,6 +39,58 @@ export const INTERVAL_MS_MAP = {
     'MANUAL': -1
 };
 
+export const DEFAULT_AGENT_TASKS = {
+    'MGT-01': '전사 관제 및 대표님 텔레그램 보고 대기 (긴급 감시 10분 주기)',
+    'PUR-01': '업무시간 1일 2회 정기 감시 대기 중 (다음: 익일 오전 10:00, 미결 1010건 관리)',
+    'PUR-02': '대경 미결 엑셀 대장 및 신규 인입 실시간 파싱 대기',
+    'PUR-03': '발주 대비 입고 지연 정밀 매칭 및 위험 등급 판정 대기',
+    'PUR-04': 'P1 필수확인·P2 독촉·P3 예상문제 우선순위 보고 대기',
+    'SAL-03': '고객사별 미결 공정 상태 및 납기 사전 조율 대기',
+    'DAT-07': '품목군별 제조 리드타임 통계 분석 및 견적팀 제공 대기',
+    'INT-01': 'altf@altf.kr 견적의뢰 메일 실시간 수신 대기 중',
+    'INT-02': '카카오톡 채널(@altf) 및 솔라피 인입 실시간 수신 대기 중',
+    'INT-03': '비정형 문서·사진 Vision OCR 판독 엔진 대기 중',
+    'INT-04': '대용량 엑셀 BOM 및 구글시트 파싱 대기',
+    'INT-05': '14,136건 ALTF 표준 마스터 품목 규격 정규화 대기 중',
+    'INT-06': '사무실 견적서 수정 사항 실시간 감시 및 INT-03 피드백 학습 대기 중',
+    'SLE-01': '견적의뢰 인입 시 견적서 초안 자동 작성 대기',
+    'SLE-02': '단가 요율 및 시화/양산 실시간 재고 검증 대기',
+    'SLE-07': '품목코드별 시스템 요율 대조 및 최근 거래처 요율 이력 상시 모니터링',
+    'SLE-08': '견적 발송 후 48시간 이상 미수주 건 자동 추적 및 리마인드 모니터링',
+    'SLE-11': '카카오 발주 사진/전표 Vision OCR 상시 대기',
+    'SLE-12': '인입 발주 텍스트 ➔ 배관 피팅 정밀 품목 및 단가 매칭 대기',
+    'SLE-13': '발주 필수 조건(도착지/운송비) 정합성 검증 대기',
+    'SLE-14': '영업3팀 발주 검토 및 승인 대기열 관리 대기',
+    'SLE-15': '사무실 발주서 수정 Diff 실시간 감시 및 누적 규칙 학습 대기',
+    'PUR-11': '웹/ERP 수주 발주서 인입 실시간 파싱 및 주문 원장 등록 상시 가동',
+    'PUR-12': '기등록 견적서(단가/스펙/납기) vs 고객 발주서 1:1 무결점 대조 파이프라인 가동',
+    'PUR-13': '태일·시화 재고 우선 배정 및 대경 직송/가공 최적 경로 판별 대기',
+    'PUR-14': 'D/M 경로 대경 매입발주서 생성 및 회신 확인 대기',
+    'PUR-07': '[영업시간 1시간 주기] 발주 2,487건 분류 관리 및 미결 백로그 상시 추적 중',
+    'PUR-08': '재고 발주 적정성 실시간 감시 대기 중',
+    'QC-01': '메일플러그 IMAP 소켓 24시간 실시간 수신 대기 중',
+    'QC-02': '외주 성적서 PDF 파싱 및 KS/ASTM 규격 이상치 실시간 검출 대기',
+    'QC-06': '시화 출고 LOT 1:1 엄격 매칭 기반 성적서 무결점 발행 대기',
+    'QC-12': '대경 직송 거래명세표 수신 시 성적서 1:1 확정 대기',
+    'QC-13': '성적서 누락 경보 감시 및 24시간 초과 시 독촉 대기',
+    'LOG-11': '출고 승인 건 시화 창고 랙 위치 매핑 및 피킹/패킹 작업 지시서 자동 생성',
+    'LOG-12': '창고 현장 패킹 바코드 검수 및 중량/계근 데이터 확인 대기열 감시',
+    'LOG-13': '차량 상차 완료 건 MES/ERP 출고 확정 및 거래명세표/인수증 자동 발행',
+    'GEN-01': '대경벤드 매입 거래명세표 자동 채번 및 원장 매칭 대기',
+    'GEN-03': '매출 거래명세표 + 성적서 PDF 1:1 결합 패키지 번들링 대기',
+    'GEN-10': '1,265개 거래처 마스터 실시간 동기화 유지 중',
+    'DIS-01': '고객/매입처 발송 단일 창구 승인 대기열 통제 가동',
+    'EXE-01': '텔레그램 인바운드 스트림 실시간 라우팅 대기 중',
+    'EXE-02': '카카오톡 인바운드 텍스트·사진 사전확인 및 영업2/3팀 분배 대기',
+    'EXE-11': '매일 08:00/14:00 업무 지연 감시 스케줄러 가동',
+    'DAT-01': 'Make.com OAuth 연결 상태 실시간 감시 대기 중',
+    'DAT-02': 'Make.com 자동화 시나리오 상시 가동 상태 감시 중',
+    'DAT-03': '태일철강/시화 재고 시트 실시간 변동 동기화 대기 중',
+    'DAT-04': '대경 재고 원본 수신 및 표준 규격 변환 대기 중',
+    'DAT-05': '통합 재고 DB 3~5분 버퍼링 연산 및 일관성 관제 대기 중',
+    'DAT-06': '통합 inventory.json S3 배포 및 실시간 변동량 모니터링 대기 중'
+};
+
 class AgentControlManager extends EventEmitter {
     constructor() {
         super();
@@ -230,6 +282,47 @@ class AgentControlManager extends EventEmitter {
             return { success: true, count: this.agentsCache.length, agents: this.agentsCache };
         } catch (e) {
             console.error('[AgentControlManager] 전사 활성화 저장 오류:', e.message);
+            throw e;
+        }
+    }
+
+    /**
+     * 🔄 전사 봇 상태 및 업무를 제자리(STANDBY/ACTIVE 기본 위치)로 환원
+     */
+    resetAllAgentsToDefaultPositions() {
+        this.loadAgents();
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('ko-KR');
+
+        this.agentsCache = this.agentsCache.map(agent => {
+            const isManager = agent.position === '부장' || agent.position === '팀장' || agent.position === '과장';
+            const approval = isManager ? 'APPROVED' : 'AUTO_RUNNING';
+            const defaultTask = DEFAULT_AGENT_TASKS[agent.code] || `${agent.name} 상시 가동 대기 중`;
+            const existingLogs = Array.isArray(agent.logs) ? agent.logs : [];
+            const resetLog = `[${timeStr}] 🔄 [제자리 복귀] 봇 상태 제자리 위치(상시 대기)로 정상 복귀 완료`;
+
+            return {
+                ...agent,
+                status: 'ACTIVE',
+                isCreated: true,
+                approvalStatus: approval,
+                currentTask: defaultTask,
+                lastActive: '방금 전',
+                metrics: {
+                    ...(agent.metrics || { speed: 98, accuracy: 99, load: 15, uptime: '99.9%', tasksToday: 10 }),
+                    load: Math.min(agent.metrics?.load || 15, 20)
+                },
+                logs: [resetLog, ...existingLogs.filter(l => !l.includes('[제자리 복귀]')).slice(0, 9)]
+            };
+        });
+
+        try {
+            fs.writeFileSync(AGENTS_PATH, JSON.stringify(this.agentsCache, null, 2), 'utf8');
+            console.log(`🔄 [AgentControlManager] 전사 ${this.agentsCache.length}기 봇 상태 제자리 위치(STANDBY) 복귀 완료`);
+            this.emit('change', this.agentsCache);
+            return { success: true, count: this.agentsCache.length, agents: this.agentsCache };
+        } catch (e) {
+            console.error('[AgentControlManager] 봇 제자리 복귀 오류:', e.message);
             throw e;
         }
     }

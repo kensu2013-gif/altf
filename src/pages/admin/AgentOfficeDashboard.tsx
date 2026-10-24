@@ -2022,6 +2022,33 @@ export default function AgentOfficeDashboard() {
         }
     };
 
+    // 🔄 전사 봇 상태 제자리 위치(상시 대기) 복귀 핸들러
+    const [isResettingAllBots, setIsResettingAllBots] = useState(false);
+    const handleResetAllBots = async () => {
+        setIsResettingAllBots(true);
+        const nowStr = new Date().toLocaleTimeString('ko-KR');
+
+        try {
+            const res = await fetch('/api/agents/reset-positions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (data.success && Array.isArray(data.agents)) {
+                setAgents(data.agents);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data.agents));
+                setSimulationLog(prev => [
+                    `🔄 [${nowStr}] [전사 오케스트레이터] 전사 ${data.count}기 봇 상태 제자리 위치(상시 대기)로 정상 복귀 완료!`,
+                    ...prev.slice(0, 14)
+                ]);
+            }
+        } catch (err: unknown) {
+            console.error('[ResetAll] Error calling /api/agents/reset-positions:', err);
+        } finally {
+            setIsResettingAllBots(false);
+        }
+    };
+
     // 같은 부서 및 직급/그룹 내에서 에이전트 위치(좌/우 순서) 맞바꾸기
     const handleMoveAgentOrder = (agentId: string, direction: 'prev' | 'next', e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
@@ -3032,6 +3059,21 @@ export default function AgentOfficeDashboard() {
                         <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/30 border border-emerald-400/50 text-emerald-300 font-mono">
                             {createdAgents.length} READY
                         </span>
+                    </button>
+
+                    {/* 🔄 전사 봇 상태 제자리 위치 복귀 버튼 */}
+                    <button
+                        onClick={handleResetAllBots}
+                        disabled={isResettingAllBots}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-bold text-xs transition-all cursor-pointer shadow-md ${
+                            isResettingAllBots
+                                ? 'border-amber-400 bg-amber-950/80 text-amber-200 animate-pulse'
+                                : 'border-slate-600 bg-slate-800/80 hover:bg-slate-700/80 hover:border-slate-400 text-slate-200 hover:text-white shadow-[0_0_10px_rgba(148,163,184,0.15)]'
+                        }`}
+                        title="전사 모든 봇의 업무 및 상태를 초기 제자리 위치(상시 가동 대기)로 깨끗하게 복귀시킵니다."
+                    >
+                        <RotateCw className={`w-3.5 h-3.5 ${isResettingAllBots ? 'animate-spin text-amber-300' : 'text-slate-400'}`} />
+                        <span>{isResettingAllBots ? '제자리 복귀 중...' : '🔄 제자리 복귀'}</span>
                     </button>
 
                     {/* 📋 [영업3팀] 카카오톡 발주서 접수대기 & AI 정밀 분석 관제 퀵 버튼 */}

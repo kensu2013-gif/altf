@@ -1196,7 +1196,30 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    // ⚡ 전사 봇 41기 전체 즉시 실행 파이프라인 가동 API (RUN ALL)
+    // 🔄 전사 봇 제자리 위치(STANDBY 기본 상태) 복귀 API
+    if (url.pathname === '/api/agents/reset-positions' && req.method === 'POST') {
+        try {
+            const result = agentControlManager.resetAllAgentsToDefaultPositions();
+            db.agents = agentControlManager.agentsCache;
+            queueSave();
+
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({
+                success: true,
+                count: result.count,
+                message: `전사 ${result.count}기 봇 상태 제자리 위치(상시 대기) 복귀 완료`,
+                agents: db.agents
+            }));
+            return;
+        } catch (e) {
+            console.error('[API] Reset all agents to default positions failed:', e);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: e.message }));
+            return;
+        }
+    }
+
+    // ⚡ 전사 봇 49기 전체 즉시 실행 파이프라인 가동 API (RUN ALL)
     if (url.pathname === '/api/agents/run-all' && req.method === 'POST') {
         try {
             // 1. 전사 봇 상태를 ACTIVE로 일괄 전환 & 보존
