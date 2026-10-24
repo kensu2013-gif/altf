@@ -1439,6 +1439,17 @@ export class KakaoBotService {
             const agents = JSON.parse(fs.readFileSync(AGENTS_FILE, 'utf8'));
             const timeStr = new Date().toLocaleTimeString('ko-KR');
 
+            // 0. EXE-02 (카카오 사전확인·분배 대리 - 사전확인 및 영업3팀 분배)
+            const exe02 = agents.find(a => a.code === 'EXE-02' || a.id === 'exe-02-kakao-classifier');
+            if (exe02) {
+                exe02.lastActive = '방금 전';
+                exe02.currentTask = `[사전분배 대리] ${orderRecord.imageUrl ? '사진 발주서' : '텍스트 발주서'} 판독 ➔ 영업3팀(발주팀) 배정 [${orderRecord.customerName}]`;
+                if (!Array.isArray(exe02.logs)) exe02.logs = [];
+                exe02.logs.unshift(`[${timeStr}] 🛒 [EXE-02 사전분배 대리] 사전확인 완료: 발주서(ORDER) 판독 ➔ 영업3팀(SLE-11~15) 배정 [${orderRecord.customerName} | 도착지: ${orderRecord.destination || '확인요망'}]`);
+                exe02.logs = exe02.logs.slice(0, 10);
+                if (exe02.metrics) exe02.metrics.tasksToday = (exe02.metrics.tasksToday || 0) + 1;
+            }
+
             // 1. SLE-11 (카카오 발주 비전 OCR 판독봇)
             const sle11 = agents.find(a => a.code === 'SLE-11' || a.id === 'sle-11-order-vision-ocr');
             if (sle11) {
@@ -1831,29 +1842,29 @@ export class KakaoBotService {
                 }
             };
 
-            // EXE-02 (카카오톡 인바운드 분배봇)
+            // EXE-02 (카카오 사전확인·분배 대리)
             const exe02 = agents.find(a => a.code === 'EXE-02' || a.id === 'exe-02-kakao-classifier');
             if (exe02) {
                 safeSetAgentStatus(exe02, 'ACTIVE');
                 exe02.lastActive = '방금 전';
-                exe02.currentTask = `카카오 견적 인입 분류 -> 영업부(SLE) 이첩 [${intake.id}]`;
+                exe02.currentTask = `[사전분배 대리] ${intake.type === 'image' ? '사진 견적서' : '텍스트 견적요청'} 판독 ➔ 영업2팀(정규화팀) 배정 [${intake.id}]`;
                 if (!Array.isArray(exe02.logs)) exe02.logs = [];
-                exe02.logs.unshift(`[${new Date().toLocaleTimeString('ko-KR')}] 🟡 [EXE-02] 카카오 견적 의뢰 인입 -> 영업부(SLE-01/02) 견적 파이프라인 이첩 완료`);
+                exe02.logs.unshift(`[${new Date().toLocaleTimeString('ko-KR')}] 📋 [EXE-02 사전분배 대리] 사전확인 완료: 견적의뢰(QUOTATION) 판정 ➔ 영업2팀(INT-01~06) 배정 [${intake.customer?.name || '고객사'}]`);
                 exe02.logs = exe02.logs.slice(0, 10);
                 if (exe02.metrics) exe02.metrics.tasksToday = (exe02.metrics.tasksToday || 0) + 1;
                 changed = true;
             }
 
-            // INT-02 (메신저/카톡 견적 인입 봇)
+            // INT-02 (영업2팀 견적접수·큐관리봇)
             const int02 = agents.find(a => a.code === 'INT-02' || a.id === 'int-02-messenger-intake' || a.id === 'INT-02');
             if (int02) {
                 safeSetAgentStatus(int02, 'ACTIVE');
                 int02.lastActive = '방금 전';
-                int02.currentTask = `카카오톡 견적 접수 [${intake.id}] - ${intake.utterance.slice(0, 30)}`;
+                int02.currentTask = `영업2팀 견적 접수 등록 [${intake.id}] - ${intake.utterance.slice(0, 30)}`;
                 int02.processedCount = (int02.processedCount || 0) + 1;
                 if (int02.metrics) int02.metrics.tasksToday = (int02.metrics.tasksToday || 0) + 1;
                 if (!Array.isArray(int02.logs)) int02.logs = [];
-                int02.logs.unshift(`[${new Date().toLocaleTimeString('ko-KR')}] 카톡 수신 완료: ${intake.utterance.slice(0, 35)}...`);
+                int02.logs.unshift(`[${new Date().toLocaleTimeString('ko-KR')}] 📥 [INT-02] EXE-02 이첩 견적건 수신: ${intake.customer?.name || '고객사'} (정규화 파이프라인 전달)`);
                 int02.logs = int02.logs.slice(0, 10);
                 changed = true;
             }
