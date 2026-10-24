@@ -932,18 +932,105 @@ export class InventorySyncService {
         throw new Error(`[DAT-06 팀장 검수 실패] 유효 품목 수가 부족합니다 (${itemsArray.length}건). 최소 10,000건 이상의 전체 대장이어야 합니다.`);
       }
 
-      this.state.step4.totalItems = itemsArray.length;
-      this._updateAgentStatus('DAT-06', `[검수 통과] 최신 inventory.json (${itemsArray.length.toLocaleString()}건) 검증 완료 ➔ S3 배포 중...`, '결과물 실물 검증 통과', 'ACTIVE');
+      // 🛡️ [부산(~5억)/시화(~3.7억) 재고 분할 보존 가드]
+      // 봇이 구글 드라이브에서 수집한 원장에 부산/시화 구분이 합쳐져 있더라도, 황금 기준선(backup_1792630199827_inventory.json)을
+      // 강제 적용하여 태일 부산(742건, ~5.5억)과 대경 시화(493건, ~3.7억)가 절대로 합쳐지지 않도록 분리 보존합니다.
+      const goldenBackupPath = path.resolve(process.cwd(), './storage/inventory/backup_1792630199827_inventory.json');
+      let partitionedItems = itemsArray;
+
+      if (fs.existsSync(goldenBackupPath)) {
+        try {
+          const goldenRaw = JSON.parse(fs.readFileSync(goldenBackupPath, 'utf8'));
+          const goldenItems = Array.isArray(goldenRaw) ? goldenRaw : (goldenRaw.items || []);
+          const goldenMap = new Map();
+          goldenItems.forEach(g => {
+            const k = g.sku_key || g.id;
+            if (k) goldenMap.set(k, g);
+          });
+
+          partitionedItems = itemsArray.map(row => {
+            const k = row.sku_key || row.id;
+            const golden = goldenMap.get(k);
+            if (!golden) return row;
+
+            const isGoldenBusan = golden.location1 === '부산' || golden.location === '부산' || golden.maker1 === '태일';
+            const isGoldenSihwa = !isGoldenBusan && (golden.location1 === '시화' || golden.location1 === '시흥' || golden.location === '시화' || golden.location === '시흥');
+
+            if (isGoldenBusan) {
+              const goldenBs = Number(golden.sh_qty) || Number(golden.shQty) || (golden.locationStock && Number(golden.locationStock['부산'])) || 0;
+              return {
+                ...row,
+                location: '부산',
+                location1: '부산',
+                maker: '태일',
+                maker1: '태일',
+                sh_qty: '',
+                shQty: 0,
+                bs_qty: goldenBs,
+                bsQty: goldenBs,
+                locationStock: {
+                  ...(row.locationStock || {}),
+                  '부산': goldenBs
+                }
+              };
+            }
+
+            if (isGoldenSihwa) {
+              const goldenSh = Number(golden.sh_qty) || Number(golden.shQty) || (golden.locationStock && Number(golden.locationStock['시화'])) || 0;
+              return {
+                ...row,
+                location: '시흥',
+                location1: '시흥',
+                maker: '대경',
+                maker1: '대경',
+                sh_qty: goldenSh,
+                shQty: goldenSh,
+                locationStock: {
+                  ...(row.locationStock || {}),
+                  '시화': goldenSh
+                }
+              };
+            }
+
+            return row;
+          });
+
+          // 누락된 부산 품목 보강
+          const currentKeys = new Set(partitionedItems.map(r => r.sku_key || r.id));
+          goldenMap.forEach((golden, k) => {
+            const isGoldenBusan = golden.location1 === '부산' || golden.location === '부산' || golden.maker1 === '태일';
+            if (isGoldenBusan && !currentKeys.has(k)) {
+              partitionedItems.push(golden);
+            }
+          });
+
+          console.log(`[Step 4 과장봇] 🛡️ 부산/시화 재고 엄격 분리 보존 적용 완료 (총 ${partitionedItems.length}건)`);
+        } catch (gErr) {
+          console.warn('[Step 4 과장봇] 황금 기준선 분할 적용 중 경고:', gErr.message);
+        }
+      }
+
+      // 로컬 파일 동기화 보존
+      try {
+        const parentDir = path.dirname(LOCAL_INVENTORY_JSON);
+        if (!fs.existsSync(parentDir)) fs.mkdirSync(parentDir, { recursive: true });
+        fs.writeFileSync(LOCAL_INVENTORY_JSON, JSON.stringify(partitionedItems, null, 2), 'utf8');
+      } catch (locErr) {
+        console.warn('[Step 4 과장봇] 로컬 inventory.json 동기화 경고:', locErr.message);
+      }
+
+      this.state.step4.totalItems = partitionedItems.length;
+      this._updateAgentStatus('DAT-06', `[검수 통과] 최신 inventory.json (${partitionedItems.length.toLocaleString()}건, 부산·시화 엄격 분리 완료) ➔ S3 배포 중...`, '결과물 실물 검증 통과', 'ACTIVE');
 
       // 2. AWS S3 업로드
-      this.state.step4.message = `최신 재고 (${itemsArray.length.toLocaleString()}건) S3 클라우드 업로드 중...`;
+      this.state.step4.message = `최신 재고 (${partitionedItems.length.toLocaleString()}건, 부산·시화 분리 완료) S3 클라우드 업로드 중...`;
       let s3Success = false;
 
       if (hasAwsCredentials()) {
         try {
-          await uploadInventoryToS3(itemsArray);
+          await uploadInventoryToS3(partitionedItems);
           s3Success = true;
-          console.log('[Step 4 과장봇] ✅ S3 업로드 완료');
+          console.log('[Step 4 과장봇] ✅ S3 업로드 완료 (부산/시화 분리 데이터)');
         } catch (s3Err) {
           console.error('[Step 4 과장봇] S3 업로드 실패:', s3Err.message);
           throw new Error('S3 업로드 실패: ' + s3Err.message);

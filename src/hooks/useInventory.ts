@@ -128,8 +128,8 @@ export function useInventory() {
                 if (isBusan) {
                     if (locationStock['시화'] > 0 && !locationStock['부산']) {
                         locationStock['부산'] = locationStock['시화'];
-                        locationStock['시화'] = 0;
                     }
+                    locationStock['시화'] = 0;
                 }
 
                 if (Object.keys(locationStock).length === 0) {
@@ -217,8 +217,8 @@ export function useInventory() {
                 if (isBusan) {
                     if (locationStock['시화'] > 0 && !locationStock['부산']) {
                         locationStock['부산'] = locationStock['시화'];
-                        locationStock['시화'] = 0;
                     }
+                    locationStock['시화'] = 0;
                 }
 
                 if (Object.keys(locationStock).length === 0) {

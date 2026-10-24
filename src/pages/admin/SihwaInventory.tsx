@@ -1235,10 +1235,24 @@ export default function SihwaInventory() {
         const targetInventoryList = Array.from(uniqueInventoryMap.values());
 
         targetInventoryList.forEach((item: Product) => {
+            const isBusanItem = item.location1 === '부산' || 
+                                item.location === '부산' || 
+                                (item.location1 && String(item.location1).includes('부산')) || 
+                                (item.location && String(item.location).includes('부산')) || 
+                                item.maker1 === '태일' || 
+                                item.maker === '태일' || 
+                                (item.locationStock && item.locationStock['부산'] !== undefined && Number(item.locationStock['부산']) > 0);
+
             let shQty = 0;
             let ysQty = 0;
 
-            if (item.locationStock && Object.keys(item.locationStock).length > 0) {
+            if (isBusanItem) {
+                // 부산(태일) 재고는 시화재고 계산에 절대 포함되지 않음 (엄격한 분리 보존)
+                shQty = 0;
+                if (item.locationStock && (item.locationStock['양산'] !== undefined || item.locationStock['대경'] !== undefined)) {
+                    ysQty = Number(item.locationStock['양산'] || item.locationStock['대경'] || 0);
+                }
+            } else if (item.locationStock && Object.keys(item.locationStock).length > 0) {
                 if (item.locationStock['시화'] !== undefined) shQty += Number(item.locationStock['시화']);
                 if (item.locationStock['서울'] !== undefined) shQty += Number(item.locationStock['서울']);
                 if (item.locationStock['양산'] !== undefined) ysQty += Number(item.locationStock['양산']);
