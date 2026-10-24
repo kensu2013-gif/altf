@@ -1173,7 +1173,7 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // 🚀 전사 봇 41기 전체 일괄 활성화 API
+    // 🚀 전사 봇 전체 일괄 활성화 API
     if (url.pathname === '/api/agents/activate-all' && req.method === 'POST') {
         try {
             const result = agentControlManager.activateAllAgents();
@@ -1184,7 +1184,7 @@ const server = http.createServer(async (req, res) => {
             res.end(JSON.stringify({
                 success: true,
                 count: result.count,
-                message: '전사 41기 봇 전체 활성화(ACTIVE) 완료',
+                message: `전사 ${result.count}기 봇 전체 활성화(ACTIVE) 완료`,
                 agents: db.agents
             }));
             return;
@@ -1275,7 +1275,7 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({
                 success: true,
-                message: '⚡ 전사 봇 41기 전체 활성화 및 실시간 파이프라인 가동이 성공적으로 개시되었습니다.',
+                message: `⚡ 전사 봇 ${result.count}기 전체 활성화 및 실시간 파이프라인 가동이 성공적으로 개시되었습니다.`,
                 executionReport,
                 agents: db.agents
             }));

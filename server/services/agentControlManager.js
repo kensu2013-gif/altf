@@ -192,7 +192,7 @@ class AgentControlManager extends EventEmitter {
     }
 
     /**
-     * 🚀 전사 봇 41기 전체 일괄 활성화 (Ready & Active State)
+     * 🚀 전사 봇 전체 일괄 활성화 (Ready & Active State)
      * - 모든 봇의 status를 'ACTIVE'로 전환
      * - isCreated를 true로 보장
      * - 사원/대리는 AUTO_RUNNING, 과장/팀장은 APPROVED로 자동 승인 상태 설정
@@ -225,7 +225,7 @@ class AgentControlManager extends EventEmitter {
 
         try {
             fs.writeFileSync(AGENTS_PATH, JSON.stringify(this.agentsCache, null, 2), 'utf8');
-            console.log(`🚀 [AgentControlManager] 전사 41기 봇 전체 활성화(ACTIVE) 저장 완료`);
+            console.log(`🚀 [AgentControlManager] 전사 ${this.agentsCache.length}기 봇 전체 활성화(ACTIVE) 저장 완료`);
             this.emit('change', this.agentsCache);
             return { success: true, count: this.agentsCache.length, agents: this.agentsCache };
         } catch (e) {

@@ -1942,7 +1942,7 @@ export default function AgentOfficeDashboard() {
         ]);
     };
 
-    // ⚡ 전사 봇 41기 전체 일괄 활성화 & 백엔드 파이프라인 동시 가동 핸들러
+    // ⚡ 전사 봇 전체 일괄 활성화 & 백엔드 파이프라인 동시 가동 핸들러
     const handleRunAllBots = async () => {
         setIsExecutingAllBots(true);
         setShowRunAllModal(true);
@@ -1968,7 +1968,7 @@ export default function AgentOfficeDashboard() {
         }));
 
         setSimulationLog(prev => [
-            `⚡ [${nowStr}] [전사 오케스트레이터] 7대 실무 부서 41기 전 봇 일괄 가동 명령 하달! 백엔드 자율 파이프라인 동시 트리거 개시!`,
+            `⚡ [${nowStr}] [전사 오케스트레이터] ${departments.length}개 부서 ${createdAgents.length}기 전 봇 일괄 가동 명령 하달! 백엔드 자율 파이프라인 동시 트리거 개시!`,
             ...prev.slice(0, 14)
         ]);
 
@@ -1981,8 +1981,8 @@ export default function AgentOfficeDashboard() {
             if (data.success) {
                 setRunAllResult({
                     timestamp: data.executionReport?.timestamp || new Date().toISOString(),
-                    totalBots: data.executionReport?.totalBots || 41,
-                    activatedBots: data.executionReport?.activatedBots || 41,
+                    totalBots: data.executionReport?.totalBots || createdAgents.length,
+                    activatedBots: data.executionReport?.activatedBots || createdAgents.length,
                     triggeredPipelines: data.executionReport?.triggeredPipelines || [
                         { dept: '구매부', code: 'PUR-01', name: '알트에프 재고 발주 동기화' },
                         { dept: '구매부/데이터관리팀', code: 'PUR-02~04, DAT-07', name: '대경 생산미결 파싱 & 공정납기 정밀진단' },
@@ -1991,7 +1991,7 @@ export default function AgentOfficeDashboard() {
                         { dept: '데이터관리팀', code: 'DAT-03~06', name: 'ALTF 재고 DB 및 S3 동기화 체인' },
                         { dept: '영업부', code: 'SLE-07', name: '견적 요율 자동 점검' }
                     ],
-                    message: data.message || '전사 봇 41기 전체 가동 완료'
+                    message: data.message || `전사 봇 ${createdAgents.length}기 전체 가동 완료`
                 });
                 if (Array.isArray(data.agents)) {
                     setAgents(data.agents);
@@ -2005,8 +2005,8 @@ export default function AgentOfficeDashboard() {
             // 백엔드 실패 시에도 로컬 상태는 ACTIVE로 정상 표시
             setRunAllResult({
                 timestamp: new Date().toISOString(),
-                totalBots: 41,
-                activatedBots: 41,
+                totalBots: createdAgents.length,
+                activatedBots: createdAgents.length,
                 triggeredPipelines: [
                     { dept: '구매부', code: 'PUR-01', name: '알트에프 재고 발주 동기화' },
                     { dept: '구매부/데이터관리팀', code: 'PUR-02~04, DAT-07', name: '대경 생산미결 파싱 & 공정납기 정밀진단' },
@@ -2015,7 +2015,7 @@ export default function AgentOfficeDashboard() {
                     { dept: '데이터관리팀', code: 'DAT-03~06', name: 'ALTF 재고 DB 및 S3 동기화 체인' },
                     { dept: '영업부', code: 'SLE-07', name: '견적 요율 자동 점검' }
                 ],
-                message: '전사 41기 봇 전체 활성화 완료'
+                message: `전사 ${createdAgents.length}기 봇 전체 활성화 완료`
             });
         } finally {
             setIsExecutingAllBots(false);
@@ -3016,7 +3016,7 @@ export default function AgentOfficeDashboard() {
                         )}
                     </div>
 
-                    {/* ⚡ 전사 봇 41기 전체 일괄 가동 마스터 버튼 */}
+                    {/* ⚡ 전사 봇 전체 일괄 가동 마스터 버튼 */}
                     <button
                         onClick={handleRunAllBots}
                         disabled={isExecutingAllBots}
@@ -3025,12 +3025,12 @@ export default function AgentOfficeDashboard() {
                                 ? 'border-cyan-400 bg-cyan-950/80 text-cyan-200 animate-pulse'
                                 : 'border-emerald-400/80 bg-gradient-to-r from-emerald-600/35 via-teal-600/35 to-cyan-600/35 hover:from-emerald-600/55 hover:to-cyan-600/55 text-emerald-200 hover:text-white hover:border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.25)]'
                         }`}
-                        title="전사 7대 실무 부서 41기 AI 봇 전체를 일괄 활성화하고 실시간 백엔드 자율 파이프라인을 동시 가동합니다."
+                        title={`전사 ${departments.length}개 부서 ${createdAgents.length}기 AI 봇 전체를 일괄 활성화하고 실시간 백엔드 자율 파이프라인을 동시 가동합니다.`}
                     >
                         <Zap className={`w-3.5 h-3.5 ${isExecutingAllBots ? 'animate-spin text-cyan-300' : 'text-emerald-400 fill-emerald-400/30'}`} />
-                        <span>{isExecutingAllBots ? '41기 가동 중...' : '⚡ 전사 봇 41기 전체 가동'}</span>
+                        <span>{isExecutingAllBots ? `${createdAgents.length}기 가동 중...` : `⚡ 전사 봇 ${createdAgents.length}기 전체 가동`}</span>
                         <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/30 border border-emerald-400/50 text-emerald-300 font-mono">
-                            41 READY
+                            {createdAgents.length} READY
                         </span>
                     </button>
 
@@ -6777,7 +6777,7 @@ export default function AgentOfficeDashboard() {
                 </div>
             )}
 
-            {/* ⚡ 0. 전사 봇 41기 전체 일괄 가동 오케스트레이션 모달 (Run All Bots HUD) */}
+            {/* ⚡ 0. 전사 봇 전체 일괄 가동 오케스트레이션 모달 (Run All Bots HUD) */}
             {showRunAllModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
                     <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-[#070D19] border border-cyan-500/50 rounded-2xl shadow-[0_0_50px_rgba(0,240,255,0.25)] overflow-hidden text-slate-100">
@@ -6789,13 +6789,13 @@ export default function AgentOfficeDashboard() {
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <h2 className="text-lg font-bold text-white tracking-wide">전사 봇 41기 전체 일괄 가동 오케스트레이터</h2>
+                                        <h2 className="text-lg font-bold text-white tracking-wide">전사 봇 {createdAgents.length}기 전체 일괄 가동 오케스트레이터</h2>
                                         <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 border border-emerald-400/50 text-emerald-300">
                                             {isExecutingAllBots ? '가동 및 동기화 중...' : '전사 가동 완료 ✓'}
                                         </span>
                                     </div>
                                     <p className="text-xs text-slate-400 mt-0.5">
-                                        {runAllResult?.message || '7대 실무 부서 41기 전 봇 활성화(ACTIVE) 및 실시간 백엔드 자율 파이프라인 동시 트리거'}
+                                        {runAllResult?.message || `${departments.length}개 부서 ${createdAgents.length}기 전 봇 활성화(ACTIVE) 및 실시간 백엔드 자율 파이프라인 동시 트리거`}
                                         {runAllResult?.timestamp && (
                                             <span className="ml-2 text-cyan-400/80">({new Date(runAllResult.timestamp).toLocaleTimeString()})</span>
                                         )}
@@ -6816,13 +6816,13 @@ export default function AgentOfficeDashboard() {
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 <div className="p-3.5 rounded-xl border border-cyan-500/30 bg-cyan-950/20">
                                     <div className="text-[11px] text-cyan-400 font-bold uppercase">전사 봇 총원</div>
-                                    <div className="text-2xl font-black text-cyan-200 mt-1">{runAllResult?.totalBots ?? 41}기</div>
-                                    <div className="text-[10px] text-slate-400 mt-0.5">7대 실무 부서 전원 등록</div>
+                                    <div className="text-2xl font-black text-cyan-200 mt-1">{runAllResult?.totalBots ?? createdAgents.length}기</div>
+                                    <div className="text-[10px] text-slate-400 mt-0.5">{departments.length}개 부서 전원 등록</div>
                                 </div>
                                 <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-950/20">
                                     <div className="text-[11px] text-emerald-400 font-bold uppercase">가동 상태 (ACTIVE)</div>
                                     <div className="text-2xl font-black text-emerald-300 mt-1">
-                                        {runAllResult?.activatedBots ?? 41} / {runAllResult?.totalBots ?? 41} (100%)
+                                        {runAllResult?.activatedBots ?? createdAgents.length} / {runAllResult?.totalBots ?? createdAgents.length} (100%)
                                     </div>
                                     <div className="text-[10px] text-emerald-400/80 mt-0.5">OFFLINE 0 | STANDBY 0</div>
                                 </div>
@@ -6838,35 +6838,37 @@ export default function AgentOfficeDashboard() {
                                 </div>
                             </div>
 
-                            {/* 7대 부서별 봇 현황 카드 */}
+                            {/* 부서별 봇 현황 카드 (동적 렌더링) */}
                             <div>
                                 <h3 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
                                     <Layers className="w-4 h-4 text-cyan-400" />
-                                    <span>7대 실무 부서별 41기 봇 가동 상세</span>
+                                    <span>{departments.length}개 부서별 {createdAgents.length}기 봇 가동 상세</span>
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    {[
-                                        { dept: '구매부', count: 10, codes: 'PUR-01~04, 07, 08, 11~14', desc: '대경 미결 추적, 재고 발주 동기화, 수주 대조' },
-                                        { dept: '영업부', count: 11, codes: 'SAL-03, INT-01~06, SLE-01~02, 07~08', desc: '견적 인입, 정규화, 요율 점검, 미주문 팔로업' },
-                                        { dept: '데이터관리팀', count: 7, codes: 'DAT-01~07', desc: 'Make.com 연동, S3 재고 총괄, 리드타임 통계' },
-                                        { dept: '품질부', count: 5, codes: 'QC-01, 02, 06, 12, 13', desc: '메일플러그 수집, 26컬럼 파싱, 성적서 발행' },
-                                        { dept: '출고물류부', count: 3, codes: 'LOG-11, 12, 13', desc: '시화 출고지시, 포장 바코드 검수, MES 연동' },
-                                        { dept: '총무부', count: 3, codes: 'GEN-01, 03, 10', desc: '매입 거래명세표, 서류 패키징, CRM 마스터' },
-                                        { dept: '관제·게이트부', count: 2, codes: 'DIS-01, EXE-11', desc: '단일 발송 게이트 통제, 전사 업무 흐름 감시' }
-                                    ].map(item => (
-                                        <div key={item.dept} className="p-3 rounded-xl border border-slate-800 bg-[#0B1526]/80 flex flex-col justify-between">
-                                            <div>
-                                                <div className="flex items-center justify-between mb-1">
-                                                    <span className="text-xs font-bold text-slate-200">{item.dept}</span>
-                                                    <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                                                        {item.count}기 ALL ACTIVE ✓
-                                                    </span>
+                                    {departments.map(dept => {
+                                        const deptBots = agents.filter(a => a.deptId === dept.id && a.isCreated !== false);
+                                        const codeList = deptBots.map(b => b.code || b.id.toUpperCase());
+                                        const codesText = codeList.length > 5 
+                                            ? `${codeList[0]}~${codeList[codeList.length - 1]} (${codeList.length}대)` 
+                                            : codeList.join(', ');
+                                        return (
+                                            <div key={dept.id} className="p-3 rounded-xl border border-slate-800 bg-[#0B1526]/80 flex flex-col justify-between">
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                                                            <span>{dept.icon}</span>
+                                                            <span>{dept.name}</span>
+                                                        </span>
+                                                        <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                                            {deptBots.length}기 ALL ACTIVE ✓
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[11px] font-mono text-cyan-400 font-semibold mb-1">{codesText}</div>
+                                                    <div className="text-[10px] text-slate-400 leading-relaxed">{dept.description}</div>
                                                 </div>
-                                                <div className="text-[11px] font-mono text-cyan-400 font-semibold mb-1">{item.codes}</div>
-                                                <div className="text-[10px] text-slate-400 leading-relaxed">{item.desc}</div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
 
@@ -6926,7 +6928,7 @@ export default function AgentOfficeDashboard() {
                         {/* 푸터 */}
                         <div className="px-6 py-3.5 border-t border-cyan-900/40 bg-[#0A1424] flex items-center justify-between">
                             <div className="text-xs text-slate-400">
-                                {runAllResult?.message || '41기 전 봇이 백엔드 스케줄러와 메모리 캐시에 즉시 보존되었습니다.'}
+                                {runAllResult?.message || `${createdAgents.length}기 전 봇이 백엔드 스케줄러와 메모리 캐시에 즉시 보존되었습니다.`}
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
