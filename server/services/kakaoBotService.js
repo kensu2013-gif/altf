@@ -1586,6 +1586,9 @@ export class KakaoBotService {
             order.totalAmount = order.items.reduce((s, it) => s + (it.amount || 0), 0);
         }
         if (updateData.memo) order.memo = updateData.memo;
+        if (updateData.remarks !== undefined) order.remarks = updateData.remarks;
+        if (updateData.assignedTeam !== undefined) order.assignedTeam = updateData.assignedTeam;
+        if (updateData.assignedDept !== undefined) order.assignedDept = updateData.assignedDept;
 
         // 재검증
         const missing = [];

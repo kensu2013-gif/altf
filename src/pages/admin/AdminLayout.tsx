@@ -9,6 +9,7 @@ import {
     ChevronLeft,
     ChevronRight
 } from 'lucide-react';
+import useSWR from 'swr';
 import { useState, useEffect } from 'react';
 
 export default function AdminLayout() {
@@ -114,26 +115,19 @@ export default function AdminLayout() {
         return count;
     }, 0);
 
-    const [kakaoPendingCount, setKakaoPendingCount] = useState<number>(0);
-
-    const fetchKakaoPendingCount = useCallback(async () => {
-        try {
-            const res = await fetch('/api/kakao/orders?limit=100');
-            if (res.ok) {
-                const data = await res.json();
-                if (data.success && Array.isArray(data.orders)) {
-                    const pending = data.orders.filter((o: any) => o.status !== 'APPROVED').length;
-                    setKakaoPendingCount(pending);
-                }
+    const { data: kakaoPendingCount = 0 } = useSWR<number>(
+        '/api/kakao/orders?limit=100',
+        async (url: string) => {
+            const res = await fetch(url);
+            if (!res.ok) return 0;
+            const data = await res.json();
+            if (data.success && Array.isArray(data.orders)) {
+                return data.orders.filter((o: { status?: string }) => o.status !== 'APPROVED').length;
             }
-        } catch (e) {}
-    }, []);
-
-    useEffect(() => {
-        fetchKakaoPendingCount();
-        const interval = setInterval(fetchKakaoPendingCount, 15000);
-        return () => clearInterval(interval);
-    }, [fetchKakaoPendingCount]);
+            return 0;
+        },
+        { refreshInterval: 15000 }
+    );
 
     const handleLogout = () => {
         logout();
