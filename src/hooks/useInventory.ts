@@ -47,10 +47,14 @@ interface RawInventoryItem {
     [key: string]: unknown; // Allow other properties to pass through
 }
 
-// Fetcher function with resilient S3 CDN fallback
+// Fetcher function with resilient S3 CDN fallback and cache-busting
 const fetcher = async (url: string) => {
     try {
-        const res = await fetch(url);
+        const cacheBustedUrl = url + (url.includes('?') ? '&' : '?') + `_cb=${Date.now()}`;
+        const res = await fetch(cacheBustedUrl, {
+            cache: 'no-cache',
+            headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
+        });
         const contentType = res.headers.get('content-type') || '';
         if (res.ok && contentType.includes('application/json')) {
             const data = await res.json();
@@ -76,7 +80,11 @@ const fetcher = async (url: string) => {
 
     // Direct S3 Fallback
     console.log(`[useInventory] Fetching inventory directly from S3 CDN: ${S3_INVENTORY_URL}`);
-    const s3Res = await fetch(S3_INVENTORY_URL);
+    const s3BustedUrl = S3_INVENTORY_URL + `?_cb=${Date.now()}`;
+    const s3Res = await fetch(s3BustedUrl, {
+        cache: 'no-cache',
+        headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
+    });
     if (!s3Res.ok) throw new Error(`S3 HTTP ${s3Res.status}`);
     const s3Data = await s3Res.json();
     if (s3Data && typeof s3Data === 'object') {
@@ -93,14 +101,14 @@ export function useInventory() {
         revalidateIfStale: true, // Allow background revalidation on mount
         revalidateOnFocus: true,  // Revalidate when admin switches windows
         revalidateOnReconnect: true,
-        dedupingInterval: 60000,  // Reduce deduping window to 1 minute
-        keepPreviousData: true,   // Keep showing old data while fetching new
+        dedupingInterval: 5000,   // Rapid 5-second deduping window for admin freshness
+        keepPreviousData: false,  // Don't show stale cached inventory across data updates
     });
 
     const refresh = async () => {
         try {
             console.log('[useInventory] Forced refresh initiated. Fetching bypass URL...');
-            const forceUrl = INVENTORY_URL + (INVENTORY_URL.includes('?') ? '&' : '?') + 'refresh=true';
+            const forceUrl = INVENTORY_URL + (INVENTORY_URL.includes('?') ? '&' : '?') + `refresh=true&_ts=${Date.now()}`;
             const updated = await fetcher(forceUrl);
             
             // Format and update state directly
