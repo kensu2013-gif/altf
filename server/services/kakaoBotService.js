@@ -1365,7 +1365,26 @@ export class KakaoBotService {
         }
 
         const customerName = parsed.customerName || matchedUser?.company || recentQuote?.customerInfo?.company || matchedUser?.name || '카카오톡 고객사';
-        const phone = parsed.phone || matchedUser?.phone || recentQuote?.customerInfo?.phone || '';
+        let phone = parsed.phone || matchedUser?.phone || recentQuote?.customerInfo?.phone || '';
+
+        // 🧠 [SLE-15] 학습된 거래처별 배송/운송 규칙 선제 적용 (이전에 학습된 규칙이 있다면 자동 보완)
+        const learnedRule = orderRuleCorrectionAgent.getCustomerRule(customerName);
+        if (learnedRule) {
+            if (!parsed.destination && learnedRule.destination) {
+                parsed.destination = learnedRule.destination;
+                console.log(`[KakaoBot] 🎯 [SLE-15 규칙 자동적용] ${customerName} ➔ 도착지: ${learnedRule.destination}`);
+            }
+            if (!parsed.freightTerms && learnedRule.freightTerms) {
+                parsed.freightTerms = learnedRule.freightTerms;
+                console.log(`[KakaoBot] 🎯 [SLE-15 규칙 자동적용] ${customerName} ➔ 운송조건: ${learnedRule.freightTerms}`);
+            }
+            if (!parsed.recipient && learnedRule.recipient) {
+                parsed.recipient = learnedRule.recipient;
+            }
+            if (!phone && learnedRule.phone) {
+                phone = learnedRule.phone;
+            }
+        }
 
         // 🛡️ 필수 4대 항목 재검증 (발송업체명, 도착지, 운송비, 품목규격)
         const missingFields = [];

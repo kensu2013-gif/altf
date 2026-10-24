@@ -114,6 +114,27 @@ export default function AdminLayout() {
         return count;
     }, 0);
 
+    const [kakaoPendingCount, setKakaoPendingCount] = useState<number>(0);
+
+    const fetchKakaoPendingCount = useCallback(async () => {
+        try {
+            const res = await fetch('/api/kakao/orders?limit=100');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success && Array.isArray(data.orders)) {
+                    const pending = data.orders.filter((o: any) => o.status !== 'APPROVED').length;
+                    setKakaoPendingCount(pending);
+                }
+            }
+        } catch (e) {}
+    }, []);
+
+    useEffect(() => {
+        fetchKakaoPendingCount();
+        const interval = setInterval(fetchKakaoPendingCount, 15000);
+        return () => clearInterval(interval);
+    }, [fetchKakaoPendingCount]);
+
     const handleLogout = () => {
         logout();
         navigate('/login');
@@ -123,6 +144,7 @@ export default function AdminLayout() {
         // { label: '대시보드', path: '/admin', exact: true, emoji: '📊' }, // Maybe later
         { label: '알트에프 거래처 (CRM)', path: '/admin/customers', emoji: '🏢' },
         { label: '멤버 관리', path: '/admin/members', emoji: '👥' },
+        { label: '카톡 발주 접수 대기', path: '/admin/kakao-orders', emoji: '📋', badge: kakaoPendingCount },
         { label: '주문 관리', path: '/admin/orders', emoji: '🛒', badge: orders.filter(o => o.status === 'SUBMITTED' && !o.isDeleted).length },
         { label: '미결 관리', path: '/admin/pending', emoji: '⏳', badge: delayedPendingCount },
         { label: '견적 관리', path: '/admin/quotes', emoji: '📝', badge: quotes.filter(q => q.status === 'SUBMITTED' && !q.isDeleted).length },
@@ -171,7 +193,7 @@ export default function AdminLayout() {
                     {NAV_ITEMS.filter(item => {
                         if ('masterOnly' in item && item.masterOnly && user?.role !== 'MASTER') return false;
                         if (user?.role === 'MANAGER') {
-                            const baseAllowed = ['/admin/orders', '/admin/pending', '/admin/quotes', '/admin/pilot-split-po'];
+                            const baseAllowed = ['/admin/orders', '/admin/pending', '/admin/quotes', '/admin/pilot-split-po', '/admin/kakao-orders'];
                             if (user.permissions?.viewCrm && item.path === '/admin/customers') return true;
                             if (user.permissions?.viewSihwa && (item.path === '/admin/sihwainventory' || item.path === '/admin/busaninventory')) return true;
                             return baseAllowed.includes(item.path);

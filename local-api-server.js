@@ -2887,6 +2887,13 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // 3-0-6. GET /api/kakao/orders/learned-rules : SLE-15 거래처별 배송/운송 정립 규칙 목록
+        if (req.method === 'GET' && url.pathname === '/api/kakao/orders/learned-rules') {
+            const rules = orderRuleCorrectionAgent.getLearnedRules();
+            sendJsonResponse(req, res, 200, { success: true, rules });
+            return;
+        }
+
         // 3-1. DELETE /api/kakao/intakes/:id : 카카오톡 인입 기록 삭제
         if (req.method === 'DELETE' && url.pathname.startsWith('/api/kakao/intakes/')) {
             const intakeId = url.pathname.split('/').pop();

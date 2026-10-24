@@ -1,0 +1,16 @@
+{
+  "customers": {
+    "이지스텍": {
+      "customerName": "이지스텍",
+      "destination": "금성밴드 본사 (화물 지점: 경동 구로608A / 대신 신도림지점)",
+      "freightTerms": "착불화물",
+      "recipient": "조현진",
+      "phone": "",
+      "ruleNotes": "금성밴드 본사 납품 원칙. 화물 발송 시 경동 구로608A 또는 대신 신도림지점 이용",
+      "updatedAt": "2026-10-24T14:42:03.230Z",
+      "sampleCount": 1
+    }
+  },
+  "itemPatterns": {},
+  "lastUpdated": "2026-10-24T14:42:03.230Z"
+}

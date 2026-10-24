@@ -17,11 +17,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_DIR = path.join(__dirname, '../data');
 const ORDER_CORRECTIONS_FILE = path.join(DATA_DIR, 'order_rule_corrections.json');
+const LEARNED_RULES_FILE = path.join(DATA_DIR, 'kakao_learned_rules.json');
 
 export class OrderRuleCorrectionAgent {
     constructor() {
         this.corrections = [];
+        this.learnedRules = {
+            customers: {},
+            itemPatterns: {},
+            lastUpdated: new Date().toISOString()
+        };
         this.loadCorrections();
+        this.loadLearnedRules();
     }
 
     loadCorrections() {
@@ -47,6 +54,44 @@ export class OrderRuleCorrectionAgent {
             fs.writeFileSync(ORDER_CORRECTIONS_FILE, JSON.stringify(this.corrections, null, 2), 'utf8');
         } catch (e) {
             console.error('[OrderRuleCorrectionAgent] 발주 수정 내역 저장 실패:', e.message);
+        }
+    }
+
+    loadLearnedRules() {
+        try {
+            if (fs.existsSync(LEARNED_RULES_FILE)) {
+                const raw = fs.readFileSync(LEARNED_RULES_FILE, 'utf8');
+                this.learnedRules = JSON.parse(raw);
+            } else {
+                this.learnedRules = {
+                    customers: {
+                        '이지스텍': {
+                            customerName: '이지스텍',
+                            destination: '금성밴드 본사 (화물 지점: 경동 구로608A / 대신 신도림지점)',
+                            freightTerms: '착불화물',
+                            recipient: '조현진',
+                            phone: '',
+                            ruleNotes: '금성밴드 본사 납품 원칙. 화물 발송 시 경동 구로608A 또는 대신 신도림지점 이용',
+                            updatedAt: new Date().toISOString(),
+                            sampleCount: 1
+                        }
+                    },
+                    itemPatterns: {},
+                    lastUpdated: new Date().toISOString()
+                };
+                this.saveLearnedRules();
+            }
+        } catch (e) {
+            console.error('[OrderRuleCorrectionAgent] 학습 규칙 로드 실패:', e.message);
+        }
+    }
+
+    saveLearnedRules() {
+        try {
+            this.learnedRules.lastUpdated = new Date().toISOString();
+            fs.writeFileSync(LEARNED_RULES_FILE, JSON.stringify(this.learnedRules, null, 2), 'utf8');
+        } catch (e) {
+            console.error('[OrderRuleCorrectionAgent] 학습 규칙 저장 실패:', e.message);
         }
     }
 
@@ -179,8 +224,47 @@ export class OrderRuleCorrectionAgent {
         }
         this.saveCorrections();
 
+        // 3. 🧠 SLE-15 지능형 영구 규칙 정립 (고객사별 배송지/운송조건 및 담당자 정보 자동 학습)
+        try {
+            const cust = (afterOrder.customerName || beforeOrder.customerName || '').trim();
+            if (cust && cust !== '카카오톡 고객사') {
+                const currentRule = this.learnedRules.customers[cust] || {
+                    customerName: cust,
+                    sampleCount: 0
+                };
+                if (afterOrder.destination) currentRule.destination = afterOrder.destination;
+                if (afterOrder.freightTerms) currentRule.freightTerms = afterOrder.freightTerms;
+                if (afterOrder.recipient) currentRule.recipient = afterOrder.recipient;
+                if (afterOrder.phone) currentRule.phone = afterOrder.phone;
+                currentRule.updatedAt = new Date().toISOString();
+                currentRule.sampleCount = (currentRule.sampleCount || 0) + 1;
+                currentRule.lastModifiedBy = modifiedBy;
+                this.learnedRules.customers[cust] = currentRule;
+                this.saveLearnedRules();
+                console.log(`[OrderRuleCorrectionAgent] 🎓 [SLE-15 영구규칙 정립] 거래처(${cust}) 배송·운송 규칙 자동 학습 갱신 완료!`);
+            }
+        } catch (ruleErr) {
+            console.warn('[OrderRuleCorrectionAgent] 학습 규칙 갱신 오류:', ruleErr.message);
+        }
+
         console.log(`[OrderRuleCorrectionAgent] 🧠 [수정관찰봇] 발주서(${orderId})에서 품목 ${detectedChanges.length}건, 조건 ${conditionDiffs.length}건 수정 감지 및 누적 보존 완료!`);
         return record;
+    }
+
+    /**
+     * 거래처별 학습된 배송/운송 규칙 조회
+     */
+    getCustomerRule(customerName) {
+        if (!customerName) return null;
+        const normalized = customerName.trim();
+        return this.learnedRules.customers[normalized] || null;
+    }
+
+    /**
+     * 전체 영구 학습 규칙 목록 반환
+     */
+    getLearnedRules() {
+        return this.learnedRules;
     }
 
     /**
@@ -231,7 +315,8 @@ export class OrderRuleCorrectionAgent {
             materialCorrectionsCount: materialCorrections.length,
             thicknessCorrectionsCount: thicknessCorrections.length,
             sizeCorrectionsCount: sizeCorrections.length,
-            recentCorrections: this.corrections.slice(0, 20)
+            recentCorrections: this.corrections.slice(0, 20),
+            learnedRules: this.learnedRules
         };
     }
 }

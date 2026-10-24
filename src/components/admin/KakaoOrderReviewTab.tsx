@@ -124,7 +124,9 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [analyzing, setAnalyzing] = useState<boolean>(false);
     const [showCorrectionModal, setShowCorrectionModal] = useState<boolean>(false);
+    const [correctionModalTab, setCorrectionModalTab] = useState<'RULES' | 'DIFFS'>('RULES');
     const [correctionReport, setCorrectionReport] = useState<CorrectionSummaryReport | null>(null);
+    const [learnedRules, setLearnedRules] = useState<{ customers: Record<string, any>; lastUpdated?: string } | null>(null);
 
     // Selected order editing state
     const [editCustomer, setEditCustomer] = useState<string>('');
@@ -133,6 +135,20 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
     const [editRecipient, setEditRecipient] = useState<string>('');
     const [editPhone, setEditPhone] = useState<string>('');
     const [editItems, setEditItems] = useState<KakaoOrderProductItem[]>([]);
+
+    const fetchLearnedRules = useCallback(async () => {
+        try {
+            const res = await fetch('/api/kakao/orders/learned-rules');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success && data.rules) {
+                    setLearnedRules(data.rules);
+                }
+            }
+        } catch (err) {
+            console.warn('[KakaoOrderReviewTab] 학습 규칙 조회 실패:', err);
+        }
+    }, []);
 
     const fetchOrders = useCallback(async () => {
         setLoading(true);
@@ -156,20 +172,24 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
 
     useEffect(() => {
         fetchOrders();
-    }, [fetchOrders]);
+        fetchLearnedRules();
+    }, [fetchOrders, fetchLearnedRules]);
 
     const activeOrder = orders.find(o => o.id === selectedOrderId) || orders[0] || null;
 
     useEffect(() => {
         if (activeOrder) {
-            setEditCustomer(activeOrder.customerName || '');
-            setEditDestination(activeOrder.destination || '');
-            setEditFreight(activeOrder.freightTerms || '');
-            setEditRecipient(activeOrder.recipient || '');
-            setEditPhone(activeOrder.phone || '');
+            const cust = activeOrder.customerName || '';
+            const learned = learnedRules?.customers?.[cust];
+
+            setEditCustomer(cust);
+            setEditDestination(activeOrder.destination || learned?.destination || '');
+            setEditFreight(activeOrder.freightTerms || learned?.freightTerms || '');
+            setEditRecipient(activeOrder.recipient || learned?.recipient || '');
+            setEditPhone(activeOrder.phone || learned?.phone || '');
             setEditItems(JSON.parse(JSON.stringify(activeOrder.items || [])));
         }
-    }, [activeOrder]);
+    }, [activeOrder, learnedRules]);
 
     // Filtering
     const filteredOrders = orders.filter(order => {
@@ -194,6 +214,48 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
     const isDestinationEmpty = !editDestination.trim();
     const isFreightEmpty = !editFreight.trim();
     const canApprove = !isDestinationEmpty && !isFreightEmpty && activeOrder?.status !== 'APPROVED';
+
+    // 🚚 Destination suggestions dynamically derived from remarks, utterance, and learned rules
+    const destinationSuggestions = React.useMemo(() => {
+        if (!activeOrder) return [];
+        const list: string[] = [];
+        const remarks = activeOrder.remarks || '';
+        const utter = activeOrder.utterance || '';
+        const combined = `${remarks} ${utter}`;
+
+        // 1. Learned rule for this customer
+        const learned = learnedRules?.customers?.[activeOrder.customerName];
+        if (learned?.destination && !list.includes(learned.destination)) {
+            list.push(learned.destination);
+        }
+
+        // 2. Extracted from remarks (e.g., 금성밴드 본사, 경동/대신 화물 지점)
+        if (/금성밴드/i.test(combined)) {
+            list.push('금성밴드 본사 (화물 지점: 경동 구로608A / 대신 신도림지점)');
+            list.push('금성밴드 본사 납품');
+        }
+        if (/경동/i.test(combined)) {
+            const m = combined.match(/경동[:\s]*([^\s,;]+)/);
+            if (m) list.push(`경동화물 (${m[1]} 지점)`);
+        }
+        if (/대신/i.test(combined)) {
+            const m = combined.match(/대신[:\s]*([^\s,;]+)/);
+            if (m) list.push(`대신화물 (${m[1]} 지점)`);
+        }
+        if (!list.includes('본사 직송')) list.push('본사 직송');
+        if (!list.includes('시화공단 물류센터')) list.push('시화공단 물류센터');
+
+        return Array.from(new Set(list));
+    }, [activeOrder, learnedRules]);
+
+    const FREIGHT_CHIPS = [
+        { label: '선불 화물 발송', hint: '당사 선불' },
+        { label: '착불화물', hint: '고객 착불' },
+        { label: '현불화물 후 화물비청구', hint: '현불 후 청구' },
+        { label: '본사 직송 (무운임)', hint: '직송' },
+        { label: '용차(독차)', hint: '용차' },
+        { label: '시화창고 방문수령', hint: '방문수령' }
+    ];
 
     // Item handlers
     const handleItemChange = (index: number, field: keyof KakaoOrderProductItem, value: string | number) => {
@@ -603,6 +665,48 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
 
                     {/* Scrollable Form Body */}
                     <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                        {/* 👤 Who Sent It & When HUD Card */}
+                        <div className="bg-gradient-to-r from-[#161a26] via-[#1a1f2e] to-[#161a26] border border-gray-700/80 rounded-xl p-4 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex items-center gap-3.5">
+                                <div className="w-11 h-11 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 flex-shrink-0 shadow-inner">
+                                    <Building2 className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">발신 고객사</span>
+                                        <span className="px-2 py-0.5 text-[10px] rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                                            카카오톡 접수
+                                        </span>
+                                    </div>
+                                    <div className="text-base font-extrabold text-white flex items-center gap-2 mt-0.5">
+                                        <span>{activeOrder.customerName || '고객사 미기재'}</span>
+                                        {activeOrder.recipient && (
+                                            <span className="text-xs font-semibold text-gray-300 bg-gray-800/80 px-2 py-0.5 rounded border border-gray-700">
+                                                담당: {activeOrder.recipient} {activeOrder.phone ? `(${activeOrder.phone})` : ''}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-4 text-xs border-t md:border-t-0 md:border-l border-gray-700/80 pt-3 md:pt-0 md:pl-5">
+                                <div>
+                                    <div className="text-[11px] text-gray-400 font-medium">수신/접수 일시</div>
+                                    <div className="font-bold text-amber-300 font-mono text-sm">
+                                        {new Date(activeOrder.receivedAt).toLocaleString('ko-KR')}
+                                    </div>
+                                </div>
+                                <div className="h-6 w-px bg-gray-700/60 hidden sm:block" />
+                                <div>
+                                    <div className="text-[11px] text-gray-400 font-medium">배정 담당부서</div>
+                                    <div className="font-bold text-emerald-400 flex items-center gap-1.5 text-sm">
+                                        <span>영업3팀 (발주팀)</span>
+                                        <span className="text-[10px] text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded">➔ 구매부</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* ⚠️ Incomplete Validation Banner */}
                         {activeOrder.status !== 'APPROVED' && (isDestinationEmpty || isFreightEmpty) && (
                             <div className="bg-rose-950/40 border border-rose-800/80 rounded-xl p-4 flex items-start gap-3 text-rose-200">
@@ -613,7 +717,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                     </div>
                                     <p className="leading-relaxed">
                                         알트에프 발주 원칙상 <b>도착지 정보(화물 지점 또는 주소)</b>와 <b>운송비 조건(선불/현불청구/착불)</b>이 명확하지 않으면 정식 발주서로 접수되지 않습니다.
-                                        아래 입력란에서 사무실 직원이 직접 확인 및 보완 후 <b>[정식 발주서 등록 승인]</b>을 진행해주세요.
+                                        아래 <b>원클릭 퀵 칩</b> 또는 입력란에서 확정 후 <b>[정식 발주서 등록 승인]</b>을 진행해주세요.
                                     </p>
                                 </div>
                             </div>
@@ -625,7 +729,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                 <div className="flex items-center justify-between text-xs font-bold text-gray-300">
                                     <div className="flex items-center gap-2">
                                         <FileText className="w-4 h-4 text-amber-400" />
-                                        <span>고객 카카오톡 원문 (Utterance)</span>
+                                        <span>고객 카카오톡 원문 & 비고 메모</span>
                                     </div>
                                     <button
                                         onClick={() => {
@@ -640,15 +744,27 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                     </button>
                                 </div>
                                 <div className="bg-[#0f1117] border border-gray-800/80 rounded-lg p-3 text-xs text-gray-200 font-mono whitespace-pre-wrap max-h-48 overflow-y-auto selection:bg-amber-500 selection:text-black">
+                                    {activeOrder.remarks ? (
+                                        <div className="mb-2 p-2 rounded bg-amber-950/30 border border-amber-800/40 text-amber-200">
+                                            <span className="font-bold">📝 수신 비고 메모:</span> {activeOrder.remarks}
+                                        </div>
+                                    ) : null}
                                     {activeOrder.utterance || '(텍스트 내용 없음)'}
                                 </div>
                             </div>
 
                             {/* Image Preview Box */}
                             <div className="bg-[#151821] border border-gray-800 rounded-xl p-4 space-y-2">
-                                <div className="flex items-center gap-2 text-xs font-bold text-gray-300">
-                                    <ImageIcon className="w-4 h-4 text-cyan-400" />
-                                    <span>수신 사진/발주서 문서</span>
+                                <div className="flex items-center justify-between text-xs font-bold text-gray-300">
+                                    <div className="flex items-center gap-2">
+                                        <ImageIcon className="w-4 h-4 text-cyan-400" />
+                                        <span>수신 사진/발주서 문서 원본</span>
+                                    </div>
+                                    {activeOrder.imageUrl && (
+                                        <span className="text-[10px] text-cyan-300 bg-cyan-950/60 border border-cyan-800/50 px-2 py-0.5 rounded">
+                                            클릭 시 원본 확대
+                                        </span>
+                                    )}
                                 </div>
                                 {activeOrder.imageUrl ? (
                                     <div className="relative group bg-[#0f1117] border border-gray-800/80 rounded-lg h-48 flex items-center justify-center overflow-hidden">
@@ -662,9 +778,9 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                             href={activeOrder.imageUrl}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 hover:bg-black text-[10px] text-gray-200 rounded flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            className="absolute bottom-2 right-2 px-2.5 py-1.5 bg-black/80 hover:bg-black text-[11px] text-gray-100 rounded-lg flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity border border-gray-700 shadow-lg"
                                         >
-                                            <ExternalLink className="w-3 h-3" /> 크게보기
+                                            <ExternalLink className="w-3.5 h-3.5" /> 새창 크게보기
                                         </a>
                                     </div>
                                 ) : (
@@ -677,9 +793,14 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
 
                         {/* Office Staff Verification Inputs */}
                         <div className="bg-[#151821] border border-gray-800 rounded-xl p-5 space-y-4">
-                            <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                                1. 발송 및 운송 필수 항목 검증 (Human-in-the-Loop)
+                            <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center justify-between">
+                                <span className="flex items-center gap-2">
+                                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                                    1. 발송 및 운송 필수 항목 검증 (Human-in-the-Loop)
+                                </span>
+                                <span className="text-[11px] text-gray-400 font-normal">
+                                    * 운송비 조건과 도착지를 확정하면 하단 승인 버튼이 활성화됩니다.
+                                </span>
                             </h4>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
@@ -700,9 +821,11 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
 
                                 {/* Destination */}
                                 <div className="space-y-1">
-                                    <label className="text-gray-300 font-bold flex items-center gap-1">
-                                        <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                                        도착지 정보 (화물지점/주소) <span className="text-rose-400">*</span>
+                                    <label className="text-gray-300 font-bold flex items-center justify-between">
+                                        <span className="flex items-center gap-1">
+                                            <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                                            도착지 정보 (화물지점/주소) <span className="text-rose-400">*</span>
+                                        </span>
                                     </label>
                                     <input
                                         type="text"
@@ -716,15 +839,47 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                         }`}
                                     />
                                     {isDestinationEmpty && (
-                                        <span className="text-[10px] text-rose-400 font-semibold">⚠️ 필수 항목: 도착지 정보를 입력해주세요.</span>
+                                        <span className="text-[10px] text-rose-400 font-semibold block">⚠️ 필수 항목: 도착지 정보를 입력해주세요.</span>
+                                    )}
+
+                                    {/* 📍 Smart Destination Recommendation Chips */}
+                                    {destinationSuggestions.length > 0 && (
+                                        <div className="pt-1.5 space-y-1">
+                                            <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                                                💡 추천 도착지 (클릭 시 자동 입력):
+                                            </span>
+                                            <div className="flex flex-wrap gap-1">
+                                                {destinationSuggestions.map((sug, i) => (
+                                                    <button
+                                                        key={i}
+                                                        type="button"
+                                                        onClick={() => setEditDestination(sug)}
+                                                        className={`px-2 py-0.5 text-[10px] rounded border transition-all ${
+                                                            editDestination === sug
+                                                                ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow'
+                                                                : 'bg-gray-800/80 hover:bg-gray-700 text-gray-300 border-gray-700'
+                                                        }`}
+                                                    >
+                                                        📍 {sug}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
 
                                 {/* Freight Terms */}
                                 <div className="space-y-1">
-                                    <label className="text-gray-300 font-bold flex items-center gap-1">
-                                        <Truck className="w-3.5 h-3.5 text-gray-400" />
-                                        운송비 조건 <span className="text-rose-400">*</span>
+                                    <label className="text-gray-300 font-bold flex items-center justify-between">
+                                        <span className="flex items-center gap-1">
+                                            <Truck className="w-3.5 h-3.5 text-gray-400" />
+                                            운송비 조건 <span className="text-rose-400">*</span>
+                                        </span>
+                                        {learnedRules?.customers?.[activeOrder.customerName]?.freightTerms && (
+                                            <span className="text-[10px] text-indigo-300 bg-indigo-950/50 px-1.5 py-0.2 rounded font-normal">
+                                                ⭐ 단골: {learnedRules.customers[activeOrder.customerName].freightTerms}
+                                            </span>
+                                        )}
                                     </label>
                                     <div className="flex gap-2">
                                         <input
@@ -743,18 +898,47 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                                             className="bg-gray-800 border border-gray-700 rounded-lg px-2 text-gray-300 text-xs focus:outline-none"
                                             defaultValue=""
                                         >
-                                            <option value="" disabled>선택</option>
+                                            <option value="" disabled>직접선택</option>
                                             <option value="선불 화물 발송">선불 화물 발송</option>
                                             <option value="현불화물 후 화물비청구">현불화물 후 화물비청구</option>
                                             <option value="현불화물">현불화물</option>
                                             <option value="착불화물">착불화물</option>
-                                            <option value="직송">직송</option>
-                                            <option value="용차">용차</option>
+                                            <option value="본사 직송 (무운임)">본사 직송 (무운임)</option>
+                                            <option value="용차(독차)">용차(독차)</option>
+                                            <option value="시화창고 방문수령">시화창고 방문수령</option>
                                         </select>
                                     </div>
                                     {isFreightEmpty && (
-                                        <span className="text-[10px] text-rose-400 font-semibold">⚠️ 필수 항목: 운송비 조건을 입력해주세요.</span>
+                                        <span className="text-[10px] text-rose-400 font-semibold block">⚠️ 필수 항목: 운송비 조건을 입력해주세요.</span>
                                     )}
+
+                                    {/* 🚚 Quick Selection Chips for Freight */}
+                                    <div className="pt-1.5 space-y-1">
+                                        <span className="text-[10px] text-gray-400">⚡ 원클릭 운송비 선택:</span>
+                                        <div className="flex flex-wrap gap-1">
+                                            {FREIGHT_CHIPS.map(chip => {
+                                                const isSelected = editFreight === chip.label;
+                                                const isLearned = learnedRules?.customers?.[activeOrder.customerName]?.freightTerms === chip.label;
+                                                return (
+                                                    <button
+                                                        key={chip.label}
+                                                        type="button"
+                                                        onClick={() => setEditFreight(chip.label)}
+                                                        className={`px-2 py-0.5 text-[10px] rounded border font-medium transition-all ${
+                                                            isSelected
+                                                                ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow'
+                                                                : isLearned
+                                                                    ? 'bg-indigo-950/60 text-indigo-300 border-indigo-600/70 hover:bg-indigo-900/80'
+                                                                    : 'bg-gray-800/80 hover:bg-gray-700 text-gray-300 border-gray-700'
+                                                        }`}
+                                                    >
+                                                        {isLearned && '⭐ '}
+                                                        {chip.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Recipient */}
@@ -1039,6 +1223,32 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                             </button>
                         </div>
 
+                        {/* Modal Tab Switcher */}
+                        <div className="flex border-b border-gray-800 bg-gray-900/90 px-5 pt-2 gap-2 text-xs">
+                            <button
+                                onClick={() => setCorrectionModalTab('RULES')}
+                                className={`pb-2.5 px-3 font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                                    correctionModalTab === 'RULES'
+                                        ? 'border-indigo-400 text-indigo-300'
+                                        : 'border-transparent text-gray-400 hover:text-gray-200'
+                                }`}
+                            >
+                                <Building2 className="w-3.5 h-3.5" />
+                                <span>📚 1. 거래처별 정립된 배송·운송 규칙 대장 ({Object.keys(learnedRules?.customers || {}).length}개사)</span>
+                            </button>
+                            <button
+                                onClick={() => setCorrectionModalTab('DIFFS')}
+                                className={`pb-2.5 px-3 font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                                    correctionModalTab === 'DIFFS'
+                                        ? 'border-indigo-400 text-indigo-300'
+                                        : 'border-transparent text-gray-400 hover:text-gray-200'
+                                }`}
+                            >
+                                <BookOpen className="w-3.5 h-3.5" />
+                                <span>🧠 2. 실시간 수정 Diff 감지 내역 ({correctionReport?.recentCorrections?.length || 0}건)</span>
+                            </button>
+                        </div>
+
                         {/* Metrics Bar */}
                         <div className="grid grid-cols-4 gap-3 p-4 bg-gray-900/60 border-b border-gray-800/80 text-xs">
                             <div className="p-3 rounded-xl bg-gray-850/80 border border-gray-800">
@@ -1067,77 +1277,127 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
                             </div>
                         </div>
 
-                        {/* Recent Corrections List */}
-                        <div className="flex-1 overflow-y-auto p-5 space-y-3">
-                            <div className="text-xs font-bold text-gray-300 flex items-center justify-between">
-                                <span>최근 감지 및 학습 이력 (최근 {correctionReport?.recentCorrections?.length || 0}건)</span>
-                                <span className="text-[11px] text-gray-500 font-mono">server/data/order_corrections.json</span>
-                            </div>
+                        {/* Modal Tab Content */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-3 custom-scrollbar">
+                            {correctionModalTab === 'RULES' ? (
+                                <div className="space-y-3">
+                                    <div className="text-xs font-bold text-gray-300 flex items-center justify-between">
+                                        <span>고객사별 자동 학습된 기본 도착지 및 운송비 룰 (다음 발주 인입 시 자동 적용)</span>
+                                        <span className="text-[11px] text-gray-500 font-mono">server/data/kakao_learned_rules.json</span>
+                                    </div>
 
-                            {(!correctionReport?.recentCorrections || correctionReport.recentCorrections.length === 0) ? (
-                                <div className="p-8 text-center rounded-xl bg-gray-900/40 border border-gray-800 text-gray-400 text-xs">
-                                    <AlertCircle className="w-8 h-8 text-gray-500 mx-auto mb-2 opacity-50" />
-                                    아직 기록된 수정 학습 내역이 없습니다.
-                                    <p className="text-[11px] text-gray-500 mt-1">
-                                        카톡 발주서 검토 화면에서 품목 또는 도착지/운송 조건을 수정하여 저장하시면 자동으로 감지되어 누적 학습됩니다.
-                                    </p>
+                                    {(!learnedRules?.customers || Object.keys(learnedRules.customers).length === 0) ? (
+                                        <div className="p-8 text-center rounded-xl bg-gray-900/40 border border-gray-800 text-gray-400 text-xs">
+                                            아직 정립된 거래처별 규칙이 없습니다.
+                                        </div>
+                                    ) : (
+                                        Object.entries(learnedRules.customers).map(([cName, rule]: [string, any]) => (
+                                            <div key={cName} className="p-4 rounded-xl bg-gray-900/80 border border-indigo-500/30 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+                                                            <Building2 className="w-4 h-4 text-emerald-400" />
+                                                            {cName}
+                                                        </span>
+                                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                                            누적 학습 {rule.sampleCount || 1}회
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[10px] text-gray-400 font-mono">
+                                                        {rule.updatedAt ? new Date(rule.updatedAt).toLocaleString('ko-KR') : ''}
+                                                    </span>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs pt-1">
+                                                    <div className="p-2.5 rounded-lg bg-gray-850 border border-gray-800 space-y-0.5">
+                                                        <span className="text-[10px] text-gray-400 font-semibold block">📍 기본 도착지 / 화물지점:</span>
+                                                        <span className="text-white font-medium">{rule.destination || '(미지정)'}</span>
+                                                    </div>
+                                                    <div className="p-2.5 rounded-lg bg-gray-850 border border-gray-800 space-y-0.5">
+                                                        <span className="text-[10px] text-gray-400 font-semibold block">🚚 기본 운송비 조건:</span>
+                                                        <span className="text-amber-300 font-bold">{rule.freightTerms || '(미지정)'}</span>
+                                                    </div>
+                                                </div>
+
+                                                {rule.ruleNotes && (
+                                                    <div className="text-[11px] text-gray-400 bg-gray-950/60 p-2 rounded border border-gray-800">
+                                                        💡 <span className="font-semibold text-gray-300">규칙 요약:</span> {rule.ruleNotes}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                             ) : (
-                                correctionReport.recentCorrections.map((rec) => (
-                                    <div key={rec.id} className="p-3.5 rounded-xl bg-gray-900/80 border border-gray-800 space-y-2.5">
-                                        <div className="flex items-center justify-between text-xs">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-bold text-indigo-300">{rec.customerName || '고객사'}</span>
-                                                <span className="text-[10px] text-gray-400 font-mono">#{rec.orderNo || rec.orderId}</span>
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">
-                                                    {rec.channelTag || '카카오톡'}
-                                                </span>
-                                            </div>
-                                            <span className="text-[10px] text-gray-400">
-                                                {new Date(rec.timestamp).toLocaleString('ko-KR')}
-                                            </span>
-                                        </div>
-
-                                        {/* Item Changes */}
-                                        {rec.itemChanges && rec.itemChanges.length > 0 && (
-                                            <div className="space-y-1.5 pl-2 border-l-2 border-indigo-500/40">
-                                                {rec.itemChanges.map((ic, idx) => (
-                                                    <div key={idx} className="text-xs space-y-1">
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <span className="font-semibold text-gray-300">{ic.itemName || `품목 #${ic.itemIndex + 1}`}</span>
-                                                            {ic.fieldDiffs?.map((fd, fIdx) => (
-                                                                <span key={fIdx} className="px-2 py-0.5 rounded bg-gray-800 text-[11px] font-mono text-gray-200">
-                                                                    <span className="text-gray-400">{fd.field}: </span>
-                                                                    <span className="text-rose-400 line-through mr-1">{String(fd.from)}</span>
-                                                                    <span className="text-emerald-400 font-bold">➔ {String(fd.to)}</span>
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                        {ic.ruleInferred && (
-                                                            <div className="text-[11px] text-indigo-300/90 bg-indigo-950/40 px-2 py-0.5 rounded inline-block">
-                                                                💡 추론 규칙: {ic.ruleInferred}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {/* Condition Changes */}
-                                        {rec.conditionChanges && rec.conditionChanges.length > 0 && (
-                                            <div className="flex items-center gap-2 flex-wrap text-xs pl-2 border-l-2 border-amber-500/40">
-                                                <span className="text-[11px] text-amber-400 font-medium">조건 보정:</span>
-                                                {rec.conditionChanges.map((cc, cIdx) => (
-                                                    <span key={cIdx} className="px-2 py-0.5 rounded bg-gray-800 text-[11px] font-mono text-gray-200">
-                                                        <span className="text-gray-400">{cc.field}: </span>
-                                                        <span className="text-rose-400 line-through mr-1">{String(cc.from)}</span>
-                                                        <span className="text-emerald-400 font-bold">➔ {String(cc.to)}</span>
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
+                                <div className="space-y-3">
+                                    <div className="text-xs font-bold text-gray-300 flex items-center justify-between">
+                                        <span>최근 감지 및 학습 이력 (최근 {correctionReport?.recentCorrections?.length || 0}건)</span>
+                                        <span className="text-[11px] text-gray-500 font-mono">server/data/order_rule_corrections.json</span>
                                     </div>
-                                ))
+
+                                    {(!correctionReport?.recentCorrections || correctionReport.recentCorrections.length === 0) ? (
+                                        <div className="p-8 text-center rounded-xl bg-gray-900/40 border border-gray-800 text-gray-400 text-xs">
+                                            <AlertCircle className="w-8 h-8 text-gray-500 mx-auto mb-2 opacity-50" />
+                                            아직 기록된 수정 학습 내역이 없습니다.
+                                        </div>
+                                    ) : (
+                                        correctionReport.recentCorrections.map((rec) => (
+                                            <div key={rec.id} className="p-3.5 rounded-xl bg-gray-900/80 border border-gray-800 space-y-2.5">
+                                                <div className="flex items-center justify-between text-xs">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-indigo-300">{rec.customerName || '고객사'}</span>
+                                                        <span className="text-[10px] text-gray-400 font-mono">#{rec.orderNo || rec.orderId}</span>
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">
+                                                            {rec.channelTag || '카카오톡'}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[10px] text-gray-400">
+                                                        {new Date(rec.timestamp).toLocaleString('ko-KR')}
+                                                    </span>
+                                                </div>
+
+                                                {/* Item Changes */}
+                                                {rec.itemChanges && rec.itemChanges.length > 0 && (
+                                                    <div className="space-y-1.5 pl-2 border-l-2 border-indigo-500/40">
+                                                        {rec.itemChanges.map((ic, idx) => (
+                                                            <div key={idx} className="text-xs space-y-1">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <span className="font-semibold text-gray-300">{ic.itemName || `품목 #${ic.itemIndex + 1}`}</span>
+                                                                    {ic.fieldDiffs?.map((fd, fIdx) => (
+                                                                        <span key={fIdx} className="px-2 py-0.5 rounded bg-gray-800 text-[11px] font-mono text-gray-200">
+                                                                            <span className="text-gray-400">{fd.field}: </span>
+                                                                            <span className="text-rose-400 line-through mr-1">{String(fd.from)}</span>
+                                                                            <span className="text-emerald-400 font-bold">➔ {String(fd.to)}</span>
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                                {ic.ruleInferred && (
+                                                                    <div className="text-[11px] text-indigo-300/90 bg-indigo-950/40 px-2 py-0.5 rounded inline-block">
+                                                                        💡 추론 규칙: {ic.ruleInferred}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {/* Condition Changes */}
+                                                {rec.conditionChanges && rec.conditionChanges.length > 0 && (
+                                                    <div className="flex items-center gap-2 flex-wrap text-xs pl-2 border-l-2 border-amber-500/40">
+                                                        <span className="text-[11px] text-amber-400 font-medium">조건 보정:</span>
+                                                        {rec.conditionChanges.map((cc, cIdx) => (
+                                                            <span key={cIdx} className="px-2 py-0.5 rounded bg-gray-800 text-[11px] font-mono text-gray-200">
+                                                                <span className="text-gray-400">{cc.field}: </span>
+                                                                <span className="text-rose-400 line-through mr-1">{String(cc.from)}</span>
+                                                                <span className="text-emerald-400 font-bold">➔ {String(cc.to)}</span>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             )}
                         </div>
 

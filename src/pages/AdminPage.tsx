@@ -32,13 +32,25 @@ export default function AdminPage() {
     const user = useStore((state) => state.auth.user);
     const { findProduct } = useInventoryIndex(inventory);
     const [crmCustomers, setCrmCustomers] = useState<CrmCustomer[]>([]);
+    const [kakaoPendingCount, setKakaoPendingCount] = useState<number>(0);
 
-
-    // Sync Orders on Mount
-    useState(() => {
-        // Using useEffect inside component body effectively
-        // doing this in render body is bad, but I'll use useEffect below 
-    });
+    // Sync Kakao pending orders count
+    useEffect(() => {
+        const fetchKakao = () => {
+            fetch('/api/kakao/orders?limit=50')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && Array.isArray(data.orders)) {
+                        const count = data.orders.filter((o: any) => o.status !== 'APPROVED').length;
+                        setKakaoPendingCount(count);
+                    }
+                })
+                .catch(() => {});
+        };
+        fetchKakao();
+        const timer = setInterval(fetchKakao, 15000);
+        return () => clearInterval(timer);
+    }, []);
 
     useEffect(() => {
         if (!user) return;
@@ -361,6 +373,37 @@ export default function AdminPage() {
                 <h1 className="text-2xl font-bold text-slate-900">관리자 대시보드</h1>
                 <p className="text-sm text-slate-500">전체 주문 내역 및 상태 관리</p>
             </div>
+
+            {/* 📋 Kakao Orders Ingestion Waiting Banner */}
+            {kakaoPendingCount > 0 && (
+                <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-teal-500/10 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                    <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-600 flex items-center justify-center font-bold text-lg flex-shrink-0">
+                            📋
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-slate-900">
+                                    [영업3팀] 카카오톡 발주 접수 대기건 ({kakaoPendingCount}건)
+                                </span>
+                                <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold border border-amber-200">
+                                    화물 운송조건 확정 필요
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-600 mt-0.5">
+                                고객이 카카오톡으로 전송한 발주서의 사진 및 품목이 준비되어 있습니다. 도착지와 운송비를 1클릭으로 확정하고 정식 발주서로 등록하세요.
+                            </p>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={() => navigate('/admin/kakao-orders')}
+                        className="flex-shrink-0 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5"
+                    >
+                        <span>👉 발주 대기열 확인 및 운송 확정</span>
+                    </button>
+                </div>
+            )}
 
             {user?.role === 'MASTER' && (
                 <AnalyticsPanel orders={filteredOrders} inventory={inventory} />

@@ -38,6 +38,7 @@ const AdminProfile = lazy(() => import('./pages/admin/Profile'));
 const PilotSplitPO = lazy(() => import('./pages/admin/PilotSplitPO'));
 const AdminAiReports = lazy(() => import('./pages/admin/AiReports'));
 const AgentOfficeDashboard = lazy(() => import('./pages/admin/AgentOfficeDashboard'));
+const KakaoOrdersPage = lazy(() => import('./pages/admin/KakaoOrdersPage'));
 
 // ... (keep existing code)
 
@@ -126,6 +127,7 @@ function AnimatedRoutes() {
               <Route path="settings" element={<PageTransition><AdminSettings /></PageTransition>} />
               <Route path="profile" element={<PageTransition><AdminProfile /></PageTransition>} />
               <Route path="pilot-split-po" element={<PageTransition><PilotSplitPO /></PageTransition>} />
+              <Route path="kakao-orders" element={<PageTransition><KakaoOrdersPage /></PageTransition>} />
               <Route path="ai-reports" element={<PageTransition><AdminAiReports /></PageTransition>} />
               <Route path="agent-office" element={<PageTransition><AgentOfficeDashboard /></PageTransition>} />
             </Route>
