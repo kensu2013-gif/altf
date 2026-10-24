@@ -654,6 +654,11 @@ export class InventorySyncService {
         }
       }
 
+      // 3. Apps Script 호출 후 구글시트 대용량 수식 연산 및 구글 드라이브 파일 생성 대기 (최소 90초)
+      this.state.step3.message = 'ALTF 재고 DB 수식 연산 및 구글 드라이브 파일 생성 대기 중 (90초)...';
+      this._updateAgentStatus('DAT-05', '[연산 대기] ALTF 재고 DB 대용량 수식 연산 및 드라이브 파일 반영 대기 중...', 'ALTF DB 연산 처리 대기');
+      await new Promise(r => setTimeout(r, 90000)); // 90초 필수 연산 대기
+
       this.state.step3.status = 'SUCCESS';
       this.state.step3.lastRun = new Date().toISOString();
       this.state.step3.message = 'ALTF 재고 DATA BASE 시트 연산 완료 및 최신 inventory.json 준비 완료';
@@ -796,8 +801,15 @@ export class InventorySyncService {
       // 유효한 JSON인지 파싱 검증
       const parsed = JSON.parse(text);
       const items = Array.isArray(parsed) ? parsed : (parsed.items || []);
-      if (!items || items.length < 5000) {
+      if (!items || items.length < 10000) {
         throw new Error(`다운로드된 데이터 품목수(${items.length}건)가 부족합니다.`);
+      }
+
+      // 🛡️ [ALTF 재고 DB 연산 완결 실물 검증]
+      // 구글시트 연산이 완료되어 정상 추출된 파일은 부산 태일 재고(location1: 부산, maker1: 태일)가 최소 300건 이상이어야 함
+      const busanCount = items.filter(it => it.location1 === '부산' || it.maker1 === '태일').length;
+      if (busanCount < 300) {
+        throw new Error(`구글 드라이브 파일의 부산(태일) 재고 품목수(${busanCount}건)가 미달합니다. ALTF 재고 DB 시트의 연산 및 내보내기가 아직 진행 중입니다.`);
       }
 
       const homedir = os.homedir();
