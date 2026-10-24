@@ -170,9 +170,17 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
         setTimeout(() => setToastMessage(null), 3200);
     }, []);
 
+const getApiBase = () => {
+    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+    if (typeof window !== 'undefined' && window.location.hostname.includes('altf.kr')) {
+        return 'https://altf-api.onrender.com';
+    }
+    return '';
+};
+
     const fetchLearnedRules = useCallback(async () => {
         try {
-            const res = await fetch('/api/kakao/orders/learned-rules');
+            const res = await fetch(`${getApiBase()}/api/kakao/orders/learned-rules`);
             if (res.ok) {
                 const data = await res.json();
                 if (data.success && data.rules) {
@@ -187,7 +195,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
     const fetchOrders = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetch('/api/kakao/orders');
+            const res = await fetch(`${getApiBase()}/api/kakao/orders`);
             if (res.ok) {
                 const data = await res.json();
                 if (data.success && Array.isArray(data.orders)) {
@@ -392,7 +400,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
         if (!activeOrder) return;
         setSaving(true);
         try {
-            const res = await fetch(`/api/kakao/orders/${activeOrder.id}/update`, {
+            const res = await fetch(`${getApiBase()}/api/kakao/orders/${activeOrder.id}/update`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -423,7 +431,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
     // 🧠 SLE-15 발주서 수정관찰 누적 학습 리포트 조회
     const fetchCorrectionReport = async () => {
         try {
-            const res = await fetch('/api/kakao/orders/corrections');
+            const res = await fetch(`${getApiBase()}/api/kakao/orders/corrections`);
             if (res.ok) {
                 const data = await res.json();
                 setCorrectionReport(data);
@@ -449,7 +457,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
         setSaving(true);
         try {
             // First update edits
-            await fetch(`/api/kakao/orders/${activeOrder.id}/update`, {
+            await fetch(`${getApiBase()}/api/kakao/orders/${activeOrder.id}/update`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -465,7 +473,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
             });
 
             // Then approve
-            const res = await fetch(`/api/kakao/orders/${activeOrder.id}/approve`, {
+            const res = await fetch(`${getApiBase()}/api/kakao/orders/${activeOrder.id}/approve`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ approvedBy: '사무실 관리자' })
@@ -494,7 +502,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
 
         setSaving(true);
         try {
-            const res = await fetch(`/api/kakao/orders/${activeOrder.id}/reject`, {
+            const res = await fetch(`${getApiBase()}/api/kakao/orders/${activeOrder.id}/reject`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reason })
@@ -519,7 +527,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
 
         setSaving(true);
         try {
-            const res = await fetch(`/api/kakao/orders/${activeOrder.id}`, {
+            const res = await fetch(`${getApiBase()}/api/kakao/orders/${activeOrder.id}`, {
                 method: 'DELETE'
             });
             if (res.ok) {
@@ -541,7 +549,7 @@ export const KakaoOrderReviewTab: React.FC<KakaoOrderReviewTabProps> = () => {
         if (!activeOrder) return;
         setAnalyzing(true);
         try {
-            const res = await fetch(`/api/kakao/orders/${activeOrder.id}/analyze`, {
+            const res = await fetch(`${getApiBase()}/api/kakao/orders/${activeOrder.id}/analyze`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

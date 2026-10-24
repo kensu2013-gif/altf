@@ -115,8 +115,9 @@ export default function AdminLayout() {
         return count;
     }, 0);
 
+    const apiBase = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && window.location.hostname.includes('altf.kr') ? 'https://altf-api.onrender.com' : '');
     const { data: kakaoPendingCount = 0 } = useSWR<number>(
-        '/api/kakao/orders?limit=100',
+        `${apiBase}/api/kakao/orders?limit=100`,
         async (url: string) => {
             const res = await fetch(url);
             if (!res.ok) return 0;

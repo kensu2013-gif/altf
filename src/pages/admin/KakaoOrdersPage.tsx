@@ -1,6 +1,5 @@
-import React from 'react';
 import { KakaoOrderReviewTab } from '../../components/admin/KakaoOrderReviewTab';
-import { ArrowLeft, MessageSquareQuote, ShieldAlert, Sparkles, Building2, Truck, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Sparkles, Truck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 /**

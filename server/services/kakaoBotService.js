@@ -180,6 +180,10 @@ export class KakaoBotService {
             safeAtomicWrite(DRAFT_QUOTES_FILE, this.draftQuotations.slice(0, 500));
             safeAtomicWrite(USERS_FILE, this.users);
             safeAtomicWrite(KAKAO_ORDERS_FILE, this.orders.slice(0, 500));
+            // ⚡ S3 DB 및 외부 연동 동기화 훅 호출
+            if (typeof this.onDataChanged === 'function') {
+                this.onDataChanged();
+            }
         } catch (e) {
             console.error('[KakaoBotService] 데이터 저장 실패:', e.message);
         }
@@ -1867,7 +1871,11 @@ export class KakaoBotService {
                 console.error('[KakaoBot] KAKAO_ORDERS_FILE 로드 오류:', e.message);
             }
         }
-        const sorted = [...this.orders].sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
+        // S3 DB 폴백 (클라우드 인스턴스 또는 컨테이너 재시작 시 데이터 보존)
+        if ((!this.orders || this.orders.length === 0) && Array.isArray(global.__ALTF_DB?.kakaoOrders) && global.__ALTF_DB.kakaoOrders.length > 0) {
+            this.orders = global.__ALTF_DB.kakaoOrders;
+        }
+        const sorted = [...(this.orders || [])].sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
         return {
             total: sorted.length,
             orders: sorted.slice(offset, offset + limit)

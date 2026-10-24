@@ -278,7 +278,7 @@ export async function saveDbToS3(dbObject) {
             Body: JSON.stringify(dbObject),
             ContentType: 'application/json'
         });
-        await sendWithTimeout(command, 10000);
+        await sendWithTimeout(command, 90000);
         console.log('[S3] Data saved successfully to S3');
     } catch (error) {
         const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';

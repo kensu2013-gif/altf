@@ -37,7 +37,8 @@ export default function AdminPage() {
     // Sync Kakao pending orders count
     useEffect(() => {
         const fetchKakao = () => {
-            fetch('/api/kakao/orders?limit=50')
+            const apiBase = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && window.location.hostname.includes('altf.kr') ? 'https://altf-api.onrender.com' : '');
+            fetch(`${apiBase}/api/kakao/orders?limit=50`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.success && Array.isArray(data.orders)) {

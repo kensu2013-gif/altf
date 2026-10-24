@@ -422,10 +422,15 @@ async function loadData() {
             } else if (existingKensu.status !== 'APPROVED') {
                 existingKensu.status = 'APPROVED';
                 console.log(`[API] Approved User: ${kensuUserEmail}`);
-                await saveData();
+            // S3 카카오 발주서 동기화
+            if (Array.isArray(db.kakaoOrders) && db.kakaoOrders.length > 0) {
+                if (!kakaoBotService.orders || kakaoBotService.orders.length === 0) {
+                    kakaoBotService.orders = db.kakaoOrders;
+                    kakaoBotService.saveData();
+                    console.log(`[API] ⚡ S3로부터 카카오 발주서 ${db.kakaoOrders.length}건 로컬 동기화 완료`);
+                }
             }
-
-            // June 19 self-healing block removed
+            global.__ALTF_DB = db;
         } else {
             // Seed Initial Admin if file doesn't exist
             db.users = [
@@ -546,18 +551,11 @@ async function saveData() {
             console.warn('[Safety Merge Guard] Warning during S3 verification:', mergeErr.message);
         }
 
-        // 🛡️ [배포 전 altf.kr 격리 가드]: 개발/테스트 중인 카카오 발주서는 사용자 명시적 배포 요청 전까지 S3(altf.kr)에 업로드 차단
-        const ordersForS3 = (db.orders || []).filter(o => 
-            !o.id?.includes('KKO') && 
-            !o.poNumber?.includes('KKO') && 
-            o.orderChannel !== '카카오톡' && 
-            o.source !== '카카오톡' &&
-            o.customerName !== '에스와이금속' &&
-            o.customerName !== '원진철강'
-        );
+        // 🛡️ altf.kr 실시간 반영: 봇들이 수신/승인한 카카오 발주서 및 전체 정식 발주서를 S3(altf.kr)에 완전 동기화
         const s3Payload = {
             ...db,
-            orders: ordersForS3
+            orders: db.orders || [],
+            kakaoOrders: kakaoBotService.orders || db.kakaoOrders || []
         };
         await saveDbToS3(s3Payload);
         // console.log('[API] Data saved to S3');
@@ -624,6 +622,18 @@ kakaoBotService.onQuotationUpdated = (updatedQuote) => {
         }
     } catch (e) {
         console.error('[API] 카카오 견적서 업데이트 동기화 오류:', e.message);
+    }
+};
+
+// ⚡ 카카오톡 발주서(PO) 수신/수정/삭제 시 db.kakaoOrders 및 S3 실시간 동기화
+kakaoBotService.onDataChanged = () => {
+    try {
+        db.kakaoOrders = kakaoBotService.orders || [];
+        db.kakaoIntakes = kakaoBotService.intakes || [];
+        queueSave();
+        console.log(`[API] ⚡ 카카오톡 발주서(${db.kakaoOrders.length}건) S3 DB 동기화 완료`);
+    } catch (e) {
+        console.error('[API] 카카오 발주서 S3 동기화 오류:', e.message);
     }
 };
 
